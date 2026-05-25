@@ -11618,5 +11618,82 @@ async function recognizeCellImageV24(worker, rawImg){
 }
 
 </script>
+  /* ===== OCR 空白・ノイズ誤認対策 patch ===== */
+
+// OCR後クリーニング
+function cleanOCRText(text) {
+  if (!text) return "";
+
+  return text
+    // 半角/全角スペース
+    .replace(/[ \u3000]/g, "")
+    // 改行・タブ
+    .replace(/[\r\n\t]/g, "")
+    // ゼロ幅文字
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    // OCRゴミ（孤立記号）
+    .replace(/[|¦`'"]/g, "")
+    .trim();
+}
+
+// 日本語っぽい文字判定
+function isLikelyJapaneseText(text) {
+  return /[ぁ-んァ-ン一-龯0-9→]/.test(text);
+}
+
+// 英字ゴミ判定
+function isShortEnglishGarbage(text) {
+  return /^[A-Za-z]{1,3}$/.test(text);
+}
+
+// 微小ノイズ領域除外
+function isTinyNoise(box) {
+  if (!box) return false;
+  return box.width < 3 || box.height < 5;
+}
+
+/* ===== 既存OCR結果処理へ組み込み ===== */
+
+const originalNormalizeOCR = window.normalizeOCRResult || ((t) => t);
+
+window.normalizeOCRResult = function(text, box = null) {
+  // bbox小さすぎるなら捨てる
+  if (isTinyNoise(box)) return "";
+
+  // 元処理
+  let result = originalNormalizeOCR(text);
+
+  // 空白・ノイズ除去
+  result = cleanOCRText(result);
+
+  return result;
+};
+
+/* ===== 候補探索前の補正 ===== */
+
+const originalFindCandidates = window.findCandidates || null;
+
+if (originalFindCandidates) {
+  window.findCandidates = function(rawText, ...args) {
+    let text = cleanOCRText(rawText);
+
+    // 空白除去後に長さ再計算
+    const len = text.length;
+
+    // 英字ゴミなら words.txt 優先
+    if (isShortEnglishGarbage(text)) {
+      text = "";
+    }
+
+    // 日本語が含まれるなら優先維持
+    if (isLikelyJapaneseText(rawText)) {
+      text = cleanOCRText(rawText);
+    }
+
+    return originalFindCandidates(text, ...args);
+  };
+}
+
+console.log("OCR 空白/ノイズ誤認 patch loaded");
 </body>
 </html>
