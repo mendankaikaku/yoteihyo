@@ -12,7 +12,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>予定表PDF OCR（整理版 index_clean_v1）</title>
+  <title>予定表PDF OCR（整理版 index_clean_v1 + 統合用データ v73）</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -1212,6 +1212,114 @@ document.addEventListener("input", (e)=>{
   validateSingleCell(cell);
 }, true);
 
+
+
+// ===== V72: Excel出力に「統合用データ」シートを追加 =====
+// 予定表シートは従来通り残し、全体統合アプリが読みやすい縦長データも同時に出力する。
+function v72ExcelColumnName(colIndexZeroBased){
+  let n = Number(colIndexZeroBased) + 1;
+  let s = "";
+  while(n > 0){
+    const m = (n - 1) % 26;
+    s = String.fromCharCode(65 + m) + s;
+    n = Math.floor((n - 1) / 26);
+  }
+  return s || "A";
+}
+
+function v72CleanCellValue(value){
+  return String(value ?? "")
+    .replace(/候補:.*/s, "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .trim();
+}
+
+function v72SplitScheduleLines(value){
+  const text = v72CleanCellValue(value);
+  if(!text) return [];
+  return text
+    .split(/\n+/)
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+
+function v72GetWeekStartFromAOA(aoa){
+  const firstRow = Array.isArray(aoa) && aoa[0] ? aoa[0] : [];
+  for(let c=1; c<firstRow.length; c++){
+    const d = v72CleanCellValue(firstRow[c]);
+    if(d) return d;
+  }
+  return "";
+}
+
+function v72BuildIntegrationAOA(aoa, options = {}){
+  const studentName = v72CleanCellValue(options.studentName || "");
+  const exportFileName = v72CleanCellValue(options.exportFileName || "");
+  const weekStart = v72CleanCellValue(options.weekStart || v72GetWeekStartFromAOA(aoa));
+
+  const out = [[
+    "生徒名",
+    "週開始日",
+    "日付",
+    "曜日",
+    "時限/行名",
+    "行番号",
+    "列番号",
+    "内容",
+    "元セル",
+    "出力ファイル名"
+  ]];
+
+  if(!Array.isArray(aoa) || !aoa.length) return out;
+
+  const dateRow = aoa[0] || [];
+  const weekdayRow = aoa[1] || [];
+
+  for(let r=2; r<aoa.length; r++){
+    const row = aoa[r] || [];
+    const rowLabel = v72CleanCellValue(row[0]);
+
+    for(let c=1; c<row.length; c++){
+      const items = v72SplitScheduleLines(row[c]);
+      if(!items.length) continue;
+
+      const dateText = v72CleanCellValue(dateRow[c]);
+      const weekdayText = v72CleanCellValue(weekdayRow[c]);
+      const excelCell = `${v72ExcelColumnName(c)}${r + 1}`;
+
+      for(const item of items){
+        out.push([
+          studentName,
+          weekStart,
+          dateText,
+          weekdayText,
+          rowLabel,
+          r + 1,
+          c + 1,
+          item,
+          excelCell,
+          exportFileName
+        ]);
+      }
+    }
+  }
+
+  return out;
+}
+
+function v72BuildIntegrationSheet(XLSXLib, aoa, options = {}){
+  const integrationAOA = v72BuildIntegrationAOA(aoa, options);
+  const ws = XLSXLib.utils.aoa_to_sheet(integrationAOA);
+  ws["!cols"] = [
+    {wch:16}, {wch:12}, {wch:12}, {wch:8}, {wch:12},
+    {wch:8}, {wch:8}, {wch:30}, {wch:10}, {wch:24}
+  ];
+  ws["!autofilter"] = {
+    ref: XLSXLib.utils.encode_range({s:{r:0,c:0}, e:{r:Math.max(0, integrationAOA.length-1), c:9}})
+  };
+  return ws;
+}
 document.getElementById("excelBtn").onclick = () => {
   const aoa=tableToAOA();
   if(!aoa.length) return alert("表がありません");
@@ -1219,6 +1327,13 @@ document.getElementById("excelBtn").onclick = () => {
   const ws=XLSX.utils.aoa_to_sheet(aoa);
   ws["!cols"] = aoa[0].map((_,i)=>({wch: i===0 ? 16 : 18}));
   XLSX.utils.book_append_sheet(wb,ws,"予定表");
+
+  const integrationWs = v72BuildIntegrationSheet(XLSX, aoa, {
+    studentName: (document.getElementById("excelNameInput")?.value || ""),
+    exportFileName: "yoteihyo_schedule.xlsx"
+  });
+  XLSX.utils.book_append_sheet(wb, integrationWs, "統合用データ");
+
   XLSX.writeFile(wb,"yoteihyo_schedule.xlsx");
 };
 
@@ -5380,17 +5495,28 @@ if(typeof leapRankCandidates === "function" && !window.__leapParenNumberV23){
 
       const wb = window.XLSX.utils.book_new();
       const ws = window.XLSX.utils.aoa_to_sheet(aoa);
-
       v33ApplyExcelStyles(ws, aoa);
       window.XLSX.utils.book_append_sheet(wb, ws, "予定表");
+
+      const filename = v33BuildFileName();
+
+      // V73補強: 後段のV33 Excel出力にも「統合用データ」シートを必ず追加する。
+      // 前段のexcelBtn.onclickだけだと、V33側のonclick上書きで2枚目が消えるためここで追加する。
+      if(typeof v72BuildIntegrationSheet === "function"){
+        const integrationWs = v72BuildIntegrationSheet(window.XLSX, aoa, {
+          studentName: (document.getElementById("excelNameInput")?.value || ""),
+          exportFileName: filename
+        });
+        window.XLSX.utils.book_append_sheet(wb, integrationWs, "統合用データ");
+      }
 
       // Excel側の印刷縮小設定が効きやすいように workbook 側にも設定
       wb.Workbook = wb.Workbook || {};
       wb.Workbook.Views = wb.Workbook.Views || [{RTL:false}];
 
-      const filename = v33BuildFileName();
       window.XLSX.writeFile(wb, filename);
-      if(typeof log === "function") log(`Excel出力しました: ${filename}\n罫線・中央ぞろえ・縮小して全体表示を設定しました。`);
+      if(typeof log === "function") log(`Excel出力しました: ${filename}
+予定表シートと統合用データシートを出力しました。`);
     }catch(e){
       console.error(e);
       alert("Excel出力でエラーが発生しました: " + (e && e.message ? e.message : e));
