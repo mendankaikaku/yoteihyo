@@ -1,0 +1,669 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>予定表Excel 全体統合アプリ</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+  <style>
+    :root{
+      --bg:#f6f7fb;--card:#fff;--line:#d9dee8;--text:#1f2937;--muted:#667085;
+      --accent:#2563eb;--accent2:#1d4ed8;--ok:#16a34a;--warn:#dc2626;--soft:#eff6ff;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI","Noto Sans JP",sans-serif;}
+    header{background:#fff;border-bottom:1px solid var(--line);padding:18px 24px;}
+    h1{font-size:20px;margin:0 0 6px;}
+    .hint{font-size:12px;color:var(--muted);line-height:1.6;}
+    .wrap{display:grid;grid-template-columns:340px minmax(0,1fr);gap:16px;padding:16px;}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:0 1px 2px rgba(0,0,0,.04);}
+    label{font-size:13px;color:var(--muted);display:block;margin:12px 0 6px;}
+    input,select,textarea{width:100%;border:1px solid var(--line);border-radius:10px;padding:9px;background:#fff;font:inherit;}
+    input[type=file]{padding:8px;}
+    input[type=checkbox]{width:auto;margin-right:6px;}
+    button{border:0;border-radius:11px;padding:10px 12px;background:var(--accent);color:#fff;font-weight:800;cursor:pointer;margin:6px 4px 6px 0;}
+    button.secondary{background:#475467;}
+    button.ghost{background:#eef2ff;color:#1e40af;}
+    button.ok{background:var(--ok);}
+    button:disabled{opacity:.45;cursor:not-allowed;}
+    #status{white-space:pre-wrap;background:#0f172a;color:#e5e7eb;border-radius:12px;padding:12px;min-height:90px;font-size:12px;line-height:1.5;}
+    .previewWrap{overflow:auto;max-height:calc(100vh - 210px);border:1px solid var(--line);border-radius:12px;background:#fff;}
+    table{border-collapse:collapse;background:#fff;width:max-content;min-width:100%;}
+    th,td{border:1px solid #98a2b3;padding:6px 8px;vertical-align:top;min-width:110px;max-width:260px;white-space:pre-wrap;word-break:break-word;font-size:12px;}
+    th{background:#f2f4f7;position:sticky;top:0;z-index:2;}
+    th:first-child,td:first-child{position:sticky;left:0;z-index:1;background:#fff;font-weight:700;min-width:140px;}
+    th:first-child{z-index:3;background:#e5e7eb;}
+    .pill{display:inline-block;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;border-radius:999px;padding:3px 8px;margin:2px;font-size:12px;}
+    .stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:12px;}
+    .stat{background:#f8fafc;border:1px solid var(--line);border-radius:12px;padding:10px;}
+    .stat b{display:block;font-size:18px;}
+    .tabs{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;}
+    .hidden{display:none!important;}
+    details{border:1px solid var(--line);border-radius:12px;padding:10px;background:#fafafa;margin-top:10px;}
+    summary{cursor:pointer;font-weight:700;}
+    .drop{border:2px dashed #c7d2fe;background:#f8fbff;border-radius:14px;padding:14px;text-align:center;color:#475569;margin-top:8px;}
+    .drop.drag{background:#eef2ff;border-color:#2563eb;}
+    .warn{color:var(--warn);font-weight:700;}
+    .smallrow{display:flex;align-items:center;gap:8px;}
+    @media (max-width:1050px){.wrap{grid-template-columns:1fr}.previewWrap{max-height:65vh}.stats{grid-template-columns:repeat(2,1fr)}}
+  </style>
+</head>
+<body>
+<header>
+  <h1>予定表Excel 全体統合アプリ</h1>
+  <div class="hint">整理用HTMLから出力したExcelの「統合用データ」シートと、生徒対応表（学年・生徒名・読み仮名・担当・高校・備考）を合わせて、横軸カレンダー・縦軸生徒名の全体予定表を作ります。Excelファイルは外部送信せず、このブラウザ内だけで処理します。</div>
+</header>
+
+<div class="wrap">
+  <aside class="card">
+    <label>親フォルダーを選択</label>
+    <input id="folderInput" type="file" webkitdirectory directory multiple accept=".xlsx,.xls,.xlsm" />
+    <div id="dropZone" class="drop">または、Excelファイル/フォルダーをここへドラッグ</div>
+    <div class="hint">推奨構造：予定表/生徒名/週ごとのExcel.xlsx。Chrome/Edgeならフォルダー選択できます。</div>
+
+    <label>生徒対応表を選択（任意）</label>
+    <input id="rosterInput" type="file" accept=".xlsx,.xls,.xlsm,.csv" />
+    <div class="hint">列名：学年 / 生徒名 / 読み仮名 / 担当 / 高校 / 備考。実名や学年はこのブラウザ内で処理し、外部送信しません。</div>
+
+    <label>読み取るシート名</label>
+    <input id="sheetName" type="text" value="統合用データ" />
+
+    <label>生徒名の決め方</label>
+    <select id="studentMode">
+      <option value="folder" selected>親フォルダー直下のフォルダー名を生徒名にする</option>
+      <option value="sheet">統合用データの「生徒名」列を優先する</option>
+      <option value="file">Excelファイル名から推定する</option>
+    </select>
+
+    <label>期間フィルター</label>
+    <div class="smallrow">
+      <input id="fromDate" type="date" />
+      <span class="hint">〜</span>
+      <input id="toDate" type="date" />
+    </div>
+    <div class="hint">空欄なら読み取れた全期間を出力します。</div>
+
+    <label>表示・出力設定</label>
+    <div class="hint"><label><input id="splitLines" type="checkbox" checked />1セル内の改行予定を予定一覧では分割する</label></div>
+    <div class="hint"><label><input id="includeRowName" type="checkbox" checked />全体カレンダーのセルに時限/行名も入れる</label></div>
+    <div class="hint"><label><input id="sortStudents" type="checkbox" checked />生徒名を五十音順に並べる</label></div>
+    <div class="hint"><label><input id="colorWeekend" type="checkbox" checked />出力Excelで土日列を薄く色分けする</label></div>
+
+    <button id="mergeBtn" class="ok">統合プレビュー作成</button>
+    <button id="downloadBtn" disabled>全体予定表Excelを出力</button>
+    <button id="clearBtn" class="secondary">クリア</button>
+
+    <label>状態</label>
+    <div id="status">待機中</div>
+
+    <details>
+      <summary>想定する「統合用データ」列</summary>
+      <div class="hint" style="margin-top:8px;">
+        生徒名 / 週開始日 / 日付 / 曜日 / 時限/行名 / 行番号 / 列番号 / 内容 / 元セル / 出力ファイル名<br>
+        列名が多少違っても、日付・曜日・内容・行名をできるだけ自動推定します。
+      </div>
+    </details>
+  </aside>
+
+  <main class="card">
+    <div class="stats">
+      <div class="stat"><span class="hint">読み込みExcel</span><b id="statFiles">0</b></div>
+      <div class="stat"><span class="hint">予定件数</span><b id="statRows">0</b></div>
+      <div class="stat"><span class="hint">生徒数</span><b id="statStudents">0</b></div>
+      <div class="stat"><span class="hint">日付数</span><b id="statDates">0</b></div>
+    </div>
+
+    <div class="tabs">
+      <button class="ghost" data-pane="calendarPane">全体カレンダー</button>
+      <button class="ghost" data-pane="listPane">予定一覧</button>
+      <button class="ghost" data-pane="rosterPane">生徒対応表</button>
+      <button class="ghost" data-pane="logPane">読み取りログ</button>
+    </div>
+
+    <section id="calendarPane" class="previewWrap"><div class="hint" style="padding:14px;">まだ統合していません。</div></section>
+    <section id="listPane" class="previewWrap hidden"><div class="hint" style="padding:14px;">まだ統合していません。</div></section>
+    <section id="rosterPane" class="previewWrap hidden"><div class="hint" style="padding:14px;">まだ対応表は読み込んでいません。</div></section>
+    <section id="logPane" class="previewWrap hidden"><div class="hint" style="padding:14px;">まだログはありません。</div></section>
+  </main>
+</div>
+
+<script>
+const state = {
+  files: [],
+  records: [],
+  calendarAoa: [],
+  listAoa: [],
+  logAoa: [],
+  rosterAoa: [],
+  rosterMap: new Map(),
+  workbookReady: false
+};
+
+const $ = id => document.getElementById(id);
+function log(msg){ $("status").textContent = msg; }
+function esc(s){ return String(s ?? "").replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
+function norm(s){ return String(s ?? "").replace(/\r\n/g,"\n").replace(/\r/g,"\n").trim(); }
+function pad2(n){ return String(n).padStart(2,"0"); }
+function ymd(d){ return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`; }
+function mmdd(d){ return `${d.getMonth()+1}/${d.getDate()}`; }
+const WEEK_JA = ["日","月","火","水","木","金","土"];
+
+function parseDateLoose(value, fallbackYear = new Date().getFullYear()){
+  if(value == null || value === "") return null;
+  if(value instanceof Date && !isNaN(value)) return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+  if(typeof value === "number"){
+    const o = XLSX.SSF.parse_date_code(value);
+    if(o) return new Date(o.y, o.m-1, o.d);
+  }
+  let s = String(value).trim();
+  if(!s) return null;
+  s = s.replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0)-0xFEE0));
+  s = s.replace(/[年月]/g,"/").replace(/日/g,"").replace(/\(.+?\)|（.+?）/g,"").trim();
+  let m = s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})$/);
+  if(m) return new Date(Number(m[1]), Number(m[2])-1, Number(m[3]));
+  m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})$/);
+  if(m) return new Date(fallbackYear, Number(m[1])-1, Number(m[2]));
+  m = s.match(/(\d{1,2})\s*月\s*(\d{1,2})\s*日?/);
+  if(m) return new Date(fallbackYear, Number(m[1])-1, Number(m[2]));
+  return null;
+}
+
+function getHeaderMap(aoa){
+  const header = (aoa[0] || []).map(x => norm(x));
+  const map = {};
+  header.forEach((h,i)=>{ if(h) map[h]=i; });
+  function find(names){
+    for(const name of names){ if(map[name] !== undefined) return map[name]; }
+    for(let i=0;i<header.length;i++){
+      const h = header[i];
+      if(names.some(n => h.includes(n))) return i;
+    }
+    return -1;
+  }
+  return {
+    student: find(["生徒名","名前","生徒"]),
+    weekStart: find(["週開始日","週はじめ","開始日"]),
+    date: find(["日付","日にち","日"]),
+    weekday: find(["曜日"]),
+    rowName: find(["時限/行名","時限","行名","時間","コマ"]),
+    rowNo: find(["行番号","行"]),
+    colNo: find(["列番号","列"]),
+    content: find(["内容","予定","科目","やること"]),
+    sourceCell: find(["元セル","セル"]),
+    outFile: find(["出力ファイル名","ファイル名","元ファイル"]),
+  };
+}
+
+
+const ROSTER_COLUMNS = ["学年","生徒名","読み仮名","担当","高校","備考"];
+function normalizeNameKey(s){ return String(s ?? "").replace(/[\s\u3000]+/g, "").trim(); }
+function emptyRoster(student=""){
+  return {"学年":"","生徒名":student,"読み仮名":"","担当":"","高校":"","備考":""};
+}
+function getRosterHeaderMap(aoa){
+  const header = (aoa[0] || []).map(x => norm(x));
+  const find = (names) => {
+    for(const name of names){
+      const idx = header.findIndex(h => h === name);
+      if(idx >= 0) return idx;
+    }
+    for(let i=0;i<header.length;i++){
+      const h = header[i];
+      if(names.some(n => h.includes(n))) return i;
+    }
+    return -1;
+  };
+  return {
+    grade: find(["学年","学年名","grade"]),
+    student: find(["生徒名","氏名","名前","生徒","name"]),
+    kana: find(["読み仮名","よみがな","ふりがな","フリガナ","読み","かな"]),
+    teacher: find(["担当","担当者","担任"]),
+    school: find(["高校","学校","高校名"]),
+    note: find(["備考","メモ","その他","注意"])
+  };
+}
+function rosterMetaForStudent(student){
+  const key = normalizeNameKey(student);
+  return state.rosterMap.get(key) || emptyRoster(student);
+}
+function studentSortKey(student){
+  const meta = rosterMetaForStudent(student);
+  return normalizeNameKey(meta["読み仮名"] || meta["生徒名"] || student);
+}
+function parseCsvText(text){
+  const rows=[]; let row=[], cell="", q=false;
+  for(let i=0;i<text.length;i++){
+    const ch=text[i], nx=text[i+1];
+    if(q){
+      if(ch==='"' && nx==='"'){ cell+='"'; i++; }
+      else if(ch==='"') q=false;
+      else cell+=ch;
+    }else{
+      if(ch==='"') q=true;
+      else if(ch===','){ row.push(cell); cell=""; }
+      else if(ch==='\n'){ row.push(cell); rows.push(row); row=[]; cell=""; }
+      else if(ch==='\r'){}
+      else cell+=ch;
+    }
+  }
+  row.push(cell); rows.push(row);
+  return rows.filter(r => r.some(v => norm(v)));
+}
+async function parseRosterFile(file){
+  if(!file){
+    state.rosterAoa = [ROSTER_COLUMNS];
+    state.rosterMap = new Map();
+    renderAoa("rosterPane", state.rosterAoa, 300);
+    return {count:0, message:"対応表なし"};
+  }
+  let aoa=[];
+  if(/\.csv$/i.test(file.name)){
+    const text = await file.text();
+    aoa = parseCsvText(text);
+  }else{
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, {type:"array", cellDates:true});
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:"", raw:false});
+  }
+  if(!aoa.length){
+    state.rosterAoa = [ROSTER_COLUMNS];
+    state.rosterMap = new Map();
+    renderAoa("rosterPane", state.rosterAoa, 300);
+    return {count:0, message:"対応表が空です"};
+  }
+  const h = getRosterHeaderMap(aoa);
+  if(h.student < 0) throw new Error("対応表に『生徒名』列が見つかりません。列名は 学年 / 生徒名 / 読み仮名 / 担当 / 高校 / 備考 にしてください。");
+  const map = new Map();
+  const out = [ROSTER_COLUMNS];
+  for(let r=1;r<aoa.length;r++){
+    const row = aoa[r] || [];
+    const meta = {
+      "学年": h.grade >= 0 ? norm(row[h.grade]) : "",
+      "生徒名": h.student >= 0 ? norm(row[h.student]) : "",
+      "読み仮名": h.kana >= 0 ? norm(row[h.kana]) : "",
+      "担当": h.teacher >= 0 ? norm(row[h.teacher]) : "",
+      "高校": h.school >= 0 ? norm(row[h.school]) : "",
+      "備考": h.note >= 0 ? norm(row[h.note]) : ""
+    };
+    if(!meta["生徒名"]) continue;
+    map.set(normalizeNameKey(meta["生徒名"]), meta);
+    out.push(ROSTER_COLUMNS.map(c => meta[c] || ""));
+  }
+  state.rosterMap = map;
+  state.rosterAoa = out;
+  renderAoa("rosterPane", state.rosterAoa, 300);
+  return {count:map.size, message:`対応表読み込み: ${map.size}名`};
+}
+
+function getStudentNameFromPath(file){
+  const mode = $("studentMode").value;
+  const rel = file.webkitRelativePath || file.name;
+  const parts = rel.split("/").filter(Boolean);
+  if(mode === "file") return file.name.replace(/\.(xlsx|xlsm|xls)$/i, "").replace(/[._-]?\d{1,4}[年月\/-].*$/u, "").trim() || file.name;
+  // folder mode: if root/student/file.xlsx, student is parts[1]. if student/file.xlsx, student is parts[0].
+  if(parts.length >= 3) return parts[1];
+  if(parts.length >= 2) return parts[0];
+  return file.name.replace(/\.(xlsx|xlsm|xls)$/i, "");
+}
+
+async function readFileAsArrayBuffer(file){
+  return await file.arrayBuffer();
+}
+
+function shouldSkipFile(file){
+  return !/\.(xlsx|xlsm|xls)$/i.test(file.name) || /^~\$/.test(file.name);
+}
+
+async function parseExcelFile(file){
+  const logRows = [];
+  const records = [];
+  const sheetName = norm($("sheetName").value) || "統合用データ";
+  const folderStudent = getStudentNameFromPath(file);
+
+  try{
+    const buf = await readFileAsArrayBuffer(file);
+    const wb = XLSX.read(buf, {type:"array", cellDates:true});
+    const actualSheetName = wb.SheetNames.includes(sheetName) ? sheetName : wb.SheetNames.find(n => n.includes("統合"));
+    if(!actualSheetName){
+      logRows.push([file.webkitRelativePath || file.name, "失敗", `「${sheetName}」シートがありません`, ""]);
+      return {records, logRows};
+    }
+
+    const ws = wb.Sheets[actualSheetName];
+    const aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:"", raw:false});
+    if(aoa.length < 2){
+      logRows.push([file.webkitRelativePath || file.name, "失敗", "統合用データが空です", actualSheetName]);
+      return {records, logRows};
+    }
+
+    const h = getHeaderMap(aoa);
+    if(h.content < 0 || h.date < 0){
+      logRows.push([file.webkitRelativePath || file.name, "失敗", "日付列または内容列が見つかりません", actualSheetName]);
+      return {records, logRows};
+    }
+
+    let count = 0;
+    for(let r=1;r<aoa.length;r++){
+      const row = aoa[r] || [];
+      let content = norm(row[h.content]);
+      if(!content) continue;
+
+      const dateObj = parseDateLoose(row[h.date]);
+      if(!dateObj){
+        logRows.push([file.webkitRelativePath || file.name, "注意", `日付を読めない行: ${r+1}`, norm(row[h.date])]);
+        continue;
+      }
+
+      const sheetStudent = h.student >= 0 ? norm(row[h.student]) : "";
+      const student = ($("studentMode").value === "sheet" && sheetStudent) ? sheetStudent : folderStudent;
+      const rowName = h.rowName >= 0 ? norm(row[h.rowName]) : "";
+      const weekday = h.weekday >= 0 ? norm(row[h.weekday]) : WEEK_JA[dateObj.getDay()];
+      const sourceCell = h.sourceCell >= 0 ? norm(row[h.sourceCell]) : "";
+      const outFile = h.outFile >= 0 ? norm(row[h.outFile]) : file.name;
+      const weekStart = h.weekStart >= 0 ? norm(row[h.weekStart]) : "";
+      const rowNo = h.rowNo >= 0 ? norm(row[h.rowNo]) : "";
+      const colNo = h.colNo >= 0 ? norm(row[h.colNo]) : "";
+
+      const items = $("splitLines").checked ? content.split(/\n+/).map(norm).filter(Boolean) : [content];
+      for(const item of items){
+        records.push({
+          student, dateKey:ymd(dateObj), dateObj, dateLabel:`${mmdd(dateObj)}(${WEEK_JA[dateObj.getDay()]})`, weekday,
+          rowName, content:item, sourceCell, outFile, sourcePath:file.webkitRelativePath || file.name,
+          weekStart, rowNo, colNo
+        });
+        count++;
+      }
+    }
+    logRows.push([file.webkitRelativePath || file.name, "成功", `${count}件読み込み`, actualSheetName]);
+  }catch(e){
+    logRows.push([file.webkitRelativePath || file.name, "失敗", e.message || String(e), ""]);
+  }
+  return {records, logRows};
+}
+
+function filterRecords(records){
+  const from = $("fromDate").value ? new Date($("fromDate").value + "T00:00:00") : null;
+  const to = $("toDate").value ? new Date($("toDate").value + "T23:59:59") : null;
+  return records.filter(rec => (!from || rec.dateObj >= from) && (!to || rec.dateObj <= to));
+}
+
+function buildOutputs(records, logRows){
+  const students = [...new Set(records.map(r => r.student || "未分類"))];
+  if($("sortStudents").checked) students.sort((a,b)=>studentSortKey(a).localeCompare(studentSortKey(b),"ja") || String(a).localeCompare(String(b),"ja"));
+  const dateKeys = [...new Set(records.map(r => r.dateKey))].sort();
+  const dateMeta = new Map(records.map(r => [r.dateKey, r.dateLabel]));
+
+  const cellMap = new Map();
+  for(const rec of records){
+    const key = `${rec.student}\t${rec.dateKey}`;
+    const prefix = $("includeRowName").checked && rec.rowName ? `${rec.rowName}: ` : "";
+    const text = `${prefix}${rec.content}`;
+    if(!cellMap.has(key)) cellMap.set(key, []);
+    if(!cellMap.get(key).includes(text)) cellMap.get(key).push(text);
+  }
+
+  const calendarAoa = [["学年","生徒名","読み仮名","担当","高校","備考", ...dateKeys.map(k => dateMeta.get(k) || k)]];
+  const unmatched = [];
+  for(const stu of students){
+    const meta = rosterMetaForStudent(stu);
+    if(state.rosterMap.size && !state.rosterMap.has(normalizeNameKey(stu))) unmatched.push(stu);
+    calendarAoa.push([
+      meta["学年"] || "",
+      meta["生徒名"] || stu,
+      meta["読み仮名"] || "",
+      meta["担当"] || "",
+      meta["高校"] || "",
+      meta["備考"] || "",
+      ...dateKeys.map(k => (cellMap.get(`${stu}\t${k}`) || []).join("\n"))
+    ]);
+  }
+
+  const listAoa = [["学年","生徒名","読み仮名","担当","高校","備考","日付","曜日","時限/行名","内容","元セル","元ファイル","元パス","週開始日","行番号","列番号"]];
+  const sorted = [...records].sort((a,b)=> a.dateKey.localeCompare(b.dateKey) || studentSortKey(a.student).localeCompare(studentSortKey(b.student),"ja") || String(a.rowName).localeCompare(String(b.rowName),"ja"));
+  for(const r of sorted){
+    const meta = rosterMetaForStudent(r.student);
+    listAoa.push([
+      meta["学年"] || "",
+      meta["生徒名"] || r.student,
+      meta["読み仮名"] || "",
+      meta["担当"] || "",
+      meta["高校"] || "",
+      meta["備考"] || "",
+      r.dateKey, r.weekday, r.rowName, r.content, r.sourceCell, r.outFile, r.sourcePath, r.weekStart, r.rowNo, r.colNo
+    ]);
+  }
+
+  const extraLogs = unmatched.map(name => ["対応表照合", "注意", "対応表に一致する生徒名がありません", name]);
+  const fullLogAoa = [["ファイル","結果","内容","シート名/詳細"], ...logRows, ...extraLogs];
+  return {calendarAoa, listAoa, logAoa:fullLogAoa, students, dateKeys};
+}
+
+function renderAoa(containerId, aoa, maxRows=300){
+  const host = $(containerId);
+  if(!aoa.length){ host.innerHTML = `<div class="hint" style="padding:14px;">データなし</div>`; return; }
+  let html = "<table><tbody>";
+  aoa.slice(0,maxRows).forEach((row,ri)=>{
+    html += "<tr>";
+    row.forEach(cell => html += ri === 0 ? `<th>${esc(cell)}</th>` : `<td>${esc(cell)}</td>`);
+    html += "</tr>";
+  });
+  html += "</tbody></table>";
+  if(aoa.length > maxRows) html += `<div class="hint" style="padding:10px;">表示は先頭${maxRows}行のみ。Excelには全件出力します。</div>`;
+  host.innerHTML = html;
+}
+
+function updateStats(files, records, students, dateKeys){
+  $("statFiles").textContent = files.length;
+  $("statRows").textContent = records.length;
+  $("statStudents").textContent = students.length;
+  $("statDates").textContent = dateKeys.length;
+}
+
+async function merge(){
+  const files = state.files.filter(f => !shouldSkipFile(f));
+  if(!files.length){ alert("Excelファイルを選択してください"); return; }
+  $("mergeBtn").disabled = true;
+  $("downloadBtn").disabled = true;
+  log(`読み込み中...\n対象Excel: ${files.length}件`);
+
+  let allRecords = [];
+  let allLogs = [];
+  for(let i=0;i<files.length;i++){
+    log(`読み込み中 ${i+1}/${files.length}\n${files[i].webkitRelativePath || files[i].name}`);
+    const {records, logRows} = await parseExcelFile(files[i]);
+    allRecords.push(...records);
+    allLogs.push(...logRows);
+  }
+  allRecords = filterRecords(allRecords);
+
+  const out = buildOutputs(allRecords, allLogs);
+  state.records = allRecords;
+  state.calendarAoa = out.calendarAoa;
+  state.listAoa = out.listAoa;
+  state.logAoa = out.logAoa;
+  state.workbookReady = allRecords.length > 0;
+
+  renderAoa("calendarPane", state.calendarAoa, 300);
+  renderAoa("listPane", state.listAoa, 300);
+  renderAoa("logPane", state.logAoa, 500);
+  if(!state.rosterAoa.length) renderAoa("rosterPane", [ROSTER_COLUMNS], 300);
+  updateStats(files, allRecords, out.students, out.dateKeys);
+  $("downloadBtn").disabled = !state.workbookReady;
+  $("mergeBtn").disabled = false;
+
+  const success = allLogs.filter(x => x[1] === "成功").length;
+  const fail = allLogs.filter(x => x[1] === "失敗").length;
+  log(`統合プレビュー作成完了\n成功ファイル: ${success}\n失敗ファイル: ${fail}\n予定件数: ${allRecords.length}\n生徒数: ${out.students.length}\n日付数: ${out.dateKeys.length}`);
+}
+
+function aoaToSheet(aoa){ return XLSX.utils.aoa_to_sheet(aoa); }
+function setRangeStyle(ws, range, styleFn){
+  if(!range) return;
+  for(let R=range.s.r; R<=range.e.r; R++){
+    for(let C=range.s.c; C<=range.e.c; C++){
+      const addr = XLSX.utils.encode_cell({r:R,c:C});
+      if(!ws[addr]) continue;
+      ws[addr].s = Object.assign(ws[addr].s || {}, styleFn(R,C,ws[addr]));
+    }
+  }
+}
+
+function textLineCount(value, widthChars){
+  const text = String(value ?? "");
+  if(!text) return 1;
+  return text.split(/\r?\n/).reduce((sum, line) => {
+    const visualLen = [...line].reduce((n, ch) => n + (ch.charCodeAt(0) > 255 ? 1.7 : 1), 0);
+    return sum + Math.max(1, Math.ceil(visualLen / Math.max(8, widthChars)));
+  }, 0);
+}
+
+function buildRowsForAoa(aoa, widths, opt={}){
+  const min = opt.min ?? 22;
+  const max = opt.max ?? 150;
+  const header = opt.header ?? 28;
+  const pxPerLine = opt.pxPerLine ?? 18;
+  return aoa.map((row, r) => {
+    if(r === 0) return {hpt: header};
+    let lines = 1;
+    row.forEach((v, c) => {
+      lines = Math.max(lines, textLineCount(v, widths[c] || 18));
+    });
+    return {hpt: Math.max(min, Math.min(max, 10 + lines * pxPerLine))};
+  });
+}
+
+function applyNiceSheetSettings(ws, aoa, widths, options={}){
+  ws["!cols"] = widths.map(wch => ({wch}));
+  ws["!rows"] = buildRowsForAoa(aoa, widths, options.rows || {});
+  const range = XLSX.utils.decode_range(ws["!ref"] || "A1:A1");
+  if(range.e.r >= 0 && range.e.c >= 0){
+    ws["!autofilter"] = {ref: XLSX.utils.encode_range(range)};
+  }
+  return range;
+}
+
+function downloadWorkbook(){
+  if(!state.workbookReady){ alert("先に統合プレビューを作成してください"); return; }
+  const wb = XLSX.utils.book_new();
+  const wsCal = aoaToSheet(state.calendarAoa);
+  const wsList = aoaToSheet(state.listAoa);
+  const wsLog = aoaToSheet(state.logAoa);
+  const wsRoster = aoaToSheet(state.rosterAoa && state.rosterAoa.length ? state.rosterAoa : [ROSTER_COLUMNS]);
+
+  // 全体カレンダーは「一目で内容が読める」よう、日付列を広め・行高を内容量で自動調整。
+  const calWidths = state.calendarAoa[0].map((_,i)=> i===0 ? 10 : i===1 ? 18 : i<=5 ? 16 : 30);
+  const listWidths = [10,18,18,16,24,36,13,8,14,46,12,28,52,14,10,10];
+  const logWidths = [58,12,48,22];
+  const rosterWidths = [10,18,18,16,24,36];
+
+  const calRange = applyNiceSheetSettings(wsCal, state.calendarAoa, calWidths, {rows:{min:40,max:170,header:32,pxPerLine:19}});
+  const listRange = applyNiceSheetSettings(wsList, state.listAoa, listWidths, {rows:{min:24,max:110,header:30,pxPerLine:18}});
+  const logRange = applyNiceSheetSettings(wsLog, state.logAoa, logWidths, {rows:{min:24,max:95,header:30,pxPerLine:18}});
+  const rosterRange = applyNiceSheetSettings(wsRoster, state.rosterAoa && state.rosterAoa.length ? state.rosterAoa : [ROSTER_COLUMNS], rosterWidths, {rows:{min:24,max:95,header:30,pxPerLine:18}});
+
+  const border = {top:{style:"thin",color:{rgb:"98A2B3"}},bottom:{style:"thin",color:{rgb:"98A2B3"}},left:{style:"thin",color:{rgb:"98A2B3"}},right:{style:"thin",color:{rgb:"98A2B3"}}};
+  const headerFill = {fgColor:{rgb:"E5E7EB"}};
+  const nameFill = {fgColor:{rgb:"F1F5F9"}};
+  const weekendFill = {fgColor:{rgb:"F8FAFC"}};
+  const fontBase = {name:"Yu Gothic", sz:11, color:{rgb:"111827"}};
+  const fontHeader = {name:"Yu Gothic", sz:11, bold:true, color:{rgb:"111827"}};
+
+  setRangeStyle(wsCal, calRange, (R,C)=>{
+    const style = {
+      font: (R===0 || C===0) ? fontHeader : fontBase,
+      alignment:{vertical:"top", horizontal:C===0?"center":"left", wrapText:true},
+      border
+    };
+    if(R===0) style.alignment = {vertical:"center", horizontal:"center", wrapText:true};
+    if(R===0) style.fill = headerFill;
+    if(C===0 && R>0) style.fill = nameFill;
+    if($("colorWeekend").checked && R>0 && C>0){
+      const label = String(state.calendarAoa[0][C] || "");
+      if(label.includes("(土)") || label.includes("(日)")) style.fill = weekendFill;
+    }
+    return style;
+  });
+
+  setRangeStyle(wsList, listRange, (R,C)=>({
+    font: R===0 ? fontHeader : fontBase,
+    alignment:{vertical:"top", horizontal:R===0?"center":"left", wrapText:true},
+    border,
+    fill:R===0?headerFill:undefined
+  }));
+
+  setRangeStyle(wsLog, logRange, (R,C)=>({
+    font: R===0 ? fontHeader : fontBase,
+    alignment:{vertical:"top", horizontal:R===0?"center":"left", wrapText:true},
+    border,
+    fill:R===0?headerFill:undefined
+  }));
+
+  setRangeStyle(wsRoster, rosterRange, (R,C)=>({
+    font: R===0 ? fontHeader : fontBase,
+    alignment:{vertical:"top", horizontal:R===0?"center":"left", wrapText:true},
+    border,
+    fill:R===0?headerFill:undefined
+  }));
+
+  // SheetJS互換の固定ペイン設定。対応Excelでは1行目・1列目が固定される。
+  wsCal["!freeze"] = {xSplit:1, ySplit:1};
+  wsList["!freeze"] = {ySplit:1};
+  wsLog["!freeze"] = {ySplit:1};
+  wsRoster["!freeze"] = {ySplit:1};
+
+  XLSX.utils.book_append_sheet(wb, wsCal, "全体カレンダー");
+  XLSX.utils.book_append_sheet(wb, wsList, "予定一覧データ");
+  XLSX.utils.book_append_sheet(wb, wsRoster, "生徒対応表");
+  XLSX.utils.book_append_sheet(wb, wsLog, "読み取りログ");
+
+  const today = new Date();
+  XLSX.writeFile(wb, `全体予定表_${ymd(today)}.xlsx`);
+}
+
+function setFiles(fileList){
+  state.files = [...fileList].filter(f => !shouldSkipFile(f));
+  updateStats(state.files, [], [], []);
+  $("downloadBtn").disabled = true;
+  log(`ファイル選択完了\nExcelファイル: ${state.files.length}件\n「統合プレビュー作成」を押してください。`);
+}
+
+$("folderInput").addEventListener("change", e => setFiles(e.target.files));
+$("rosterInput").addEventListener("change", async e => {
+  try{
+    const res = await parseRosterFile(e.target.files[0]);
+    log(`${res.message}\n予定表フォルダーも選んでから「統合プレビュー作成」を押してください。`);
+  }catch(err){
+    alert(err.message || String(err));
+    log("対応表の読み込みでエラーが出ました。");
+  }
+});
+$("mergeBtn").addEventListener("click", merge);
+$("downloadBtn").addEventListener("click", downloadWorkbook);
+$("clearBtn").addEventListener("click", () => {
+  state.files=[]; state.records=[]; state.calendarAoa=[]; state.listAoa=[]; state.logAoa=[]; state.rosterAoa=[]; state.rosterMap=new Map(); state.workbookReady=false;
+  $("folderInput").value="";
+  $("rosterInput").value="";
+  updateStats([],[],[],[]);
+  ["calendarPane","listPane","rosterPane","logPane"].forEach(id => $(id).innerHTML = `<div class="hint" style="padding:14px;">クリアしました。</div>`);
+  $("downloadBtn").disabled = true;
+  log("待機中");
+});
+
+document.querySelectorAll(".tabs button").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    ["calendarPane","listPane","rosterPane","logPane"].forEach(id => $(id).classList.add("hidden"));
+    $(btn.dataset.pane).classList.remove("hidden");
+  });
+});
+
+const dz = $("dropZone");
+["dragenter","dragover"].forEach(ev => dz.addEventListener(ev, e=>{ e.preventDefault(); dz.classList.add("drag"); }));
+["dragleave","drop"].forEach(ev => dz.addEventListener(ev, e=>{ e.preventDefault(); dz.classList.remove("drag"); }));
+dz.addEventListener("drop", e => {
+  const files = e.dataTransfer.files;
+  setFiles(files);
+});
+</script>
+</body>
+</html>
