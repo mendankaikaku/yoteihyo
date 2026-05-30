@@ -866,6 +866,11 @@ function isSSJudgeText(text){
   const t = String(text ?? "").replace(/Ｓ/g,"S").toUpperCase();
   return /SS/.test(t);
 }
+function isSJudgeText(text){
+  const t = toHalfWidth(String(text ?? "")).toUpperCase();
+  // STAGEなどの英単語中のSを誤検出しないよう、英数字に挟まれていない単独のSだけを拾う。
+  return /(^|[^A-Z0-9])S(判定|$|[^A-Z0-9])/.test(t);
+}
 function isCourseLearnedText(text){
   const t = toHalfWidth(String(text ?? ""));
   return /講座を?習得|講座を?修得|完全習得|完全修得/.test(t);
@@ -920,6 +925,18 @@ function addDaysOnly(d, days){
   const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
   x.setDate(x.getDate() + days);
   return x;
+}
+function addMonths(d, months){
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const day = x.getDate();
+  x.setMonth(x.getMonth() + months);
+  // 月末ずれ対策
+  if(x.getDate() !== day) x.setDate(0);
+  return x;
+}
+function getCenterDate(){
+  const v = $("centerDate") && $("centerDate").value;
+  return v ? new Date(v + "T00:00:00") : new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
 }
 
 function buildOutputs(records, logRows, resultRecords=[]){
@@ -995,11 +1012,10 @@ function buildOutputs(records, logRows, resultRecords=[]){
   for(const rec of resultRecords){
     const key = `${rec.student}\t${rec.dateKey}`;
     const rk = `${rec.student}\t${rec.dateKey}\t${rec.timeLabel}\t${rec.study}\t${rec.result}`;
-    const resultText = `${rec.study} ${rec.result} ${rec.summary}`;
-    const mark = isSakuraResultText(resultText) || resultMatchedKeys.has(rk);
-    const reason = isSakuraResultText(resultText) ? sakuraResultReason(resultText) : "予定一致";
     const base = `${rec.timeLabel ? rec.timeLabel + " " : ""}${rec.summary}`;
-    const text = mark ? `🌸 ${reason}: ${base}` : base;
+    const resultText = `${rec.study || ""} ${rec.result || ""} ${rec.summary || ""}`;
+    // S/SS判定・講座習得/完全習得は、黒い桜マークを付け、セル背景は薄黄色にする。
+    const text = isYellowResultCellText(resultText) ? `🌸 ${base}` : base;
     if(!resultMap.has(key)) resultMap.set(key, []);
     if(!resultMap.get(key).includes(text)) resultMap.get(key).push(text);
   }
@@ -1064,15 +1080,14 @@ function buildOutputs(records, logRows, resultRecords=[]){
   for(const r of resultSorted){
     const meta = rosterMetaForStudent(r.student);
     const rk = `${r.student}\t${r.dateKey}\t${r.timeLabel}\t${r.study}\t${r.result}`;
-    const resultText = `${r.study} ${r.result} ${r.summary}`;
-    const mark = isSakuraResultText(resultText) || resultMatchedKeys.has(rk);
-    const reason = isSakuraResultText(resultText) ? sakuraResultReason(resultText) : "予定一致";
     const display = `${r.timeLabel ? r.timeLabel + " " : ""}${r.summary}`;
+    const resultText = `${r.study || ""} ${r.result || ""} ${r.summary || ""}`;
+    const markedDisplay = isYellowResultCellText(resultText) ? `🌸 ${display}` : display;
     resultAoa.push([
       meta["学年"] || r.grade || "",
       meta["生徒名"] || r.student || r.rawName || "",
       r.studentNo || meta["生徒番号"] || "",
-      r.dateKey, r.timeLabel, r.type, r.category, r.study, r.result, mark ? `🌸 ${reason}: ${display}` : display, r.sourceFile, r.sourceSheet
+      r.dateKey, r.timeLabel, r.type, r.category, r.study, r.result, markedDisplay, r.sourceFile, r.sourceSheet
     ]);
   }
 
@@ -1082,9 +1097,13 @@ function buildOutputs(records, logRows, resultRecords=[]){
   return {calendarAoa, listAoa, resultAoa, logAoa:fullLogAoa, students, dateKeys};
 }
 
+function isYellowResultCellText(text){
+  const raw = String(text ?? "");
+  const t = toHalfWidth(raw).toUpperCase();
+  return raw.includes("🌸") || /SS判定|SS/.test(t) || isSJudgeText(t) || /講座を?(完全)?(習得|修得)/.test(t) || /完全(習得|修得)/.test(t);
+}
 function formatMarkedHtml(cell){
   let html = esc(cell);
-  html = html.replace(/🌸/g, '<span style="color:#dc2626;font-weight:900;">🌸</span>');
   html = html.replace(/❗未受講警告/g, '<span style="color:#dc2626;font-weight:900;">❗未受講警告</span>');
   html = html.replace(/!未受講警告/g, '<span style="color:#dc2626;font-weight:900;">!未受講警告</span>');
   return html;
@@ -1102,7 +1121,9 @@ function renderAoa(containerId, aoa, maxRows=300){
       }else{
         const head = String((aoa[0] || [])[ci] || "");
         const val = String(cell || "");
-        const style = head.includes("予定") && val.includes("未受講警告") ? ' style="background:#fce7f3;"' : "";
+        let style = "";
+        if(head.includes("予定") && val.includes("未受講警告")) style = ' style="background:#fce7f3;"';
+        else if(head.includes("結果") && isYellowResultCellText(val)) style = ' style="background:#fef9c3;"';
         html += `<td${style}>${formatMarkedHtml(cell)}</td>`;
       }
     });
@@ -1212,8 +1233,21 @@ function buildRowsForAoa(aoa, widths, opt={}){
 }
 
 function applyNiceSheetSettings(ws, aoa, widths, options={}){
-  ws["!cols"] = widths.map(wch => ({wch}));
-  ws["!rows"] = buildRowsForAoa(aoa, widths, options.rows || {});
+  // widths は従来の wch 数値に加えて、{wpx:400} のような列幅指定にも対応。
+  // Excelでは列幅が内部的に文字幅換算されるため、掲示用は実測に合わせて約400px相当のwchで指定する。
+  ws["!cols"] = widths.map(w => {
+    if(typeof w === "object" && w !== null) return w;
+    return {wch:w};
+  });
+  const rowWidthChars = widths.map(w => {
+    if(typeof w === "object" && w !== null){
+      if(w.wch) return w.wch;
+      if(w.wpx) return Math.max(8, Math.round(w.wpx / 7));
+      return 18;
+    }
+    return w;
+  });
+  ws["!rows"] = buildRowsForAoa(aoa, rowWidthChars, options.rows || {});
   const range = XLSX.utils.decode_range(ws["!ref"] || "A1:A1");
   if(range.e.r >= 0 && range.e.c >= 0){
     ws["!autofilter"] = {ref: XLSX.utils.encode_range(range)};
@@ -1221,144 +1255,805 @@ function applyNiceSheetSettings(ws, aoa, widths, options={}){
   return range;
 }
 
-function downloadWorkbook(){
-  if(!state.workbookReady){ alert("先に統合プレビューを作成してください"); return; }
-  const wb = XLSX.utils.book_new();
-  const wsCal = aoaToSheet(state.calendarAoa);
-  const wsList = aoaToSheet(state.listAoa);
-  const wsLog = aoaToSheet(state.logAoa);
-  const wsResult = aoaToSheet(state.resultAoa && state.resultAoa.length ? state.resultAoa : [["学年","生徒名","生徒番号","日付","時刻","区分","分類","学習内容","学習結果","カレンダー表示","元ファイル","元シート"]]);
-  const wsRoster = aoaToSheet(state.rosterAoa && state.rosterAoa.length ? state.rosterAoa : [ROSTER_COLUMNS]);
 
-  // 全体カレンダーは「一目で内容が読める」よう、日付列を広め・行高を内容量で自動調整。
-  const calWidths = state.calendarAoa[0].map((_,i)=> i===0 ? 10 : i===1 ? 14 : i===2 ? 18 : i<=6 ? 16 : 30);
+function stripPosterPrefixLine(s){
+  return String(s ?? "")
+    .replace(/\s*❗未受講警告\s*/g, "")
+    .replace(/\s*!未受講警告\s*/g, "")
+    .replace(/^\s*(受講[①②③123]?|その他[①②③123]?|その他の予定[①②③123]?|予定|結果)\s*[:：]\s*/g, "")
+    .trim();
+}
+
+function bulletizePosterLines(lines){
+  return [...new Set(lines.map(stripPosterPrefixLine).filter(Boolean))]
+    .map(s => `・${s}`)
+    .join("\n");
+}
+
+function cleanPosterPlanText(value){
+  const lines = String(value ?? "")
+    .split(/\r?\n+/)
+    .map(stripPosterPrefixLine)
+    .filter(Boolean)
+    .filter(s => !/^学習内容\s*[:：]/.test(s) && !/^備考\s*[:：]/.test(s));
+  return bulletizePosterLines(lines);
+}
+
+
+
+// 掲示用の略称辞書。
+// 左の正規表現に当てはまる講座名・コンテンツ名を、右の短い表記に置き換える。
+// よく使うものはここに追加すれば、掲示用カレンダーの表示だけ短くできる。
+const POSTER_ABBREV_RULES = [
+  [/大学入学共通テスト対策\s*英語\s*Listening\s*[＆&]\s*Read\w*/gi, "共テ英L&R"],
+  [/大学入学共通テスト対策\s*英語\s*Reading/gi, "共テ英R"],
+  [/大学入学共通テスト対策\s*英語\s*Listening/gi, "共テ英L"],
+  [/はじめからの基礎単語\s*1200/g, "基単1200"],
+  [/新\s*難度別システム英語\s*文法編\s*Ⅲ/g, "難シス英 文Ⅲ"],
+  [/難度別システム英語\s*英文法\s*Ⅱ/g, "難シス英 文Ⅱ"],
+  [/ベーシック\s*化学\s*PART\s*2/gi, "ベ化2"],
+  [/ハイレベル\s*化学\s*PART\s*1/gi, "ハイ化1"],
+  [/スタンダード\s*化学\s*PART\s*2/gi, "スタ化2"],
+  [/スタンダード\s*物理\s*Part\s*1/gi, "スタ物1"],
+  [/難関\s*物理\s*PART\s*1/gi, "難物1"],
+  [/難関\s*物理\s*PART\s*2/gi, "難物2"],
+  [/高等学校対応\s*数学Ⅰ・A\s*-\s*上級\s*-/g, "高数ⅠA上"],
+  [/高等学校対応\s*数学Ⅰ・A\s*-\s*標準\s*-/g, "高数ⅠA標"],
+  [/高等学校対応\s*数学Ⅰ・A\s*-\s*基礎\s*-/g, "高数ⅠA基"],
+  [/高等学校対応\s*数学Ⅱ\s*-\s*標準\s*-/g, "高数Ⅱ標"],
+  [/高等学校対応\s*数学Ⅱ\s*-\s*基礎\s*-/g, "高数Ⅱ基"],
+  [/高等学校対応\s*数学Ⅲ・C\s*-\s*基礎\s*-/g, "高数ⅢC基"],
+  [/(高等学校対応|高校対応)\s*数学C\s*-\s*標準\s*-\s*ベクトル/g, "高数C標ベク"],
+  [/高等学校対応\s*数学C\s*-\s*基礎\s*-\s*ベクトル/g, "高数C基ベク"],
+  [/高校対応\s*数学B\s*-\s*上級\s*-\s*統計的な推測/g, "高数B上統計"],
+  [/高等学校対応\s*数学A\s*-\s*上級\s*-\s*図形の性質/g, "高数A上図形"],
+  [/共通テスト対応\s*Listening\s*[＆&]\s*Reading\s*基礎力練成/gi, "共テ英LR基"],
+  [/共(通)?テ(スト)?対応\s*Listening\s*[＆&]\s*Reading\s*実力完成/gi, "共テ英LR実力"],
+  [/共通テスト対応\s*Listening\s*[＆&]\s*Reading\s*実力完成/gi, "共テ英LR実力"],
+  [/受験数学（文理共通）応用/g, "受数文理応"],
+  [/受験数学（理系）応用/g, "受数理応"],
+  [/公共[，、]\s*政治・経済\s*経済編/g, "公政経 経済"],
+  [/ハイパー現代文/g, "ハイ現"],
+  [/基礎からの的中パワーアップ古文/g, "的中古文"],
+  [/スタンダード\s*化学/g, "スタ化"],
+  [/スタンダード\s*物理/g, "スタ物"],
+  [/スタンダード\s*生物/g, "スタ生"],
+  [/スタンダード\s*日本史/g, "スタ日史"],
+  [/スタンダード\s*世界史/g, "スタ世史"],
+  [/スタンダード\s*地理/g, "スタ地理"],
+  [/難関\s*物理/g, "難物"],
+  [/難関\s*化学/g, "難化"],
+  [/難関\s*生物/g, "難生"],
+  [/難関\s*数学/g, "難数"],
+  [/難関\s*英語/g, "難英"],
+  [/ハイレベル\s*物理/g, "ハイ物"],
+  [/ハイレベル\s*化学/g, "ハイ化"],
+  [/ハイレベル\s*生物/g, "ハイ生"],
+  [/ハイレベル\s*数学/g, "ハイ数"],
+  [/トップレベル\s*物理/g, "トップ物"],
+  [/トップレベル\s*化学/g, "トップ化"],
+  [/トップレベル\s*数学/g, "トップ数"],
+  [/高等学校対応\s*数学/g, "高対数"],
+  [/高等学校対応\s*英語/g, "高対英"],
+  [/高等学校対応\s*物理/g, "高対物"],
+  [/高等学校対応\s*化学/g, "高対化"],
+  [/受験数学/g, "受数"],
+  [/数学計算演習/g, "数計演"],
+  [/過去問演習講座/g, "過去問"],
+  [/共通テスト過去問演習/g, "共テ過去問"],
+  [/大学入学共通テスト/g, "共テ"],
+  [/共通テスト/g, "共テ"],
+  [/志望校別単元ジャンル演習/g, "単ジャン"],
+  [/第一志望校対策演習/g, "一志"],
+  [/単元ジャンル演習/g, "単ジャン"],
+  [/英単語\s*1800/g, "単語1800"],
+  [/英熟語\s*750/g, "熟語750"],
+  [/英文法\s*750/g, "文法750"],
+  [/基本例文\s*300/g, "例文300"],
+  [/上級英単語/g, "上級単語"],
+  [/今日のコラム/g, "コラム"],
+  [/高速基礎マスター/g, "高マス"],
+  [/確認テスト/g, "確認"],
+  [/修了判定テスト|終了判定テスト/g, "修判"],
+  [/現代文/g, "現文"],
+  [/古文/g, "古文"],
+  [/漢文/g, "漢文"],
+  [/日本史/g, "日史"],
+  [/世界史/g, "世史"],
+  [/政治経済/g, "政経"],
+  [/倫理/g, "倫理"],
+  [/地理/g, "地理"],
+  [/情報I|情報Ⅰ/g, "情報"],
+];
+
+function applyPosterAbbrevDictionary(text){
+  let s = String(text ?? "");
+  for(const [pattern, replacement] of POSTER_ABBREV_RULES){
+    s = s.replace(pattern, replacement);
+  }
+  // 略称化後の余分な空白だけ整える。丸数字や数字は残す。
+  return s.replace(/\s+/g, " ").trim();
+}
+
+function posterResultKind(text){
+  const t = toHalfWidth(String(text ?? "")).toUpperCase();
+  if(/SS判定|SS/.test(t)) return "SS";
+  if(isSJudgeText(t)) return "S";
+  if(/講座を?完全(習得|修得)|完全(習得|修得)/.test(t)) return "完全習得";
+  if(/講座を?(習得|修得)/.test(t)) return "習得";
+  // 掲示用では、講座名が取れる受講開始だけは「受講」として出せるようにする。
+  // ただし共通テスト本試験の「合格まであと○点」は別関数で除外する。
+  if(/受講開始/.test(t)) return "受講";
+  return "";
+}
+
+function findJudgeMarkerIndex(text, kind){
+  const raw = String(text ?? "");
+  const upper = toHalfWidth(raw).toUpperCase();
+  if(kind === "SS") return upper.indexOf("SS");
+  if(kind === "S"){
+    const m = upper.match(/(^|[^A-Z0-9])S(判定|$|[^A-Z0-9])/);
+    return m ? m.index + (m[1] ? m[1].length : 0) : -1;
+  }
+  return upper.search(/講座を?完全(習得|修得)|完全(習得|修得)|講座を?(習得|修得)/);
+}
+
+function nearestNumberBeforeJudge(text, kind){
+  const raw = toHalfWidth(String(text ?? ""));
+  const idx = findJudgeMarkerIndex(raw, kind);
+  if(idx < 0) return "";
+  const before = raw.slice(0, idx);
+  const tokens = [];
+  // 19:30 のような時刻は除外し、SS/Sの直前側にある一番近い数字・丸数字だけを拾う。
+  const re = /[①-㊿⓪❶-❿⑴-⑽]|[0-9]+|[一二三四五六七八九十]+/g;
+  let m;
+  while((m = re.exec(before))){
+    const start = m.index;
+    const end = start + m[0].length;
+    const prev = before[start - 1] || "";
+    const next = before[end] || "";
+    if(prev === ":" || prev === "：" || next === ":" || next === "：") continue;
+    tokens.push(m[0]);
+  }
+  return tokens.length ? tokens[tokens.length - 1] : "";
+}
+
+function stripPosterPrefixes(text){
+  let s = toHalfWidth(String(text ?? ""));
+  s = s.replace(/^[\s・]+/g, "");
+  s = s.replace(/^🌸\s*/g, "");
+  s = s.replace(/^(SS判定|S判定|完全習得|講座習得|予定一致|結果)\s*[:：]\s*/g, "");
+  s = s.replace(/^\d{1,2}:\d{2}\s*/g, "");
+  return s.trim();
+}
+
+function cleanPosterCourseCandidate(text){
+  let s = stripPosterPrefixes(text);
+  // 時刻は講座番号ではないので完全に捨てる。
+  s = s.replace(/\b\d{1,2}:\d{2}\b/g, " ");
+  // 「分類: 講座名」の場合は最後のコロン以降を講座名として使う。
+  if(/[：:]/.test(s)) s = s.split(/[：:]/).pop();
+  s = s
+    .replace(/[【\[].*?[】\]]/g, "")
+    .replace(/\s*\(.*?\)\s*/g, "")
+    .replace(/\s*（.*?）\s*/g, "")
+    .replace(/確認テスト|修了判定テスト|終了判定テスト|修了判定|終了判定|受講開始|高速基礎マスター|演習\/過去問|演習|過去問|結果/g, "")
+    .replace(/講座を?完全(習得|修得)(しました|した)?/g, "")
+    .replace(/講座を?(習得|修得)(しました|した)?/g, "")
+    .replace(/完全(習得|修得)(しました|した)?/g, "")
+    .replace(/SS判定|S判定|判定/g, "")
+    .replace(/しました|しました。|した|した。|できました|できた|です|でした|になりました|達成しました/g, "")
+    .replace(/[！!。]+/g, "")
+    .replace(/^[\s、。・\/／:：]+|[\s、。・\/／:：]+$/g, "")
+    .trim();
+  // 末尾に「で」「の」「を」などの助詞だけが残るのを防ぐ。
+  s = s.replace(/[ぁ-ん]{1,8}$/g, "");
+  return s.replace(/\s+/g, " ").trim();
+}
+
+function hasCourseNumber(text){
+  return /[①-㊿⓪❶-❿⑴-⑽]|[0-9]+|[一二三四五六七八九十]+/.test(String(text ?? ""));
+}
+
+
+// 掲示用の結果名は「東進コンテンツ名として認識できる語」だけを表示する。
+// 結果文の「初めてSS判定を取得」の「て」などは、ここで必ず捨てる。
+const POSTER_CONTENT_EXTRACT_RULES = [
+  [/大学入学共通テスト対策\s*英語\s*Listening\s*[＆&]\s*Read\w*/gi, "共テ英L&R"],
+  [/大学入学共通テスト対策\s*英語\s*Reading/gi, "共テ英R"],
+  [/大学入学共通テスト対策\s*英語\s*Listening/gi, "共テ英L"],
+  [/はじめからの基礎単語\s*1200/g, "基単1200"],
+  [/新\s*難度別システム英語\s*文法編\s*Ⅲ/g, "難シス英 文Ⅲ"],
+  [/難度別システム英語\s*英文法\s*Ⅱ/g, "難シス英 文Ⅱ"],
+  [/ベーシック\s*化学\s*PART\s*2/gi, "ベ化2"],
+  [/ハイレベル\s*化学\s*PART\s*1/gi, "ハイ化1"],
+  [/スタンダード\s*化学\s*PART\s*2/gi, "スタ化2"],
+  [/スタンダード\s*物理\s*Part\s*1/gi, "スタ物1"],
+  [/難関\s*物理\s*PART\s*1/gi, "難物1"],
+  [/難関\s*物理\s*PART\s*2/gi, "難物2"],
+  [/高等学校対応\s*数学Ⅰ・A\s*-\s*上級\s*-/g, "高数ⅠA上"],
+  [/高等学校対応\s*数学Ⅰ・A\s*-\s*標準\s*-/g, "高数ⅠA標"],
+  [/高等学校対応\s*数学Ⅰ・A\s*-\s*基礎\s*-/g, "高数ⅠA基"],
+  [/高等学校対応\s*数学Ⅱ\s*-\s*標準\s*-/g, "高数Ⅱ標"],
+  [/高等学校対応\s*数学Ⅱ\s*-\s*基礎\s*-/g, "高数Ⅱ基"],
+  [/高等学校対応\s*数学Ⅲ・C\s*-\s*基礎\s*-/g, "高数ⅢC基"],
+  [/(高等学校対応|高校対応)\s*数学C\s*-\s*標準\s*-\s*ベクトル/g, "高数C標ベク"],
+  [/高等学校対応\s*数学C\s*-\s*基礎\s*-\s*ベクトル/g, "高数C基ベク"],
+  [/高校対応\s*数学B\s*-\s*上級\s*-\s*統計的な推測/g, "高数B上統計"],
+  [/高等学校対応\s*数学A\s*-\s*上級\s*-\s*図形の性質/g, "高数A上図形"],
+  [/共通テスト対応\s*Listening\s*[＆&]\s*Reading\s*基礎力練成/gi, "共テ英LR基"],
+  [/共(通)?テ(スト)?対応\s*Listening\s*[＆&]\s*Reading\s*実力完成/gi, "共テ英LR実力"],
+  [/共通テスト対応\s*Listening\s*[＆&]\s*Reading\s*実力完成/gi, "共テ英LR実力"],
+  [/受験数学（文理共通）応用/g, "受数文理応"],
+  [/受験数学（理系）応用/g, "受数理応"],
+  [/公共[，、]\s*政治・経済\s*経済編/g, "公政経 経済"],
+  [/ハイパー現代文/g, "ハイ現"],
+  [/基礎からの的中パワーアップ古文/g, "的中古文"],
+  [/スタンダード\s*化学/g, "スタ化"],
+  [/スタンダード\s*物理/g, "スタ物"],
+  [/スタンダード\s*生物/g, "スタ生"],
+  [/スタンダード\s*日本史/g, "スタ日史"],
+  [/スタンダード\s*世界史/g, "スタ世史"],
+  [/スタンダード\s*地理/g, "スタ地理"],
+  [/難関\s*物理/g, "難物"],
+  [/難関\s*化学/g, "難化"],
+  [/難関\s*生物/g, "難生"],
+  [/難関\s*数学/g, "難数"],
+  [/難関\s*英語/g, "難英"],
+  [/ハイレベル\s*物理/g, "ハイ物"],
+  [/ハイレベル\s*化学/g, "ハイ化"],
+  [/ハイレベル\s*生物/g, "ハイ生"],
+  [/ハイレベル\s*数学/g, "ハイ数"],
+  [/トップレベル\s*物理/g, "トップ物"],
+  [/トップレベル\s*化学/g, "トップ化"],
+  [/トップレベル\s*数学/g, "トップ数"],
+  [/高等学校対応\s*数学/g, "高対数"],
+  [/高等学校対応\s*英語/g, "高対英"],
+  [/高等学校対応\s*物理/g, "高対物"],
+  [/高等学校対応\s*化学/g, "高対化"],
+  [/受験数学/g, "受数"],
+  [/数学計算演習/g, "数計演"],
+  [/過去問演習講座/g, "過去問"],
+  [/共通テスト過去問演習/g, "共テ過去問"],
+  [/大学入学共通テスト/g, "共テ"],
+  [/共通テスト/g, "共テ"],
+  [/志望校別単元ジャンル演習/g, "単ジャン"],
+  [/第一志望校対策演習/g, "一志"],
+  [/単元ジャンル演習/g, "単ジャン"],
+  [/英単語\s*1800/g, "単語1800"],
+  [/英熟語\s*750/g, "熟語750"],
+  [/英文法\s*750/g, "文法750"],
+  [/基本例文\s*300/g, "例文300"],
+  [/上級英単語/g, "上級単語"],
+  [/今日のコラム/g, "コラム"],
+  [/高速基礎マスター/g, "高マス"],
+  [/現代文/g, "現文"],
+  [/古文/g, "古文"],
+  [/漢文/g, "漢文"],
+  [/日本史/g, "日史"],
+  [/世界史/g, "世史"],
+  [/政治経済/g, "政経"],
+  [/倫理/g, "倫理"],
+  [/地理/g, "地理"],
+  [/情報I|情報Ⅰ/g, "情報"],
+];
+
+function numberTokenAfter(text, pos){
+  const s = toHalfWidth(String(text ?? ""));
+  const after = s.slice(pos, pos + 40);
+  // 「第4回」「4回」「④」などを、講座名の直後側から拾う。
+  // 19:30 のような時刻は、コロン前後チェックで除外する。
+  const re = /(?:第\s*)?([①-㊿⓪❶-❿⑴-⑽]|[0-9]{1,2}|[一二三四五六七八九十]{1,3})\s*回?/g;
+  let m;
+  while((m = re.exec(after))){
+    const start = m.index;
+    const end = start + m[0].length;
+    const prev = after[start - 1] || "";
+    const next = after[end] || "";
+    if(prev === ":" || prev === "：" || next === ":" || next === "：") continue;
+    return m[1];
+  }
+  return "";
+}
+
+function numberTokenBeforeJudgeOnly(text, kind){
+  // SS/S の直前側で一番近い番号を拾う。ただし 19:30 のような時刻は除外。
+  const raw = toHalfWidth(String(text ?? ""));
+  const idx = findJudgeMarkerIndex(raw, kind);
+  if(idx < 0) return "";
+  const before = raw.slice(0, idx);
+  const tokens = [];
+  const re = /[①-㊿⓪❶-❿⑴-⑽]|[0-9]{1,2}|[一二三四五六七八九十]{1,3}/g;
+  let m;
+  while((m = re.exec(before))){
+    const start = m.index;
+    const end = start + m[0].length;
+    const prev = before[start - 1] || "";
+    const next = before[end] || "";
+    if(prev === ":" || prev === "：" || next === ":" || next === "：") continue;
+    tokens.push(m[0]);
+  }
+  return tokens.length ? tokens[tokens.length - 1] : "";
+}
+
+function stageTokenForPoster(text){
+  const raw = toHalfWidth(String(text ?? ""));
+  const m = raw.match(/ステージ\s*([①-㊿⓪❶-❿⑴-⑽]|[0-9]{1,3}|[一二三四五六七八九十]{1,3})/);
+  return m ? `ST${m[1]}` : "";
+}
+
+function lessonTokenForPoster(text, kind){
+  const raw = toHalfWidth(String(text ?? ""));
+  // 「第4講」「第5回」を最優先で拾う。時刻 19:30 はこの正規表現には当たらない。
+  const explicit = raw.match(/第\s*([①-㊿⓪❶-❿⑴-⑽]|[0-9]{1,3}|[一二三四五六七八九十]{1,3})\s*(講|回)/);
+  if(explicit) return explicit[1];
+  // S/SSの直前側に番号がある場合も拾う。
+  const beforeJudge = (kind === "S" || kind === "SS") ? numberTokenBeforeJudgeOnly(raw, kind) : "";
+  return beforeJudge || "";
+}
+
+function extractStrictToshinContentName(text, kind=""){
+  const raw = toHalfWidth(String(text ?? ""));
+  if(!raw.trim()) return "";
+
+  // 結果の説明文側ではなく、できるだけ「学習内容側」を優先する。
+  // 例: 「確認テスト: 難関物理⑧ / 難関物理⑧で初めてSS判定を取得」
+  //     → 左側と右側の両方を見ても、ルールに合う「難関物理」だけを採用する。
+  const chunks = raw
+    .split(/\s*\/\s*|\n+/)
+    .map(x => x.trim())
+    .filter(Boolean);
+  chunks.push(raw);
+
+  for(const chunk of chunks){
+    for(const [pattern, abbr] of POSTER_CONTENT_EXTRACT_RULES){
+      const re = new RegExp(pattern.source, pattern.flags.replace("g", "") + (pattern.flags.includes("i") ? "" : ""));
+      const m = re.exec(chunk);
+      if(!m) continue;
+      const end = m.index + m[0].length;
+      let label = abbr;
+      const rawMatchIndex = raw.search(new RegExp(pattern.source, pattern.flags.replace("g", "") + (pattern.flags.includes("i") ? "" : "")));
+      const rawEnd = rawMatchIndex >= 0 ? rawMatchIndex + m[0].length : -1;
+      const directNo = numberTokenAfter(chunk, end);
+      const rawDirectNo = rawEnd >= 0 ? numberTokenAfter(raw, rawEnd) : "";
+      const stageNo = stageTokenForPoster(raw);
+      const lessonNo = lessonTokenForPoster(raw, kind);
+      if(stageNo && !/ST[0-9①-㊿⓪❶-❿⑴-⑽一二三四五六七八九十]/.test(label)){
+        label += ` ${stageNo}`;
+      }else{
+        const no = directNo || rawDirectNo || lessonNo;
+        if(no && !hasCourseNumber(label)) label += no;
+      }
+      return label;
+    }
+  }
+
+  // 固定辞書にない講座は、丸数字つきの「漢字/カタカナ/英字 + 番号」だけ許可する。
+  // ここでも助詞やひらがな単独は絶対に返さない。
+  const m = raw.match(/([一-龥ァ-ヶA-Za-z][一-龥ァ-ヶA-Za-z0-9\s]{1,20}?)([①-㊿⓪❶-❿⑴-⑽])/);
+  if(m){
+    const candidate = applyPosterAbbrevDictionary((m[1] + m[2]).replace(/確認テスト|修了判定テスト|終了判定テスト|結果/g, "").trim());
+    if(candidate && !/^[ぁ-んー]+$/.test(candidate)) return [...candidate].slice(0,16).join("");
+  }
+  return "";
+}
+
+function isLikelyToshinContentName(text){
+  return !!extractStrictToshinContentName(text, "");
+}
+
+function extractToshinContentFromCandidate(text, kind=""){
+  return extractStrictToshinContentName(text, kind);
+}
+
+function shortenPosterResultName(text, kind=""){
+  const s = extractStrictToshinContentName(text, kind);
+  return [...s].length > 16 ? [...s].slice(0,16).join("") + "…" : s;
+}
+
+
+
+// --- 2026-05-30 修正: 「確認テスト: 講座名 / 第○講 ... SS判定」形式から、講座名と講番号を厳密に抽出する ---
+function normalizePosterSourceText(text){
+  return toHalfWidth(String(text ?? ""))
+    .replace(/[－–—―−]/g, "-")
+    .replace(/[＆]/g, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractPosterLessonToken(text){
+  const raw = normalizePosterSourceText(text);
+  const stage = raw.match(/ステージ\s*([①-㊿⓪❶-❿⑴-⑽]|[0-9]{1,3}|[一二三四五六七八九十]{1,3})/);
+  if(stage) return `ST${stage[1]}`;
+  const explicit = raw.match(/第\s*([①-㊿⓪❶-❿⑴-⑽]|[0-9]{1,3}|[一二三四五六七八九十]{1,3})\s*(講|回)/);
+  if(explicit) return explicit[1];
+  return "";
+}
+
+function extractPosterContentLabelStrict(text){
+  const raw = normalizePosterSourceText(text);
+  if(!raw) return "";
+
+  // 「20:56 確認テスト: 高等学校対応 数学Ⅲ・C-基礎- / 第26講 ...」のような行では、
+  // まず「確認テスト:」の後ろ、かつ「/」の手前にある講座名部分を最優先で見る。
+  const candidates = [];
+  const slashParts = raw.split(/\s*\/\s*/).map(x => x.trim()).filter(Boolean);
+  for(const part of slashParts){
+    const afterColon = part.includes(":") ? part.split(":").pop().trim() : part;
+    candidates.push(afterColon, part);
+  }
+  candidates.push(raw);
+
+  for(const chunk of candidates){
+    for(const [pattern, abbr] of POSTER_CONTENT_EXTRACT_RULES){
+      const flags = (pattern.flags || "").replace(/g/g, "");
+      const re = new RegExp(pattern.source, flags);
+      if(re.test(chunk)) return abbr;
+    }
+  }
+  return "";
+}
+
+function extractStrictToshinContentName(text, kind=""){
+  const raw = normalizePosterSourceText(text);
+  if(!raw) return "";
+  const label = extractPosterContentLabelStrict(raw);
+  if(!label) return "";
+  const token = extractPosterLessonToken(raw);
+  if(token && !hasCourseNumber(label) && !/\sST[①-㊿⓪❶-❿⑴-⑽0-9一二三四五六七八九十]+$/.test(label)){
+    return token.startsWith("ST") ? `${label} ${token}` : `${label}${token}`;
+  }
+  return label;
+}
+
+function shortenPosterResultName(text, kind=""){
+  const s = extractStrictToshinContentName(text, kind);
+  return [...s].length > 18 ? [...s].slice(0,18).join("") + "…" : s;
+}
+
+function isCommonTestMainExamLine(text){
+  const t = toHalfWidth(String(text ?? ""));
+  return /共通テスト\s*\d{4}\s*本試験/.test(t);
+}
+
+function commonTestPassedPosterLabel(text){
+  const t = toHalfWidth(String(text ?? ""));
+  if(!isCommonTestMainExamLine(t)) return "";
+  // 「合格まであと○点」は掲示しない。合格したものだけ掲示する。
+  if(/合格\s*まで\s*あと|あと\s*\d+\s*点/.test(t)) return "";
+  if(!/合格/.test(t)) return "";
+  const ym = t.match(/共通テスト\s*(\d{4})\s*本試験/);
+  const year = ym ? ym[1] : "";
+  let subj = t.replace(/^.*?本試験\s*/, "");
+  subj = subj.replace(/合格.*$/g, "");
+  subj = subj.replace(/[！!。\s]+$/g, "").trim();
+  subj = subj.replace(/国語\s*[（(].*?[）)]/g, "国語");
+  subj = subj.replace(/数学\s*([①②③④⑤⑥⑦⑧⑨⑩0-9]+)/g, "数学$1");
+  subj = subj || "共テ";
+  return `共テ${year}本 ${subj} 合格`;
+}
+
+
+
+// --- 2026-05-30 追加修正: 判定語の「手前」を優先して、講座名と第○講/第○回を抽出する ---
+function posterImportantMarkerIndex(text, kind=""){
+  const raw = normalizePosterSourceText(text);
+  const upper = raw.toUpperCase();
+  const candidates = [];
+  if(kind === "SS" || !kind){
+    const i = upper.indexOf("SS");
+    if(i >= 0) candidates.push(i);
+  }
+  if(kind === "S" || !kind){
+    const m = upper.match(/(^|[^A-Z0-9])S(判定|$|[^A-Z0-9])/);
+    if(m) candidates.push(m.index + (m[1] ? m[1].length : 0));
+  }
+  const patterns = [/初回合格/g, /合格/g, /完全習得|完全修得/g, /習得|修得/g, /受講開始/g];
+  for(const re of patterns){
+    const m = re.exec(raw);
+    if(m) candidates.push(m.index);
+  }
+  return candidates.length ? Math.min(...candidates) : raw.length;
+}
+
+function lastLessonTokenBefore(text, markerIndex){
+  const raw = normalizePosterSourceText(text);
+  const before = raw.slice(0, Math.max(0, markerIndex));
+  let found = "";
+  const stageRe = /ステージ\s*([①-㊿⓪❶-❿⑴-⑽]|[0-9]{1,3}|[一二三四五六七八九十]{1,3})/g;
+  let m;
+  while((m = stageRe.exec(before))) found = `ST${m[1]}`;
+  if(found) return found;
+  const lessonRe = /第\s*([①-㊿⓪❶-❿⑴-⑽]|[0-9]{1,3}|[一二三四五六七八九十]{1,3})\s*(講|回)/g;
+  while((m = lessonRe.exec(before))) found = m[1];
+  return found;
+}
+
+function contentLabelFromChunk(chunk){
+  const cleaned = normalizePosterSourceText(chunk)
+    .replace(/^.*?(確認テスト|修了判定テスト|終了判定テスト|受講|結果)\s*[:：]\s*/g, "")
+    .replace(/^\d{1,2}:\d{2}\s*/g, "")
+    .trim();
+  for(const [pattern, abbr] of POSTER_CONTENT_EXTRACT_RULES){
+    const flags = (pattern.flags || "").replace(/g/g, "");
+    const re = new RegExp(pattern.source, flags);
+    if(re.test(cleaned)) return abbr;
+  }
+  return "";
+}
+
+function extractPosterContentLabelLookback(text, markerIndex){
+  const raw = normalizePosterSourceText(text);
+  const before = raw.slice(0, Math.max(0, markerIndex));
+  const candidates = [];
+
+  // 最重要：判定語の手前に「講座名 / 第○講 ...」がある場合、
+  // 「/」のさらに手前の講座名部分を見る。
+  const slash = Math.max(before.lastIndexOf("/"), before.lastIndexOf("／"));
+  if(slash >= 0){
+    const leftOfSlash = before.slice(0, slash).trim();
+    const colon = Math.max(leftOfSlash.lastIndexOf(":"), leftOfSlash.lastIndexOf("："));
+    candidates.push(colon >= 0 ? leftOfSlash.slice(colon + 1).trim() : leftOfSlash);
+    candidates.push(leftOfSlash);
+  }
+
+  // 次に、判定語の手前全体を、後ろ側のまとまりから見る。
+  const parts = before.split(/\s*\/\s*|\n+/).map(x => x.trim()).filter(Boolean).reverse();
+  for(const part of parts){
+    const colon = Math.max(part.lastIndexOf(":"), part.lastIndexOf("："));
+    if(colon >= 0) candidates.push(part.slice(colon + 1).trim());
+    candidates.push(part);
+  }
+
+  // 最後に全文も保険で見る。ただし判定語より後ろは見ない。
+  candidates.push(before);
+
+  for(const c of candidates){
+    const label = contentLabelFromChunk(c);
+    if(label) return label;
+  }
+  return "";
+}
+
+function extractStrictToshinContentName(text, kind=""){
+  const raw = normalizePosterSourceText(text);
+  if(!raw) return "";
+  const marker = posterImportantMarkerIndex(raw, kind);
+  const label = extractPosterContentLabelLookback(raw, marker);
+  if(!label) return "";
+  const token = lastLessonTokenBefore(raw, marker) || extractPosterLessonToken(raw);
+  if(token && !hasCourseNumber(label) && !/\sST[①-㊿⓪❶-❿⑴-⑽0-9一二三四五六七八九十]+$/.test(label)){
+    return token.startsWith("ST") ? `${label} ${token}` : `${label}${token}`;
+  }
+  return label;
+}
+
+function shortenPosterResultName(text, kind=""){
+  const s = extractStrictToshinContentName(text, kind);
+  return [...s].length > 18 ? [...s].slice(0,18).join("") + "…" : s;
+}
+
+function cleanPosterResultText(value){
+  const lines = String(value ?? "")
+    .split(/\r?\n+/)
+    .map(s => s.trim())
+    .filter(Boolean);
+  const out = [];
+  for(const line of lines){
+    // 共通テスト本試験系は「合格」だけ掲示する。
+    // 「合格まであと○点」は生徒に見せないため、ここでは表示しない。
+    const commonPassed = commonTestPassedPosterLabel(line);
+    if(commonPassed){
+      out.push(`・🌸 ${commonPassed}`);
+      continue;
+    }
+
+    const kind = posterResultKind(line);
+    if(!kind) continue;
+    const name = shortenPosterResultName(line, kind);
+    if(!name) continue;
+
+    // S/SS/習得/完全習得は桜付き。受講開始は情報として出すだけ。
+    if(kind === "受講") out.push(`・${name} 受講`);
+    else out.push(`・🌸 ${name} ${kind}`);
+  }
+  return [...new Set(out)].join("\n");
+}
+
+function buildPosterCalendarAoa(calendarAoa){
+  if(!calendarAoa || calendarAoa.length < 1) return [["学年","生徒名"]];
+  const header = calendarAoa[0] || [];
+  const datePairs = [];
+  for(let c=0;c<header.length;c++){
+    const h = String(header[c] ?? "");
+    if(h.includes("予定")){
+      const label = h.replace(/\n予定/g, "").replace(/予定/g, "").trim();
+      const resultIndex = header.findIndex((x, i) => i > c && String(x ?? "").replace(/\n結果/g, "").replace(/結果/g, "").trim() === label && String(x ?? "").includes("結果"));
+      datePairs.push({planIndex:c, resultIndex, label:label || h});
+    }
+  }
+
+  // 掲示用は1日を左右2分割する。
+  // 左列＝予定、右列＝結果。セル内には「予定:」「結果:」の文字を入れず、箇条書きだけにする。
+  const outHeader = ["学年","生徒名"];
+  for(const d of datePairs){
+    outHeader.push(d.label, "");
+  }
+  const out = [outHeader];
+
+  for(let r=1;r<calendarAoa.length;r++){
+    const row = calendarAoa[r] || [];
+    const vals = [];
+    for(const x of datePairs){
+      const plan = cleanPosterPlanText(row[x.planIndex]);
+      const result = x.resultIndex >= 0 ? cleanPosterResultText(row[x.resultIndex]) : "";
+      vals.push(plan, result);
+    }
+    // 掲示用では、予定も対象結果も1つもない生徒は省く
+    if(vals.every(v => !v)) continue;
+    out.push([row[0] || "", row[2] || row[1] || "", ...vals]);
+  }
+  return out;
+}
+
+function applyPosterHeaderMerges(wsPoster, posterAoa){
+  const merges = wsPoster["!merges"] || [];
+  // C列以降を2列ずつ、日付見出しとして結合する。
+  for(let c=2; c<(posterAoa[0] || []).length; c+=2){
+    if((posterAoa[0] || [])[c]) merges.push({s:{r:0,c}, e:{r:0,c:c+1}});
+  }
+  wsPoster["!merges"] = merges;
+}
+
+function posterHeaderLabelForCol(posterAoa, c){
+  const header = posterAoa[0] || [];
+  return String(header[c] || header[c-1] || "");
+}
+
+function dateRangeForOutput(mode){
+  const center = getCenterDate();
+  let from = null, to = null, label = "全期間";
+  if(mode === "2w"){
+    from = addDaysOnly(center, -14);
+    to = addDaysOnly(center, 14);
+    label = `${ymd(from)}_${ymd(to)}`;
+  }else if(mode === "1m"){
+    from = addMonths(center, -1);
+    to = addMonths(center, 1);
+    label = `${ymd(from)}_${ymd(to)}`;
+  }else{
+    from = $("fromDate").value ? new Date($("fromDate").value + "T00:00:00") : null;
+    to = $("toDate").value ? new Date($("toDate").value + "T00:00:00") : null;
+    label = from || to ? `${from ? ymd(from) : "開始なし"}_${to ? ymd(to) : "終了なし"}` : "全期間";
+  }
+  if(from) from.setHours(0,0,0,0);
+  if(to) to.setHours(23,59,59,999);
+  return {from,to,label};
+}
+function inDateRange(rec, from, to){
+  return (!from || rec.dateObj >= from) && (!to || rec.dateObj <= to);
+}
+function downloadWithRange(mode){
+  if(!state.workbookReady){ alert("先に統合プレビューを作成してください"); return; }
+  const {from,to,label} = dateRangeForOutput(mode);
+  const records = state.records.filter(r => inDateRange(r, from, to));
+  const results = state.resultRecords.filter(r => inDateRange(r, from, to));
+  const out = buildOutputs(records, [], results);
+  downloadWorkbookFromAoa(out.calendarAoa, out.listAoa, out.resultAoa, state.rosterAoa, out.logAoa, label);
+}
+function downloadWorkbookFromAoa(calendarAoa, listAoa, resultAoa, rosterAoa, logAoa, label){
+  const wb = XLSX.utils.book_new();
+  const resultHeader = [["学年","生徒名","生徒番号","日付","時刻","区分","分類","学習内容","学習結果","カレンダー表示","元ファイル","元シート"]];
+  const rosterHeader = [ROSTER_COLUMNS];
+  const wsCal = aoaToSheet(calendarAoa);
+  const wsList = aoaToSheet(listAoa);
+  const wsResult = aoaToSheet(resultAoa && resultAoa.length ? resultAoa : resultHeader);
+  const wsRoster = aoaToSheet(rosterAoa && rosterAoa.length ? rosterAoa : rosterHeader);
+  const wsLog = aoaToSheet(logAoa && logAoa.length ? logAoa : [["ファイル","結果","内容","シート名/詳細"]]);
+  const posterAoa = buildPosterCalendarAoa(calendarAoa);
+  const wsPoster = aoaToSheet(posterAoa);
+  applyPosterHeaderMerges(wsPoster, posterAoa);
+
+  const calWidths = calendarAoa[0].map((_,i)=> i===0 ? 10 : i===1 ? 14 : i===2 ? 18 : i<=6 ? 16 : 30);
   const listWidths = [10,14,18,18,16,24,36,13,8,14,46,12,28,52,14,10,10];
-  const logWidths = [58,12,48,22];
   const resultWidths = [10,18,14,13,8,12,16,34,44,60,26,18];
   const rosterWidths = [14,10,18,18,16,24,36];
+  const logWidths = [58,12,48,22];
+  const posterWidths = posterAoa[0].map((_,i)=> {
+    if(i === 0) return {wch:9};                 // A列：学年
+    return {wch:35.5};                       // 掲示用シートはA列以外を実測約400ピクセル幅に再調整
+  });
 
-  const calRange = applyNiceSheetSettings(wsCal, state.calendarAoa, calWidths, {rows:{min:40,max:170,header:32,pxPerLine:19}});
-  const listRange = applyNiceSheetSettings(wsList, state.listAoa, listWidths, {rows:{min:24,max:110,header:30,pxPerLine:18}});
-  const logRange = applyNiceSheetSettings(wsLog, state.logAoa, logWidths, {rows:{min:24,max:95,header:30,pxPerLine:18}});
-  const resultRange = applyNiceSheetSettings(wsResult, state.resultAoa && state.resultAoa.length ? state.resultAoa : [["学年","生徒名","生徒番号","日付","時刻","区分","分類","学習内容","学習結果","カレンダー表示","元ファイル","元シート"]], resultWidths, {rows:{min:24,max:130,header:30,pxPerLine:18}});
-  const rosterRange = applyNiceSheetSettings(wsRoster, state.rosterAoa && state.rosterAoa.length ? state.rosterAoa : [ROSTER_COLUMNS], rosterWidths, {rows:{min:24,max:95,header:30,pxPerLine:18}});
+  const calRange = applyNiceSheetSettings(wsCal, calendarAoa, calWidths, {rows:{min:40,max:170,header:32,pxPerLine:19}});
+  const listRange = applyNiceSheetSettings(wsList, listAoa, listWidths, {rows:{min:24,max:110,header:30,pxPerLine:18}});
+  const resultRange = applyNiceSheetSettings(wsResult, resultAoa && resultAoa.length ? resultAoa : resultHeader, resultWidths, {rows:{min:24,max:130,header:30,pxPerLine:18}});
+  const rosterRange = applyNiceSheetSettings(wsRoster, rosterAoa && rosterAoa.length ? rosterAoa : rosterHeader, rosterWidths, {rows:{min:24,max:95,header:30,pxPerLine:18}});
+  const logRange = applyNiceSheetSettings(wsLog, logAoa && logAoa.length ? logAoa : [["ファイル","結果","内容","シート名/詳細"]], logWidths, {rows:{min:24,max:95,header:30,pxPerLine:18}});
+  const posterRange = applyNiceSheetSettings(wsPoster, posterAoa, posterWidths, {rows:{min:54,max:320,header:42,pxPerLine:24}});
 
   const border = {top:{style:"thin",color:{rgb:"98A2B3"}},bottom:{style:"thin",color:{rgb:"98A2B3"}},left:{style:"thin",color:{rgb:"98A2B3"}},right:{style:"thin",color:{rgb:"98A2B3"}}};
   const headerFill = {fgColor:{rgb:"E5E7EB"}};
   const nameFill = {fgColor:{rgb:"F1F5F9"}};
   const weekendFill = {fgColor:{rgb:"F8FAFC"}};
+  const warnFill = {fgColor:{rgb:"FCE7F3"}};
+  const yellowFill = {fgColor:{rgb:"FEF9C3"}};
   const fontBase = {name:"Yu Gothic", sz:11, color:{rgb:"111827"}};
-  const fontRed = {name:"Yu Gothic", sz:11, color:{rgb:"DC2626"}, bold:true};
   const fontHeader = {name:"Yu Gothic", sz:11, bold:true, color:{rgb:"111827"}};
+  const fontPoster = {name:"Yu Gothic", sz:14, color:{rgb:"111827"}};
+  const fontPosterHeader = {name:"Yu Gothic", sz:14, bold:true, color:{rgb:"111827"}};
+  const fontRed = {name:"Yu Gothic", sz:11, bold:true, color:{rgb:"DC2626"}};
+  // 掲示用は印刷時に全内容が見えるよう、文字量に応じてフォントサイズを少し下げる。
+  // 行高も上で文字量に合わせて伸ばしているので、長い結果でも切れにくい。
+  function posterFontByText(text){
+    const s = String(text ?? "");
+    const flatLen = [...s.replace(/\r?\n/g, "")].reduce((n, ch) => n + (ch.charCodeAt(0) > 255 ? 1.7 : 1), 0);
+    const lines = s ? s.split(/\r?\n/).length : 1;
+    let sz = 14;
+    if(flatLen > 85 || lines >= 5) sz = 12;
+    if(flatLen > 145 || lines >= 8) sz = 10;
+    if(flatLen > 220 || lines >= 12) sz = 9;
+    return {name:"Yu Gothic", sz, color:{rgb:"111827"}};
+  }
 
-  setRangeStyle(wsCal, calRange, (R,C)=>{
+  setRangeStyle(wsCal, calRange, (R,C,cell)=>{
+    const headerText = String((calendarAoa[0] || [])[C] || "");
+    const text = String(cell.v ?? "");
+    const style = {font:(R===0 || C<=2) ? fontHeader : fontBase, alignment:{vertical:R===0?"center":"top", horizontal:R===0?"center":(C<=1?"center":"left"), wrapText:true}, border};
+    if(R===0) style.fill = headerFill;
+    if(R>0 && C<=2) style.fill = nameFill;
+    if($("colorWeekend").checked && R>0 && C>6 && (headerText.includes("(土)") || headerText.includes("(日)"))) style.fill = weekendFill;
+    if(R>0 && headerText.includes("予定") && text.includes("未受講警告")){ style.fill = warnFill; style.font = fontRed; }
+    if(R>0 && headerText.includes("結果") && isYellowResultCellText(text)){ style.fill = yellowFill; style.font = fontBase; }
+    return style;
+  });
+  setRangeStyle(wsPoster, posterRange, (R,C,cell)=>{
+    const headerText = posterHeaderLabelForCol(posterAoa, C);
+    const text = String(cell.v ?? "");
+    const isResultColumn = C >= 3 && ((C - 3) % 2 === 0); // C列以降は「予定, 結果」の順。結果列だけ黄色判定
     const style = {
-      font: (R===0 || C<=2) ? fontHeader : fontBase,
-      alignment:{vertical:"top", horizontal:C<=1?"center":"left", wrapText:true},
+      font:(R===0 || C<=1) ? fontPosterHeader : posterFontByText(text),
+      alignment:{vertical:R===0?"center":"top", horizontal:R===0?"center":(C<=1?"center":"left"), wrapText:true},
       border
     };
-    if(R===0) style.alignment = {vertical:"center", horizontal:"center", wrapText:true};
     if(R===0) style.fill = headerFill;
-    if(C<=2 && R>0) style.fill = nameFill;
-    if($("colorWeekend").checked && R>0 && C>6){
-      const label = String(state.calendarAoa[0][C] || "");
-      if(label.includes("(土)") || label.includes("(日)")) style.fill = weekendFill;
-    }
-    // 未受講警告の予定セルは、見落とし防止のため薄ピンク背景にし、警告文字が目立つよう赤字にする。
-    if(R>0 && C>6 && String(state.calendarAoa[0][C] || "").includes("予定") && String(state.calendarAoa[R][C] || "").includes("未受講警告")){
-      style.fill = {fgColor:{rgb:"FCE7F3"}};
-      style.font = fontRed;
-    }
-    // 結果セルに🌸がある場合は、背景は塗らず、桜マークが分かるよう赤字にする。
-    if(R>0 && C>6 && String(state.calendarAoa[0][C] || "").includes("結果") && String(state.calendarAoa[R][C] || "").includes("🌸")){
-      style.font = fontRed;
-    }
+    if(R>0 && C<=1) style.fill = nameFill;
+    if($("colorWeekend").checked && R>0 && C>1 && (headerText.includes("(土)") || headerText.includes("(日)"))) style.fill = weekendFill;
+    // 掲示用の結果列は、S/SS/習得/完全習得/共テ合格など桜つきの成果だけ薄黄色。受講開始だけなら塗らない。
+    if(R>0 && isResultColumn && text.includes("🌸")) style.fill = yellowFill;
     return style;
   });
 
-  setRangeStyle(wsList, listRange, (R,C)=>{
-    const val = String((state.listAoa[R] || [])[C] || "");
-    return {
-      font: R===0 ? fontHeader : (val.includes("未受講警告") ? fontRed : fontBase),
-      alignment:{vertical:"top", horizontal:R===0?"center":"left", wrapText:true},
-      border,
-      fill:R===0?headerFill:(val.includes("未受講警告")?{fgColor:{rgb:"FCE7F3"}}:undefined)
-    };
+  const commonStyle = (range, ws, aoa) => setRangeStyle(ws, range, (R,C,cell)=>({font:R===0?fontHeader:fontBase, alignment:{vertical:"top", horizontal:R===0?"center":"left", wrapText:true}, border, fill:R===0?headerFill:undefined}));
+  commonStyle(listRange, wsList, listAoa);
+  commonStyle(rosterRange, wsRoster, rosterAoa && rosterAoa.length ? rosterAoa : rosterHeader);
+  commonStyle(logRange, wsLog, logAoa && logAoa.length ? logAoa : [["ファイル","結果","内容","シート名/詳細"]]);
+  setRangeStyle(wsResult, resultRange, (R,C,cell)=>{
+    const text = String(cell.v ?? "");
+    const style = {font:R===0?fontHeader:fontBase, alignment:{vertical:"top", horizontal:R===0?"center":"left", wrapText:true}, border};
+    if(R===0) style.fill = headerFill;
+    if(R>0 && isYellowResultCellText(text)) style.fill = yellowFill;
+    return style;
   });
 
-  setRangeStyle(wsLog, logRange, (R,C)=>({
-    font: R===0 ? fontHeader : fontBase,
-    alignment:{vertical:"top", horizontal:R===0?"center":"left", wrapText:true},
-    border,
-    fill:R===0?headerFill:undefined
-  }));
-
-  setRangeStyle(wsResult, resultRange, (R,C)=>{
-    const val = String((state.resultAoa[R] || [])[C] || "");
-    return {
-      font: R===0 ? fontHeader : (val.includes("🌸") ? fontRed : fontBase),
-      alignment:{vertical:"top", horizontal:R===0?"center":"left", wrapText:true},
-      border,
-      fill:R===0?headerFill:undefined
-    };
-  });
-
-  setRangeStyle(wsRoster, rosterRange, (R,C)=>({
-    font: R===0 ? fontHeader : fontBase,
-    alignment:{vertical:"top", horizontal:R===0?"center":"left", wrapText:true},
-    border,
-    fill:R===0?headerFill:undefined
-  }));
-
-  // SheetJS互換の固定ペイン設定。対応Excelでは1行目・1列目が固定される。
   wsCal["!freeze"] = {xSplit:1, ySplit:1};
+  wsPoster["!freeze"] = {xSplit:2, ySplit:1};
+  // 掲示用は校舎掲示を想定して、横向き・余白少なめ・横1ページに収まる設定を付与。
+  wsPoster["!pageSetup"] = {orientation:"landscape", fitToWidth:1, fitToHeight:0};
+  wsPoster["!margins"] = {left:0.25, right:0.25, top:0.35, bottom:0.35, header:0.2, footer:0.2};
   wsList["!freeze"] = {ySplit:1};
-  wsLog["!freeze"] = {ySplit:1};
   wsResult["!freeze"] = {ySplit:1};
   wsRoster["!freeze"] = {ySplit:1};
+  wsLog["!freeze"] = {ySplit:1};
 
   XLSX.utils.book_append_sheet(wb, wsCal, "全体カレンダー");
+  XLSX.utils.book_append_sheet(wb, wsPoster, "掲示用カレンダー");
   XLSX.utils.book_append_sheet(wb, wsList, "予定一覧データ");
   XLSX.utils.book_append_sheet(wb, wsResult, "結果一覧データ");
   XLSX.utils.book_append_sheet(wb, wsRoster, "生徒対応表");
   XLSX.utils.book_append_sheet(wb, wsLog, "読み取りログ");
-
-  const today = new Date();
-  const from = $("fromDate").value;
-  const to = $("toDate").value;
-  const rangeLabel = from && to ? `_${from}_${to}` : "";
-  XLSX.writeFile(wb, `全体予定表${rangeLabel}_${ymd(today)}.xlsx`);
+  XLSX.writeFile(wb, `全体予定表_${label}.xlsx`);
 }
-
-function addDays(date, days){
-  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  d.setDate(d.getDate() + days);
-  return d;
-}
-function addMonths(date, months){
-  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  d.setMonth(d.getMonth() + months);
-  return d;
-}
-function getCenterDate(){
-  const v = $("centerDate") && $("centerDate").value;
-  if(v) return new Date(v + "T00:00:00");
-  return new Date();
-}
-async function downloadWithRange(mode){
-  if(!state.files.length){ alert("先に予定フォルダーを選択してください"); return; }
-  const center = getCenterDate();
-  if(mode === "2w"){
-    $("fromDate").value = ymd(addDays(center, -14));
-    $("toDate").value = ymd(addDays(center, 14));
-  }else if(mode === "1m"){
-    $("fromDate").value = ymd(addMonths(center, -1));
-    $("toDate").value = ymd(addMonths(center, 1));
-  }
-  await merge();
-  if(state.workbookReady) downloadWorkbook();
-}
-
 function setFiles(fileList){
   state.files = [...fileList].filter(f => !shouldSkipFile(f));
   updateStats(state.files, [], [], [], state.resultRecords);
