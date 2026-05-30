@@ -67,7 +67,7 @@
 
     <label>結果Excelを選択（任意・複数可）</label>
     <input id="resultInput" type="file" multiple accept=".xlsx,.xls,.xlsm" />
-    <div class="hint">列名：生徒番号 / 名前 / 学年 / 区分 / 学習内容 / 学習結果 / いいね! / 日時。複数日分は同じシートに下へ追記するのが推奨です。シートを日別に分けても全シートを読み取ります。</div>
+    <div class="hint">列名ありでも、列名なしでも読めます。基本形は A列:生徒番号 / B列:フルネーム / C列:学年 / D列:区分 / E列:学習内容 / F列:学習結果 / G列:いいね! / H列:日時 です。名前列が空白でも、生徒番号と対応表を照合して生徒名を復元します。</div>
 
     <label>読み取るシート名</label>
     <input id="sheetName" type="text" value="予定入力" />
@@ -79,13 +79,17 @@
       <option value="file">Excelファイル名から推定する</option>
     </select>
 
-    <label>期間フィルター</label>
+    <label>基準日</label>
+    <input id="centerDate" type="date" />
+    <div class="hint">「その日前後2週間」「その日前後1か月」は、この基準日を中心に出力します。初期値は今日です。予定Excelは、この基準日の1か月前以降の日付だけを読み込みます。</div>
+
+    <label>期間指定</label>
     <div class="smallrow">
       <input id="fromDate" type="date" />
       <span class="hint">〜</span>
       <input id="toDate" type="date" />
     </div>
-    <div class="hint">空欄なら読み取れた全期間を出力します。</div>
+    <div class="hint">期間指定出力では、この開始日〜終了日だけを出力します。空欄なら読み取れた全期間を出力します。</div>
 
     <label>表示・出力設定</label>
     <div class="hint"><label><input id="splitLines" type="checkbox" checked />1セル内の改行予定を予定一覧では分割する</label></div>
@@ -94,7 +98,9 @@
     <div class="hint"><label><input id="colorWeekend" type="checkbox" checked />出力Excelで土日列を薄く色分けする</label></div>
 
     <button id="mergeBtn" class="ok">統合プレビュー作成</button>
-    <button id="downloadBtn" disabled>全体予定表Excelを出力</button>
+    <button id="download2wBtn" disabled>その日前後2週間を出力</button>
+    <button id="download1mBtn" disabled>その日前後1か月を出力</button>
+    <button id="downloadBtn" disabled>期間指定出力</button>
     <button id="clearBtn" class="secondary">クリア</button>
 
     <label>状態</label>
@@ -151,6 +157,12 @@ const state = {
 };
 
 const $ = id => document.getElementById(id);
+function setDownloadButtonsDisabled(disabled){
+  ["downloadBtn","download2wBtn","download1mBtn"].forEach(id => {
+    const el = $(id);
+    if(el) el.disabled = disabled;
+  });
+}
 function log(msg){ $("status").textContent = msg; }
 function esc(s){ return String(s ?? "").replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
 function norm(s){ return String(s ?? "").replace(/\r\n/g,"\n").replace(/\r/g,"\n").trim(); }
@@ -159,6 +171,10 @@ function ymd(d){ return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.get
 function mmdd(d){ return `${d.getMonth()+1}/${d.getDate()}`; }
 function colName(n){ let s=""; while(n>0){ const m=(n-1)%26; s=String.fromCharCode(65+m)+s; n=Math.floor((n-1)/26); } return s; }
 const WEEK_JA = ["日","月","火","水","木","金","土"];
+
+document.addEventListener("DOMContentLoaded", () => {
+  if($("centerDate") && !$("centerDate").value) $("centerDate").value = ymd(new Date());
+});
 
 function parseDateLoose(value, fallbackYear = new Date().getFullYear()){
   if(value == null || value === "") return null;
@@ -227,6 +243,34 @@ function getHeaderMap(aoa){
 
 const ROSTER_COLUMNS = ["生徒番号","学年","生徒名","読み仮名","担当","高校","備考"];
 function normalizeNameKey(s){ return String(s ?? "").replace(/[\s\u3000]+/g, "").trim(); }
+function normalizeStudentNoKey(s){
+  let v = String(s ?? "")
+    .replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0)-0xFEE0))
+    .replace(/[\s\u3000"']/g, "")
+    .trim();
+  if(!v) return "";
+  // Excelで数値として読まれて 12345.0 のようになった場合を吸収
+  if(/^\d+\.0+$/.test(v)) v = v.replace(/\.0+$/, "");
+  return v;
+}
+function studentNoKeys(s){
+  const k = normalizeStudentNoKey(s);
+  if(!k) return [];
+  const keys = [k];
+  // 対応表と結果Excelで「00123」と「123」が混在しても照合できるようにする
+  const noZero = k.replace(/^0+(?=\d)/, "");
+  if(noZero && noZero !== k) keys.push(noZero);
+  return [...new Set(keys)];
+}
+function setRosterNo(noMap, studentNo, meta){
+  for(const k of studentNoKeys(studentNo)) noMap.set(k, meta);
+}
+function lookupRosterByStudentNo(studentNo){
+  for(const k of studentNoKeys(studentNo)){
+    if(state.rosterNoMap.has(k)) return state.rosterNoMap.get(k);
+  }
+  return null;
+}
 function emptyRoster(student=""){
   return {"生徒番号":"","学年":"","生徒名":student,"読み仮名":"","担当":"","高校":"","備考":""};
 }
@@ -365,7 +409,7 @@ async function parseRosterFile(file){
     const key = normalizeNameKey(meta["生徒名"]);
     if(!key) return false;
     map.set(key, meta);
-    if(meta["生徒番号"]) noMap.set(normalizeNameKey(meta["生徒番号"]), meta);
+    if(meta["生徒番号"]) setRosterNo(noMap, meta["生徒番号"], meta);
     out.push(ROSTER_COLUMNS.map(c => meta[c] || ""));
     return true;
   }
@@ -690,16 +734,28 @@ function getResultHeaderMap(aoa){
 
 function resolveResultStudent(studentName, studentNo){
   const nameKey = normalizeNameKey(studentName);
-  if(nameKey){
-    const resolved = resolveRosterMeta(studentName);
-    if((resolved.status === "exact" || resolved.status === "prefix") && resolved.meta["生徒名"]){
-      return resolved.meta["生徒名"];
-    }
-    return studentName;
+
+  // 結果Excelの「名前」列を空白にしている場合は、生徒番号だけで対応表から名前を引く。
+  // 対応表を読み込んでいて生徒番号が一致すれば、出力Excelの生徒名欄には本名を入れる。
+  if(!nameKey){
+    const metaByNo = lookupRosterByStudentNo(studentNo);
+    if(metaByNo && metaByNo["生徒名"]) return metaByNo["生徒名"];
+    const noKey = normalizeStudentNoKey(studentNo);
+    return noKey ? `未照合:${noKey}` : "";
   }
-  const noKey = normalizeNameKey(studentNo);
-  if(noKey && state.rosterNoMap.has(noKey)) return state.rosterNoMap.get(noKey)["生徒名"];
-  return noKey ? `生徒番号:${studentNo}` : "";
+
+  // 名前欄に誤って生徒番号が入っている/列がずれている場合も、生徒番号として照合を試す。
+  const metaFromNameAsNo = lookupRosterByStudentNo(studentName);
+  if(metaFromNameAsNo && metaFromNameAsNo["生徒名"]) return metaFromNameAsNo["生徒名"];
+
+  const resolved = resolveRosterMeta(studentName);
+  if((resolved.status === "exact" || resolved.status === "prefix") && resolved.meta["生徒名"]){
+    return resolved.meta["生徒名"];
+  }
+
+  const metaByNo = lookupRosterByStudentNo(studentNo);
+  if(metaByNo && metaByNo["生徒名"]) return metaByNo["生徒名"];
+  return studentName;
 }
 
 function classifyResult(study, result){
@@ -723,6 +779,17 @@ function summarizeResult(study, result){
   return `${category}: ${s} / ${detail}`;
 }
 
+function looksLikeResultHeader(row){
+  const joined = (row || []).map(v => norm(v)).join("|");
+  return /生徒番号|名前|生徒名|学習内容|学習結果|日時|区分/.test(joined);
+}
+
+function fixedResultHeaderMap(){
+  // 列名なし結果Excel用の固定レイアウト
+  // A:生徒番号 B:フルネーム C:学年 D:区分 E:学習内容 F:学習結果 G:いいね H:日時
+  return {studentNo:0, student:1, grade:2, type:3, study:4, result:5, like:6, datetime:7};
+}
+
 async function parseResultFile(file){
   const logRows = [];
   const records = [];
@@ -731,15 +798,19 @@ async function parseResultFile(file){
     const wb = XLSX.read(buf, {type:"array", cellDates:true});
     for(const sheetName of wb.SheetNames){
       const ws = wb.Sheets[sheetName];
-      const aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:"", raw:true});
-      if(aoa.length < 2) continue;
-      const h = getResultHeaderMap(aoa);
+      const aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:"", raw:true}).filter(row => (row || []).some(v => norm(v)));
+      if(aoa.length < 1) continue;
+
+      const hasHeader = looksLikeResultHeader(aoa[0]);
+      const h = hasHeader ? getResultHeaderMap(aoa) : fixedResultHeaderMap();
+      const startRow = hasHeader ? 1 : 0;
+
       if(h.study < 0 || h.result < 0 || h.datetime < 0){
-        logRows.push([file.name, "注意", `結果Excelの列不足のためスキップ: ${sheetName}`, "学習内容・学習結果・日時が必要"]);
+        logRows.push([file.name, "注意", `結果Excelの列不足のためスキップ: ${sheetName}`, "A:生徒番号 B:名前 C:学年 D:区分 E:学習内容 F:学習結果 G:いいね H:日時、または見出し行が必要です"]);
         continue;
       }
       let count = 0;
-      for(let r=1;r<aoa.length;r++){
+      for(let r=startRow;r<aoa.length;r++){
         const row = aoa[r] || [];
         const study = norm(row[h.study]);
         const result = norm(row[h.result]);
@@ -764,7 +835,7 @@ async function parseResultFile(file){
         });
         count++;
       }
-      logRows.push([file.name, "成功", `結果 ${count}件読み込み`, sheetName]);
+      logRows.push([file.name, "成功", `結果 ${count}件読み込み${hasHeader ? "（見出し行あり）" : "（A〜H固定列）"}`, sheetName]);
     }
   }catch(e){
     logRows.push([file.name, "失敗", e.message || String(e), "結果Excel"]);
@@ -781,12 +852,36 @@ function filterResultRecords(records){
 function filterRecords(records){
   const from = $("fromDate").value ? new Date($("fromDate").value + "T00:00:00") : null;
   const to = $("toDate").value ? new Date($("toDate").value + "T23:59:59") : null;
-  return records.filter(rec => (!from || rec.dateObj >= from) && (!to || rec.dateObj <= to));
+
+  // 予定Excelは、基準日の1か月前より古い予定を自動で読み込まない。
+  // 例：基準日が6/30なら、5/30以降の予定だけを統合対象にする。
+  const planOldest = addMonths(getCenterDate(), -1);
+  planOldest.setHours(0,0,0,0);
+  const effectiveFrom = from && from > planOldest ? from : planOldest;
+
+  return records.filter(rec => rec.dateObj >= effectiveFrom && (!to || rec.dateObj <= to));
 }
 
 function isSSJudgeText(text){
   const t = String(text ?? "").replace(/Ｓ/g,"S").toUpperCase();
   return /SS/.test(t);
+}
+function isCourseLearnedText(text){
+  const t = toHalfWidth(String(text ?? ""));
+  return /講座を?習得|講座を?修得|完全習得|完全修得/.test(t);
+}
+function isCompleteLearnedText(text){
+  const t = toHalfWidth(String(text ?? ""));
+  return /完全習得|完全修得/.test(t);
+}
+function isSakuraResultText(text){
+  return isSSJudgeText(text) || isCourseLearnedText(text) || isCompleteLearnedText(text);
+}
+function sakuraResultReason(text){
+  if(isSSJudgeText(text)) return "SS判定";
+  if(isCompleteLearnedText(text)) return "完全習得";
+  if(isCourseLearnedText(text)) return "講座習得";
+  return "予定一致";
 }
 
 function toHalfWidth(s){
@@ -828,6 +923,18 @@ function addDaysOnly(d, days){
 }
 
 function buildOutputs(records, logRows, resultRecords=[]){
+  // 予定Excelは苗字だけ、結果Excelはフルネームで入ることがあるため、
+  // 出力表を作る直前に必ず対応表で「正式な生徒名」に正規化する。
+  // これにより「北野」と「北野太郎」が別行になるのを防ぐ。
+  records = records.map(r => {
+    const canonical = canonicalStudentName(r.student);
+    return Object.assign({}, r, {rawStudent:r.student, student: canonical || r.student || "未分類"});
+  });
+  resultRecords = resultRecords.map(r => {
+    const canonical = canonicalStudentName(r.student);
+    return Object.assign({}, r, {rawStudentResolved:r.student, student: canonical || r.student || "未照合"});
+  });
+
   const students = [...new Set([...records.map(r => r.student || "未分類"), ...resultRecords.map(r => r.student || "未照合")])];
   if($("sortStudents").checked) students.sort((a,b)=>studentSortKey(a).localeCompare(studentSortKey(b),"ja") || String(a).localeCompare(String(b),"ja"));
   const dateKeys = [...new Set([...records.map(r => r.dateKey), ...resultRecords.map(r => r.dateKey)])].sort();
@@ -888,8 +995,9 @@ function buildOutputs(records, logRows, resultRecords=[]){
   for(const rec of resultRecords){
     const key = `${rec.student}\t${rec.dateKey}`;
     const rk = `${rec.student}\t${rec.dateKey}\t${rec.timeLabel}\t${rec.study}\t${rec.result}`;
-    const mark = isSSJudgeText(`${rec.study} ${rec.result} ${rec.summary}`) || resultMatchedKeys.has(rk);
-    const reason = isSSJudgeText(`${rec.study} ${rec.result} ${rec.summary}`) ? "SS判定" : "予定一致";
+    const resultText = `${rec.study} ${rec.result} ${rec.summary}`;
+    const mark = isSakuraResultText(resultText) || resultMatchedKeys.has(rk);
+    const reason = isSakuraResultText(resultText) ? sakuraResultReason(resultText) : "予定一致";
     const base = `${rec.timeLabel ? rec.timeLabel + " " : ""}${rec.summary}`;
     const text = mark ? `🌸 ${reason}: ${base}` : base;
     if(!resultMap.has(key)) resultMap.set(key, []);
@@ -908,7 +1016,7 @@ function buildOutputs(records, logRows, resultRecords=[]){
   for(const stu of students){
     const resolved = resolveRosterMeta(stu);
     const meta = resolved.meta;
-    if(state.rosterMap.size && resolved.status !== "exact" && resolved.status !== "prefix" && !String(stu).startsWith("生徒番号:")){
+    if(state.rosterMap.size && resolved.status !== "exact" && resolved.status !== "prefix" && !String(stu).startsWith("未照合:")){
       const detail = resolved.status === "ambiguous" ? `${stu}（候補: ${resolved.candidates.map(m => m["生徒名"]).join(" / ")}）` : stu;
       unmatched.push(detail);
     }
@@ -931,7 +1039,7 @@ function buildOutputs(records, logRows, resultRecords=[]){
   }
 
   for(const rr of resultRecords){
-    if(!rr.student || String(rr.student).startsWith("生徒番号:")) unmatchedResults.push(rr);
+    if(!rr.student || String(rr.student).startsWith("未照合:")) unmatchedResults.push(rr);
   }
 
   const listAoa = [["学年","生徒番号","生徒名","読み仮名","担当","高校","備考","日付","曜日","時限/行名","内容","元セル","元ファイル","元パス","週開始日","行番号","列番号"]];
@@ -956,8 +1064,9 @@ function buildOutputs(records, logRows, resultRecords=[]){
   for(const r of resultSorted){
     const meta = rosterMetaForStudent(r.student);
     const rk = `${r.student}\t${r.dateKey}\t${r.timeLabel}\t${r.study}\t${r.result}`;
-    const mark = isSSJudgeText(`${r.study} ${r.result} ${r.summary}`) || resultMatchedKeys.has(rk);
-    const reason = isSSJudgeText(`${r.study} ${r.result} ${r.summary}`) ? "SS判定" : "予定一致";
+    const resultText = `${r.study} ${r.result} ${r.summary}`;
+    const mark = isSakuraResultText(resultText) || resultMatchedKeys.has(rk);
+    const reason = isSakuraResultText(resultText) ? sakuraResultReason(resultText) : "予定一致";
     const display = `${r.timeLabel ? r.timeLabel + " " : ""}${r.summary}`;
     resultAoa.push([
       meta["学年"] || r.grade || "",
@@ -973,13 +1082,30 @@ function buildOutputs(records, logRows, resultRecords=[]){
   return {calendarAoa, listAoa, resultAoa, logAoa:fullLogAoa, students, dateKeys};
 }
 
+function formatMarkedHtml(cell){
+  let html = esc(cell);
+  html = html.replace(/🌸/g, '<span style="color:#dc2626;font-weight:900;">🌸</span>');
+  html = html.replace(/❗未受講警告/g, '<span style="color:#dc2626;font-weight:900;">❗未受講警告</span>');
+  html = html.replace(/!未受講警告/g, '<span style="color:#dc2626;font-weight:900;">!未受講警告</span>');
+  return html;
+}
+
 function renderAoa(containerId, aoa, maxRows=300){
   const host = $(containerId);
   if(!aoa.length){ host.innerHTML = `<div class="hint" style="padding:14px;">データなし</div>`; return; }
   let html = "<table><tbody>";
   aoa.slice(0,maxRows).forEach((row,ri)=>{
     html += "<tr>";
-    row.forEach(cell => html += ri === 0 ? `<th>${esc(cell)}</th>` : `<td>${esc(cell)}</td>`);
+    row.forEach((cell,ci) => {
+      if(ri === 0){
+        html += `<th>${esc(cell)}</th>`;
+      }else{
+        const head = String((aoa[0] || [])[ci] || "");
+        const val = String(cell || "");
+        const style = head.includes("予定") && val.includes("未受講警告") ? ' style="background:#fce7f3;"' : "";
+        html += `<td${style}>${formatMarkedHtml(cell)}</td>`;
+      }
+    });
     html += "</tr>";
   });
   html += "</tbody></table>";
@@ -999,7 +1125,7 @@ async function merge(){
   const files = state.files.filter(f => !shouldSkipFile(f));
   if(!files.length){ alert("Excelファイルを選択してください"); return; }
   $("mergeBtn").disabled = true;
-  $("downloadBtn").disabled = true;
+  setDownloadButtonsDisabled(true);
   log(`読み込み中...\n対象Excel: ${files.length}件\n結果Excel: ${state.resultFiles.length}件`);
 
   let allRecords = [];
@@ -1010,7 +1136,12 @@ async function merge(){
     allRecords.push(...records);
     allLogs.push(...logRows);
   }
+  const planCountBeforeDateLimit = allRecords.length;
   allRecords = filterRecords(allRecords);
+  const planSkippedByDateLimit = planCountBeforeDateLimit - allRecords.length;
+  if(planSkippedByDateLimit > 0){
+    allLogs.push(["予定Excel日付制限", "注意", `基準日の1か月前より古い予定を${planSkippedByDateLimit}件除外しました`, `基準日: ${ymd(getCenterDate())}`]);
+  }
 
   let allResults = [];
   for(let i=0;i<state.resultFiles.length;i++){
@@ -1036,7 +1167,7 @@ async function merge(){
   renderAoa("logPane", state.logAoa, 500);
   if(!state.rosterAoa.length) renderAoa("rosterPane", [ROSTER_COLUMNS], 300);
   updateStats(files, allRecords, out.students, out.dateKeys, allResults);
-  $("downloadBtn").disabled = !state.workbookReady;
+  setDownloadButtonsDisabled(!state.workbookReady);
   $("mergeBtn").disabled = false;
 
   const success = allLogs.filter(x => x[1] === "成功").length;
@@ -1117,6 +1248,7 @@ function downloadWorkbook(){
   const nameFill = {fgColor:{rgb:"F1F5F9"}};
   const weekendFill = {fgColor:{rgb:"F8FAFC"}};
   const fontBase = {name:"Yu Gothic", sz:11, color:{rgb:"111827"}};
+  const fontRed = {name:"Yu Gothic", sz:11, color:{rgb:"DC2626"}, bold:true};
   const fontHeader = {name:"Yu Gothic", sz:11, bold:true, color:{rgb:"111827"}};
 
   setRangeStyle(wsCal, calRange, (R,C)=>{
@@ -1132,20 +1264,27 @@ function downloadWorkbook(){
       const label = String(state.calendarAoa[0][C] || "");
       if(label.includes("(土)") || label.includes("(日)")) style.fill = weekendFill;
     }
-    // 結果セルにSS判定が含まれる場合は、文字が読めるよう薄い桜色でスタンプ風に強調
-    if(R>0 && C>6 && String(state.calendarAoa[0][C] || "").includes("結果") && isSSJudgeText(state.calendarAoa[R][C])){
+    // 未受講警告の予定セルは、見落とし防止のため薄ピンク背景にし、警告文字が目立つよう赤字にする。
+    if(R>0 && C>6 && String(state.calendarAoa[0][C] || "").includes("予定") && String(state.calendarAoa[R][C] || "").includes("未受講警告")){
       style.fill = {fgColor:{rgb:"FCE7F3"}};
-      style.font = {name:"Yu Gothic", sz:11, color:{rgb:"831843"}, bold:true};
+      style.font = fontRed;
+    }
+    // 結果セルに🌸がある場合は、背景は塗らず、桜マークが分かるよう赤字にする。
+    if(R>0 && C>6 && String(state.calendarAoa[0][C] || "").includes("結果") && String(state.calendarAoa[R][C] || "").includes("🌸")){
+      style.font = fontRed;
     }
     return style;
   });
 
-  setRangeStyle(wsList, listRange, (R,C)=>({
-    font: R===0 ? fontHeader : fontBase,
-    alignment:{vertical:"top", horizontal:R===0?"center":"left", wrapText:true},
-    border,
-    fill:R===0?headerFill:undefined
-  }));
+  setRangeStyle(wsList, listRange, (R,C)=>{
+    const val = String((state.listAoa[R] || [])[C] || "");
+    return {
+      font: R===0 ? fontHeader : (val.includes("未受講警告") ? fontRed : fontBase),
+      alignment:{vertical:"top", horizontal:R===0?"center":"left", wrapText:true},
+      border,
+      fill:R===0?headerFill:(val.includes("未受講警告")?{fgColor:{rgb:"FCE7F3"}}:undefined)
+    };
+  });
 
   setRangeStyle(wsLog, logRange, (R,C)=>({
     font: R===0 ? fontHeader : fontBase,
@@ -1154,12 +1293,15 @@ function downloadWorkbook(){
     fill:R===0?headerFill:undefined
   }));
 
-  setRangeStyle(wsResult, resultRange, (R,C)=>({
-    font: R===0 ? fontHeader : fontBase,
-    alignment:{vertical:"top", horizontal:R===0?"center":"left", wrapText:true},
-    border,
-    fill:R===0?headerFill:undefined
-  }));
+  setRangeStyle(wsResult, resultRange, (R,C)=>{
+    const val = String((state.resultAoa[R] || [])[C] || "");
+    return {
+      font: R===0 ? fontHeader : (val.includes("🌸") ? fontRed : fontBase),
+      alignment:{vertical:"top", horizontal:R===0?"center":"left", wrapText:true},
+      border,
+      fill:R===0?headerFill:undefined
+    };
+  });
 
   setRangeStyle(wsRoster, rosterRange, (R,C)=>({
     font: R===0 ? fontHeader : fontBase,
@@ -1182,18 +1324,50 @@ function downloadWorkbook(){
   XLSX.utils.book_append_sheet(wb, wsLog, "読み取りログ");
 
   const today = new Date();
-  XLSX.writeFile(wb, `全体予定表_${ymd(today)}.xlsx`);
+  const from = $("fromDate").value;
+  const to = $("toDate").value;
+  const rangeLabel = from && to ? `_${from}_${to}` : "";
+  XLSX.writeFile(wb, `全体予定表${rangeLabel}_${ymd(today)}.xlsx`);
+}
+
+function addDays(date, days){
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  d.setDate(d.getDate() + days);
+  return d;
+}
+function addMonths(date, months){
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  d.setMonth(d.getMonth() + months);
+  return d;
+}
+function getCenterDate(){
+  const v = $("centerDate") && $("centerDate").value;
+  if(v) return new Date(v + "T00:00:00");
+  return new Date();
+}
+async function downloadWithRange(mode){
+  if(!state.files.length){ alert("先に予定フォルダーを選択してください"); return; }
+  const center = getCenterDate();
+  if(mode === "2w"){
+    $("fromDate").value = ymd(addDays(center, -14));
+    $("toDate").value = ymd(addDays(center, 14));
+  }else if(mode === "1m"){
+    $("fromDate").value = ymd(addMonths(center, -1));
+    $("toDate").value = ymd(addMonths(center, 1));
+  }
+  await merge();
+  if(state.workbookReady) downloadWorkbook();
 }
 
 function setFiles(fileList){
   state.files = [...fileList].filter(f => !shouldSkipFile(f));
   updateStats(state.files, [], [], [], state.resultRecords);
-  $("downloadBtn").disabled = true;
+  setDownloadButtonsDisabled(true);
   log(`予定Excel選択完了\nExcelファイル: ${state.files.length}件\n「統合プレビュー作成」を押してください。`);
 }
 function setResultFiles(fileList){
   state.resultFiles = [...fileList].filter(f => !shouldSkipFile(f));
-  $("downloadBtn").disabled = true;
+  setDownloadButtonsDisabled(true);
   log(`結果Excel選択完了\n結果Excelファイル: ${state.resultFiles.length}件\n予定表フォルダーも選んでから「統合プレビュー作成」を押してください。`);
 }
 
@@ -1209,7 +1383,9 @@ $("rosterInput").addEventListener("change", async e => {
   }
 });
 $("mergeBtn").addEventListener("click", merge);
-$("downloadBtn").addEventListener("click", downloadWorkbook);
+$("download2wBtn").addEventListener("click", () => downloadWithRange("2w"));
+$("download1mBtn").addEventListener("click", () => downloadWithRange("1m"));
+$("downloadBtn").addEventListener("click", () => downloadWithRange("custom"));
 $("clearBtn").addEventListener("click", () => {
   state.files=[]; state.resultFiles=[]; state.records=[]; state.resultRecords=[]; state.calendarAoa=[]; state.listAoa=[]; state.resultAoa=[]; state.logAoa=[]; state.rosterAoa=[]; state.rosterMap=new Map(); state.rosterNoMap=new Map(); state.workbookReady=false;
   $("folderInput").value="";
@@ -1217,7 +1393,7 @@ $("clearBtn").addEventListener("click", () => {
   $("resultInput").value="";
   updateStats([],[],[],[],[]);
   ["calendarPane","listPane","resultPane","rosterPane","logPane"].forEach(id => $(id).innerHTML = `<div class="hint" style="padding:14px;">クリアしました。</div>`);
-  $("downloadBtn").disabled = true;
+  setDownloadButtonsDisabled(true);
   log("待機中");
 });
 
