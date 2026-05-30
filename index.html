@@ -10,13 +10,13 @@
 </style>
 </head>
 <body>
-<header><div class="wrap"><h1>予定入力HTML（受講3行・その他の予定3行）</h1><div class="sub">手書きOCRを使わず、予定を直接入力してExcel（.xlsx）として保存します。Excel破損対策済み。生徒名ごとに下段の内容を保存し、次週にボタンで読み込めます。</div></div></header>
+<header><div class="wrap"><h1>予定入力HTML（受講3行・その他の予定3行）</h1><div class="sub">①生徒名 → ②日付を反映 → ③前回内容を読み込んで打ち込む → ④コピー → ⑤この生徒の内容を保存 → ⑥Excel出力 の順で使えます。Excel破損対策済み。生徒名ごとに下段の内容を保存し、次週にボタンで読み込めます。</div></div></header>
 <main class="wrap">
 <section class="card"><div class="toolbar">
-<div class="field"><label>生徒名</label><input id="studentName" placeholder="例：北野" /></div>
+<div class="field"><label>① 生徒名</label><input id="studentName" placeholder="例：北野" /></div>
 <div class="field"><label>開始日（ページを開いた日）</label><input id="weekStart" type="date" /></div>
-<button id="applyDates">日付を反映</button><button id="exportXlsx">Excel出力</button><button id="copyText">コピー</button><button class="secondary" id="saveStudentMemory">この生徒の内容を保存</button><button class="secondary" id="loadStudentMemory">前回内容を読込</button><button class="secondary" id="saveLocal">ブラウザに一時保存</button><button class="secondary" id="loadLocal">一時保存を復元</button><button class="danger" id="clearAll">全消去</button>
-</div><div class="hint" style="margin-top:10px">Enterで次のマスへ移動します。入力欄内で改行したい場合は Shift + Enter。Excel名は「生徒名.開始日-終了日.xlsx」です。「前回内容を読込」は、生徒名ごとに保存した下段（教科・問題集/高速マスター・内容・備考）だけを復元します。</div></section>
+<button id="applyDates">② 日付を反映</button><button class="secondary" id="loadStudentMemory">③ 前回内容を読み込んで打ち込む</button><button id="copyText">④ コピー</button><button class="secondary" id="saveStudentMemory">⑤ この生徒の内容を保存</button><button id="exportXlsx">⑥ Excel出力</button><button class="secondary" id="saveLocal">ブラウザに一時保存</button><button class="secondary" id="loadLocal">一時保存を復元</button><button class="danger" id="clearAll">全消去</button>
+</div><div class="hint" style="margin-top:10px">Enterで次のマスへ移動します。入力欄内で改行したい場合は Shift + Enter。Excel名は「生徒名.開始日-終了日.xlsx」です。「③ 前回内容を読み込んで打ち込む」は、生徒名ごとに保存した下段（教科・問題集/高速マスター・内容・備考）だけを復元します。</div></section>
 <div class="grid"><div>
 <section class="card"><p class="sectionTitle">上段：日付ごとの予定（受講1〜3／その他の予定1〜3）</p><div style="overflow:auto"><table id="scheduleTable"><thead><tr><th style="width:110px">予定/日付</th><th data-day="0"></th><th data-day="1"></th><th data-day="2"></th><th data-day="3"></th><th data-day="4"></th><th data-day="5"></th><th data-day="6"></th></tr></thead><tbody id="scheduleBody"></tbody></table></div></section>
 <section class="card"><p class="sectionTitle">下段：教科・問題集/高速マスター・内容</p><div style="overflow:auto"><table id="materialTable"><thead><tr><th style="width:110px">教科</th><th colspan="3">問題集/高速マスター</th><th colspan="4">内容</th><th class="nowrap" style="width:80px">操作</th></tr></thead><tbody id="materialBody"></tbody></table></div><div class="actions"><button class="secondary" id="addMaterial">行を追加</button><button class="secondary" id="addMany">5行追加</button></div></section>
