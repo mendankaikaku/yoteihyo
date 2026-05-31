@@ -152,6 +152,7 @@ const state = {
   logAoa: [],
   resultAoa: [],
   examRecords: [],
+  eventRecords: [],
   rosterAoa: [],
   rosterMap: new Map(),
   rosterNoMap: new Map(),
@@ -810,6 +811,104 @@ async function parseExamFile(file){
   return {records, logRows};
 }
 
+
+
+// ============================================================
+// 2.6 予定入力Excel内「イベント確認」シートの読み取り
+// ============================================================
+function getEventHeaderMap(aoa){
+  const header = (aoa[0] || []).map(x => norm(x));
+  const find = (names) => {
+    for(const name of names){ const idx = header.findIndex(h => h === name); if(idx >= 0) return idx; }
+    for(let i=0;i<header.length;i++){ const h = header[i]; if(names.some(n => h.includes(n))) return i; }
+    return -1;
+  };
+  return {
+    student: find(['生徒名','名前']),
+    grade: find(['学年']),
+    weekStart: find(['週開始','週開始日']),
+    eventName: find(['イベント名','イベント']),
+    datetime: find(['日時','日付','実施日','時刻']),
+    status: find(['参加/不参加','参加','不参加','出欠']),
+    note: find(['備考','メモ']),
+    savedAt: find(['保存日時','保存日'])
+  };
+}
+function parseEventDateTime(value, weekStart=''){
+  if(value == null || value === '') return {datetime:'', dateObj:new Date(2099,0,1)};
+  if(value instanceof Date && !isNaN(value)){
+    return {datetime:`${ymd(value)} ${hm(value)}`.trim(), dateObj:new Date(value.getFullYear(), value.getMonth(), value.getDate())};
+  }
+  let s = String(value).trim();
+  if(!s) return {datetime:'', dateObj:new Date(2099,0,1)};
+  // datetime-local の 2026-06-01T19:30 に対応
+  const mIso = s.match(/^(\d{4}-\d{1,2}-\d{1,2})[T\s](\d{1,2}:\d{2})/);
+  if(mIso){
+    const d = parseDateLoose(mIso[1]);
+    if(d) return {datetime:`${ymd(d)} ${mIso[2]}`, dateObj:new Date(d.getFullYear(), d.getMonth(), d.getDate())};
+  }
+  const dt = parseDateTimeLoose(s);
+  if(dt) return {datetime:`${ymd(dt)}${hm(dt) ? ' ' + hm(dt) : ''}`, dateObj:new Date(dt.getFullYear(), dt.getMonth(), dt.getDate())};
+  // 時刻だけなら週開始日を添える
+  const tm = s.match(/(\d{1,2}:\d{2})/);
+  const base = parseDateLoose(weekStart);
+  if(tm && base) return {datetime:`${ymd(base)} ${tm[1]}`, dateObj:new Date(base.getFullYear(), base.getMonth(), base.getDate())};
+  return {datetime:s, dateObj:new Date(2099,0,1)};
+}
+async function parseEventFile(file){
+  const records = [];
+  const logRows = [];
+  try{
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, {type:'array', cellDates:true});
+    const sheetName = wb.SheetNames.find(n => n === 'イベント確認' || n.includes('イベント'));
+    if(!sheetName) return {records, logRows};
+    const ws = wb.Sheets[sheetName];
+    const aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:'', raw:false});
+    if(aoa.length < 2) return {records, logRows};
+    const h = getEventHeaderMap(aoa);
+    if(h.eventName < 0 || h.status < 0){
+      logRows.push([file.webkitRelativePath || file.name, '注意', 'イベント確認シートの列不足のためスキップ', sheetName]);
+      return {records, logRows};
+    }
+    const fallbackStudent = canonicalStudentName(getStudentNameFromPath(file));
+    let count = 0;
+    for(let r=1;r<aoa.length;r++){
+      const row = aoa[r] || [];
+      const eventName = norm(row[h.eventName]);
+      const status = h.status >= 0 ? norm(row[h.status]) : '';
+      const note = h.note >= 0 ? norm(row[h.note]) : '';
+      if(!eventName && !status && !note) continue;
+      const rawStudent = h.student >= 0 ? norm(row[h.student]) : '';
+      const student = canonicalStudentName(rawStudent || fallbackStudent);
+      const meta = rosterMetaForStudent(student);
+      const weekStart = h.weekStart >= 0 ? norm(row[h.weekStart]) : '';
+      const dtInfo = h.datetime >= 0 ? parseEventDateTime(row[h.datetime], weekStart) : {datetime:'', dateObj:new Date(2099,0,1)};
+      const rowGrade = h.grade >= 0 ? norm(row[h.grade]) : '';
+      records.push({
+        student,
+        grade: meta['学年'] || rowGrade || '',
+        studentNo: meta['生徒番号'] || '',
+        kana: meta['読み仮名'] || '',
+        eventName,
+        datetime: dtInfo.datetime,
+        dateObj: dtInfo.dateObj,
+        status,
+        note,
+        weekStart,
+        sourceFile: file.name,
+        sourcePath: file.webkitRelativePath || file.name,
+        savedAt: h.savedAt >= 0 ? norm(row[h.savedAt]) : ''
+      });
+      count++;
+    }
+    if(count) logRows.push([file.webkitRelativePath || file.name, '成功', `イベント確認 ${count}件読み込み`, sheetName]);
+  }catch(e){
+    logRows.push([file.webkitRelativePath || file.name, '失敗', e.message || String(e), 'イベント確認']);
+  }
+  return {records, logRows};
+}
+
 // ============================================================
 // 3. 結果Excelの読み取り
 // ============================================================
@@ -1255,6 +1354,7 @@ async function merge(){
 
   let allRecords = [];
   let allExamRecords = [];
+  let allEventRecords = [];
   let allLogs = [];
   for(let i=0;i<files.length;i++){
     log(`読み込み中 ${i+1}/${files.length}\n${files[i].webkitRelativePath || files[i].name}`);
@@ -1264,6 +1364,9 @@ async function merge(){
     const examParsed = await parseExamFile(files[i]);
     allExamRecords.push(...examParsed.records);
     allLogs.push(...examParsed.logRows);
+    const eventParsed = await parseEventFile(files[i]);
+    allEventRecords.push(...eventParsed.records);
+    allLogs.push(...eventParsed.logRows);
   }
   const planCountBeforeDateLimit = allRecords.length;
   allRecords = filterRecords(allRecords);
@@ -1285,6 +1388,7 @@ async function merge(){
   state.records = allRecords;
   state.resultRecords = allResults;
   state.examRecords = allExamRecords;
+  state.eventRecords = allEventRecords;
   state.calendarAoa = out.calendarAoa;
   state.listAoa = out.listAoa;
   state.resultAoa = out.resultAoa;
@@ -1303,7 +1407,8 @@ async function merge(){
   const success = allLogs.filter(x => x[1] === "成功").length;
   const fail = allLogs.filter(x => x[1] === "失敗").length;
   log(`統合プレビュー作成完了\n成功ファイル: ${success}\n失敗ファイル: ${fail}\n予定件数: ${allRecords.length}\n結果件数: ${allResults.length}\n生徒数: ${out.students.length}\n日付数: ${out.dateKeys.length}
-模試確認件数: ${allExamRecords.length}`);
+模試確認件数: ${allExamRecords.length}
+イベント確認件数: ${allEventRecords.length}`);
 }
 
 function aoaToSheet(aoa){ return XLSX.utils.aoa_to_sheet(aoa); }
@@ -1865,82 +1970,123 @@ function downloadWithRange(mode){
   const records = state.records.filter(r => inDateRange(r, from, to));
   const results = state.resultRecords.filter(r => inDateRange(r, from, to));
   const exams = state.examRecords.filter(r => (!from || r.examDateObj >= from) && (!to || r.examDateObj <= to));
+  const events = state.eventRecords.filter(r => (!from || r.dateObj >= from) && (!to || r.dateObj <= to));
   const out = buildOutputs(records, [], results);
-  downloadWorkbookFromAoa(out.calendarAoa, out.listAoa, out.resultAoa, state.rosterAoa, out.logAoa, label, exams);
+  downloadWorkbookFromAoa(out.calendarAoa, out.listAoa, out.resultAoa, state.rosterAoa, out.logAoa, label, exams, events);
 }
 
 function safeSheetName(name){
   return String(name || '未設定').replace(/[\\\/\?\*\[\]:]/g, '').slice(0, 31) || '未設定';
 }
-function buildExamSubjectSheetAoa(records, grade){
-  const gradeRecords = records.filter(r => String(r.grade || '未設定') === grade);
+function shortSheetPart(name){
+  let s = String(name || '未設定')
+    .replace(/大学入学共通テスト/g,'共テ')
+    .replace(/共通テスト/g,'共テ')
+    .replace(/本番レベル模試/g,'本レ')
+    .replace(/全国統一高校生テスト/g,'全統高')
+    .replace(/模試/g,'')
+    .replace(/\s+/g,'')
+    .trim();
+  return s || '未設定';
+}
+function uniqueSheetName(base, used){
+  let name = safeSheetName(base);
+  if(!used.has(name)){ used.add(name); return name; }
+  for(let i=2;i<1000;i++){
+    const suffix = `_${i}`;
+    const cand = safeSheetName(String(base).slice(0, 31 - suffix.length) + suffix);
+    if(!used.has(cand)){ used.add(cand); return cand; }
+  }
+  return name;
+}
+function examKeyOf(r){ return `${r.examDate || ''}\t${r.examName || ''}\t${r.type || ''}`; }
+function buildExamSubjectSheetAoa(records, grade, examKey){
+  const gradeRecords = records.filter(r => String(r.grade || '未設定') === grade && examKeyOf(r) === examKey);
+  const first = gradeRecords[0] || {};
+  const subjects = [...new Set(gradeRecords.flatMap(r => subjectsForExamType(r.type, r.subjects)))];
+  const aoa = [[`${first.examDate ? first.examDate + ' ' : ''}${first.examName || '模試名未入力'}`], ['学年','生徒番号','生徒名','受験方法', ...subjects]];
   const students = new Map();
   for(const r of gradeRecords){
     const key = r.student || '未照合';
-    if(!students.has(key)){
-      const meta = rosterMetaForStudent(key);
-      students.set(key, {
-        grade: meta['学年'] || r.grade || '',
-        studentNo: meta['生徒番号'] || r.studentNo || '',
-        student: meta['生徒名'] || key,
-        kana: meta['読み仮名'] || r.kana || ''
-      });
-    }
+    const meta = rosterMetaForStudent(key);
+    students.set(key, {
+      grade: meta['学年'] || r.grade || '',
+      studentNo: meta['生徒番号'] || r.studentNo || '',
+      student: meta['生徒名'] || key,
+      kana: meta['読み仮名'] || r.kana || '',
+      status: r.status || '',
+      subjects: r.subjects || []
+    });
   }
-  const exams = [];
-  const examMap = new Map();
-  for(const r of gradeRecords){
-    const key = `${r.examDate || ''}\t${r.examName || ''}\t${r.type || ''}`;
-    if(!examMap.has(key)){
-      examMap.set(key, {key, name:r.examName || '模試名未入力', date:r.examDate || '', type:r.type || '共通テスト系', subjects:new Set()});
-      exams.push(examMap.get(key));
-    }
-    for(const sub of subjectsForExamType(r.type, r.subjects)) examMap.get(key).subjects.add(sub);
+  const rows = [...students.values()].sort((a,b)=>String(a.kana || a.student).localeCompare(String(b.kana || b.student),'ja'));
+  for(const stu of rows){
+    aoa.push([stu.grade, stu.studentNo, stu.student, stu.status, ...subjects.map(sub => (stu.subjects || []).includes(sub) ? '〇' : '')]);
   }
-  exams.sort((a,b)=>String(a.date).localeCompare(String(b.date)) || String(a.name).localeCompare(String(b.name),'ja'));
-  const header1 = ['学年','生徒番号','生徒名'];
-  const header2 = ['','',''];
-  for(const ex of exams){
-    const subjects = [...ex.subjects];
-    header1.push(`${ex.date ? ex.date + ' ' : ''}${ex.name}`);
-    header2.push('受験方法');
-    for(const sub of subjects){ header1.push(''); header2.push(sub); }
-  }
-  const aoa = [header1, header2];
-  const studentRows = [...students.values()].sort((a,b)=>String(a.kana || a.student).localeCompare(String(b.kana || b.student),'ja'));
-  const byStudentExam = new Map();
-  for(const r of gradeRecords){
-    const examKey = `${r.examDate || ''}\t${r.examName || ''}\t${r.type || ''}`;
-    byStudentExam.set(`${r.student}\t${examKey}`, r);
-  }
-  for(const stu of studentRows){
-    const row = [stu.grade, stu.studentNo, stu.student];
-    for(const ex of exams){
-      const r = byStudentExam.get(`${stu.student}\t${ex.key}`);
-      row.push(r ? (r.status || '') : '');
-      for(const sub of [...ex.subjects]) row.push(r && (r.subjects || []).includes(sub) ? '〇' : '');
-    }
-    aoa.push(row);
-  }
-  return {aoa, exams};
+  return {aoa, exam:first};
 }
 function buildExamSubjectSheets(examRecords){
-  const grades = [...new Set(examRecords.map(r => r.grade || '未設定'))].sort((a,b)=>String(a).localeCompare(String(b),'ja'));
-  return grades.map(grade => ({grade, sheetName:safeSheetName(`模試科目_${grade}`), ...buildExamSubjectSheetAoa(examRecords, grade)}));
+  const used = new Set();
+  const groups = new Map();
+  for(const r of examRecords || []){
+    const grade = r.grade || '未設定';
+    const key = `${grade}\t${examKeyOf(r)}`;
+    if(!groups.has(key)) groups.set(key, {grade, examKey: examKeyOf(r), sample:r});
+  }
+  return [...groups.values()]
+    .sort((a,b)=>String(a.sample.examDate || '').localeCompare(String(b.sample.examDate || '')) || String(a.sample.examName || '').localeCompare(String(b.sample.examName || ''),'ja') || String(a.grade).localeCompare(String(b.grade),'ja'))
+    .map(g => {
+      const built = buildExamSubjectSheetAoa(examRecords, g.grade, g.examKey);
+      const sheetName = uniqueSheetName(`模試_${shortSheetPart(g.sample.examName)}_${g.grade}`, used);
+      return {grade:g.grade, sheetName, ...built};
+    });
 }
 function addExamSheetMerges(ws, aoa){
-  const merges = ws['!merges'] || [];
-  let c = 3;
-  while(c < (aoa[0] || []).length){
-    let e = c;
-    while(e + 1 < (aoa[0] || []).length && !(aoa[0] || [])[e + 1]) e++;
-    if(e > c) merges.push({s:{r:0,c}, e:{r:0,c:e}});
-    c = e + 1;
+  ws['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:Math.max(3,(aoa[1] || []).length-1)}}];
+}
+function eventKeyOf(r){ return `${r.datetime || ''}\t${r.eventName || ''}`; }
+function buildEventSheetAoa(records, grade, eventKey){
+  const gradeRecords = records.filter(r => String(r.grade || '未設定') === grade && eventKeyOf(r) === eventKey);
+  const first = gradeRecords[0] || {};
+  const aoa = [[`${first.datetime ? first.datetime + ' ' : ''}${first.eventName || 'イベント名未入力'}`], ['学年','生徒番号','生徒名','日時','参加/不参加','備考','保存日時']];
+  const rows = gradeRecords.map(r => {
+    const meta = rosterMetaForStudent(r.student);
+    return {
+      grade: meta['学年'] || r.grade || '',
+      studentNo: meta['生徒番号'] || r.studentNo || '',
+      student: meta['生徒名'] || r.student || '',
+      kana: meta['読み仮名'] || r.kana || '',
+      datetime: r.datetime || '',
+      status: r.status || '',
+      note: r.note || '',
+      savedAt: r.savedAt || ''
+    };
+  }).sort((a,b)=>String(a.kana || a.student).localeCompare(String(b.kana || b.student),'ja'));
+  for(const r of rows){
+    aoa.push([r.grade, r.studentNo, r.student, r.datetime, r.status, r.note, r.savedAt]);
   }
-  ws['!merges'] = merges;
+  return {aoa, event:first};
+}
+function buildEventSheets(eventRecords){
+  const used = new Set();
+  const groups = new Map();
+  for(const r of eventRecords || []){
+    const grade = r.grade || '未設定';
+    const key = `${grade}\t${eventKeyOf(r)}`;
+    if(!groups.has(key)) groups.set(key, {grade, eventKey:eventKeyOf(r), sample:r});
+  }
+  return [...groups.values()]
+    .sort((a,b)=>String(a.sample.datetime || '').localeCompare(String(b.sample.datetime || '')) || String(a.sample.eventName || '').localeCompare(String(b.sample.eventName || ''),'ja') || String(a.grade).localeCompare(String(b.grade),'ja'))
+    .map(g => {
+      const built = buildEventSheetAoa(eventRecords, g.grade, g.eventKey);
+      const sheetName = uniqueSheetName(`イベント_${shortSheetPart(g.sample.eventName)}_${g.grade}`, used);
+      return {grade:g.grade, sheetName, ...built};
+    });
+}
+function addSingleTitleMerge(ws, aoa){
+  ws['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:Math.max(0,(aoa[1] || []).length-1)}}];
 }
 
-function downloadWorkbookFromAoa(calendarAoa, listAoa, resultAoa, rosterAoa, logAoa, label, examRecords=[]){
+function downloadWorkbookFromAoa(calendarAoa, listAoa, resultAoa, rosterAoa, logAoa, label, examRecords=[], eventRecords=[]){
   const wb = XLSX.utils.book_new();
   const resultHeader = [["学年","生徒名","生徒番号","日付","時刻","区分","分類","学習内容","学習結果","カレンダー表示","元ファイル","元シート"]];
   const rosterHeader = [ROSTER_COLUMNS];
@@ -1955,6 +2101,9 @@ function downloadWorkbookFromAoa(calendarAoa, listAoa, resultAoa, rosterAoa, log
   const examSheets = buildExamSubjectSheets(examRecords || []);
   const examSheetObjects = examSheets.map(s => ({...s, ws:aoaToSheet(s.aoa)}));
   examSheetObjects.forEach(s => addExamSheetMerges(s.ws, s.aoa));
+  const eventSheets = buildEventSheets(eventRecords || []);
+  const eventSheetObjects = eventSheets.map(s => ({...s, ws:aoaToSheet(s.aoa)}));
+  eventSheetObjects.forEach(s => addSingleTitleMerge(s.ws, s.aoa));
 
   const calWidths = calendarAoa[0].map((_,i)=> i===0 ? 10 : i===1 ? 14 : i===2 ? 18 : i<=6 ? 16 : 30);
   const listWidths = [10,14,18,18,16,24,36,13,8,14,46,12,28,52,14,10,10];
@@ -1972,7 +2121,8 @@ function downloadWorkbookFromAoa(calendarAoa, listAoa, resultAoa, rosterAoa, log
   const rosterRange = applyNiceSheetSettings(wsRoster, rosterAoa && rosterAoa.length ? rosterAoa : rosterHeader, rosterWidths, {rows:{min:24,max:95,header:30,pxPerLine:18}});
   const logRange = applyNiceSheetSettings(wsLog, logAoa && logAoa.length ? logAoa : [["ファイル","結果","内容","シート名/詳細"]], logWidths, {rows:{min:24,max:95,header:30,pxPerLine:18}});
   const posterRange = applyNiceSheetSettings(wsPoster, posterAoa, posterWidths, {rows:{min:54,max:320,header:42,pxPerLine:24}});
-  const examSheetRanges = examSheetObjects.map(s => ({...s, range: applyNiceSheetSettings(s.ws, s.aoa, (s.aoa[0] || []).map((_,i)=> i===0?10:i===1?14:i===2?18:12), {rows:{min:24,max:80,header:30,pxPerLine:18}})}));
+  const examSheetRanges = examSheetObjects.map(s => ({...s, range: applyNiceSheetSettings(s.ws, s.aoa, (s.aoa[1] || s.aoa[0] || []).map((_,i)=> i===0?10:i===1?14:i===2?18:i===3?12:12), {rows:{min:24,max:90,header:30,pxPerLine:18}})}));
+  const eventSheetRanges = eventSheetObjects.map(s => ({...s, range: applyNiceSheetSettings(s.ws, s.aoa, [10,14,18,18,14,36,20], {rows:{min:24,max:110,header:30,pxPerLine:18}})}));
 
   const border = {top:{style:"thin",color:{rgb:"98A2B3"}},bottom:{style:"thin",color:{rgb:"98A2B3"}},left:{style:"thin",color:{rgb:"98A2B3"}},right:{style:"thin",color:{rgb:"98A2B3"}}};
   const headerFill = {fgColor:{rgb:"E5E7EB"}};
@@ -2041,14 +2191,22 @@ function downloadWorkbookFromAoa(calendarAoa, listAoa, resultAoa, rosterAoa, log
   for(const s of examSheetRanges){
     setRangeStyle(s.ws, s.range, (R,C,cell)=>{
       const isHeader = R <= 1;
-      const style = {font:isHeader?fontHeader:fontBase, alignment:{vertical:'center', horizontal:isHeader || C<3 ? 'center':'center', wrapText:true}, border};
+      const style = {font:isHeader?fontHeader:fontBase, alignment:{vertical:'center', horizontal:isHeader || C<4 ? 'center':'center', wrapText:true}, border};
       if(isHeader) style.fill = headerFill;
       if(R>1 && C<3) style.fill = nameFill;
       return style;
     });
     s.ws['!freeze'] = {xSplit:3, ySplit:2};
-    // xlsx-js-styleではExcelの入力規則を完全には保証できないため、受験方法列には選択済みの値を入れている。
-    // 必要に応じてExcel上で 当日/後日/不受験 のプルダウンを追加できるよう、列名を「受験方法」にしている。
+  }
+  for(const s of eventSheetRanges){
+    setRangeStyle(s.ws, s.range, (R,C,cell)=>{
+      const isHeader = R <= 1;
+      const style = {font:isHeader?fontHeader:fontBase, alignment:{vertical:'top', horizontal:isHeader || C<5 ? 'center':'left', wrapText:true}, border};
+      if(isHeader) style.fill = headerFill;
+      if(R>1 && C<3) style.fill = nameFill;
+      return style;
+    });
+    s.ws['!freeze'] = {xSplit:3, ySplit:2};
   }
 
 
@@ -2068,6 +2226,7 @@ function downloadWorkbookFromAoa(calendarAoa, listAoa, resultAoa, rosterAoa, log
   XLSX.utils.book_append_sheet(wb, wsResult, "結果一覧データ");
   XLSX.utils.book_append_sheet(wb, wsRoster, "生徒対応表");
   examSheetObjects.forEach(s => XLSX.utils.book_append_sheet(wb, s.ws, s.sheetName));
+  eventSheetObjects.forEach(s => XLSX.utils.book_append_sheet(wb, s.ws, s.sheetName));
   XLSX.utils.book_append_sheet(wb, wsLog, "読み取りログ");
   XLSX.writeFile(wb, `全体予定表_${label}.xlsx`);
 }
