@@ -29,7 +29,7 @@ details.advanced{margin-top:12px;border:1px solid var(--line);border-radius:12px
 <header>
   <div class="wrap">
     <h1>予定入力HTML（受講3行・その他の予定3行）</h1>
-    <div class="sub">①生徒名 → ②日付を反映 → ③前回内容を読み込んで打ち込む → ④コピー → ⑤この生徒の内容を保存 → ⑥Excel出力 の順で使えます。生徒名ごとに下段を保存し、次週に読み込めます。</div>
+    <div class="sub">①生徒名 → ②日付を反映 → ③前回内容を読み込んで打ち込む → ④この生徒の内容を保存 → ⑤コピーしてPOSを開く → ⑥Excel出力 の順で使えます。生徒名ごとに下段を保存し、次週に読み込めます。</div>
   </div>
 </header>
 
@@ -41,8 +41,8 @@ details.advanced{margin-top:12px;border:1px solid var(--line);border-radius:12px
       <div class="field"><label>開始日（ページを開いた日）</label><input id="weekStart" type="date" /></div>
       <button id="applyDates">② 日付を反映</button>
       <button class="secondary" id="loadStudentMemory">③ 前回内容を読み込んで打ち込む</button>
-      <button id="copyText">④ コピー</button>
-      <button class="secondary" id="saveStudentMemory">⑤ この生徒の内容を保存</button>
+      <button class="secondary" id="saveStudentMemory">④ この生徒の内容を保存</button>
+      <button id="copyText">⑤ コピーしてPOSを開く</button>
       <button class="ok" id="exportXlsx">⑥ Excel出力</button>
     </div>
     <div class="hint" style="margin-top:10px">Enterで次のマスへ移動します。入力欄内で改行したい場合は Shift + Enter。Excel名は「生徒名.開始日-終了日.xlsx」です。Excel出力時にも下段内容をこの生徒名で自動保存します。</div>
@@ -282,16 +282,40 @@ function buildCopyText(){
 
 async function copyToClipboard(){
   const text=buildCopyText();
+  const posUrl='https://pos.toshin.com/SSO2022/SSO2/FCoach/SSOLogin/SSOLogin';
+
+  // コピー処理の await 後に window.open すると、ブラウザにポップアップ扱いされやすい。
+  // そのため、ユーザーが押した直後にPOSを直接開いてからコピーする。
+  const opened=window.open(posUrl,'_blank','noopener');
+
   try{
-    if(navigator.clipboard&&window.isSecureContext){await navigator.clipboard.writeText(text)}
-    else{const ta=document.createElement('textarea');ta.value=text;ta.setAttribute('readonly','');ta.style.position='fixed';ta.style.left='-9999px';document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta)}
-    alert('コピーしました。貼り付けたい場所で Ctrl+V できます。');
-  }catch(e){alert('自動コピーに失敗しました。')}
+    if(navigator.clipboard&&window.isSecureContext){
+      await navigator.clipboard.writeText(text);
+    }else{
+      const ta=document.createElement('textarea');
+      ta.value=text;
+      ta.setAttribute('readonly','');
+      ta.style.position='fixed';
+      ta.style.left='-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    if(!opened){
+      alert('コピーしました。POSはブラウザにブロックされたので手動で開いてください。');
+    }else{
+      alert('コピーしました。開いたPOS画面で Ctrl+V してください。');
+    }
+  }catch(e){
+    if(!opened){
+      alert('自動コピーに失敗しました。POSもブラウザにブロックされました。');
+    }else{
+      alert('POSを開きましたが、自動コピーに失敗しました。');
+    }
+  }
 }
 
-/* =========================================================
-   5. 生徒別保存・一時保存
-========================================================= */
 function studentKey(){const name=($('#studentName').value||'').trim();return name?`yoteiStudentMemory:${name}`:''}
 function getStudentMemory(){const data=getData();return{studentName:data.studentName,materials:data.materials.filter(m=>(m.subject||m.book||m.content)),remarks:data.remarks,savedAt:new Date().toISOString()}}
 function saveStudentMemory(showAlert=true){
