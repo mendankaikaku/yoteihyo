@@ -3,592 +3,782 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>予定入力HTML（生徒別前回内容保存版）</title>
+<title>予定入力HTML（グループ面談・フォルダ選択後自動保存版）</title>
 <style>
-:root{
-  --bg:#f6f7fb;--card:#fff;--line:#d7dce8;--text:#172033;--muted:#667085;
-  --accent:#2563eb;--accent2:#eef4ff;--danger:#dc2626;--ok:#16a34a;
-}
+:root{--bg:#f6f7fb;--card:#fff;--line:#d7dce8;--text:#172033;--muted:#667085;--accent:#2563eb;--accent2:#eef4ff;--danger:#dc2626;--ok:#16a34a;--soft:#f8fafc}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans JP",sans-serif}
 header{position:sticky;top:0;z-index:5;background:rgba(246,247,251,.94);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
-.wrap{max-width:1280px;margin:0 auto;padding:18px}
-h1{font-size:24px;margin:0 0 8px}.sub,.hint,.footerNote{color:var(--muted);font-size:13px;line-height:1.6}
-.grid{display:grid;grid-template-columns:1.1fr .9fr;gap:16px;align-items:start}.card{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 8px 24px rgba(15,23,42,.05);padding:16px;margin:16px 0}
-.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:end}.field{display:flex;flex-direction:column;gap:6px;min-width:160px}.field label{font-size:12px;color:var(--muted);font-weight:700}.field input{border:1px solid var(--line);border-radius:10px;padding:9px 10px;font-size:14px;background:#fff}
-button{border:0;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer;background:var(--accent);color:#fff}button.secondary{background:#e5e7eb;color:#111827}button.danger{background:var(--danger)}button.small{padding:6px 10px;font-size:12px}
-button.ok{background:var(--ok)}
-table{width:100%;border-collapse:collapse;background:#fff}th,td{border:1px solid #9ca3af;padding:6px;vertical-align:top}th{background:#f3f4f6;text-align:center;font-size:13px}td.label{background:#f9fafb;font-weight:800;text-align:center;white-space:nowrap}td textarea{width:100%;border:0;outline:0;resize:vertical;min-height:42px;font-size:13px;line-height:1.45;padding:4px;background:transparent;font-family:inherit}td textarea:focus{background:#fffbea;box-shadow:inset 0 0 0 2px #fde68a}
-.sectionTitle{font-weight:800;margin:0 0 10px}.previewDay{border:1px solid var(--line);border-radius:12px;padding:10px;background:#fff;margin:8px 0}.previewDay h3{margin:0 0 6px;font-size:14px}.pill{display:inline-block;background:var(--accent2);color:#1d4ed8;border-radius:999px;padding:2px 8px;font-size:12px;font-weight:700;margin-right:4px}.empty{color:#98a2b3}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.notice{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:12px;padding:10px;font-size:13px;line-height:1.6}.nowrap{white-space:nowrap}
-details.advanced{margin-top:12px;border:1px solid var(--line);border-radius:12px;background:#fafafa;padding:10px}details.advanced summary{cursor:pointer;font-weight:800;color:#344054}.advancedButtons{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-#saveInfo{font-size:12px;color:var(--muted);margin-top:8px;white-space:pre-wrap}
-
-.examItem,.eventItem{border:1px solid var(--line);border-radius:12px;padding:10px;background:#fff;margin:10px 0}
-.examHead{display:flex;justify-content:space-between;gap:8px;align-items:center;font-weight:800}
-.examDate{font-size:12px;color:var(--muted);font-weight:700}
-.checkRow{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
-.checkRow label{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--text);background:#f8fafc;border:1px solid var(--line);border-radius:999px;padding:4px 8px;cursor:pointer}
-.checkRow input{width:auto;margin:0}
-.eventItem input,.eventItem textarea,.examMasterRow input,.examMasterRow select{width:100%;border:1px solid var(--line);border-radius:10px;padding:8px;background:#fff;font:inherit}
-.examMasterRow{display:grid;grid-template-columns:1.4fr 110px 100px auto;gap:8px;align-items:end;margin:8px 0}
-@media(max-width:980px){.examMasterRow{grid-template-columns:1fr}}
-@media(max-width:980px){.grid{grid-template-columns:1fr}.wrap{padding:12px}table{font-size:12px}th,td{padding:4px}.field{min-width:140px}}
+.wrap{max-width:1400px;margin:0 auto;padding:18px}
+h1{font-size:24px;margin:0 0 8px}.sub,.hint{color:var(--muted);font-size:13px;line-height:1.6}.sectionTitle{font-weight:800;margin:0 0 10px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 8px 24px rgba(15,23,42,.05);padding:16px;margin:16px 0}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:end}.field{display:flex;flex-direction:column;gap:6px;min-width:180px}.field.wide{min-width:360px;flex:1}.field label{font-size:12px;color:var(--muted);font-weight:700}.field input,.field select,.field textarea{border:1px solid var(--line);border-radius:10px;padding:9px 10px;font-size:14px;background:#fff;font-family:inherit}
+button{border:0;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer;background:var(--accent);color:#fff}button.secondary{background:#e5e7eb;color:#111827}button.danger{background:var(--danger)}button.ok{background:var(--ok)}button.small{padding:6px 10px;font-size:12px}button:disabled{opacity:.45;cursor:not-allowed}
+table{width:100%;border-collapse:collapse;background:#fff}th,td{border:1px solid #9ca3af;padding:6px;vertical-align:top}th{background:#f3f4f6;text-align:center;font-size:13px}td.label{background:#f9fafb;font-weight:800;text-align:center;white-space:nowrap}td textarea{width:100%;border:0;outline:0;resize:vertical;min-height:42px;font-size:13px;line-height:1.45;padding:4px;background:transparent;font-family:inherit}td textarea:focus,.eventItem textarea:focus,.eventItem input:focus{background:#fffbea;box-shadow:inset 0 0 0 2px #fde68a}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.notice{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:12px;padding:10px;font-size:13px;line-height:1.6}.empty{color:#98a2b3}.pill{display:inline-block;background:var(--accent2);color:#1d4ed8;border-radius:999px;padding:2px 8px;font-size:12px;font-weight:700;margin-right:4px}
+.studentGrid{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(560px,1fr);gap:16px;overflow-x:auto;padding-bottom:8px}.studentCard{min-width:560px}.studentHead{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:12px}.studentNameTitle{font-size:20px;font-weight:900}.miniBar{display:flex;gap:8px;flex-wrap:wrap}
+.examItem,.eventItem{border:1px solid var(--line);border-radius:12px;padding:10px;background:#fff;margin:10px 0}.examHead{display:flex;justify-content:space-between;gap:8px;align-items:center;font-weight:800}.examDate{font-size:12px;color:var(--muted);font-weight:700}.checkRow{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}.checkRow label{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--text);background:#f8fafc;border:1px solid var(--line);border-radius:999px;padding:4px 8px;cursor:pointer}.checkRow input{width:auto;margin:0}
+.eventItem input,.eventItem textarea,.examMasterRow input,.examMasterRow select{width:100%;border:1px solid var(--line);border-radius:10px;padding:8px;background:#fff;font:inherit}.examMasterRow{display:grid;grid-template-columns:1.4fr 110px 110px 130px auto;gap:8px;align-items:end;margin:8px 0}.subjectTemplateBox{border:1px solid var(--line);border-radius:12px;background:#fff;padding:10px;margin-top:12px}.subjectTemplateGrid{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}.subjectTemplateGrid label{display:inline-flex;align-items:center;gap:4px;font-size:12px;background:#f8fafc;border:1px solid var(--line);border-radius:999px;padding:4px 8px}.subjectTemplateGrid input{width:auto;margin:0}.subjectTemplateBox textarea{width:100%;border:1px solid var(--line);border-radius:10px;padding:8px;background:#fff;font:inherit;min-height:54px}
+details.advanced{margin-top:12px;border:1px solid var(--line);border-radius:12px;background:#fafafa;padding:10px}details.advanced summary{cursor:pointer;font-weight:800;color:#344054}.advancedButtons{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}#saveInfo{font-size:12px;color:var(--muted);margin-top:8px;white-space:pre-wrap}
+@media(max-width:980px){.wrap{padding:12px}.studentGrid{grid-auto-flow:row;grid-auto-columns:auto}.studentCard{min-width:0}.field.wide{min-width:240px}table{font-size:12px}th,td{padding:4px}.examMasterRow{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
-<header>
-  <div class="wrap">
-    <h1>予定入力HTML（受講3行・その他の予定3行）</h1>
-    <div class="sub">①生徒名 → ②日付を反映 → ③前回内容を読み込んで打ち込む → ④この生徒の内容を保存 → ⑤コピーしてPOSを開く → ⑥Excel出力 の順で使えます。生徒名ごとに下段を保存し、次週に読み込めます。</div>
-  </div>
-</header>
-
+<header><div class="wrap"><h1>予定入力HTML（グループ面談対応版）</h1><div class="sub">生徒名をカンマでつなぐと、生徒ごとの列が出ます。保存は「この生徒」または「まとめて」で統一。Excel保存はまとめて担任名フォルダを選ぶと、各生徒名フォルダへ保存できます。</div></div></header>
 <main class="wrap">
   <section class="card">
     <p class="sectionTitle">基本操作</p>
     <div class="toolbar">
-      <div class="field"><label>① 生徒名</label><input id="studentName" placeholder="例：北野" /></div>
+      <div class="field wide"><label>① 生徒名（複数ならカンマ区切り）</label><input id="studentNames" placeholder="例：北野, 田中, 山田太" /></div>
       <div class="field"><label>開始日（ページを開いた日）</label><input id="weekStart" type="date" /></div>
-      <button id="applyDates">② 日付を反映</button>
-      <button class="secondary" id="loadStudentMemory">③ 前回内容を読み込んで打ち込む</button>
-      <button class="secondary" id="saveStudentMemory">④ この生徒の内容を保存</button>
-      <button id="copyText">⑤ コピーしてPOSを開く</button>
-      <button class="ok" id="exportXlsx">⑥ Excel出力</button>
+      <button id="applyStudents">② 生徒列・日付を反映</button>
+      <button class="secondary" id="loadGroupMemory">③ まとめて復元</button>
+      <button class="secondary" id="saveGroupMemory">④ まとめて保存（個人も更新）</button>
+      <button class="secondary" id="saveAllExcelToStudentFolders">⑤ 担任名フォルダを選んで全員分Excel保存</button>
+      <button class="secondary" id="exportXlsx">⑥ ZIP出力</button>
     </div>
-    <div class="hint" style="margin-top:10px">Enterで次のマスへ移動します。入力欄内で改行したい場合は Shift + Enter。Excel名は「生徒名.開始日-終了日.xlsx」です。Excel出力時にも下段内容をこの生徒名で自動保存します。</div>
+    <div class="hint" style="margin-top:10px">Enterで次のマスへ移動します。入力欄内で改行したい場合は Shift + Enter。保存・復元はこのパソコンのブラウザ内に保存します。Excelは「担任名フォルダを選んで全員分Excel保存」を押して担任名フォルダを選ぶだけで、担任名フォルダ内の各生徒名フォルダへ保存します。予備としてZIP出力も使えます。コピーは各生徒列の「〇〇の面談内容をコピーしてPOSを開く」から実行します。</div>
     <div id="saveInfo"></div>
   </section>
 
-  <div class="grid">
-    <div>
-      <section class="card">
-        <p class="sectionTitle">上段：日付ごとの予定（例：難関物理③、2021本試）</p>
-        <div style="overflow:auto"><table id="scheduleTable"><thead><tr><th style="width:110px">予定/日付</th><th data-day="0"></th><th data-day="1"></th><th data-day="2"></th><th data-day="3"></th><th data-day="4"></th><th data-day="5"></th><th data-day="6"></th></tr></thead><tbody id="scheduleBody"></tbody></table></div>
-        <div class="actions"><button class="secondary" id="addJukouRow">受講行を追加</button><button class="secondary" id="addOtherRow">その他の予定行を追加</button></div>
-        <div class="hint">最初は受講①・その他①だけ表示します。必要に応じて受講②・受講③、その他②・その他③を追加できます。出力Excelは統合用HTMLと互換のため、未追加行は空欄として保持します。</div>
-      </section>
-      <section class="card">
-        <p class="sectionTitle">下段：教科・問題集/高速マスター・内容</p>
-        <div style="overflow:auto"><table id="materialTable"><thead><tr><th style="width:110px">教科</th><th colspan="3">問題集/高速マスター</th><th colspan="4">内容</th><th class="nowrap" style="width:80px">操作</th></tr></thead><tbody id="materialBody"></tbody></table></div>
-        <div class="actions"><button class="secondary" id="addMaterial">行を追加</button></div>
-        <div class="hint">最初は1行だけ表示します。必要になったら行を追加してください。</div>
-      </section>
-      <section class="card">
-        <p class="sectionTitle">備考</p>
-        <table><tbody><tr><td class="label" style="width:110px">備考</td><td colspan="7"><textarea id="remarks" data-kind="remarks" placeholder="週全体の備考、注意事項、変更点など"></textarea></td></tr></tbody></table>
-      </section>
-    </div>
-    <aside>
-      <section class="card">
-        <p class="sectionTitle">模試確認（2週間前から表示）</p>
-        <div class="hint">週開始日から2週間以内に実施される模試だけ表示します。科目・当日/後日/不受験は「④ この生徒の内容を保存」で生徒別に保存されます。</div>
-        <div id="examPanel"></div>
-        <details class="advanced">
-          <summary>模試マスタを編集</summary>
-          <div class="hint" style="margin-top:8px">模試名・実施日・種別を登録します。共通テスト系と冠模試で科目チェック欄を分けます。</div>
-          <div id="examMasterPanel"></div>
-          <button class="secondary" id="addExamMaster" type="button">模試を追加</button>
-          <button class="secondary" id="saveExamMaster" type="button">模試マスタを保存</button>
-        </details>
-      </section>
-      <section class="card">
-        <p class="sectionTitle">イベント確認</p>
-        <div class="hint">イベント名・参加/不参加・備考を入力します。予定入力とは別シートに出力され、統合用HTMLでは読み取りません。</div>
-        <div id="eventPanel"></div>
-        <div class="actions"><button class="secondary" id="addEventRow" type="button">イベント行を追加</button></div>
-      </section>
-      <section class="card notice"><b>統合用HTMLで読む想定</b><br>予定入力シートの構造はそのままです。模試確認・イベント確認はExcel内では別シートに出力しますが、統合用HTMLでは読み取りません。上段の予定欄は「難関物理③」「2021本試」のように短く書く想定です。</section>
-    </aside>
-  </div>
   <section class="card">
-    <p class="sectionTitle">詳細設定・一時保存</p>
-    <details class="advanced">
-      <summary>開く</summary>
-      <div class="hint" style="margin-top:8px">一時保存は、途中入力をこのブラウザに一時退避するための機能です。生徒別の前回内容保存とは別です。</div>
-      <div class="advancedButtons">
-        <button class="secondary" id="saveLocal">ブラウザに一時保存</button>
-        <button class="secondary" id="loadLocal">一時保存を復元</button>
-        <button class="danger" id="clearAll">全消去</button>
+    <p class="sectionTitle">上段：日付ごとの予定（例：受講＝難関物理③、その他＝2021本試）</p>
+    <div class="hint">最初は受講①・その他①だけ表示します。必要に応じて、各生徒の上段表の下にあるボタンから受講②・受講③、その他②・その他③を追加できます。</div>
+  </section>
+
+  <div id="studentGrid" class="studentGrid"></div>
+
+  <section class="card">
+    <p class="sectionTitle">模試マスタ</p>
+    <div class="hint">週開始日から3週間以内に実施される模試だけ、各生徒の模試欄に表示します。模試ごとに科目型を選べます。科目型は編集してストックできます。</div>
+    <details class="advanced" open>
+      <summary>模試マスタを編集</summary>
+      <div id="examMasterPanel"></div>
+      <div class="actions"><button class="secondary" id="addExamMaster" type="button">模試を追加</button><button class="secondary" id="saveExamMaster" type="button">模試マスタを保存</button></div>
+      <div class="subjectTemplateBox">
+        <b>科目型ストック</b>
+        <div class="hint">共テ型は最初から入っています。チェックボックスを編集して保存すると、次回以降も科目型として選べます。</div>
+        <div class="toolbar" style="margin-top:8px">
+          <div class="field"><label>科目型名</label><input id="subjectTemplateName" placeholder="例：高1高2型"></div>
+          <div class="field"><label>既存型を読込</label><select id="subjectTemplateSelect"></select></div>
+          <button class="secondary" id="loadSubjectTemplate" type="button">型を読込</button>
+          <button class="secondary" id="saveSubjectTemplate" type="button">この科目型を保存</button>
+        </div>
+        <div id="subjectTemplateChecks" class="subjectTemplateGrid"></div>
+        <div class="field" style="margin-top:8px"><label>追加科目（カンマ区切り）</label><textarea id="subjectTemplateCustom" placeholder="例：英語R, 英語L, 数学ⅠA"></textarea></div>
       </div>
     </details>
   </section>
 
-</main>
+  <section class="card notice"><b>統合用HTMLで読む想定</b><br>個人別Excelには「予定入力」「模試確認」「イベント確認」の3シートを出力します。統合用HTMLは予定入力を予定に使い、模試確認から模試科目リストを作れます。イベント確認は別管理用です。</section>
 
+
+  <section class="card">
+    <details class="advanced">
+      <summary>詳細設定</summary>
+      <div class="hint" style="margin-top:8px">保存ボタンは、共有フォルダを選択している場合は共有フォルダへ、未選択の場合はこのブラウザ内へ保存します。この保存はこのパソコンのブラウザ内だけで使えます。</div>
+      <div class="advancedButtons"><button class="danger" id="clearAll">全消去</button></div>
+    </details>
+  </section>
+</main>
 <script>
 /* =========================================================
-   1. 共通設定・ユーティリティ
+   1. 共通設定・状態
 ========================================================= */
 const $=(s)=>document.querySelector(s);
 const $$=(s)=>Array.from(document.querySelectorAll(s));
 const DOW=['日','月','火','水','木','金','土'];
 const LIMITS=['受講①','受講②','受講③','その他①','その他②','その他③'];
 const MAX_SCHEDULE_ROWS=3;
-let lessonCount=1;
-let otherCount=1;
-let materialCount=1;
-
 const COMMON_TEST_SUBJECTS=['英語R','英語L','数学ⅠA','数学ⅡBC','国語','物理','化学','生物','地学','日本史','世界史','地理','公共政経','情報'];
 const CROWN_TEST_SUBJECTS=['英語','数学','国語','物理','化学','生物','地学','日本史','世界史','地理','小論文'];
+const SUBJECT_TEMPLATE_KEY='yoteiSubjectTemplates';
+const DEFAULT_SUBJECT_TEMPLATES=[
+  {name:'共テ型', subjects:COMMON_TEST_SUBJECTS},
+  {name:'冠模試型', subjects:CROWN_TEST_SUBJECTS}
+];
+const SUBJECT_POOL=[...new Set([...COMMON_TEST_SUBJECTS,...CROWN_TEST_SUBJECTS,'数学','英語','理科','社会','総合問題','面接','小論文'])];
 const EXAM_MASTER_KEY='yoteiExamMaster';
-const DEFAULT_EXAM_MASTER=[];
-let eventCount=1;
-
+const POS_URL='https://pos.toshin.com/SSO2022/SSO2/FCoach/SSOLogin/SSOLogin';
+let students=[];
+let studentData={};
 
 function pad(n){return String(n).padStart(2,'0')}
 function ymd(d){return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`}
 function jpDate(d){return `${d.getMonth()+1}月${d.getDate()}日`}
 function escapeXml(s){return String(s??'').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g,'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
-function setDefaultDate(){if(!$('#weekStart').value){$('#weekStart').value=ymd(new Date())}}
+function escapeHtml(s){return String(s??'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function setDefaultDate(){if(!$('#weekStart').value) $('#weekStart').value=ymd(new Date())}
 function getDates(){const base=new Date($('#weekStart').value+'T00:00:00');return Array.from({length:7},(_,i)=>{const d=new Date(base);d.setDate(base.getDate()+i);return d})}
-function addDays(d,n){const x=new Date(d.getFullYear(),d.getMonth(),d.getDate());x.setDate(x.getDate()+n);return x}
 function daysBetween(a,b){const aa=new Date(a.getFullYear(),a.getMonth(),a.getDate());const bb=new Date(b.getFullYear(),b.getMonth(),b.getDate());return Math.round((bb-aa)/86400000)}
-function showSaveInfo(text){const el=$('#saveInfo');if(el)el.textContent=text||''}
+function showSaveInfo(text){$('#saveInfo').textContent=text||''}
 function colName(n){let s='';while(n>0){let m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=Math.floor((n-1)/26)}return s}
 function cellRef(r,c){return colName(c)+r}
+function splitNames(){return ($('#studentNames').value||'').split(/[、，,]/).map(x=>x.trim()).filter(Boolean)}
+function emptyStudentData(){return {lessonCount:1,otherCount:1,schedule:Array.from({length:7},()=>Array(6).fill('')),materials:[{subject:'',book:'',content:''}],remarks:'',exams:[],events:[{name:'',status:'',note:''}]}}
+function normalizeStudentData(data){
+  const d=Object.assign(emptyStudentData(),data||{});
+  if(!Array.isArray(d.schedule)) d.schedule=Array.from({length:7},()=>Array(6).fill(''));
+  d.schedule=Array.from({length:7},(_,i)=>Array.from({length:6},(_,r)=>d.schedule?.[i]?.[r]||''));
+  if(!Array.isArray(d.materials)||!d.materials.length)d.materials=[{subject:'',book:'',content:''}];
+  if(!Array.isArray(d.exams))d.exams=[];
+  if(!Array.isArray(d.events)||!d.events.length)d.events=[{name:'',status:'',note:''}];
+  d.lessonCount=Math.min(MAX_SCHEDULE_ROWS,Math.max(1,Number(d.lessonCount)||maxUsedLesson(d)));
+  d.otherCount=Math.min(MAX_SCHEDULE_ROWS,Math.max(1,Number(d.otherCount)||maxUsedOther(d)));
+  return d;
+}
+function ensureStudent(name){studentData[name]=normalizeStudentData(studentData[name]); return studentData[name]}
+function currentScheduleRowIndexes(name){const data=ensureStudent(name);return [...Array.from({length:data.lessonCount},(_,i)=>i),...Array.from({length:data.otherCount},(_,i)=>3+i)]}
 
 /* =========================================================
-   2. 画面構築・入力制御
+   2. 画面構築
 ========================================================= */
-function currentScheduleRowIndexes(){
-  return [
-    ...Array.from({length:lessonCount},(_,i)=>i),
-    ...Array.from({length:otherCount},(_,i)=>3+i)
-  ];
+function init(){setDefaultDate(); if(!$('#studentNames').value) $('#studentNames').value=''; renderExamMasterPanel(); bindGlobalEvents(); applyStudents();}
+function applyStudents(){
+  syncFromDom();
+  const names=splitNames();
+  students=names.length?names:[];
+  students.forEach(ensureStudent);
+  renderStudents();
+  showSaveInfo(students.length?`${students.length}名の入力欄を表示中です。`:'生徒名を入力してください。');
 }
-
-function buildUI(){
-  renderSchedule();
-  renderMaterials();
-  setDefaultDate();
-  applyDates();
+function renderStudents(){
+  const grid=$('#studentGrid');
+  if(!students.length){grid.innerHTML='<section class="card"><span class="empty">生徒名を入力して「② 生徒列・日付を反映」を押してください。</span></section>';return;}
+  grid.innerHTML=students.map(name=>studentCardHtml(name)).join('');
+  students.forEach(name=>fillStudentValues(name));
+  updateScheduleHeaders();
   bindInputs();
-  refreshPreview();
+  updateScheduleAddButtons();
 }
-
-function renderSchedule(){
-  const old=getData();
-  const sb=$('#scheduleBody');
-  sb.innerHTML='';
-  currentScheduleRowIndexes().forEach(i=>{
-    const lim=LIMITS[i];
-    const tr=document.createElement('tr');
-    tr.innerHTML=`<td class="label">${lim}</td>`+Array.from({length:7},(_,d)=>`<td><textarea data-kind="schedule" data-row="${i}" data-day="${d}" placeholder="${lim.startsWith('受講')?'例：難関物理③':'例：2021本試'}"></textarea></td>`).join('');
-    sb.appendChild(tr);
+function studentCardHtml(name){
+  return `<section class="card studentCard" data-student-card="${escapeHtml(name)}">
+    <div class="studentHead"><div class="studentNameTitle">${escapeHtml(name)}</div><div class="miniBar"><button class="small secondary" data-load-one="${escapeHtml(name)}">この生徒を復元</button><button class="small secondary" data-save-one="${escapeHtml(name)}">この生徒を保存</button><button class="small" data-copy-one="${escapeHtml(name)}">${escapeHtml(name)}の面談内容をコピーしてPOSを開く</button></div></div>
+    <p class="sectionTitle">予定</p>
+    <div style="overflow:auto"><table class="scheduleTable"><thead><tr><th style="width:100px">予定/日付</th>${Array.from({length:7},(_,d)=>`<th data-day-head="${d}"></th>`).join('')}</tr></thead><tbody>${scheduleRowsHtml(name)}</tbody></table></div>
+    <div class="actions"><button class="secondary small" data-add-schedule="lesson" data-student="${escapeHtml(name)}">${escapeHtml(name)}の受講行を追加</button><button class="secondary small" data-add-schedule="other" data-student="${escapeHtml(name)}">${escapeHtml(name)}のその他の予定行を追加</button></div>
+    <p class="sectionTitle" style="margin-top:16px">下段：教科・問題集/高速マスター・内容</p>
+    <div style="overflow:auto"><table class="materialTable"><thead><tr><th style="width:95px">教科</th><th colspan="3">問題集/高速マスター</th><th colspan="4">内容</th><th style="width:70px">操作</th></tr></thead><tbody data-material-body>${materialRowsHtml(name)}</tbody></table></div>
+    <div class="actions"><button class="secondary small" data-add-material="${escapeHtml(name)}">${escapeHtml(name)}の下段行を追加</button></div>
+    <p class="sectionTitle" style="margin-top:16px">備考</p>
+    <table><tbody><tr><td class="label" style="width:95px">備考</td><td colspan="7"><textarea data-student="${escapeHtml(name)}" data-kind="remarks" placeholder="週全体の備考、注意事項、変更点など"></textarea></td></tr></tbody></table>
+    <p class="sectionTitle" style="margin-top:16px">模試確認（3週間前から表示）</p>
+    <div class="hint">当日 / 後日 / 不受験 と科目を選んでください。</div>
+    <div data-exam-panel>${examPanelHtml(name)}</div>
+    <p class="sectionTitle" style="margin-top:16px">イベント確認</p>
+    <div data-event-panel>${eventRowsHtml(name)}</div>
+    <div class="actions"><button class="secondary small" data-add-event="${escapeHtml(name)}">${escapeHtml(name)}のイベント行を追加</button></div>
+  </section>`;
+}
+function scheduleRowsHtml(name){
+  return currentScheduleRowIndexes(name).map(i=>{const lim=LIMITS[i];return `<tr><td class="label">${lim}</td>${Array.from({length:7},(_,d)=>`<td><textarea data-student="${escapeHtml(name)}" data-kind="schedule" data-row="${i}" data-day="${d}" placeholder="${lim.startsWith('受講')?'例：難関物理③':'例：2021本試'}"></textarea></td>`).join('')}</tr>`}).join('');
+}
+function materialRowsHtml(name){const data=ensureStudent(name);return (data.materials.length?data.materials:[{subject:'',book:'',content:''}]).map((m,i)=>`<tr><td><textarea data-student="${escapeHtml(name)}" data-kind="subj" data-mat="${i}" placeholder="教科"></textarea></td><td colspan="3"><textarea data-student="${escapeHtml(name)}" data-kind="book" data-mat="${i}" placeholder="問題集/高速マスター"></textarea></td><td colspan="4"><textarea data-student="${escapeHtml(name)}" data-kind="content" data-mat="${i}" placeholder="内容"></textarea></td><td style="text-align:center"><button type="button" class="small secondary" data-delete-material="${escapeHtml(name)}" data-index="${i}">削除</button></td></tr>`).join('')}
+function eventRowsHtml(name){const data=ensureStudent(name);return (data.events.length?data.events:[{name:'',status:'',note:''}]).map((ev,i)=>`<div class="eventItem" data-event-row="${i}"><div class="field"><label>イベント名</label><input data-student="${escapeHtml(name)}" data-event-name placeholder="例：公開授業・説明会・面談会"></div><div class="checkRow"><label><input type="radio" name="event_${escapeHtml(name)}_${i}" data-student="${escapeHtml(name)}" data-event-status value="参加">参加</label><label><input type="radio" name="event_${escapeHtml(name)}_${i}" data-student="${escapeHtml(name)}" data-event-status value="不参加">不参加</label></div><div class="field" style="margin-top:8px"><label>備考</label><textarea data-student="${escapeHtml(name)}" data-event-note placeholder="備考"></textarea></div></div>`).join('')}
+function updateScheduleHeaders(){const dates=getDates();$$('[data-day-head]').forEach(th=>{const d=dates[Number(th.dataset.dayHead)];th.innerHTML=`<div>${jpDate(d)}</div><div style="font-size:12px;color:#667085">${DOW[d.getDay()]}曜日</div>`})}
+function updateScheduleAddButtons(){
+  $$('[data-add-schedule]').forEach(b=>{
+    const name=b.dataset.student;
+    const data=ensureStudent(name);
+    b.disabled=(b.dataset.addSchedule==='lesson' && data.lessonCount>=MAX_SCHEDULE_ROWS) || (b.dataset.addSchedule==='other' && data.otherCount>=MAX_SCHEDULE_ROWS);
   });
-  if(old.schedule){
-    old.schedule.forEach((day,d)=>day.forEach((v,r)=>{
-      const el=$(`textarea[data-kind="schedule"][data-day="${d}"][data-row="${r}"]`);
-      if(el)el.value=v||'';
-    }));
-  }
-  const addJ=$('#addJukouRow'), addO=$('#addOtherRow');
-  if(addJ)addJ.disabled=lessonCount>=MAX_SCHEDULE_ROWS;
-  if(addO)addO.disabled=otherCount>=MAX_SCHEDULE_ROWS;
-  bindInputs();
+}
+function addScheduleRow(kind,name){
+  syncFromDom();
+  const data=ensureStudent(name);
+  if(kind==='lesson'&&data.lessonCount<MAX_SCHEDULE_ROWS)data.lessonCount++;
+  if(kind==='other'&&data.otherCount<MAX_SCHEDULE_ROWS)data.otherCount++;
+  renderStudents();
+  updateScheduleAddButtons();
 }
 
-function addScheduleRow(kind){
-  if(kind==='lesson' && lessonCount<MAX_SCHEDULE_ROWS) lessonCount++;
-  if(kind==='other' && otherCount<MAX_SCHEDULE_ROWS) otherCount++;
-  renderSchedule();
-  refreshPreview();
-}
+/* =========================================================
+   3. 生徒別データ同期
+========================================================= */
+function syncFromDom(){if(!students.length)return; students.forEach(name=>{const card=document.querySelector(`[data-student-card="${cssEscape(name)}"]`); if(!card)return; const data=ensureStudent(name); data.schedule=Array.from({length:7},(_,d)=>LIMITS.map((_,r)=>card.querySelector(`textarea[data-kind="schedule"][data-day="${d}"][data-row="${r}"]`)?.value||'')); data.materials=Array.from(card.querySelectorAll('tbody[data-material-body] tr')).map((tr,i)=>({subject:tr.querySelector(`[data-kind="subj"]`)?.value||'',book:tr.querySelector(`[data-kind="book"]`)?.value||'',content:tr.querySelector(`[data-kind="content"]`)?.value||''})); if(!data.materials.length)data.materials=[{subject:'',book:'',content:''}]; data.remarks=card.querySelector('textarea[data-kind="remarks"]')?.value||''; data.exams=getExamInputsForCard(card); data.events=getEventInputsForCard(card);});}
+function cssEscape(s){return String(s).replace(/\\/g,'\\\\').replace(/"/g,'\\"')}
+function fillStudentValues(name){const card=document.querySelector(`[data-student-card="${cssEscape(name)}"]`);if(!card)return; const data=ensureStudent(name); data.schedule.forEach((day,d)=>day.forEach((v,r)=>{const el=card.querySelector(`textarea[data-kind="schedule"][data-day="${d}"][data-row="${r}"]`);if(el)el.value=v||''})); (data.materials||[]).forEach((m,i)=>{const tr=card.querySelectorAll('tbody[data-material-body] tr')[i]; if(!tr)return; tr.querySelector('[data-kind="subj"]').value=m.subject||''; tr.querySelector('[data-kind="book"]').value=m.book||''; tr.querySelector('[data-kind="content"]').value=m.content||'';}); const rem=card.querySelector('textarea[data-kind="remarks"]'); if(rem)rem.value=data.remarks||''; applyExamValuesToCard(card,data.exams||[]); applyEventValuesToCard(card,data.events||[]);}
+function bindInputs(){$$('input,textarea,select').forEach(el=>{el.oninput=()=>{if(el.id==='studentNames')return; syncFromDom()}; el.onkeydown=(e)=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();focusNext(el)}}}); $$('[data-save-one]').forEach(b=>b.onclick=()=>{syncFromDom();saveOne(b.dataset.saveOne,true)}); $$('[data-load-one]').forEach(b=>b.onclick=()=>loadOne(b.dataset.loadOne)); $$('[data-copy-one]').forEach(b=>b.onclick=()=>copyOne(b.dataset.copyOne)); $$('[data-add-material]').forEach(b=>b.onclick=()=>addMaterialRow(b.dataset.addMaterial)); $$('[data-delete-material]').forEach(b=>b.onclick=()=>deleteMaterialRow(b.dataset.deleteMaterial,Number(b.dataset.index))); $$('[data-add-event]').forEach(b=>b.onclick=()=>addEventRow(b.dataset.addEvent)); $$('[data-add-schedule]').forEach(b=>b.onclick=()=>addScheduleRow(b.dataset.addSchedule,b.dataset.student));}
+function focusNext(el){const inputs=$$('input,textarea,select').filter(x=>!x.disabled&&x.offsetParent!==null);const i=inputs.indexOf(el);if(i>=0&&i<inputs.length-1){inputs[i+1].focus();if(inputs[i+1].select)inputs[i+1].select()}}
+function addMaterialRow(name){syncFromDom();ensureStudent(name).materials.push({subject:'',book:'',content:''});renderStudents()}
+function deleteMaterialRow(name,i){syncFromDom();const arr=ensureStudent(name).materials;arr.splice(i,1);if(!arr.length)arr.push({subject:'',book:'',content:''});renderStudents()}
+function addEventRow(name){syncFromDom();ensureStudent(name).events.push({name:'',status:'',note:''});renderStudents()}
 
-function renderMaterials(){
-  const old=getData(false);
-  const mb=$('#materialBody');
-  mb.innerHTML='';
-  for(let i=0;i<materialCount;i++){
-    const tr=document.createElement('tr');
-    tr.innerHTML=`<td><textarea data-kind="subj" data-mat="${i}" placeholder="教科"></textarea></td><td colspan="3"><textarea data-kind="book" data-mat="${i}" placeholder="問題集/高速マスター"></textarea></td><td colspan="4"><textarea data-kind="content" data-mat="${i}" placeholder="内容"></textarea></td><td style="text-align:center"><button type="button" class="small secondary" data-delete="${i}">削除</button></td>`;
-    mb.appendChild(tr);
-  }
-  if(old.materials) old.materials.forEach((m,i)=>{
-    if(i<materialCount){
-      $(`textarea[data-kind="subj"][data-mat="${i}"]`).value=m.subject||'';
-      $(`textarea[data-kind="book"][data-mat="${i}"]`).value=m.book||'';
-      $(`textarea[data-kind="content"][data-mat="${i}"]`).value=m.content||'';
+/* =========================================================
+   4. 模試・イベント
+========================================================= */
+function getExamMaster(){try{const saved=JSON.parse(localStorage.getItem(EXAM_MASTER_KEY)||'[]');return Array.isArray(saved)?saved:[]}catch(e){return []}}
+function saveExamMasterData(rows){localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(rows))}
+function visibleExamMasters(){const start=new Date($('#weekStart').value+'T00:00:00');return getExamMaster().filter(ex=>{if(!ex.date)return false;const d=new Date(ex.date+'T00:00:00');const diff=daysBetween(start,d);return diff>=0&&diff<=21})}
+function getSubjectTemplates(){
+  try{
+    const saved=JSON.parse(localStorage.getItem(SUBJECT_TEMPLATE_KEY)||'[]');
+    const base=DEFAULT_SUBJECT_TEMPLATES.map(t=>({name:t.name,subjects:[...t.subjects]}));
+    if(Array.isArray(saved)){
+      saved.forEach(t=>{
+        if(!t||!t.name||!Array.isArray(t.subjects))return;
+        const item={name:t.name,subjects:[...new Set(t.subjects.map(x=>String(x).trim()).filter(Boolean))]};
+        const idx=base.findIndex(x=>x.name===item.name);
+        if(idx>=0)base[idx]=item; else base.push(item);
+      });
     }
-  });
-  $$('button[data-delete]').forEach(b=>b.onclick=()=>deleteMaterial(Number(b.dataset.delete)));
-  bindInputs();
+    return base;
+  }catch(e){return DEFAULT_SUBJECT_TEMPLATES.map(t=>({name:t.name,subjects:[...t.subjects]}));}
 }
-
-function deleteMaterial(i){
-  const data=getData();
-  data.materials.splice(i,1);
-  materialCount=Math.max(1,data.materials.length);
-  renderMaterials();
-  setData(data);
-  refreshPreview();
+function saveSubjectTemplates(list){localStorage.setItem(SUBJECT_TEMPLATE_KEY,JSON.stringify(list));}
+function findSubjectTemplate(name){return getSubjectTemplates().find(t=>t.name===name)||null}
+function defaultTemplateNameForType(type){return type==='crown'?'冠模試型':'共テ型'}
+function examSubjectsForType(type,templateName){const t=findSubjectTemplate(templateName||defaultTemplateNameForType(type));return t?t.subjects:(type==='crown'?CROWN_TEST_SUBJECTS:COMMON_TEST_SUBJECTS)}
+function getExamMaster(){try{const saved=JSON.parse(localStorage.getItem(EXAM_MASTER_KEY)||'[]');return Array.isArray(saved)?saved:[]}catch(e){return []}}
+function saveExamMasterData(rows){localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(rows))}
+function visibleExamMasters(){const start=new Date($('#weekStart').value+'T00:00:00');return getExamMaster().filter(ex=>{if(!ex.date)return false;const d=new Date(ex.date+'T00:00:00');const diff=daysBetween(start,d);return diff>=0&&diff<=21})}
+function examId(ex){return `${ex.name||''}|${ex.date||''}|${ex.type||'common'}|${ex.subjectTemplate||defaultTemplateNameForType(ex.type)}`}
+function examPanelHtml(name){
+  const exams=visibleExamMasters();
+  if(!exams.length)return '<div class="empty" style="margin-top:10px">3週間以内に表示対象の模試はありません。</div>';
+  return exams.map(ex=>{
+    const tmpl=ex.subjectTemplate||defaultTemplateNameForType(ex.type), id=examId(ex), subjects=examSubjectsForType(ex.type,tmpl);
+    return `<div class="examItem" data-exam-id="${escapeHtml(id)}" data-exam-name="${escapeHtml(ex.name)}" data-exam-date="${escapeHtml(ex.date)}" data-exam-type="${escapeHtml(ex.type||'common')}" data-exam-template="${escapeHtml(tmpl)}"><div class="examHead"><span>${escapeHtml(ex.name)}</span><span class="examDate">${escapeHtml(ex.date)} / ${escapeHtml(tmpl)}</span></div><div class="checkRow">${['当日','後日','不受験'].map(st=>`<label><input type="radio" name="exam_${escapeHtml(name)}_${escapeHtml(id)}" data-exam-status value="${st}">${st}</label>`).join('')}</div><div class="checkRow">${subjects.map(sub=>`<label><input type="checkbox" data-exam-subject value="${escapeHtml(sub)}">${escapeHtml(sub)}</label>`).join('')}</div></div>`;
+  }).join('')
 }
-
-function applyDates(){
-  const dates=getDates();
-  $$('#scheduleTable thead th[data-day]').forEach(th=>{
-    const d=dates[Number(th.dataset.day)];
-    th.innerHTML=`<div>${jpDate(d)}</div><div style="font-size:12px;color:#667085">${DOW[d.getDay()]}曜日</div>`;
-  });
-  refreshPreview();
+function getExamInputsForCard(card){return Array.from(card.querySelectorAll('.examItem')).map(item=>({id:item.dataset.examId||'',name:item.dataset.examName||'',date:item.dataset.examDate||'',type:item.dataset.examType||'common',subjectTemplate:item.dataset.examTemplate||defaultTemplateNameForType(item.dataset.examType||'common'),status:(item.querySelector('input[data-exam-status]:checked')||{}).value||'',subjects:Array.from(item.querySelectorAll('input[data-exam-subject]:checked')).map(x=>x.value)}))}
+function applyExamValuesToCard(card,values=[]){
+  const list=Array.isArray(values)?values:[];
+  const map=new Map(list.map(v=>[v.id||`${v.name}|${v.date}|${v.type||'common'}|${v.subjectTemplate||defaultTemplateNameForType(v.type||'common')}`,v]));
+  card.querySelectorAll('.examItem').forEach(item=>{
+    const exact=map.get(item.dataset.examId);
+    const itemTemplate=item.dataset.examTemplate||defaultTemplateNameForType(item.dataset.examType||'common');
+    const sameTemplate=list.find(v=>(v.subjectTemplate||defaultTemplateNameForType(v.type||'common'))===itemTemplate && Array.isArray(v.subjects) && v.subjects.length);
+    // 完全一致する模試があれば当日/後日/不受験も復元する。
+    // 違う模試名でも科目型が同じなら、科目チェックだけ復元する。
+    const v=exact||sameTemplate;
+    if(!v)return;
+    if(exact&&v.status){const st=item.querySelector(`input[data-exam-status][value="${v.status}"]`);if(st)st.checked=true}
+    (v.subjects||[]).forEach(sub=>{const cb=Array.from(item.querySelectorAll('input[data-exam-subject]')).find(x=>x.value===sub);if(cb)cb.checked=true})
+  })
 }
-
-function bindInputs(){
-  $$('input,textarea,select').forEach(el=>{
-    el.oninput=refreshPreview;
-    el.onkeydown=(e)=>{
-      if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();focusNext(el)}
-    };
-  });
+function getEventInputsForCard(card){return Array.from(card.querySelectorAll('.eventItem')).map(row=>({name:row.querySelector('[data-event-name]')?.value||'',status:(row.querySelector('input[data-event-status]:checked')||{}).value||'',note:row.querySelector('[data-event-note]')?.value||''})).filter(x=>x.name||x.status||x.note)}
+function applyEventValuesToCard(card,values=[]){(values||[]).forEach((ev,i)=>{const row=card.querySelector(`.eventItem[data-event-row="${i}"]`);if(!row)return; row.querySelector('[data-event-name]').value=ev.name||''; row.querySelector('[data-event-note]').value=ev.note||''; if(ev.status){const st=row.querySelector(`input[data-event-status][value="${ev.status}"]`);if(st)st.checked=true}})}
+function renderExamMasterPanel(){
+  const host=$('#examMasterPanel');
+  const rows=getExamMaster();
+  const templates=getSubjectTemplates();
+  const templateOptions=(selected)=>templates.map(t=>`<option value="${escapeHtml(t.name)}" ${t.name===(selected||'')?'selected':''}>${escapeHtml(t.name)}</option>`).join('');
+  host.innerHTML=rows.map((ex,i)=>{
+    const tmpl=ex.subjectTemplate||defaultTemplateNameForType(ex.type||'common');
+    return `<div class="examMasterRow" data-master-row="${i}"><div><label>模試名</label><input data-master-name value="${escapeHtml(ex.name||'')}" placeholder="例：全国統一高校生テスト"></div><div><label>実施日</label><input data-master-date type="date" value="${escapeHtml(ex.date||'')}"></div><div><label>分類</label><select data-master-type><option value="common" ${ex.type!=='crown'?'selected':''}>共通系</option><option value="crown" ${ex.type==='crown'?'selected':''}>冠模試</option></select></div><div><label>科目型</label><select data-master-subject-template>${templateOptions(tmpl)}</select></div><div><button type="button" class="small secondary" data-delete-master="${i}">削除</button></div></div>`;
+  }).join('')||'<div class="empty">まだ模試マスタがありません。</div>';
+  $$('[data-delete-master]').forEach(btn=>btn.onclick=()=>{const arr=getExamMaster();arr.splice(Number(btn.dataset.deleteMaster),1);saveExamMasterData(arr);renderExamMasterPanel();renderStudents()});
+  renderSubjectTemplateEditor();
 }
-
-function focusNext(el){
-  const inputs=$$('input,textarea').filter(x=>!x.disabled&&x.offsetParent!==null);
-  const i=inputs.indexOf(el);
-  if(i>=0&&i<inputs.length-1){inputs[i+1].focus();if(inputs[i+1].select) inputs[i+1].select()}
+function collectExamMasterFromPanel(){return $$('.examMasterRow').map(row=>({name:row.querySelector('[data-master-name]')?.value.trim()||'',date:row.querySelector('[data-master-date]')?.value||'',type:row.querySelector('[data-master-type]')?.value||'common',subjectTemplate:row.querySelector('[data-master-subject-template]')?.value||defaultTemplateNameForType(row.querySelector('[data-master-type]')?.value||'common')})).filter(x=>x.name||x.date)}
+function addExamMasterRow(){const arr=collectExamMasterFromPanel();arr.push({name:'',date:'',type:'common',subjectTemplate:'共テ型'});saveExamMasterData(arr);renderExamMasterPanel()}
+function saveExamMasterFromPanel(){saveExamMasterData(collectExamMasterFromPanel());renderExamMasterPanel();renderStudents();alert('模試マスタを保存しました。')}
+function renderSubjectTemplateEditor(){
+  const sel=$('#subjectTemplateSelect'), checks=$('#subjectTemplateChecks'), nameInput=$('#subjectTemplateName');
+  if(!sel||!checks||!nameInput)return;
+  const templates=getSubjectTemplates();
+  sel.innerHTML=templates.map(t=>`<option value="${escapeHtml(t.name)}">${escapeHtml(t.name)}</option>`).join('');
+  if(!nameInput.value) nameInput.value='共テ型';
+  const current=findSubjectTemplate(nameInput.value)||templates[0]||{subjects:[]};
+  const selected=new Set(current.subjects||[]);
+  const pool=[...new Set([...SUBJECT_POOL,...(current.subjects||[])])];
+  checks.innerHTML=pool.map(sub=>`<label><input type="checkbox" data-template-subject value="${escapeHtml(sub)}" ${selected.has(sub)?'checked':''}>${escapeHtml(sub)}</label>`).join('');
+  const custom=$('#subjectTemplateCustom');
+  if(custom&&!custom.value){custom.value=(current.subjects||[]).filter(x=>!SUBJECT_POOL.includes(x)).join('、');}
+}
+function loadSubjectTemplateToEditor(){
+  const name=$('#subjectTemplateSelect')?.value||'共テ型';
+  const t=findSubjectTemplate(name);if(!t)return;
+  $('#subjectTemplateName').value=t.name;
+  $('#subjectTemplateCustom').value=(t.subjects||[]).filter(x=>!SUBJECT_POOL.includes(x)).join('、');
+  renderSubjectTemplateEditor();
+}
+function saveSubjectTemplateFromEditor(){
+  const name=($('#subjectTemplateName')?.value||'').trim();
+  if(!name)return alert('科目型名を入力してください。');
+  const checked=$$('[data-template-subject]:checked').map(x=>x.value);
+  const custom=($('#subjectTemplateCustom')?.value||'').split(/[、，,\n]/).map(x=>x.trim()).filter(Boolean);
+  const subjects=[...new Set([...checked,...custom])];
+  if(!subjects.length)return alert('科目を1つ以上選んでください。');
+  const list=getSubjectTemplates();
+  const idx=list.findIndex(t=>t.name===name);
+  const item={name,subjects};
+  if(idx>=0)list[idx]=item; else list.push(item);
+  saveSubjectTemplates(list);
+  renderExamMasterPanel();
+  renderStudents();
+  alert(`科目型「${name}」を保存しました。`);
 }
 
 /* =========================================================
-   3. データ取得・復元・プレビュー
+   5. 保存・復元
+   - 共有フォルダが選択済みなら共有フォルダを優先
+   - 未選択ならブラウザ内 localStorage に保存
+   - まとめて保存時は、全員分＋各個人データを必ず同時保存
 ========================================================= */
-function getData(readSchedule=true){
+function indivKey(name){return `yoteiStudentMemory:${name}`}
+function groupKey(){return `yoteiGroupMemory:${students.join('|')}`}
+function buildIndividualMemory(name,savedAt=new Date().toISOString()){
+  return Object.assign({studentName:name,savedAt},ensureStudent(name));
+}
+function saveOneToBrowser(name,savedAt=new Date().toISOString()){
+  if(!name)return false;
+  const mem=buildIndividualMemory(name,savedAt);
+  localStorage.setItem(indivKey(name),JSON.stringify(mem));
+  return mem;
+}
+function loadOneFromBrowser(name){
+  const s=localStorage.getItem(indivKey(name));
+  return s?JSON.parse(s):null;
+}
+function buildGroupMemory(savedAt=new Date().toISOString()){
+  syncFromDom();
   return {
-    studentName:$('#studentName')?.value||'',
-    weekStart:$('#weekStart')?.value||'',
-    remarks:$('#remarks')?.value||'',
-    schedule:Array.from({length:7},(_,d)=>LIMITS.map((_,r)=> readSchedule?($(`textarea[data-kind="schedule"][data-day="${d}"][data-row="${r}"]`)?.value||''):'')),
-    materials:Array.from({length:materialCount},(_,i)=>({
-      subject:$(`textarea[data-kind="subj"][data-mat="${i}"]`)?.value||'',
-      book:$(`textarea[data-kind="book"][data-mat="${i}"]`)?.value||'',
-      content:$(`textarea[data-kind="content"][data-mat="${i}"]`)?.value||''
-    })),
-    exams:getExamInputs(),
-    events:getEventInputs()
+    version:1,
+    type:'group',
+    names:students,
+    weekStart:$('#weekStart').value,
+    studentData:Object.fromEntries(students.map(n=>[n,ensureStudent(n)])),
+    examMaster:getExamMaster(),
+    subjectTemplates:getSubjectTemplates(),
+    savedAt
   };
 }
-
-function setData(data){
-  $('#studentName').value=data.studentName||'';
-  $('#weekStart').value=data.weekStart||$('#weekStart').value;
-  $('#remarks').value=data.remarks||'';
-  materialCount=Math.max(1,(data.materials||[]).length||1);
-  const schedule=data.schedule||[];
-  const maxLesson=schedule.reduce((m,day)=>Math.max(m,...[0,1,2].filter(r=>String(day?.[r]||'').trim()).map(r=>r+1),0),0);
-  const maxOther=schedule.reduce((m,day)=>Math.max(m,...[3,4,5].filter(r=>String(day?.[r]||'').trim()).map(r=>r-2),0),0);
-  lessonCount=Math.min(MAX_SCHEDULE_ROWS,Math.max(1,maxLesson));
-  otherCount=Math.min(MAX_SCHEDULE_ROWS,Math.max(1,maxOther));
-  renderSchedule();
-  (data.schedule||[]).forEach((day,d)=>day.forEach((v,r)=>{const el=$(`textarea[data-kind="schedule"][data-day="${d}"][data-row="${r}"]`);if(el)el.value=v||''}));
-  (data.materials||[]).forEach((m,i)=>{
-    const a=$(`textarea[data-kind="subj"][data-mat="${i}"]`),b=$(`textarea[data-kind="book"][data-mat="${i}"]`),c=$(`textarea[data-kind="content"][data-mat="${i}"]`);
-    if(a)a.value=m.subject||'';if(b)b.value=m.book||'';if(c)c.value=m.content||'';
-  });
-  eventCount=Math.max(1,(data.events||[]).length||1);
-  applyDates();
-  applyExamValues(data.exams||[]);
-  applyEventValues(data.events||[]);
-  bindInputs();
-  refreshPreview();
+function saveGroupToBrowser(mem){
+  localStorage.setItem(groupKey(),JSON.stringify(mem));
+  // グループ保存した内容は、個人復元でも使えるように各個人へも同時保存する。
+  (mem.names||students).forEach(n=>saveOneToBrowser(n,mem.savedAt));
 }
-
-function refreshPreview(){
-  renderExamPanel();
-  renderEventPanel();
-}
-
-function getExamMaster(){
-  try{const saved=JSON.parse(localStorage.getItem(EXAM_MASTER_KEY)||'[]');return Array.isArray(saved)?saved:DEFAULT_EXAM_MASTER.slice()}catch(e){return DEFAULT_EXAM_MASTER.slice()}
-}
-function saveExamMasterData(rows){localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(rows))}
-function visibleExamMasters(){
-  const start=new Date($('#weekStart').value+'T00:00:00');
-  return getExamMaster().filter(ex=>{
-    if(!ex.date)return false;
-    const d=new Date(ex.date+'T00:00:00');
-    const diff=daysBetween(start,d);
-    return diff>=0 && diff<=14;
-  });
-}
-function examSubjectsForType(type){return type==='crown'?CROWN_TEST_SUBJECTS:COMMON_TEST_SUBJECTS}
-function examId(ex){return `${ex.name||''}|${ex.date||''}|${ex.type||'common'}`}
-function getExamInputs(){
-  return $$('.examItem').map(item=>({
-    id:item.dataset.examId||'',
-    name:item.dataset.examName||'',
-    date:item.dataset.examDate||'',
-    type:item.dataset.examType||'common',
-    status:(item.querySelector('input[data-exam-status]:checked')||{}).value||'',
-    subjects:Array.from(item.querySelectorAll('input[data-exam-subject]:checked')).map(x=>x.value)
-  }));
-}
-function applyExamValues(values=[]){
-  const map=new Map((values||[]).map(v=>[v.id||`${v.name}|${v.date}|${v.type||'common'}`,v]));
-  $$('.examItem').forEach(item=>{
-    const v=map.get(item.dataset.examId);
-    if(!v)return;
-    if(v.status){const st=item.querySelector(`input[data-exam-status][value="${v.status}"]`);if(st)st.checked=true}
-    (v.subjects||[]).forEach(sub=>{const cb=Array.from(item.querySelectorAll('input[data-exam-subject]')).find(x=>x.value===sub);if(cb)cb.checked=true});
-  });
-}
-function renderExamPanel(preserve=true){
-  const old=preserve?getExamInputs():[];
-  const panel=$('#examPanel');
-  if(!panel)return;
-  const exams=visibleExamMasters();
-  if(!exams.length){panel.innerHTML='<div class="empty" style="margin-top:10px">2週間以内に表示対象の模試はありません。</div>';renderExamMasterPanel();return;}
-  panel.innerHTML=exams.map(ex=>{
-    const id=examId(ex), subjects=examSubjectsForType(ex.type);
-    return `<div class="examItem" data-exam-id="${escapeXml(id)}" data-exam-name="${escapeXml(ex.name)}" data-exam-date="${escapeXml(ex.date)}" data-exam-type="${escapeXml(ex.type||'common')}">
-      <div class="examHead"><span>${escapeXml(ex.name)}</span><span class="examDate">${escapeXml(ex.date)} / ${ex.type==='crown'?'冠模試':'共通テスト系'}</span></div>
-      <div class="checkRow">${['当日','後日','不受験'].map(st=>`<label><input type="radio" name="examStatus_${escapeXml(id)}" data-exam-status value="${st}">${st}</label>`).join('')}</div>
-      <div class="checkRow">${subjects.map(sub=>`<label><input type="checkbox" data-exam-subject value="${escapeXml(sub)}">${escapeXml(sub)}</label>`).join('')}</div>
-    </div>`;
-  }).join('');
-  applyExamValues(old);
-  bindInputs();
-  renderExamMasterPanel();
-}
-function renderExamMasterPanel(){
-  const host=$('#examMasterPanel');if(!host)return;
-  const rows=getExamMaster();
-  host.innerHTML=rows.map((ex,i)=>`<div class="examMasterRow" data-master-row="${i}">
-    <div><label>模試名</label><input data-master-name value="${escapeXml(ex.name||'')}" placeholder="例：全国統一高校生テスト"></div>
-    <div><label>実施日</label><input data-master-date type="date" value="${escapeXml(ex.date||'')}"></div>
-    <div><label>種別</label><select data-master-type><option value="common" ${ex.type!=='crown'?'selected':''}>共通系</option><option value="crown" ${ex.type==='crown'?'selected':''}>冠模試</option></select></div>
-    <div><button type="button" class="small secondary" data-delete-master="${i}">削除</button></div>
-  </div>`).join('') || '<div class="empty">まだ模試マスタがありません。</div>';
-  $$('button[data-delete-master]').forEach(btn=>btn.onclick=()=>{const arr=getExamMaster();arr.splice(Number(btn.dataset.deleteMaster),1);saveExamMasterData(arr);renderExamPanel(false)});
-}
-function collectExamMasterFromPanel(){
-  return $$('.examMasterRow').map(row=>({
-    name:row.querySelector('[data-master-name]')?.value.trim()||'',
-    date:row.querySelector('[data-master-date]')?.value||'',
-    type:row.querySelector('[data-master-type]')?.value||'common'
-  })).filter(x=>x.name||x.date);
-}
-function addExamMasterRow(){const arr=collectExamMasterFromPanel();arr.push({name:'',date:'',type:'common'});saveExamMasterData(arr);renderExamMasterPanel()}
-function saveExamMasterFromPanel(){saveExamMasterData(collectExamMasterFromPanel());renderExamPanel(false);alert('模試マスタを保存しました。')}
-function getEventInputs(){
-  return $$('.eventItem').map(row=>({
-    name:row.querySelector('[data-event-name]')?.value||'',
-    status:(row.querySelector('input[data-event-status]:checked')||{}).value||'',
-    note:row.querySelector('[data-event-note]')?.value||''
-  })).filter(x=>x.name||x.status||x.note);
-}
-function applyEventValues(values=[]){eventCount=Math.max(1,(values||[]).length||1);renderEventPanel(false);(values||[]).forEach((ev,i)=>{
-  const row=$(`.eventItem[data-event-row="${i}"]`);if(!row)return;
-  row.querySelector('[data-event-name]').value=ev.name||'';
-  row.querySelector('[data-event-note]').value=ev.note||'';
-  if(ev.status){const st=row.querySelector(`input[data-event-status][value="${ev.status}"]`);if(st)st.checked=true}
-});}
-function renderEventPanel(preserve=true){
-  const old=preserve?getEventInputs():[];
-  const host=$('#eventPanel');if(!host)return;
-  host.innerHTML=Array.from({length:eventCount},(_,i)=>`<div class="eventItem" data-event-row="${i}">
-    <div class="field"><label>イベント名</label><input data-event-name placeholder="例：公開授業・説明会・面談会"></div>
-    <div class="checkRow"><label><input type="radio" name="eventStatus_${i}" data-event-status value="参加">参加</label><label><input type="radio" name="eventStatus_${i}" data-event-status value="不参加">不参加</label></div>
-    <div class="field" style="margin-top:8px"><label>備考</label><textarea data-event-note placeholder="備考"></textarea></div>
-  </div>`).join('');
-  if(preserve)applyEventValuesNoRender(old);
-  bindInputs();
-}
-function applyEventValuesNoRender(values=[]){
-  (values||[]).forEach((ev,i)=>{const row=$(`.eventItem[data-event-row="${i}"]`);if(!row)return;row.querySelector('[data-event-name]').value=ev.name||'';row.querySelector('[data-event-note]').value=ev.note||'';if(ev.status){const st=row.querySelector(`input[data-event-status][value="${ev.status}"]`);if(st)st.checked=true}});
-}
-
-
-/* =========================================================
-   4. コピー用テキスト生成
-========================================================= */
-function buildCopyText(){
-  const data=getData(),dates=getDates(),lines=[];
-  dates.forEach((d,di)=>{
-    const items=data.schedule[di].map((v,i)=>String(v||'').trim()?`${LIMITS[i]} ${String(v||'').trim().replace(/\s*\n\s*/g,' / ')}`:'').filter(Boolean).join(' / ');
-    lines.push(`${jpDate(d)}（${DOW[d.getDay()]}） ${items}`.trim());
-  });
-  data.materials.forEach(m=>{
-    const subject=String(m.subject||'').trim().replace(/\s*\n\s*/g,' / '),book=String(m.book||'').trim().replace(/\s*\n\s*/g,' / '),content=String(m.content||'').trim().replace(/\s*\n\s*/g,' / ');
-    if(subject||book||content)lines.push([subject,book,content].filter(Boolean).join('　'));
-  });
-  const remarks=String(data.remarks||'').trim().replace(/\s*\n\s*/g,' / ');
-  lines.push(`備考 ${remarks}`.trim());
-  return lines.join('\n');
-}
-
-async function copyToClipboard(){
-  const text=buildCopyText();
-  try{
-    if(navigator.clipboard&&window.isSecureContext){
-      await navigator.clipboard.writeText(text);
-    }else{
-      const ta=document.createElement('textarea');
-      ta.value=text;
-      ta.setAttribute('readonly','');
-      ta.style.position='fixed';
-      ta.style.left='-9999px';
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
+async function saveOne(name,showAlert=true){
+  syncFromDom();
+  if(!name)return false;
+  const savedAt=new Date().toISOString();
+  const mem=saveOneToBrowser(name,savedAt);
+  let place='ブラウザ内';
+  if(sharedDirHandle){
+    try{
+      await writeJsonToShared(sharedStudentFileName(name),mem);
+      await writeJsonToShared('settings_exam_master.json',{examMaster:getExamMaster(),subjectTemplates:getSubjectTemplates(),savedAt});
+      place='共有フォルダ＋ブラウザ内';
+    }catch(e){
+      if(showAlert)alert('共有フォルダへの個人保存に失敗しました。ブラウザ内には保存しました。');
+      place='ブラウザ内';
     }
-    alert('コピーしました。POSを開きます。POS側で Ctrl+V してください。');
-    openPosPage();
-  }catch(e){
-    alert('自動コピーに失敗しました。');
   }
-}
-
-function openPosPage(){
-  const posUrl='https://pos.toshin.com/SSO2022/SSO2/FCoach/SSOLogin/SSOLogin';
-  const opened=window.open(posUrl,'_blank','noopener');
-  if(!opened){
-    alert('POSを開けませんでした。ブラウザのポップアップブロック設定を確認してください。');
-  }
-}
-
-function studentKey(){const name=($('#studentName').value||'').trim();return name?`yoteiStudentMemory:${name}`:''}
-function getStudentMemory(){const data=getData();return{studentName:data.studentName,materials:data.materials.filter(m=>(m.subject||m.book||m.content)),remarks:data.remarks,exams:data.exams,events:data.events,savedAt:new Date().toISOString()}}
-function saveStudentMemory(showAlert=true){
-  const key=studentKey();
-  if(!key){if(showAlert)alert('先に生徒名を入力してください。');return false;}
-  const mem=getStudentMemory();
-  localStorage.setItem(key,JSON.stringify(mem));
-  showSaveInfo(`保存済み：${mem.studentName}（${new Date(mem.savedAt).toLocaleString('ja-JP')}）`);
-  if(showAlert)alert('この生徒の下段内容を保存しました。');
+  if(showAlert)alert(`${name}の内容を保存しました。`);
+  showSaveInfo(`保存済み：${name}（${new Date(savedAt).toLocaleString('ja-JP')} / ${place}）`);
   return true;
 }
-function loadStudentMemory(){
-  const key=studentKey();
-  if(!key)return alert('先に生徒名を入力してください。');
-  const s=localStorage.getItem(key);
-  if(!s)return alert('この生徒の保存内容はまだありません。');
-  const mem=JSON.parse(s), current=getData();
-  current.materials=mem.materials&&mem.materials.length?mem.materials:[{subject:'',book:'',content:''}];
-  current.remarks=mem.remarks||'';
-  current.exams=mem.exams||[];
-  current.events=mem.events||[];
-  setData(current);
+async function loadOne(name){
+  if(!name)return alert('生徒名がありません。');
+  let mem=null;
+  let place='ブラウザ内';
+  if(sharedDirHandle){
+    try{
+      await applySharedSettingsIfAny();
+      mem=await readJsonFromShared(sharedStudentFileName(name));
+      if(mem)place='共有フォルダ';
+    }catch(e){}
+  }
+  if(!mem){
+    mem=loadOneFromBrowser(name);
+    place='ブラウザ内';
+  }
+  if(!mem)return alert(`${name}の保存内容はまだありません。`);
+  studentData[name]=normalizeStudentData(mem);
+  renderStudents();
   const savedAt=mem.savedAt?new Date(mem.savedAt).toLocaleString('ja-JP'):'保存日時不明';
-  showSaveInfo(`前回内容を読み込みました：${mem.studentName||current.studentName}（${savedAt}）`);
-  alert(`前回内容を読み込みました。\n保存日時：${savedAt}\n上段の予定と日付はそのままです。`);
+  showSaveInfo(`${name}を復元しました（${savedAt} / ${place}）`);
+  alert(`${name}の前回内容を読み込みました。`);
 }
+async function saveGroup(){
+  syncFromDom();
+  if(!students.length)return alert('先に生徒名を入力してください。');
+  const mem=buildGroupMemory();
+  saveGroupToBrowser(mem);
+  let place='ブラウザ内';
+  if(sharedDirHandle){
+    try{
+      await writeJsonToShared(sharedGroupFileName(students),mem);
+      for(const name of students){
+        await writeJsonToShared(sharedStudentFileName(name),buildIndividualMemory(name,mem.savedAt));
+      }
+      await writeJsonToShared('settings_exam_master.json',{examMaster:getExamMaster(),subjectTemplates:getSubjectTemplates(),savedAt:mem.savedAt});
+      place='共有フォルダ＋ブラウザ内';
+    }catch(e){
+      alert('共有フォルダへのまとめて保存に失敗しました。ブラウザ内には保存しました。');
+      place='ブラウザ内';
+    }
+  }
+  alert('全員分と各個人内容を保存しました。\n次回はまとめて復元でも、この生徒を復元でも戻せます。');
+  showSaveInfo(`まとめて保存済み：${students.join('、')}（${new Date(mem.savedAt).toLocaleString('ja-JP')} / ${place}）\n※この保存で「この生徒を復元」用の個人データも更新しました。`);
+}
+async function loadGroup(){
+  const names=splitNames();
+  if(!names.length)return alert('先に生徒名を入力してください。');
+  let mem=null;
+  let place='ブラウザ内';
+
+  // 1. まず「まとめて保存データ」を探す
+  if(sharedDirHandle){
+    try{
+      await applySharedSettingsIfAny();
+      mem=await readJsonFromShared(sharedGroupFileName(names));
+      if(mem)place='共有フォルダ';
+    }catch(e){}
+  }
+  if(!mem){
+    const s=localStorage.getItem(`yoteiGroupMemory:${names.join('|')}`);
+    mem=s?JSON.parse(s):null;
+    if(mem)place='ブラウザ内';
+  }
+
+  // 2. まとめて保存がない場合は、入力されている生徒名をもとに
+  //    各個人保存データを集めてグループとして復元する
+  if(!mem){
+    const collected={};
+    const missing=[];
+    let anyShared=false;
+    for(const name of names){
+      let one=null;
+      if(sharedDirHandle){
+        try{
+          one=await readJsonFromShared(sharedStudentFileName(name));
+          if(one) anyShared=true;
+        }catch(e){}
+      }
+      if(!one) one=loadOneFromBrowser(name);
+      if(one) collected[name]=normalizeStudentData(one);
+      else missing.push(name);
+    }
+    if(Object.keys(collected).length){
+      mem={
+        version:1,
+        type:'group-from-individuals',
+        names,
+        weekStart:$('#weekStart').value,
+        studentData:collected,
+        savedAt:new Date().toISOString()
+      };
+      place=anyShared?'個人保存データ（共有フォルダ＋ブラウザ内）':'個人保存データ（ブラウザ内）';
+      if(missing.length){
+        alert(`個人保存データから復元します。
+未保存の生徒：${missing.join('、')}`);
+      }
+    }
+  }
+
+  if(!mem)return alert('この組み合わせのまとめて保存も、各個人の保存データも見つかりません。名前の表記を確認してください。');
+  $('#weekStart').value=mem.weekStart||$('#weekStart').value;
+  students=mem.names||names;
+  $('#studentNames').value=students.join(', ');
+  studentData=Object.assign(studentData,mem.studentData||{});
+  if(Array.isArray(mem.examMaster)) saveExamMasterData(mem.examMaster);
+  if(Array.isArray(mem.subjectTemplates)) saveSubjectTemplates(mem.subjectTemplates);
+  renderExamMasterPanel();
+  renderStudents();
+  const savedAt=mem.savedAt?new Date(mem.savedAt).toLocaleString('ja-JP'):'保存日時不明';
+  showSaveInfo(`グループ内容を復元しました：${students.join('、')}（${savedAt} / ${place}）`);
+  alert('グループ内容を復元しました。');
+}
+function maxUsedLesson(data){let m=1;(data.schedule||[]).forEach(day=>[0,1,2].forEach(r=>{if(String(day?.[r]||'').trim())m=Math.max(m,r+1)}));return Math.min(MAX_SCHEDULE_ROWS,m)}
+function maxUsedOther(data){let m=1;(data.schedule||[]).forEach(day=>[3,4,5].forEach(r=>{if(String(day?.[r]||'').trim())m=Math.max(m,r-2)}));return Math.min(MAX_SCHEDULE_ROWS,m)}
+/* =========================================================
+   6. コピー・POS
+========================================================= */
+function buildCopyText(name){syncFromDom(); const data=ensureStudent(name),dates=getDates(),lines=[]; lines.push(`${name} 面談内容`); dates.forEach((d,di)=>{const items=data.schedule[di].map((v,i)=>String(v||'').trim()?`${LIMITS[i]} ${String(v||'').trim().replace(/\s*\n\s*/g,' / ')}`:'').filter(Boolean).join(' / '); lines.push(`${jpDate(d)}（${DOW[d.getDay()]}） ${items}`.trim())}); data.materials.forEach(m=>{const subject=String(m.subject||'').trim().replace(/\s*\n\s*/g,' / '),book=String(m.book||'').trim().replace(/\s*\n\s*/g,' / '),content=String(m.content||'').trim().replace(/\s*\n\s*/g,' / '); if(subject||book||content)lines.push([subject,book,content].filter(Boolean).join('　'))}); const remarks=String(data.remarks||'').trim().replace(/\s*\n\s*/g,' / '); if(remarks)lines.push(`備考 ${remarks}`); (data.exams||[]).forEach(ex=>{if(ex.name||ex.status||ex.subjects?.length)lines.push(`模試 ${ex.name} ${ex.status} ${(ex.subjects||[]).join('、')}`.trim())}); (data.events||[]).forEach(ev=>{if(ev.name||ev.status||ev.note)lines.push(`イベント ${ev.name} ${ev.status} ${ev.note}`.trim())}); return lines.join('\n')}
+async function copyOne(name){const text=buildCopyText(name); try{if(navigator.clipboard&&window.isSecureContext)await navigator.clipboard.writeText(text); else{const ta=document.createElement('textarea');ta.value=text;ta.setAttribute('readonly','');ta.style.position='fixed';ta.style.left='-9999px';document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta)} alert(`${name}の面談内容をコピーしました。POSを開きます。`); const opened=window.open(POS_URL,'_blank','noopener'); if(!opened)alert('POSを開けませんでした。ポップアップブロック設定を確認してください。')}catch(e){alert('自動コピーに失敗しました。')}}
 
 /* =========================================================
-   6. Excel生成（予定入力シート構造は統合用HTMLと互換）
+   7. Excel生成
 ========================================================= */
 function cellXml(r,c,v,style=0){if(v===undefined||v===null||v==='')return '';return `<c r="${cellRef(r,c)}" t="inlineStr" s="${style}"><is><t>${escapeXml(v)}</t></is></c>`}
 function rowXml(r,cells){return `<row r="${r}">${cells.join('')}</row>`}
+function buildPlanSheetXml(name){const data=ensureStudent(name),dates=getDates();let rows=[],r=1;rows.push(rowXml(r,[cellXml(r,1,'予定入力表',1)]));r++;rows.push(rowXml(r,[cellXml(r,1,'生徒名',2),cellXml(r,2,name,0),cellXml(r,4,'週開始',2),cellXml(r,5,$('#weekStart').value,0)]));r+=2;rows.push(rowXml(r,[cellXml(r,1,'予定/日付',2),...dates.map((d,i)=>cellXml(r,2+i,`${jpDate(d)}（${DOW[d.getDay()]}）`,2))]));r++;LIMITS.forEach((lim,li)=>{rows.push(rowXml(r,[cellXml(r,1,lim,2),...data.schedule.map((day,di)=>cellXml(r,2+di,day[li]||'',0))]));r++});r++;const headerRow=r;rows.push(rowXml(r,[cellXml(r,1,'教科',2),cellXml(r,2,'問題集/高速マスター',2),cellXml(r,5,'内容',2)]));r++;data.materials.forEach(m=>{if(m.subject||m.book||m.content){rows.push(rowXml(r,[cellXml(r,1,m.subject,0),cellXml(r,2,m.book,0),cellXml(r,5,m.content,0)]));r++}});const remarksRow=r;rows.push(rowXml(r,[cellXml(r,1,'備考',2),cellXml(r,2,data.remarks,0)]));const merges=[`<mergeCell ref="A1:H1"/>`,`<mergeCell ref="B${headerRow}:D${headerRow}"/>`,`<mergeCell ref="E${headerRow}:H${headerRow}"/>`];for(let rr=headerRow+1;rr<remarksRow;rr++)merges.push(`<mergeCell ref="B${rr}:D${rr}"/>`,`<mergeCell ref="E${rr}:H${rr}"/>`);merges.push(`<mergeCell ref="B${remarksRow}:H${remarksRow}"/>`);return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="4" topLeftCell="A5" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols><col min="1" max="1" width="15" customWidth="1"/><col min="2" max="8" width="20" customWidth="1"/></cols><sheetData>${rows.join('')}</sheetData><mergeCells count="${merges.length}">${merges.join('')}</mergeCells><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`}
+function simpleSheetXml(aoa){const rows=[];aoa.forEach((row,idx)=>{const r=idx+1;rows.push(rowXml(r,row.map((v,c)=>cellXml(r,c+1,v,idx===0?2:0))))});return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols><col min="1" max="12" width="22" customWidth="1"/></cols><sheetData>${rows.join('')}</sheetData><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`}
+function buildExamSheetXml(name){const data=ensureStudent(name);const aoa=[['生徒名','週開始','模試名','実施日','種別','受験方法','科目','保存日時']];(data.exams||[]).forEach(ex=>{if(ex.name||ex.status||ex.subjects?.length)aoa.push([name,$('#weekStart').value,ex.name,ex.date,ex.subjectTemplate||defaultTemplateNameForType(ex.type||'common'),ex.status,(ex.subjects||[]).join('、'),new Date().toLocaleString('ja-JP')])});return simpleSheetXml(aoa)}
+function buildEventSheetXml(name){const data=ensureStudent(name);const aoa=[['生徒名','週開始','イベント名','参加/不参加','備考','保存日時']];(data.events||[]).forEach(ev=>{if(ev.name||ev.status||ev.note)aoa.push([name,$('#weekStart').value,ev.name,ev.status,ev.note,new Date().toLocaleString('ja-JP')])});return simpleSheetXml(aoa)}
+const enc=new TextEncoder();function bytes(s){return enc.encode(s)}function crcTable(){let t=[];for(let i=0;i<256;i++){let c=i;for(let k=0;k<8;k++)c=(c&1)?(0xedb88320^(c>>>1)):(c>>>1);t[i]=c>>>0}return t}const CRC_TABLE=crcTable();function crc32Bytes(arr){let crc=0xffffffff;for(let i=0;i<arr.length;i++)crc=(crc>>>8)^CRC_TABLE[(crc^arr[i])&0xff];return (crc^0xffffffff)>>>0}function put16(a,o,v){a[o]=v&255;a[o+1]=(v>>>8)&255}function put32(a,o,v){a[o]=v&255;a[o+1]=(v>>>8)&255;a[o+2]=(v>>>16)&255;a[o+3]=(v>>>24)&255}function concat(parts){let len=parts.reduce((s,p)=>s+p.length,0),out=new Uint8Array(len),pos=0;parts.forEach(p=>{out.set(p,pos);pos+=p.length});return out}
+function zipBytes(files){let parts=[],central=[],offset=0;files.forEach(f=>{const name=bytes(f.name),data=(f.data instanceof Uint8Array)?f.data:bytes(f.data),crc=crc32Bytes(data);let h=new Uint8Array(30);put32(h,0,0x04034b50);put16(h,4,20);put16(h,6,0x0800);put16(h,8,0);put16(h,10,0);put16(h,12,0);put32(h,14,crc);put32(h,18,data.length);put32(h,22,data.length);put16(h,26,name.length);put16(h,28,0);parts.push(h,name,data);let c=new Uint8Array(46);put32(c,0,0x02014b50);put16(c,4,20);put16(c,6,20);put16(c,8,0x0800);put16(c,10,0);put16(c,12,0);put16(c,14,0);put32(c,16,crc);put32(c,20,data.length);put32(c,24,data.length);put16(c,28,name.length);put16(c,30,0);put16(c,32,0);put16(c,34,0);put16(c,36,0);put32(c,38,0);put32(c,42,offset);central.push(c,name);offset+=h.length+name.length+data.length});const centralBytes=concat(central);let e=new Uint8Array(22);put32(e,0,0x06054b50);put16(e,4,0);put16(e,6,0);put16(e,8,files.length);put16(e,10,files.length);put32(e,12,centralBytes.length);put32(e,16,offset);put16(e,20,0);return concat([...parts,centralBytes,e])}
+function makeXlsxBytesForStudent(name){const files=[{name:'[Content_Types].xml',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/worksheets/sheet3.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`},{name:'_rels/.rels',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`},{name:'xl/workbook.xml',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="予定入力" sheetId="1" r:id="rId1"/><sheet name="模試確認" sheetId="2" r:id="rId2"/><sheet name="イベント確認" sheetId="3" r:id="rId3"/></sheets></workbook>`},{name:'xl/_rels/workbook.xml.rels',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet3.xml"/><Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`},{name:'xl/styles.xml',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Yu Gothic"/></font><font><b/><sz val="11"/><name val="Yu Gothic"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFEFF6FF"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"/><right style="thin"/><top style="thin"/><bottom style="thin"/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"><alignment wrapText="1" vertical="top"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`},{name:'xl/worksheets/sheet1.xml',data:buildPlanSheetXml(name)},{name:'xl/worksheets/sheet2.xml',data:buildExamSheetXml(name)},{name:'xl/worksheets/sheet3.xml',data:buildEventSheetXml(name)}];return zipBytes(files)}
+function safeFileName(s){return String(s||'').replace(/[\\/:*?"<>|]/g,'_')}
+function exportAll(){syncFromDom(); if(!students.length)return alert('先に生徒名を入力してください。'); students.forEach(n=>saveOneToBrowser(n,false)); const dates=getDates(); const files=students.map(name=>({name:safeFileName(`${name}.${jpDate(dates[0])}-${jpDate(dates[6])}.xlsx`),data:makeXlsxBytesForStudent(name)})); const zip=zipBytes(files); const blob=new Blob([zip],{type:'application/zip'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=safeFileName(`予定入力_グループ_${jpDate(dates[0])}-${jpDate(dates[6])}.zip`); document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
 
-function buildSheetXml(){
-  const data=getData(),dates=getDates();
-  let rows=[],r=1;
-  rows.push(rowXml(r,[cellXml(r,1,'予定入力表',1)]));r++;
-  rows.push(rowXml(r,[cellXml(r,1,'生徒名',2),cellXml(r,2,data.studentName,0),cellXml(r,4,'週開始',2),cellXml(r,5,data.weekStart,0)]));r+=2;
-  rows.push(rowXml(r,[cellXml(r,1,'予定/日付',2),...dates.map((d,i)=>cellXml(r,2+i,`${jpDate(d)}（${DOW[d.getDay()]}）`,2))]));r++;
-  LIMITS.forEach((lim,li)=>{rows.push(rowXml(r,[cellXml(r,1,lim,2),...data.schedule.map((day,di)=>cellXml(r,2+di,day[li]||'',0))]));r++});
-  r++;
-  const headerRow=r;
-  rows.push(rowXml(r,[cellXml(r,1,'教科',2),cellXml(r,2,'問題集/高速マスター',2),cellXml(r,5,'内容',2)]));r++;
-  data.materials.forEach(m=>{if(m.subject||m.book||m.content){rows.push(rowXml(r,[cellXml(r,1,m.subject,0),cellXml(r,2,m.book,0),cellXml(r,5,m.content,0)]));r++}});
-  const remarksRow=r;
-  rows.push(rowXml(r,[cellXml(r,1,'備考',2),cellXml(r,2,data.remarks,0)]));
-  const merges=[`<mergeCell ref="A1:H1"/>`,`<mergeCell ref="B${headerRow}:D${headerRow}"/>`,`<mergeCell ref="E${headerRow}:H${headerRow}"/>`];
-  for(let rr=headerRow+1;rr<remarksRow;rr++){merges.push(`<mergeCell ref="B${rr}:D${rr}"/>`,`<mergeCell ref="E${rr}:H${rr}"/>`)}
-  merges.push(`<mergeCell ref="B${remarksRow}:H${remarksRow}"/>`);
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetViews><sheetView workbookViewId="0"><pane ySplit="4" topLeftCell="A5" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols><col min="1" max="1" width="15" customWidth="1"/><col min="2" max="8" width="20" customWidth="1"/></cols><sheetData>${rows.join('')}</sheetData><mergeCells count="${merges.length}">${merges.join('')}</mergeCells><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`;
+
+/* =========================================================
+   8. Excelを既存の生徒名フォルダへ直接保存
+========================================================= */
+let excelOutputDirHandle = null;
+
+function excelFolderSaveSupported(){
+  return !!window.showDirectoryPicker;
+}
+
+async function pickExcelOutputFolder(){
+  if(!excelFolderSaveSupported()){
+    alert('このブラウザではフォルダへの直接保存が使えません。ChromeまたはEdgeで、GitHub Pagesなどのhttpsページから開いてください。');
+    return null;
+  }
+  try{
+    excelOutputDirHandle = await window.showDirectoryPicker({mode:'readwrite'});
+    showSaveInfo('担任名フォルダを選択しました。続けて生徒名フォルダへExcelを保存します。');
+    return excelOutputDirHandle;
+  }catch(e){
+    return null;
+  }
+}
+
+async function ensureExcelOutputFolder(){
+  if(excelOutputDirHandle) return excelOutputDirHandle;
+  return await pickExcelOutputFolder();
+}
+
+async function saveBytesToFileInDir(dirHandle, fileName, bytesData){
+  const fileHandle = await dirHandle.getFileHandle(fileName, {create:true});
+  const writable = await fileHandle.createWritable();
+  await writable.write(bytesData);
+  await writable.close();
 }
 
 
-function simpleSheetXml(aoa){
-  const rows=[];
-  aoa.forEach((row,idx)=>{const r=idx+1;rows.push(rowXml(r,row.map((v,c)=>cellXml(r,c+1,v,idx===0?2:0))))});
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols><col min="1" max="10" width="22" customWidth="1"/></cols><sheetData>${rows.join('')}</sheetData><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`;
-}
-function buildExamSheetXml(){
-  const data=getData();
-  const aoa=[['生徒名','週開始','模試名','実施日','種別','受験方法','科目','保存日時']];
-  (data.exams||[]).forEach(ex=>{
-    if(ex.name||ex.status||ex.subjects?.length)aoa.push([data.studentName,data.weekStart,ex.name,ex.date,ex.type==='crown'?'冠模試':'共通テスト系',ex.status,(ex.subjects||[]).join('、'),new Date().toLocaleString('ja-JP')]);
-  });
-  return simpleSheetXml(aoa);
-}
-function buildEventSheetXml(){
-  const data=getData();
-  const aoa=[['生徒名','週開始','イベント名','参加/不参加','備考','保存日時']];
-  (data.events||[]).forEach(ev=>{
-    if(ev.name||ev.status||ev.note)aoa.push([data.studentName,data.weekStart,ev.name,ev.status,ev.note,new Date().toLocaleString('ja-JP')]);
-  });
-  return simpleSheetXml(aoa);
-}
-
-const enc=new TextEncoder();
-function bytes(s){return enc.encode(s)}
-function crcTable(){let t=[];for(let i=0;i<256;i++){let c=i;for(let k=0;k<8;k++)c=(c&1)?(0xedb88320^(c>>>1)):(c>>>1);t[i]=c>>>0}return t}
-const CRC_TABLE=crcTable();
-function crc32Bytes(arr){let crc=0xffffffff;for(let i=0;i<arr.length;i++)crc=(crc>>>8)^CRC_TABLE[(crc^arr[i])&0xff];return (crc^0xffffffff)>>>0}
-function put16(a,o,v){a[o]=v&255;a[o+1]=(v>>>8)&255}
-function put32(a,o,v){a[o]=v&255;a[o+1]=(v>>>8)&255;a[o+2]=(v>>>16)&255;a[o+3]=(v>>>24)&255}
-function concat(parts){let len=parts.reduce((s,p)=>s+p.length,0),out=new Uint8Array(len),pos=0;parts.forEach(p=>{out.set(p,pos);pos+=p.length});return out}
-
-function zipBytes(files){
-  let parts=[],central=[],offset=0;
-  files.forEach(f=>{
-    const name=bytes(f.name),data=bytes(f.data),crc=crc32Bytes(data);
-    let h=new Uint8Array(30);put32(h,0,0x04034b50);put16(h,4,20);put16(h,6,0x0800);put16(h,8,0);put16(h,10,0);put16(h,12,0);put32(h,14,crc);put32(h,18,data.length);put32(h,22,data.length);put16(h,26,name.length);put16(h,28,0);parts.push(h,name,data);
-    let c=new Uint8Array(46);put32(c,0,0x02014b50);put16(c,4,20);put16(c,6,20);put16(c,8,0x0800);put16(c,10,0);put16(c,12,0);put16(c,14,0);put32(c,16,crc);put32(c,20,data.length);put32(c,24,data.length);put16(c,28,name.length);put16(c,30,0);put16(c,32,0);put16(c,34,0);put16(c,36,0);put32(c,38,0);put32(c,42,offset);central.push(c,name);
-    offset+=h.length+name.length+data.length;
-  });
-  const centralBytes=concat(central);
-  let e=new Uint8Array(22);put32(e,0,0x06054b50);put16(e,4,0);put16(e,6,0);put16(e,8,files.length);put16(e,10,files.length);put32(e,12,centralBytes.length);put32(e,16,offset);put16(e,20,0);
-  return concat([...parts,centralBytes,e]);
+async function saveOneToSelectedFolder(name){
+  syncFromDom();
+  if(!name) return alert('生徒名がありません。');
+  if(!excelFolderSaveSupported()){
+    alert('このブラウザではフォルダへの直接保存が使えません。ChromeまたはEdgeで、GitHub Pagesなどのhttpsページから開いてください。');
+    return;
+  }
+  let dir;
+  try{
+    alert(`${name} の保存先フォルダを選択してください。`);
+    dir = await window.showDirectoryPicker({mode:'readwrite'});
+  }catch(e){
+    return;
+  }
+  if(dir && dir.name && dir.name !== name){
+    const ok = confirm(`選択したフォルダ名は「${dir.name}」です。\n生徒名「${name}」のフォルダではない可能性があります。\nこのフォルダに保存しますか？`);
+    if(!ok) return;
+  }
+  saveOneToBrowser(name,false);
+  const dates = getDates();
+  const fileName = safeFileName(`${name}.${jpDate(dates[0])}-${jpDate(dates[6])}.xlsx`);
+  try{
+    await saveBytesToFileInDir(dir, fileName, makeXlsxBytesForStudent(name));
+    const msg = `${name} のExcelを保存しました：\n${dir.name || '選択フォルダ'}/${fileName}`;
+    showSaveInfo(msg);
+    alert(msg);
+  }catch(e){
+    alert(`${name} のExcel保存に失敗しました。\n${e?.message || e}`);
+  }
 }
 
-function makeXlsxBytes(){
-  const files=[
-    {name:'[Content_Types].xml',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/worksheets/sheet3.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`},
-    {name:'_rels/.rels',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`},
-    {name:'xl/workbook.xml',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="予定入力" sheetId="1" r:id="rId1"/><sheet name="模試確認" sheetId="2" r:id="rId2"/><sheet name="イベント確認" sheetId="3" r:id="rId3"/></sheets></workbook>`},
-    {name:'xl/_rels/workbook.xml.rels',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet3.xml"/><Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`},
-    {name:'xl/styles.xml',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Yu Gothic"/></font><font><b/><sz val="11"/><name val="Yu Gothic"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFEFF6FF"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"/><right style="thin"/><top style="thin"/><bottom style="thin"/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"><alignment wrapText="1" vertical="top"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`},
-    {name:'xl/worksheets/sheet1.xml',data:buildSheetXml()},
-    {name:'xl/worksheets/sheet2.xml',data:buildExamSheetXml()},
-    {name:'xl/worksheets/sheet3.xml',data:buildEventSheetXml()}
-  ];
-  return zipBytes(files);
+async function saveOneToExistingStudentFolder(name){
+  syncFromDom();
+  if(!name) return alert('生徒名がありません。');
+  const parent = await pickExcelOutputFolder();
+  if(!parent) return;
+  saveOneToBrowser(name,false);
+  const dates = getDates();
+  try{
+    const studentDir = await parent.getDirectoryHandle(name, {create:false});
+    const fileName = safeFileName(`${name}.${jpDate(dates[0])}-${jpDate(dates[6])}.xlsx`);
+    await saveBytesToFileInDir(studentDir, fileName, makeXlsxBytesForStudent(name));
+    const msg = `${name} のExcelを保存しました：\n${name}/${fileName}`;
+    showSaveInfo(msg);
+    alert(msg);
+  }catch(e){
+    if(e && e.name === 'NotFoundError'){
+      alert(`${name} のフォルダが見つかりません。\n担任名フォルダ直下に「${name}」フォルダが必要です。`);
+    }else{
+      alert(`${name} のExcel保存に失敗しました。\n${e?.message || e}`);
+    }
+  }
 }
 
-function downloadXlsx(){
-  const data=getData();
-  const student=(data.studentName||'').trim();
-  if(!student){alert('先に生徒名を入力してください。');$('#studentName').focus();return;}
-  saveStudentMemory(false);
-  const blob=new Blob([makeXlsxBytes()],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-  const dates=getDates();
-  const name=`${student}.${jpDate(dates[0])}-${jpDate(dates[6])}.xlsx`.replace(/[\\/:*?"<>|]/g,'_');
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();
-  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+async function saveAllToExistingStudentFolders(){
+  syncFromDom();
+  if(!students.length) return alert('先に生徒名を入力してください。');
+  const parent = await ensureExcelOutputFolder();
+  if(!parent) return;
+
+  students.forEach(n=>saveOneToBrowser(n,false));
+  const dates = getDates();
+  const saved = [];
+  const missing = [];
+  const failed = [];
+
+  for(const name of students){
+    try{
+      // 既存フォルダだけを使う。名前の打ち間違いで新規フォルダを作らないよう、create:false にする。
+      const studentDir = await parent.getDirectoryHandle(name, {create:false});
+      const fileName = safeFileName(`${name}.${jpDate(dates[0])}-${jpDate(dates[6])}.xlsx`);
+      await saveBytesToFileInDir(studentDir, fileName, makeXlsxBytesForStudent(name));
+      saved.push(`${name}/${fileName}`);
+    }catch(e){
+      if(e && e.name === 'NotFoundError') missing.push(name);
+      else failed.push(`${name}: ${e?.message || e}`);
+    }
+  }
+
+  let msg = '';
+  if(saved.length) msg += `保存完了：${saved.length}件\n${saved.join('\n')}`;
+  if(missing.length) msg += `${msg?'\n\n':''}生徒名フォルダが見つかりません：\n${missing.join('、')}\n※担任名フォルダ直下に同じ名前のフォルダが必要です。`;
+  if(failed.length) msg += `${msg?'\n\n':''}保存に失敗：\n${failed.join('\n')}`;
+  showSaveInfo(msg || '保存対象がありません。');
+  alert(msg || '保存対象がありません。');
+}
+
+
+/* =========================================================
+   9. 共有フォルダの読み書き
+========================================================= */
+let sharedDirHandle = null;
+
+function sharedSupported(){
+  return !!window.showDirectoryPicker;
+}
+function sharedFileSafe(s){
+  return String(s||'').replace(/[\\/:*?"<>|]/g,'_').replace(/[\s\u3000]+/g,'_').slice(0,80) || 'noname';
+}
+function sharedGroupFileName(names){
+  return `group_${sharedFileSafe((names||students).join('_'))}.json`;
+}
+function sharedStudentFileName(name){
+  return `student_${sharedFileSafe(name)}.json`;
+}
+async function pickSharedFolder(){
+  if(!sharedSupported()){
+    alert('このブラウザでは共有フォルダ保存に必要なフォルダ選択機能が使えません。ChromeまたはEdgeで、GitHub Pagesのhttpsページから開いてください。');
+    return null;
+  }
+  sharedDirHandle = await window.showDirectoryPicker({mode:'readwrite'});
+  showSaveInfo('共有フォルダを選択しました。以後、「この生徒を保存/復元」「まとめて保存/復元」は共有フォルダを優先します。');
+  return sharedDirHandle;
+}
+async function ensureSharedFolder(){
+  if(sharedDirHandle) return sharedDirHandle;
+  return await pickSharedFolder();
+}
+async function writeJsonToShared(filename, data){
+  const dir = await ensureSharedFolder();
+  if(!dir) return;
+  const handle = await dir.getFileHandle(filename, {create:true});
+  const writable = await handle.createWritable();
+  await writable.write(JSON.stringify(data, null, 2));
+  await writable.close();
+}
+async function readJsonFromShared(filename){
+  const dir = await ensureSharedFolder();
+  if(!dir) return null;
+  try{
+    const handle = await dir.getFileHandle(filename, {create:false});
+    const file = await handle.getFile();
+    return JSON.parse(await file.text());
+  }catch(e){
+    return null;
+  }
+}
+function buildSharedGroupMemory(){
+  syncFromDom();
+  return {
+    version:1,
+    type:'group',
+    names:students,
+    weekStart:$('#weekStart').value,
+        studentData:Object.fromEntries(students.map(n=>[n,ensureStudent(n)])),
+    examMaster:getExamMaster(),
+    subjectTemplates:getSubjectTemplates(),
+    savedAt:new Date().toISOString()
+  };
+}
+async function saveSharedFolder(){
+  if(!students.length)return alert('先に生徒名を入力してください。');
+  try{
+    const groupMem = buildSharedGroupMemory();
+    await writeJsonToShared(sharedGroupFileName(students), groupMem);
+    for(const name of students){
+      const mem=Object.assign({studentName:name,savedAt:groupMem.savedAt},ensureStudent(name));
+      await writeJsonToShared(sharedStudentFileName(name), mem);
+    }
+    await writeJsonToShared('settings_exam_master.json', {examMaster:getExamMaster(), subjectTemplates:getSubjectTemplates(), savedAt:groupMem.savedAt});
+    showSaveInfo(`共有フォルダに保存しました：${students.join('、')}（${new Date(groupMem.savedAt).toLocaleString('ja-JP')}）`);
+    alert('共有フォルダにグループ内容・個人内容・模試設定を保存しました。');
+  }catch(e){
+    alert('共有フォルダへの保存に失敗しました。権限や保存先を確認してください。');
+  }
+}
+async function applySharedSettingsIfAny(){
+  const settings = await readJsonFromShared('settings_exam_master.json');
+  if(settings){
+    if(Array.isArray(settings.examMaster)) saveExamMasterData(settings.examMaster);
+    if(Array.isArray(settings.subjectTemplates)) saveSubjectTemplates(settings.subjectTemplates);
+    renderExamMasterPanel();
+  }
+}
+async function loadSharedGroup(){
+  const names=splitNames();
+  if(!names.length)return alert('先に生徒名を入力してください。');
+  try{
+    await applySharedSettingsIfAny();
+    const mem = await readJsonFromShared(sharedGroupFileName(names));
+    if(!mem)return alert('共有フォルダに、この組み合わせのまとめて保存データが見つかりません。名前の順番・表記を確認してください。');
+    students=mem.names||names;
+    $('#studentNames').value=students.join(', ');
+    $('#weekStart').value=mem.weekStart||$('#weekStart').value;
+    studentData=Object.assign(studentData,mem.studentData||{});
+    if(mem.lessonCount||mem.otherCount){students.forEach(n=>{const d=ensureStudent(n); if(mem.lessonCount)d.lessonCount=mem.lessonCount; if(mem.otherCount)d.otherCount=mem.otherCount;});}
+    if(Array.isArray(mem.examMaster)) saveExamMasterData(mem.examMaster);
+    if(Array.isArray(mem.subjectTemplates)) saveSubjectTemplates(mem.subjectTemplates);
+    renderExamMasterPanel();
+    renderStudents();
+    const savedAt=mem.savedAt?new Date(mem.savedAt).toLocaleString('ja-JP'):'保存日時不明';
+    showSaveInfo(`共有フォルダからまとめて復元しました：${students.join('、')}（${savedAt}）`);
+    alert(`共有フォルダからグループ内容を復元しました。\n保存日時：${savedAt}`);
+  }catch(e){
+    alert('共有フォルダからのまとめて復元に失敗しました。');
+  }
+}
+async function loadSharedIndividuals(){
+  const names=splitNames();
+  if(!names.length)return alert('先に生徒名を入力してください。');
+  try{
+    await applySharedSettingsIfAny();
+    const missing=[];
+    for(const name of names){
+      const mem=await readJsonFromShared(sharedStudentFileName(name));
+      if(mem){
+        studentData[name]=normalizeStudentData(mem);
+      }else{
+        missing.push(name);
+      }
+    }
+    students=names;
+    renderStudents();
+    const msg=missing.length?`一部見つかりませんでした：${missing.join('、')}`:'全員分を復元しました。';
+    showSaveInfo(`共有フォルダから個人復元：${names.join('、')}\n${msg}`);
+    alert(msg);
+  }catch(e){
+    alert('共有フォルダからの個人復元に失敗しました。');
+  }
 }
 
 /* =========================================================
-   7. イベント設定
+   10. イベント
 ========================================================= */
-$('#applyDates').onclick=applyDates;
-$('#weekStart').onchange=applyDates;
-$('#addJukouRow').onclick=()=>addScheduleRow('lesson');
-$('#addOtherRow').onclick=()=>addScheduleRow('other');
-$('#addMaterial').onclick=()=>{materialCount++;renderMaterials();refreshPreview()};
-$('#exportXlsx').onclick=downloadXlsx;
-$('#copyText').onclick=copyToClipboard;
-$('#saveStudentMemory').onclick=()=>saveStudentMemory(true);
-$('#loadStudentMemory').onclick=loadStudentMemory;
-$('#saveLocal').onclick=()=>{localStorage.setItem('yoteiInputData',JSON.stringify(getData()));alert('一時保存しました')};
-$('#loadLocal').onclick=()=>{const s=localStorage.getItem('yoteiInputData');if(!s)return alert('保存データがありません');setData(JSON.parse(s))};
-$('#clearAll').onclick=()=>{if(confirm('入力内容をすべて消しますか？')){localStorage.removeItem('yoteiInputData');location.reload()}};
-$('#addExamMaster').onclick=addExamMasterRow;
-$('#saveExamMaster').onclick=saveExamMasterFromPanel;
-$('#addEventRow').onclick=()=>{eventCount++;renderEventPanel(true)};
-buildUI();
+function bindGlobalEvents(){
+  $('#applyStudents').onclick=applyStudents;
+  $('#weekStart').onchange=()=>{syncFromDom();renderStudents()};
+  $('#saveGroupMemory').onclick=saveGroup;
+  $('#loadGroupMemory').onclick=loadGroup;
+  $('#exportXlsx').onclick=exportAll; const sae=$('#saveAllExcelToStudentFolders'); if(sae)sae.onclick=saveAllToExistingStudentFolders;
+  $('#addExamMaster').onclick=addExamMasterRow;
+  $('#saveExamMaster').onclick=saveExamMasterFromPanel;
+  const lts=$('#loadSubjectTemplate'); if(lts)lts.onclick=loadSubjectTemplateToEditor;
+  const sts=$('#saveSubjectTemplate'); if(sts)sts.onclick=saveSubjectTemplateFromEditor;
+  const clear=$('#clearAll'); if(clear)clear.onclick=()=>{if(confirm('入力内容をすべて消しますか？')){localStorage.removeItem(groupKey()); students.forEach(n=>localStorage.removeItem(indivKey(n))); location.reload()}};
+}
+init();
 </script>
 </body>
 </html>
