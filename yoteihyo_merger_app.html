@@ -33,7 +33,6 @@
     th{background:#f2f4f7;position:sticky;top:0;z-index:2;}
     th:first-child,td:first-child{position:sticky;left:0;z-index:1;background:#fff;font-weight:700;min-width:140px;}
     th:first-child{z-index:3;background:#e5e7eb;}
-    .pill{display:inline-block;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;border-radius:999px;padding:3px 8px;margin:2px;font-size:12px;}
     .stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:12px;}
     .stat{background:#f8fafc;border:1px solid var(--line);border-radius:12px;padding:10px;}
     .stat b{display:block;font-size:18px;}
@@ -43,7 +42,6 @@
     summary{cursor:pointer;font-weight:700;}
     .drop{border:2px dashed #c7d2fe;background:#f8fbff;border-radius:14px;padding:14px;text-align:center;color:#475569;margin-top:8px;}
     .drop.drag{background:#eef2ff;border-color:#2563eb;}
-    .warn{color:var(--warn);font-weight:700;}
     .smallrow{display:flex;align-items:center;gap:8px;}
     @media (max-width:1050px){.wrap{grid-template-columns:1fr}.previewWrap{max-height:65vh}.stats{grid-template-columns:repeat(2,1fr)}}
   </style>
@@ -141,6 +139,9 @@
 </div>
 
 <script>
+// ============================================================
+// 0. アプリ状態・基本ユーティリティ
+// ============================================================
 const state = {
   files: [],
   resultFiles: [],
@@ -241,6 +242,10 @@ function getHeaderMap(aoa){
 }
 
 
+
+// ============================================================
+// 1. 生徒対応表の読み取り・名前照合
+// ============================================================
 const ROSTER_COLUMNS = ["生徒番号","学年","生徒名","読み仮名","担当","高校","備考"];
 function normalizeNameKey(s){ return String(s ?? "").replace(/[\s\u3000]+/g, "").trim(); }
 function normalizeStudentNoKey(s){
@@ -488,6 +493,10 @@ function shouldSkipFile(file){
 }
 
 
+
+// ============================================================
+// 2. 予定入力Excelの読み取り
+// ============================================================
 function looksLikeYoteiInputSheet(aoa){
   const a1 = norm(aoa?.[0]?.[0]);
   const a4 = norm(aoa?.[3]?.[0]);
@@ -707,6 +716,10 @@ async function parseExcelFile(file){
   }
 }
 
+
+// ============================================================
+// 3. 結果Excelの読み取り
+// ============================================================
 function getResultHeaderMap(aoa){
   const header = (aoa[0] || []).map(x => norm(x));
   const find = (names) => {
@@ -862,6 +875,10 @@ function filterRecords(records){
   return records.filter(rec => rec.dateObj >= effectiveFrom && (!to || rec.dateObj <= to));
 }
 
+
+// ============================================================
+// 4. 予定・結果照合用の文字列判定
+// ============================================================
 function isSSJudgeText(text){
   const t = String(text ?? "").replace(/Ｓ/g,"S").toUpperCase();
   return /SS/.test(t);
@@ -879,16 +896,6 @@ function isCompleteLearnedText(text){
   const t = toHalfWidth(String(text ?? ""));
   return /完全習得|完全修得/.test(t);
 }
-function isSakuraResultText(text){
-  return isSSJudgeText(text) || isCourseLearnedText(text) || isCompleteLearnedText(text);
-}
-function sakuraResultReason(text){
-  if(isSSJudgeText(text)) return "SS判定";
-  if(isCompleteLearnedText(text)) return "完全習得";
-  if(isCourseLearnedText(text)) return "講座習得";
-  return "予定一致";
-}
-
 function toHalfWidth(s){
   return String(s ?? "").replace(/[！-～]/g, ch => String.fromCharCode(ch.charCodeAt(0)-0xFEE0)).replace(/　/g," ");
 }
@@ -939,6 +946,10 @@ function getCenterDate(){
   return v ? new Date(v + "T00:00:00") : new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
 }
 
+
+// ============================================================
+// 5. 管理用カレンダー・一覧データの生成
+// ============================================================
 function buildOutputs(records, logRows, resultRecords=[]){
   // 予定Excelは苗字だけ、結果Excelはフルネームで入ることがあるため、
   // 出力表を作る直前に必ず対応表で「正式な生徒名」に正規化する。
@@ -1258,8 +1269,7 @@ function applyNiceSheetSettings(ws, aoa, widths, options={}){
 
 function stripPosterPrefixLine(s){
   return String(s ?? "")
-    .replace(/\s*❗未受講警告\s*/g, "")
-    .replace(/\s*!未受講警告\s*/g, "")
+    // 掲示用でも未受講警告は見せるので、警告文は消さない。
     .replace(/^\s*(受講[①②③123]?|その他[①②③123]?|その他の予定[①②③123]?|予定|結果)\s*[:：]\s*/g, "")
     .trim();
 }
@@ -1284,6 +1294,10 @@ function cleanPosterPlanText(value){
 // 掲示用の略称辞書。
 // 左の正規表現に当てはまる講座名・コンテンツ名を、右の短い表記に置き換える。
 // よく使うものはここに追加すれば、掲示用カレンダーの表示だけ短くできる。
+
+// ============================================================
+// 6. 掲示用カレンダー：略称辞書・表示用整形
+// ============================================================
 const POSTER_ABBREV_RULES = [
   [/大学入学共通テスト対策\s*英語\s*Listening\s*[＆&]\s*Read\w*/gi, "共テ英L&R"],
   [/大学入学共通テスト対策\s*英語\s*Reading/gi, "共テ英R"],
@@ -1387,70 +1401,6 @@ function posterResultKind(text){
   return "";
 }
 
-function findJudgeMarkerIndex(text, kind){
-  const raw = String(text ?? "");
-  const upper = toHalfWidth(raw).toUpperCase();
-  if(kind === "SS") return upper.indexOf("SS");
-  if(kind === "S"){
-    const m = upper.match(/(^|[^A-Z0-9])S(判定|$|[^A-Z0-9])/);
-    return m ? m.index + (m[1] ? m[1].length : 0) : -1;
-  }
-  return upper.search(/講座を?完全(習得|修得)|完全(習得|修得)|講座を?(習得|修得)/);
-}
-
-function nearestNumberBeforeJudge(text, kind){
-  const raw = toHalfWidth(String(text ?? ""));
-  const idx = findJudgeMarkerIndex(raw, kind);
-  if(idx < 0) return "";
-  const before = raw.slice(0, idx);
-  const tokens = [];
-  // 19:30 のような時刻は除外し、SS/Sの直前側にある一番近い数字・丸数字だけを拾う。
-  const re = /[①-㊿⓪❶-❿⑴-⑽]|[0-9]+|[一二三四五六七八九十]+/g;
-  let m;
-  while((m = re.exec(before))){
-    const start = m.index;
-    const end = start + m[0].length;
-    const prev = before[start - 1] || "";
-    const next = before[end] || "";
-    if(prev === ":" || prev === "：" || next === ":" || next === "：") continue;
-    tokens.push(m[0]);
-  }
-  return tokens.length ? tokens[tokens.length - 1] : "";
-}
-
-function stripPosterPrefixes(text){
-  let s = toHalfWidth(String(text ?? ""));
-  s = s.replace(/^[\s・]+/g, "");
-  s = s.replace(/^🌸\s*/g, "");
-  s = s.replace(/^(SS判定|S判定|完全習得|講座習得|予定一致|結果)\s*[:：]\s*/g, "");
-  s = s.replace(/^\d{1,2}:\d{2}\s*/g, "");
-  return s.trim();
-}
-
-function cleanPosterCourseCandidate(text){
-  let s = stripPosterPrefixes(text);
-  // 時刻は講座番号ではないので完全に捨てる。
-  s = s.replace(/\b\d{1,2}:\d{2}\b/g, " ");
-  // 「分類: 講座名」の場合は最後のコロン以降を講座名として使う。
-  if(/[：:]/.test(s)) s = s.split(/[：:]/).pop();
-  s = s
-    .replace(/[【\[].*?[】\]]/g, "")
-    .replace(/\s*\(.*?\)\s*/g, "")
-    .replace(/\s*（.*?）\s*/g, "")
-    .replace(/確認テスト|修了判定テスト|終了判定テスト|修了判定|終了判定|受講開始|高速基礎マスター|演習\/過去問|演習|過去問|結果/g, "")
-    .replace(/講座を?完全(習得|修得)(しました|した)?/g, "")
-    .replace(/講座を?(習得|修得)(しました|した)?/g, "")
-    .replace(/完全(習得|修得)(しました|した)?/g, "")
-    .replace(/SS判定|S判定|判定/g, "")
-    .replace(/しました|しました。|した|した。|できました|できた|です|でした|になりました|達成しました/g, "")
-    .replace(/[！!。]+/g, "")
-    .replace(/^[\s、。・\/／:：]+|[\s、。・\/／:：]+$/g, "")
-    .trim();
-  // 末尾に「で」「の」「を」などの助詞だけが残るのを防ぐ。
-  s = s.replace(/[ぁ-ん]{1,8}$/g, "");
-  return s.replace(/\s+/g, " ").trim();
-}
-
 function hasCourseNumber(text){
   return /[①-㊿⓪❶-❿⑴-⑽]|[0-9]+|[一二三四五六七八九十]+/.test(String(text ?? ""));
 }
@@ -1538,121 +1488,6 @@ const POSTER_CONTENT_EXTRACT_RULES = [
   [/情報I|情報Ⅰ/g, "情報"],
 ];
 
-function numberTokenAfter(text, pos){
-  const s = toHalfWidth(String(text ?? ""));
-  const after = s.slice(pos, pos + 40);
-  // 「第4回」「4回」「④」などを、講座名の直後側から拾う。
-  // 19:30 のような時刻は、コロン前後チェックで除外する。
-  const re = /(?:第\s*)?([①-㊿⓪❶-❿⑴-⑽]|[0-9]{1,2}|[一二三四五六七八九十]{1,3})\s*回?/g;
-  let m;
-  while((m = re.exec(after))){
-    const start = m.index;
-    const end = start + m[0].length;
-    const prev = after[start - 1] || "";
-    const next = after[end] || "";
-    if(prev === ":" || prev === "：" || next === ":" || next === "：") continue;
-    return m[1];
-  }
-  return "";
-}
-
-function numberTokenBeforeJudgeOnly(text, kind){
-  // SS/S の直前側で一番近い番号を拾う。ただし 19:30 のような時刻は除外。
-  const raw = toHalfWidth(String(text ?? ""));
-  const idx = findJudgeMarkerIndex(raw, kind);
-  if(idx < 0) return "";
-  const before = raw.slice(0, idx);
-  const tokens = [];
-  const re = /[①-㊿⓪❶-❿⑴-⑽]|[0-9]{1,2}|[一二三四五六七八九十]{1,3}/g;
-  let m;
-  while((m = re.exec(before))){
-    const start = m.index;
-    const end = start + m[0].length;
-    const prev = before[start - 1] || "";
-    const next = before[end] || "";
-    if(prev === ":" || prev === "：" || next === ":" || next === "：") continue;
-    tokens.push(m[0]);
-  }
-  return tokens.length ? tokens[tokens.length - 1] : "";
-}
-
-function stageTokenForPoster(text){
-  const raw = toHalfWidth(String(text ?? ""));
-  const m = raw.match(/ステージ\s*([①-㊿⓪❶-❿⑴-⑽]|[0-9]{1,3}|[一二三四五六七八九十]{1,3})/);
-  return m ? `ST${m[1]}` : "";
-}
-
-function lessonTokenForPoster(text, kind){
-  const raw = toHalfWidth(String(text ?? ""));
-  // 「第4講」「第5回」を最優先で拾う。時刻 19:30 はこの正規表現には当たらない。
-  const explicit = raw.match(/第\s*([①-㊿⓪❶-❿⑴-⑽]|[0-9]{1,3}|[一二三四五六七八九十]{1,3})\s*(講|回)/);
-  if(explicit) return explicit[1];
-  // S/SSの直前側に番号がある場合も拾う。
-  const beforeJudge = (kind === "S" || kind === "SS") ? numberTokenBeforeJudgeOnly(raw, kind) : "";
-  return beforeJudge || "";
-}
-
-function extractStrictToshinContentName(text, kind=""){
-  const raw = toHalfWidth(String(text ?? ""));
-  if(!raw.trim()) return "";
-
-  // 結果の説明文側ではなく、できるだけ「学習内容側」を優先する。
-  // 例: 「確認テスト: 難関物理⑧ / 難関物理⑧で初めてSS判定を取得」
-  //     → 左側と右側の両方を見ても、ルールに合う「難関物理」だけを採用する。
-  const chunks = raw
-    .split(/\s*\/\s*|\n+/)
-    .map(x => x.trim())
-    .filter(Boolean);
-  chunks.push(raw);
-
-  for(const chunk of chunks){
-    for(const [pattern, abbr] of POSTER_CONTENT_EXTRACT_RULES){
-      const re = new RegExp(pattern.source, pattern.flags.replace("g", "") + (pattern.flags.includes("i") ? "" : ""));
-      const m = re.exec(chunk);
-      if(!m) continue;
-      const end = m.index + m[0].length;
-      let label = abbr;
-      const rawMatchIndex = raw.search(new RegExp(pattern.source, pattern.flags.replace("g", "") + (pattern.flags.includes("i") ? "" : "")));
-      const rawEnd = rawMatchIndex >= 0 ? rawMatchIndex + m[0].length : -1;
-      const directNo = numberTokenAfter(chunk, end);
-      const rawDirectNo = rawEnd >= 0 ? numberTokenAfter(raw, rawEnd) : "";
-      const stageNo = stageTokenForPoster(raw);
-      const lessonNo = lessonTokenForPoster(raw, kind);
-      if(stageNo && !/ST[0-9①-㊿⓪❶-❿⑴-⑽一二三四五六七八九十]/.test(label)){
-        label += ` ${stageNo}`;
-      }else{
-        const no = directNo || rawDirectNo || lessonNo;
-        if(no && !hasCourseNumber(label)) label += no;
-      }
-      return label;
-    }
-  }
-
-  // 固定辞書にない講座は、丸数字つきの「漢字/カタカナ/英字 + 番号」だけ許可する。
-  // ここでも助詞やひらがな単独は絶対に返さない。
-  const m = raw.match(/([一-龥ァ-ヶA-Za-z][一-龥ァ-ヶA-Za-z0-9\s]{1,20}?)([①-㊿⓪❶-❿⑴-⑽])/);
-  if(m){
-    const candidate = applyPosterAbbrevDictionary((m[1] + m[2]).replace(/確認テスト|修了判定テスト|終了判定テスト|結果/g, "").trim());
-    if(candidate && !/^[ぁ-んー]+$/.test(candidate)) return [...candidate].slice(0,16).join("");
-  }
-  return "";
-}
-
-function isLikelyToshinContentName(text){
-  return !!extractStrictToshinContentName(text, "");
-}
-
-function extractToshinContentFromCandidate(text, kind=""){
-  return extractStrictToshinContentName(text, kind);
-}
-
-function shortenPosterResultName(text, kind=""){
-  const s = extractStrictToshinContentName(text, kind);
-  return [...s].length > 16 ? [...s].slice(0,16).join("") + "…" : s;
-}
-
-
-
 // --- 2026-05-30 修正: 「確認テスト: 講座名 / 第○講 ... SS判定」形式から、講座名と講番号を厳密に抽出する ---
 function normalizePosterSourceText(text){
   return toHalfWidth(String(text ?? ""))
@@ -1693,23 +1528,6 @@ function extractPosterContentLabelStrict(text){
     }
   }
   return "";
-}
-
-function extractStrictToshinContentName(text, kind=""){
-  const raw = normalizePosterSourceText(text);
-  if(!raw) return "";
-  const label = extractPosterContentLabelStrict(raw);
-  if(!label) return "";
-  const token = extractPosterLessonToken(raw);
-  if(token && !hasCourseNumber(label) && !/\sST[①-㊿⓪❶-❿⑴-⑽0-9一二三四五六七八九十]+$/.test(label)){
-    return token.startsWith("ST") ? `${label} ${token}` : `${label}${token}`;
-  }
-  return label;
-}
-
-function shortenPosterResultName(text, kind=""){
-  const s = extractStrictToshinContentName(text, kind);
-  return [...s].length > 18 ? [...s].slice(0,18).join("") + "…" : s;
 }
 
 function isCommonTestMainExamLine(text){
@@ -1861,6 +1679,10 @@ function cleanPosterResultText(value){
   return [...new Set(out)].join("\n");
 }
 
+
+// ============================================================
+// 7. 掲示用カレンダー生成
+// ============================================================
 function buildPosterCalendarAoa(calendarAoa){
   if(!calendarAoa || calendarAoa.length < 1) return [["学年","生徒名"]];
   const header = calendarAoa[0] || [];
@@ -1934,6 +1756,10 @@ function dateRangeForOutput(mode){
 function inDateRange(rec, from, to){
   return (!from || rec.dateObj >= from) && (!to || rec.dateObj <= to);
 }
+
+// ============================================================
+// 8. Excel出力
+// ============================================================
 function downloadWithRange(mode){
   if(!state.workbookReady){ alert("先に統合プレビューを作成してください"); return; }
   const {from,to,label} = dateRangeForOutput(mode);
@@ -2054,6 +1880,10 @@ function downloadWorkbookFromAoa(calendarAoa, listAoa, resultAoa, rosterAoa, log
   XLSX.utils.book_append_sheet(wb, wsLog, "読み取りログ");
   XLSX.writeFile(wb, `全体予定表_${label}.xlsx`);
 }
+
+// ============================================================
+// 9. 画面イベント
+// ============================================================
 function setFiles(fileList){
   state.files = [...fileList].filter(f => !shouldSkipFile(f));
   updateStats(state.files, [], [], [], state.resultRecords);
