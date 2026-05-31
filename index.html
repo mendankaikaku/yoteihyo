@@ -57,21 +57,12 @@ details.advanced{margin-top:12px;border:1px solid var(--line);border-radius:12px
     </div>
     <div class="hint" style="margin-top:10px">Enterで次のマスへ移動します。入力欄内で改行したい場合は Shift + Enter。Excel名は「生徒名.開始日-終了日.xlsx」です。Excel出力時にも下段内容をこの生徒名で自動保存します。</div>
     <div id="saveInfo"></div>
-    <details class="advanced">
-      <summary>詳細設定・一時保存</summary>
-      <div class="hint" style="margin-top:8px">一時保存は、途中入力をこのブラウザに一時退避するための機能です。生徒別の前回内容保存とは別です。</div>
-      <div class="advancedButtons">
-        <button class="secondary" id="saveLocal">ブラウザに一時保存</button>
-        <button class="secondary" id="loadLocal">一時保存を復元</button>
-        <button class="danger" id="clearAll">全消去</button>
-      </div>
-    </details>
   </section>
 
   <div class="grid">
     <div>
       <section class="card">
-        <p class="sectionTitle">上段：日付ごとの予定（最初は受講①・その他①だけ表示）</p>
+        <p class="sectionTitle">上段：日付ごとの予定（例：難関物理③、2021本試）</p>
         <div style="overflow:auto"><table id="scheduleTable"><thead><tr><th style="width:110px">予定/日付</th><th data-day="0"></th><th data-day="1"></th><th data-day="2"></th><th data-day="3"></th><th data-day="4"></th><th data-day="5"></th><th data-day="6"></th></tr></thead><tbody id="scheduleBody"></tbody></table></div>
         <div class="actions"><button class="secondary" id="addJukouRow">受講行を追加</button><button class="secondary" id="addOtherRow">その他の予定行を追加</button></div>
         <div class="hint">最初は受講①・その他①だけ表示します。必要に応じて受講②・受講③、その他②・その他③を追加できます。出力Excelは統合用HTMLと互換のため、未追加行は空欄として保持します。</div>
@@ -106,9 +97,22 @@ details.advanced{margin-top:12px;border:1px solid var(--line);border-radius:12px
         <div id="eventPanel"></div>
         <div class="actions"><button class="secondary" id="addEventRow" type="button">イベント行を追加</button></div>
       </section>
-      <section class="card notice"><b>統合用HTMLで読む想定</b><br>予定入力シートの構造はそのままです。模試確認・イベント確認はExcel内では別シートに出力しますが、統合用HTMLでは読み取りません。</section>
+      <section class="card notice"><b>統合用HTMLで読む想定</b><br>予定入力シートの構造はそのままです。模試確認・イベント確認はExcel内では別シートに出力しますが、統合用HTMLでは読み取りません。上段の予定欄は「難関物理③」「2021本試」のように短く書く想定です。</section>
     </aside>
   </div>
+  <section class="card">
+    <p class="sectionTitle">詳細設定・一時保存</p>
+    <details class="advanced">
+      <summary>開く</summary>
+      <div class="hint" style="margin-top:8px">一時保存は、途中入力をこのブラウザに一時退避するための機能です。生徒別の前回内容保存とは別です。</div>
+      <div class="advancedButtons">
+        <button class="secondary" id="saveLocal">ブラウザに一時保存</button>
+        <button class="secondary" id="loadLocal">一時保存を復元</button>
+        <button class="danger" id="clearAll">全消去</button>
+      </div>
+    </details>
+  </section>
+
 </main>
 
 <script>
@@ -169,7 +173,7 @@ function renderSchedule(){
   currentScheduleRowIndexes().forEach(i=>{
     const lim=LIMITS[i];
     const tr=document.createElement('tr');
-    tr.innerHTML=`<td class="label">${lim}</td>`+Array.from({length:7},(_,d)=>`<td><textarea data-kind="schedule" data-row="${i}" data-day="${d}" placeholder="${lim.startsWith('受講')?'受講内容':'その他の予定'}"></textarea></td>`).join('');
+    tr.innerHTML=`<td class="label">${lim}</td>`+Array.from({length:7},(_,d)=>`<td><textarea data-kind="schedule" data-row="${i}" data-day="${d}" placeholder="${lim.startsWith('受講')?'例：難関物理③':'例：2021本試'}"></textarea></td>`).join('');
     sb.appendChild(tr);
   });
   if(old.schedule){
