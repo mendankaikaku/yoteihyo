@@ -755,6 +755,69 @@ async function pickSaveRootFolder(forcePick=false){
 async function getDirectoryIfExists(parent, name){
   try{ return await parent.getDirectoryHandle(name, {create:false}); }catch(e){ return null; }
 }
+
+async function collectStudentFolderMatches(root, names, maxDepth=4){
+  const targetSet = new Set((names || []).map(String));
+  const matches = new Map();
+  for(const name of targetSet) matches.set(name, []);
+
+  async function walk(dir, pathParts, depth){
+    if(!dir || !dir.entries || depth > maxDepth) return;
+    for await (const [entryName, handle] of dir.entries()){
+      if(handle.kind !== 'directory') continue;
+      const nextPath = [...pathParts, entryName];
+      if(targetSet.has(entryName)){
+        matches.get(entryName).push({dir:handle, path:nextPath.join('/')});
+      }
+      await walk(handle, nextPath, depth + 1);
+    }
+  }
+
+  await walk(root, [], 1);
+  return matches;
+}
+
+async function saveAllToStudentFolderMatches(root, options={}){
+  syncFromDom();
+  const names = students || [];
+  if(!names.length) return {ok:false,msg:'先に生徒名を入力してください。',saved:[],missing:[],duplicate:[],failed:[]};
+  if(!root) return {ok:false,msg:'保存用フォルダが選択されませんでした。',saved:[],missing:[],duplicate:[],failed:[]};
+
+  names.forEach(n=>saveOneToBrowser(n,false));
+  const dates = getDates();
+  const matches = await collectStudentFolderMatches(root, names, 5);
+  const saved = [];
+  const missing = [];
+  const duplicate = [];
+  const failed = [];
+
+  for(const name of names){
+    const hits = matches.get(name) || [];
+    if(hits.length === 0){
+      missing.push(name);
+      continue;
+    }
+    if(hits.length > 1){
+      duplicate.push(`${name}: ${hits.map(h=>h.path).join(' / ')}`);
+      continue;
+    }
+    try{
+      const fileName = safeFileName(`${name}.${jpDate(dates[0])}-${jpDate(dates[6])}.xlsx`);
+      await saveBytesToFileInDir(hits[0].dir, fileName, makeXlsxBytesForStudent(name));
+      saved.push(`${hits[0].path}/${fileName}`);
+    }catch(e){
+      failed.push(`${name}: ${e?.message || e}`);
+    }
+  }
+
+  let msg = '';
+  if(saved.length) msg += `Excel保存完了：${saved.length}件\n${saved.join('\n')}`;
+  if(missing.length) msg += `${msg?'\n\n':''}生徒名フォルダが見つかりません：\n${missing.join('、')}\n※選択した保存用フォルダの下を自動検索しましたが、同名フォルダが見つかりませんでした。`;
+  if(duplicate.length) msg += `${msg?'\n\n':''}同じ生徒名フォルダが複数見つかったため保存しませんでした：\n${duplicate.join('\n')}\n※どちらに保存するか判別できないためです。`;
+  if(failed.length) msg += `${msg?'\n\n':''}Excel保存に失敗：\n${failed.join('\n')}`;
+  if(!msg) msg = 'Excel保存対象がありません。';
+  return {ok:saved.length>0 && failed.length===0 && duplicate.length===0, msg, saved, missing, duplicate, failed};
+}
 async function directoryContainsAllStudentFolders(dir, names){
   for(const name of names){
     if(!await getDirectoryIfExists(dir, name)) return false;
@@ -814,10 +877,10 @@ async function saveGroup(){
   }
 
   try{
-    // Excelは、保存用フォルダ配下の担任助手フォルダ内にある既存生徒名フォルダへ保存する。
-    const studentParent=await findStudentFolderParentFromSaveRoot(dir, students);
-    const excelResult=await saveAllToExistingStudentFolders({silent:true, forcePick:false, parentHandle:studentParent.dir});
-    if(studentParent && studentParent.label) excelResult.msg = `Excel保存先：${studentParent.label}\n` + excelResult.msg;
+    // Excelは、保存用フォルダ配下を再帰的に探し、各生徒名フォルダへ保存する。
+    // 例：保存用フォルダ / 打ち込み結果 / 担任助手名 / 生徒名 / Excel
+    // のように、直下でなくても見つけられる。
+    const excelResult=await saveAllToStudentFolderMatches(dir, {silent:true});
     status.push(excelResult.msg);
   }catch(e){
     status.push(`Excel保存：失敗しました。${e?.message ? '\n' + e.message : ''}`);
