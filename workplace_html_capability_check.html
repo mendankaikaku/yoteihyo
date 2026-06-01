@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>職場PC HTML機能チェック</title>
+  <style>
+    :root { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #1f2937; background: #f6f7fb; }
+    body { margin: 0; padding: 24px; }
+    h1 { margin: 0 0 8px; font-size: 26px; }
+    h2 { margin: 0 0 12px; font-size: 18px; }
+    p { line-height: 1.7; }
+    .wrap { max-width: 1100px; margin: 0 auto; }
+    .lead { margin: 0 0 20px; color: #4b5563; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+    .card { background: white; border: 1px solid #e5e7eb; border-radius: 16px; padding: 18px; box-shadow: 0 6px 18px rgba(0,0,0,.05); }
+    button, label.filelike { appearance: none; border: 0; border-radius: 12px; padding: 10px 14px; background: #111827; color: white; cursor: pointer; display: inline-block; font-size: 14px; margin: 4px 6px 4px 0; }
+    button.secondary { background: #374151; }
+    button.light { background: #e5e7eb; color: #111827; }
+    input[type=file] { display: none; }
+    .result { margin-top: 12px; padding: 12px; border-radius: 12px; background: #f9fafb; border: 1px solid #e5e7eb; white-space: pre-wrap; overflow-wrap: anywhere; min-height: 48px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
+    .ok { color: #047857; font-weight: 700; }
+    .bad { color: #b91c1c; font-weight: 700; }
+    .warn { color: #b45309; font-weight: 700; }
+    table { width: 100%; border-collapse: collapse; margin-top: 14px; background: white; }
+    th, td { border: 1px solid #e5e7eb; padding: 8px; text-align: left; vertical-align: top; font-size: 14px; }
+    th { background: #f3f4f6; }
+    .small { color: #6b7280; font-size: 13px; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>職場PC HTML機能チェック</h1>
+  <p class="lead">このHTMLは外部通信なしで動きます。Excel読み込み、フォルダ選択、フォルダ内検索、JSON保存・復元がブラウザで使えるか確認します。</p>
+
+  <div class="grid">
+    <section class="card">
+      <h2>1. ブラウザ基本情報</h2>
+      <button onclick="checkBrowser()">基本チェック</button>
+      <div id="browserResult" class="result">未実行</div>
+    </section>
+
+    <section class="card">
+      <h2>2. Excelファイル読み込みチェック</h2>
+      <p class="small">.xlsx を選ぶと、ファイルをArrayBufferとして読めるか、xlsx内部構造が見えるかを確認します。</p>
+      <label class="filelike">
+        Excelを選択
+        <input id="excelInput" type="file" accept=".xlsx,.xls,.xlsm" onchange="checkExcel(event)">
+      </label>
+      <div id="excelResult" class="result">未実行</div>
+    </section>
+
+    <section class="card">
+      <h2>3. フォルダ選択・フォルダ内検索チェック</h2>
+      <p class="small">webkitdirectory対応ブラウザなら、親フォルダ配下のファイル一覧を取得できます。</p>
+      <label class="filelike">
+        フォルダを選択
+        <input id="folderInput" type="file" webkitdirectory directory multiple onchange="checkFolder(event)">
+      </label>
+      <button class="secondary" onclick="searchFolderFiles()">xlsx/jsonを検索</button>
+      <div id="folderResult" class="result">未実行</div>
+    </section>
+
+    <section class="card">
+      <h2>4. JSON保存・復元チェック</h2>
+      <button onclick="saveJsonDownload()">JSONをダウンロード保存</button>
+      <button class="secondary" onclick="saveJsonWithPicker()">保存先を選んで保存</button>
+      <label class="filelike">
+        JSONを読み込んで復元
+        <input id="jsonInput" type="file" accept=".json" onchange="loadJson(event)">
+      </label>
+      <button class="light" onclick="testLocalStorage()">localStorage保存/復元</button>
+      <div id="jsonResult" class="result">未実行</div>
+    </section>
+  </div>
+
+  <section class="card" style="margin-top:16px;">
+    <h2>総合判定</h2>
+    <button onclick="runSummary()">総合判定を表示</button>
+    <table>
+      <thead><tr><th>項目</th><th>判定</th><th>意味</th></tr></thead>
+      <tbody id="summaryBody"></tbody>
+    </table>
+  </section>
+</div>
+
+<script>
+  let selectedFolderFiles = [];
+  const state = {
+    excelRead: null,
+    xlsxStructure: null,
+    folderSelect: null,
+    folderSearch: null,
+    jsonDownload: null,
+    jsonPicker: null,
+    jsonLoad: null,
+    localStorage: null,
+  };
+
+  function stamp() {
+    return new Date().toLocaleString('ja-JP');
+  }
+
+  function ok(text) { return `✅ ${text}`; }
+  function ng(text) { return `❌ ${text}`; }
+  function warn(text) { return `⚠️ ${text}`; }
+
+  function setText(id, text) {
+    document.getElementById(id).textContent = text;
+  }
+
+  function bytesToText(bytes, max = 600) {
+    const slice = bytes.slice(0, max);
+    let s = '';
+    for (let i = 0; i < slice.length; i++) s += String.fromCharCode(slice[i]);
+    return s;
+  }
+
+  // xlsxはzipなので、中央ディレクトリを軽く読んで中のファイル名を列挙する。
+  // 外部ライブラリなしの簡易チェック用。本格的なセル解析ではない。
+  function listZipEntries(arrayBuffer) {
+    const view = new DataView(arrayBuffer);
+    const bytes = new Uint8Array(arrayBuffer);
+    const entries = [];
+    const maxBack = Math.min(bytes.length, 66000);
+    let eocd = -1;
+    for (let i = bytes.length - 22; i >= bytes.length - maxBack; i--) {
+      if (i < 0) break;
+      if (view.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+    }
+    if (eocd < 0) throw new Error('ZIPの終端レコードが見つかりません。xlsxではないか、壊れている可能性があります。');
+    const centralDirSize = view.getUint32(eocd + 12, true);
+    const centralDirOffset = view.getUint32(eocd + 16, true);
+    let p = centralDirOffset;
+    const end = centralDirOffset + centralDirSize;
+    const decoder = new TextDecoder('utf-8');
+    while (p + 46 <= end && p + 46 <= bytes.length) {
+      if (view.getUint32(p, true) !== 0x02014b50) break;
+      const fileNameLen = view.getUint16(p + 28, true);
+      const extraLen = view.getUint16(p + 30, true);
+      const commentLen = view.getUint16(p + 32, true);
+      const nameStart = p + 46;
+      const nameEnd = nameStart + fileNameLen;
+      const name = decoder.decode(bytes.slice(nameStart, nameEnd));
+      entries.push(name);
+      p = nameEnd + extraLen + commentLen;
+    }
+    return entries;
+  }
+
+  function checkBrowser() {
+    const supports = [];
+    supports.push(`${'FileReader' in window ? ok('FileReaderあり') : ng('FileReaderなし')}`);
+    supports.push(`${'Blob' in window ? ok('Blobあり') : ng('Blobなし')}`);
+    supports.push(`${'URL' in window && 'createObjectURL' in URL ? ok('Blobダウンロード可能') : ng('Blobダウンロード不可')}`);
+    supports.push(`${'showSaveFilePicker' in window ? ok('File System Access APIあり') : warn('File System Access APIなし（通常のダウンロード保存で代替可）')}`);
+    supports.push(`${'localStorage' in window ? ok('localStorageあり') : ng('localStorageなし')}`);
+    const folderInput = document.createElement('input');
+    folderInput.type = 'file';
+    supports.push(`${'webkitdirectory' in folderInput ? ok('フォルダ選択 input webkitdirectory 対応') : ng('フォルダ選択 input webkitdirectory 非対応')}`);
+    setText('browserResult', `実行時刻: ${stamp()}\n\n${supports.join('\n')}\n\nUserAgent:\n${navigator.userAgent}`);
+  }
+
+  async function checkExcel(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      state.excelRead = true;
+      const bytes = new Uint8Array(arrayBuffer.slice(0, 8));
+      const head = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join(' ');
+      let msg = '';
+      msg += ok('ファイルをブラウザで読み込めました') + '\n';
+      msg += `ファイル名: ${file.name}\nサイズ: ${file.size.toLocaleString()} bytes\n先頭バイト: ${head}\n`;
+
+      if (/\.xlsx$|\.xlsm$/i.test(file.name)) {
+        try {
+          const entries = listZipEntries(arrayBuffer);
+          const hasWorkbook = entries.includes('xl/workbook.xml');
+          const sheets = entries.filter(x => /^xl\/worksheets\/sheet\d+\.xml$/.test(x));
+          state.xlsxStructure = hasWorkbook && sheets.length > 0;
+          msg += '\n' + (state.xlsxStructure ? ok('xlsx内部構造を確認できました') : warn('xlsxらしいが、workbook/sheet構造が確認できません')) + '\n';
+          msg += `workbook.xml: ${hasWorkbook ? 'あり' : 'なし'}\nworksheet数: ${sheets.length}\n`;
+          msg += `内部ファイル例:\n${entries.slice(0, 20).join('\n')}`;
+        } catch (e) {
+          state.xlsxStructure = false;
+          msg += '\n' + ng('xlsx内部構造チェックに失敗') + '\n' + e.message;
+        }
+      } else if (/\.xls$/i.test(file.name)) {
+        state.xlsxStructure = null;
+        msg += '\n' + warn('.xlsは古いExcel形式です。この簡易HTMLでは中身解析まではしません。読み込み自体は成功です。');
+      } else {
+        state.xlsxStructure = null;
+        msg += '\n' + warn('拡張子がExcelではないようです。');
+      }
+      setText('excelResult', msg);
+    } catch (e) {
+      state.excelRead = false;
+      setText('excelResult', ng('Excel読み込みに失敗') + '\n' + e.message);
+    }
+  }
+
+  function checkFolder(event) {
+    selectedFolderFiles = Array.from(event.target.files || []);
+    if (selectedFolderFiles.length === 0) {
+      state.folderSelect = false;
+      setText('folderResult', ng('フォルダ内ファイルを取得できませんでした'));
+      return;
+    }
+    state.folderSelect = true;
+    const sample = selectedFolderFiles.slice(0, 30).map(f => f.webkitRelativePath || f.name).join('\n');
+    setText('folderResult', ok('フォルダ内ファイル一覧を取得できました') + `\n件数: ${selectedFolderFiles.length}\n\n先頭30件:\n${sample}`);
+  }
+
+  function searchFolderFiles() {
+    if (!selectedFolderFiles.length) {
+      state.folderSearch = false;
+      setText('folderResult', warn('先にフォルダを選択してください'));
+      return;
+    }
+    const xlsx = selectedFolderFiles.filter(f => /\.xlsx$|\.xlsm$|\.xls$/i.test(f.name));
+    const json = selectedFolderFiles.filter(f => /\.json$/i.test(f.name));
+    const result = [];
+    result.push(ok('フォルダ内検索を実行できました'));
+    result.push(`Excel候補: ${xlsx.length}件`);
+    result.push(...xlsx.slice(0, 20).map(f => '  - ' + (f.webkitRelativePath || f.name)));
+    result.push(`\nJSON候補: ${json.length}件`);
+    result.push(...json.slice(0, 20).map(f => '  - ' + (f.webkitRelativePath || f.name)));
+    state.folderSearch = true;
+    setText('folderResult', result.join('\n'));
+  }
+
+  function makeTestJson() {
+    return {
+      app: '職場PC HTML機能チェック',
+      savedAt: new Date().toISOString(),
+      japaneseText: '日本語の保存テスト：予定表・復元・担任助手・週面シート',
+      numbers: [1, 2, 3],
+      note: 'このJSONを読み込んで文字化けしなければOKです。'
+    };
+  }
+
+  function saveJsonDownload() {
+    try {
+      const data = JSON.stringify(makeTestJson(), null, 2);
+      const blob = new Blob([data], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'html_capability_test.json';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      state.jsonDownload = true;
+      setText('jsonResult', ok('JSONダウンロード保存を実行しました') + '\n保存された html_capability_test.json を、次に「JSONを読み込んで復元」で選んでください。');
+    } catch (e) {
+      state.jsonDownload = false;
+      setText('jsonResult', ng('JSONダウンロード保存に失敗') + '\n' + e.message);
+    }
+  }
+
+  async function saveJsonWithPicker() {
+    if (!('showSaveFilePicker' in window)) {
+      state.jsonPicker = false;
+      setText('jsonResult', warn('このブラウザでは保存先を選ぶAPIが使えません') + '\n通常の「JSONをダウンロード保存」は使える可能性があります。');
+      return;
+    }
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: 'html_capability_test_picker.json',
+        types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }]
+      });
+      const writable = await handle.createWritable();
+      await writable.write(JSON.stringify(makeTestJson(), null, 2));
+      await writable.close();
+      state.jsonPicker = true;
+      setText('jsonResult', ok('保存先を選んでJSON保存できました'));
+    } catch (e) {
+      state.jsonPicker = false;
+      setText('jsonResult', warn('保存先選択保存は完了しませんでした') + '\nキャンセルまたは権限制限の可能性があります。\n' + e.message);
+    }
+  }
+
+  async function loadJson(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const obj = JSON.parse(text);
+      state.jsonLoad = true;
+      setText('jsonResult', ok('JSONを読み込んで復元できました') + `\nファイル名: ${file.name}\n\n内容:\n${JSON.stringify(obj, null, 2)}`);
+    } catch (e) {
+      state.jsonLoad = false;
+      setText('jsonResult', ng('JSON復元に失敗') + '\n' + e.message);
+    }
+  }
+
+  function testLocalStorage() {
+    try {
+      const key = 'html_capability_test_' + Date.now();
+      const value = JSON.stringify(makeTestJson());
+      localStorage.setItem(key, value);
+      const restored = localStorage.getItem(key);
+      localStorage.removeItem(key);
+      if (restored === value) {
+        state.localStorage = true;
+        setText('jsonResult', ok('localStorageへのJSON保存・復元に成功しました') + '\n同じブラウザ内で設定を保持する用途に使えます。');
+      } else {
+        state.localStorage = false;
+        setText('jsonResult', ng('localStorageの復元値が一致しません'));
+      }
+    } catch (e) {
+      state.localStorage = false;
+      setText('jsonResult', ng('localStorage保存・復元に失敗') + '\n' + e.message);
+    }
+  }
+
+  function mark(value, goodText, badText, pendingText = '未確認') {
+    if (value === true) return `<span class="ok">OK</span>`;
+    if (value === false) return `<span class="bad">NG/制限あり</span>`;
+    return `<span class="warn">${pendingText}</span>`;
+  }
+
+  function runSummary() {
+    const rows = [
+      ['Excelファイル読み込み', state.excelRead, 'ExcelファイルをHTML内で読み込めるか。'],
+      ['xlsx内部構造確認', state.xlsxStructure, 'xlsxのworkbook.xmlやsheet.xmlが見えるか。SheetJS等で解析する前段階の確認。'],
+      ['フォルダ選択', state.folderSelect, '親フォルダを選び、配下ファイル一覧を取得できるか。'],
+      ['フォルダ内検索', state.folderSearch, '取得した一覧からExcel/JSONを探せるか。'],
+      ['JSONダウンロード保存', state.jsonDownload, 'ブラウザからjsonファイルを書き出せるか。'],
+      ['保存先選択JSON保存', state.jsonPicker, 'File System Access APIで保存先を選んで直接保存できるか。未対応でも代替可能。'],
+      ['JSON復元', state.jsonLoad, '保存したjsonを読み込んで復元できるか。'],
+      ['localStorage保存', state.localStorage, 'ブラウザ内に設定や学習データを保存できるか。'],
+    ];
+    document.getElementById('summaryBody').innerHTML = rows.map(([name, val, meaning]) =>
+      `<tr><td>${name}</td><td>${mark(val)}</td><td>${meaning}</td></tr>`
+    ).join('');
+  }
+
+  checkBrowser();
+</script>
+</body>
+</html>
