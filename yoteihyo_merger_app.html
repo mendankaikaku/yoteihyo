@@ -5,115 +5,170 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>予定入力Excel 全体統合アプリ</title>
   <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
-  <style>
-    :root{
-      --bg:#f6f7fb;--card:#fff;--line:#d9dee8;--text:#1f2937;--muted:#667085;
-      --accent:#2563eb;--accent2:#1d4ed8;--ok:#16a34a;--warn:#dc2626;--soft:#eff6ff;
-    }
-    *{box-sizing:border-box}
-    body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI","Noto Sans JP",sans-serif;}
-    header{background:#fff;border-bottom:1px solid var(--line);padding:18px 24px;}
-    h1{font-size:20px;margin:0 0 6px;}
-    .hint{font-size:12px;color:var(--muted);line-height:1.6;}
-    .wrap{display:grid;grid-template-columns:340px minmax(0,1fr);gap:16px;padding:16px;}
-    .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:0 1px 2px rgba(0,0,0,.04);}
-    label{font-size:13px;color:var(--muted);display:block;margin:12px 0 6px;}
-    input,select,textarea{width:100%;border:1px solid var(--line);border-radius:10px;padding:9px;background:#fff;font:inherit;}
-    input[type=file]{padding:8px;}
-    input[type=checkbox]{width:auto;margin-right:6px;}
-    button{border:0;border-radius:11px;padding:10px 12px;background:var(--accent);color:#fff;font-weight:800;cursor:pointer;margin:6px 4px 6px 0;}
-    button.secondary{background:#475467;}
-    button.ghost{background:#eef2ff;color:#1e40af;}
-    button.ok{background:var(--ok);}
-    button:disabled{opacity:.45;cursor:not-allowed;}
-    #status{white-space:pre-wrap;background:#0f172a;color:#e5e7eb;border-radius:12px;padding:12px;min-height:90px;font-size:12px;line-height:1.5;}
-    .previewWrap{overflow:auto;max-height:calc(100vh - 210px);border:1px solid var(--line);border-radius:12px;background:#fff;}
-    table{border-collapse:collapse;background:#fff;width:max-content;min-width:100%;}
-    th,td{border:1px solid #98a2b3;padding:6px 8px;vertical-align:top;min-width:110px;max-width:260px;white-space:pre-wrap;word-break:break-word;font-size:12px;}
-    th{background:#f2f4f7;position:sticky;top:0;z-index:2;}
-    th:first-child,td:first-child{position:sticky;left:0;z-index:1;background:#fff;font-weight:700;min-width:140px;}
-    th:first-child{z-index:3;background:#e5e7eb;}
-    .stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:12px;}
-    .stat{background:#f8fafc;border:1px solid var(--line);border-radius:12px;padding:10px;}
-    .stat b{display:block;font-size:18px;}
-    .tabs{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;}
-    .hidden{display:none!important;}
-    details{border:1px solid var(--line);border-radius:12px;padding:10px;background:#fafafa;margin-top:10px;}
-    summary{cursor:pointer;font-weight:700;}
-    .drop{border:2px dashed #c7d2fe;background:#f8fbff;border-radius:14px;padding:14px;text-align:center;color:#475569;margin-top:8px;}
-    .drop.drag{background:#eef2ff;border-color:#2563eb;}
-    .smallrow{display:flex;align-items:center;gap:8px;}
-    @media (max-width:1050px){.wrap{grid-template-columns:1fr}.previewWrap{max-height:65vh}.stats{grid-template-columns:repeat(2,1fr)}}
-  </style>
+<style>
+:root{
+  --bg:#f4f6fb;--card:#fff;--line:#d8deea;--text:#172033;--muted:#667085;
+  --accent:#2563eb;--accent2:#1d4ed8;--ok:#16a34a;--warn:#dc2626;--soft:#eef4ff;
+  --shadow:0 10px 28px rgba(15,23,42,.06);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI","Noto Sans JP",sans-serif;}
+header{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.96);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);}
+.headerInner{max-width:1680px;margin:0 auto;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+h1{font-size:20px;margin:0;font-weight:900;letter-spacing:.01em;}
+.headerHint{font-size:12px;color:var(--muted);line-height:1.5;margin-top:3px;}
+.headerActions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:flex-end;}
+.wrap{max-width:1680px;margin:0 auto;padding:14px 16px 20px;}
+.controlGrid{display:grid;grid-template-columns:minmax(360px,1.2fr) minmax(330px,.9fr) minmax(360px,1.15fr) 280px;gap:12px;align-items:stretch;margin-bottom:12px;}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;box-shadow:var(--shadow);}
+.cardTitle{display:flex;align-items:center;gap:8px;font-weight:900;margin:0 0 10px;font-size:15px;}
+.step{display:inline-grid;place-items:center;min-width:24px;height:24px;border-radius:999px;background:var(--accent);color:#fff;font-weight:900;font-size:12px;padding:0 7px;}
+.hint{font-size:12px;color:var(--muted);line-height:1.5;}
+label{font-size:12px;color:#475467;display:block;margin:9px 0 5px;font-weight:800;}
+input,select,textarea{width:100%;border:1px solid var(--line);border-radius:10px;padding:8px 9px;background:#fff;font:inherit;font-size:13px;}
+input[type=file]{padding:7px;background:#fafafa;}
+input[type=checkbox]{width:auto;margin-right:6px;}
+button{border:0;border-radius:11px;padding:9px 12px;background:var(--accent);color:#fff;font-weight:900;cursor:pointer;margin:0;font-size:13px;white-space:nowrap;}
+button.secondary{background:#475467;}
+button.ghost{background:#eef2ff;color:#1e40af;}
+button.ok{background:var(--ok);}
+button:disabled{opacity:.45;cursor:not-allowed;}
+.btnRow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;}
+.primaryAction{font-size:14px;padding:11px 14px;}
+.drop{border:2px dashed #c7d2fe;background:#f8fbff;border-radius:12px;padding:10px;text-align:center;color:#475569;margin-top:8px;font-size:12px;}
+.drop.drag{background:#eef2ff;border-color:#2563eb;}
+.compactFields{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.smallrow{display:flex;align-items:center;gap:8px;}
+.checkGrid{display:grid;grid-template-columns:1fr 1fr;gap:4px 8px;margin-top:4px;}
+.checkGrid label{font-size:12px;font-weight:600;margin:0;color:#344054;}
+details{border:1px solid var(--line);border-radius:12px;padding:9px;background:#fafafa;margin-top:9px;}
+summary{cursor:pointer;font-weight:900;font-size:13px;}
+#status{white-space:pre-wrap;background:#0f172a;color:#e5e7eb;border-radius:12px;padding:10px;min-height:126px;font-size:12px;line-height:1.45;overflow:auto;}
+.stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:10px;}
+.stat{background:#fff;border:1px solid var(--line);border-radius:12px;padding:9px 10px;box-shadow:0 1px 2px rgba(0,0,0,.03);}
+.stat .hint{display:block;line-height:1.2;}
+.stat b{display:block;font-size:19px;margin-top:2px;}
+.tabs{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;position:sticky;top:73px;z-index:10;background:rgba(244,246,251,.94);backdrop-filter:blur(8px);padding:8px 0;}
+.previewCard{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px;box-shadow:var(--shadow);}
+.previewWrap{overflow:auto;height:calc(100vh - 285px);min-height:460px;border:1px solid var(--line);border-radius:12px;background:#fff;}
+.hidden{display:none!important;}
+table{border-collapse:collapse;background:#fff;width:max-content;min-width:100%;}
+th,td{border:1px solid #98a2b3;padding:6px 8px;vertical-align:top;min-width:110px;max-width:260px;white-space:pre-wrap;word-break:break-word;font-size:12px;}
+th{background:#f2f4f7;position:sticky;top:0;z-index:2;}
+th:first-child,td:first-child{position:sticky;left:0;z-index:1;background:#fff;font-weight:700;min-width:140px;}
+th:first-child{z-index:3;background:#e5e7eb;}
+.subtle{color:var(--muted);font-size:11px;}
+@media (max-width:1280px){
+  .controlGrid{grid-template-columns:1fr 1fr;}
+  .previewWrap{height:62vh;}
+}
+@media (max-width:760px){
+  .headerInner{align-items:flex-start;flex-direction:column;}
+  .controlGrid{grid-template-columns:1fr;}
+  .compactFields,.checkGrid,.stats{grid-template-columns:1fr;}
+  .tabs{top:106px;}
+  .previewWrap{height:62vh;min-height:360px;}
+}
+@media print{
+  header,.controlGrid,.tabs{display:none!important;}
+  .wrap{padding:0;}
+  .previewCard{border:0;box-shadow:none;padding:0;}
+  .previewWrap{height:auto;overflow:visible;border:0;}
+}
+</style>
 </head>
 <body>
 <header>
-  <h1>予定入力Excel 全体統合アプリ</h1>
-  <div class="hint">予定入力HTMLから出力したExcel（シート名「予定入力」）と、生徒対応表（学年・生徒番号・名前・よみがな・担当・高校・備考。予定Excelの生徒名は苗字だけ/苗字＋名1文字でも部分一致）と結果Excelを合わせて、横軸カレンダー・縦軸生徒名の全体予定表を作ります。各日は左に予定、右に結果を表示します。Excelファイルは外部送信せず、このブラウザ内だけで処理します。</div>
+  <div class="headerInner">
+    <div>
+      <h1>予定入力Excel 全体統合アプリ</h1>
+      <div class="headerHint">予定Excel・対応表・結果Excelをまとめて、管理用/掲示用カレンダー、模試科目、イベント確認を出力します。</div>
+    </div>
+    <div class="headerActions">
+      <button id="mergeBtn" class="ok primaryAction">① 統合プレビュー</button>
+      <button id="download2wBtn" disabled>② 前後2週間</button>
+      <button id="download1mBtn" disabled>③ 前後1か月</button>
+      <button id="downloadBtn" disabled>期間指定</button>
+      <button id="clearBtn" class="secondary">クリア</button>
+    </div>
+  </div>
 </header>
 
 <div class="wrap">
-  <aside class="card">
-    <label>親フォルダーを選択</label>
-    <input id="folderInput" type="file" webkitdirectory directory multiple accept=".xlsx,.xls,.xlsm" />
-    <div id="dropZone" class="drop">または、Excelファイル/フォルダーをここへドラッグ</div>
-    <div class="hint">推奨構造：予定表/生徒名.5月30日-6月5日.xlsx、または予定表/生徒名/週ごとのExcel.xlsx。Chrome/Edgeならフォルダー選択できます。</div>
-
-    <label>生徒対応表を選択（任意）</label>
-    <input id="rosterInput" type="file" accept=".xlsx,.xls,.xlsm,.csv" />
-    <div class="hint">対応表は学年ごとにシートが分かれていても読めます。各シートは左端から 学年 / 生徒番号 / 名前 / よみがな / 担当 / 高校 / 備考 の順で読み取ります。1行目に見出しがあってもOKです。外部送信はしません。</div>
-
-    <label>結果Excelを選択（任意・複数可）</label>
-    <input id="resultInput" type="file" multiple accept=".xlsx,.xls,.xlsm" />
-    <div class="hint">列名ありでも、列名なしでも読めます。基本形は A列:生徒番号 / B列:フルネーム / C列:学年 / D列:区分 / E列:学習内容 / F列:学習結果 / G列:いいね! / H列:日時 です。名前列が空白でも、生徒番号と対応表を照合して生徒名を復元します。</div>
-
-    <label>読み取るシート名</label>
-    <input id="sheetName" type="text" value="予定入力" />
-
-    <label>生徒名の決め方</label>
-    <select id="studentMode">
-      <option value="folder" selected>親フォルダー直下のフォルダー名を生徒名にする</option>
-      <option value="sheet">Excel内の「生徒名」を優先する</option>
-      <option value="file">Excelファイル名から推定する</option>
-    </select>
-
-    <label>基準日</label>
-    <input id="centerDate" type="date" />
-    <div class="hint">「その日前後2週間」「その日前後1か月」は、この基準日を中心に出力します。初期値は今日です。予定Excelは、この基準日の1か月前以降の日付だけを読み込みます。</div>
-
-    <label>期間指定</label>
-    <div class="smallrow">
-      <input id="fromDate" type="date" />
-      <span class="hint">〜</span>
-      <input id="toDate" type="date" />
-    </div>
-    <div class="hint">期間指定出力では、この開始日〜終了日だけを出力します。空欄なら読み取れた全期間を出力します。</div>
-
-    <label>表示・出力設定</label>
-    <div class="hint"><label><input id="splitLines" type="checkbox" checked />1セル内の改行予定を予定一覧では分割する</label></div>
-    <div class="hint"><label><input id="includeRowName" type="checkbox" checked />全体カレンダーのセルに時限/行名も入れる</label></div>
-    <div class="hint"><label><input id="sortStudents" type="checkbox" checked />生徒名を五十音順に並べる</label></div>
-    <div class="hint"><label><input id="colorWeekend" type="checkbox" checked />出力Excelで土日列を薄く色分けする</label></div>
-
-    <button id="mergeBtn" class="ok">統合プレビュー作成</button>
-    <button id="download2wBtn" disabled>その日前後2週間を出力</button>
-    <button id="download1mBtn" disabled>その日前後1か月を出力</button>
-    <button id="downloadBtn" disabled>期間指定出力</button>
-    <button id="clearBtn" class="secondary">クリア</button>
-
-    <label>状態</label>
-    <div id="status">待機中</div>
-
-    <details>
-      <summary>想定する予定入力Excel形式</summary>
-      <div class="hint" style="margin-top:8px;">
-        予定入力HTMLから出力したExcel：B〜H列の日付、受講①〜③・その他①〜③の6行、下段はA列=教科、B列=問題集/高速マスター、E列=内容、備考はA列が「備考」・B列が内容。<br>
-        旧形式の「統合用データ」シートも残して読み取れます。
+  <section class="controlGrid">
+    <div class="card">
+      <p class="cardTitle"><span class="step">1</span>読み込むファイル</p>
+      <label>予定Excelフォルダー</label>
+      <input id="folderInput" type="file" webkitdirectory directory multiple accept=".xlsx,.xls,.xlsm" />
+      <div id="dropZone" class="drop">Excelファイル/フォルダーをここへドラッグ</div>
+      <div class="compactFields">
+        <div>
+          <label>生徒対応表</label>
+          <input id="rosterInput" type="file" accept=".xlsx,.xls,.xlsm,.csv" />
+        </div>
+        <div>
+          <label>結果Excel</label>
+          <input id="resultInput" type="file" multiple accept=".xlsx,.xls,.xlsm" />
+        </div>
       </div>
-    </details>
-  </aside>
+      <details>
+        <summary>読み取り形式</summary>
+        <div class="hint" style="margin-top:8px;">
+          予定Excelは「予定入力」シートを読みます。対応表は 学年 / 生徒番号 / 名前 / よみがな / 担当 / 高校 / 備考 の順に対応します。
+        </div>
+      </details>
+    </div>
 
-  <main class="card">
+    <div class="card">
+      <p class="cardTitle"><span class="step">2</span>日付・読み取り条件</p>
+      <div class="compactFields">
+        <div>
+          <label>基準日</label>
+          <input id="centerDate" type="date" />
+        </div>
+        <div>
+          <label>読み取るシート名</label>
+          <input id="sheetName" type="text" value="予定入力" />
+        </div>
+      </div>
+      <label>期間指定</label>
+      <div class="smallrow">
+        <input id="fromDate" type="date" />
+        <span class="hint">〜</span>
+        <input id="toDate" type="date" />
+      </div>
+      <label>生徒名の決め方</label>
+      <select id="studentMode">
+        <option value="folder" selected>フォルダー名を生徒名にする</option>
+        <option value="sheet">Excel内の「生徒名」を優先する</option>
+        <option value="file">Excelファイル名から推定する</option>
+      </select>
+    </div>
+
+    <div class="card">
+      <p class="cardTitle"><span class="step">3</span>表示・出力設定</p>
+      <div class="checkGrid">
+        <label><input id="splitLines" type="checkbox" checked />改行予定を分割</label>
+        <label><input id="includeRowName" type="checkbox" checked />時限/行名を表示</label>
+        <label><input id="sortStudents" type="checkbox" checked />五十音順に並べる</label>
+        <label><input id="colorWeekend" type="checkbox" checked />土日を色分け</label>
+      </div>
+      <div class="hint" style="margin-top:10px;">先にファイルを選び、右上の「統合プレビュー」を押してください。プレビュー後に各出力ボタンが使えます。</div>
+      <details>
+        <summary>予定入力Excel形式</summary>
+        <div class="hint" style="margin-top:8px;">
+          B〜H列の日付、受講①〜③・その他①〜③、下段は A列=教科 / B列=問題集・高速マスター / E列=内容、備考はA列「備考」・B列内容。
+        </div>
+      </details>
+    </div>
+
+    <div class="card">
+      <p class="cardTitle"><span class="step">状態</span>ログ</p>
+      <div id="status">待機中</div>
+    </div>
+  </section>
+
+  <main class="previewCard">
     <div class="stats">
       <div class="stat"><span class="hint">読み込みExcel</span><b id="statFiles">0</b></div>
       <div class="stat"><span class="hint">予定件数</span><b id="statRows">0</b></div>
