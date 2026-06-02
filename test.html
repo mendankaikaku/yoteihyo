@@ -91,7 +91,7 @@ details.advanced{background:#fff;border-color:#e2e8f0}details.advanced summary{f
       <div class="field wide"><label>① 生徒名（複数はカンマ区切り）</label><input id="studentNames" placeholder="例：佐藤, 鈴木, 高橋" /></div>
       <div class="field"><label>開始日</label><input id="weekStart" type="date" /></div>
       <button id="applyStudents" class="primaryBig">② 反映</button>
-      <button class="secondary primaryBig" id="loadGroupMemory">③ 復元</button>
+      <button class="primaryBig" id="loadGroupMemory">③ 復元</button>
       <button class="ok primaryBig" id="saveGroupMemory">④ 保存</button>
       <button class="secondary" id="exportXlsx">ZIP出力</button>
     </div>
@@ -114,7 +114,7 @@ details.advanced{background:#fff;border-color:#e2e8f0}details.advanced summary{f
         <div class="compactHint" style="margin-top:0">復元ボタンで読み込んだ「まとめて復元」フォルダから、結果履歴JSON・学習結果Excel・週面シート・合格設計図を自動で使います。</div>
         <button class="secondary primaryBig" id="printMeetingPrep" type="button">印刷</button>
       </div>
-      <div id="meetingPrepFolderInfo" class="compactHint">復元した内容を先週分として使い、今週欄は印刷時だけ白紙にします。復元時に「まとめて復元」フォルダを選ぶと、json/result_history.json、学習結果フォルダ内の結果Excel、打ち込み結果/担任助手フォルダ内の週面シート、担任助手フォルダ/生徒名フォルダ内の合格設計図PDFまたはExcelを自動で読みます。</div>
+      <div id="meetingPrepFolderInfo" class="compactHint">復元した内容を先週分として使い、今週欄は印刷時だけ白紙にします。復元時に「復元保存」フォルダを選ぶと、json/result_history.json、学習結果フォルダ内の結果Excel、打ち込み結果/担任助手フォルダ内の週面シート、担任助手フォルダ/生徒名フォルダ内の合格設計図PDFまたはExcelを自動で読みます。</div>
     </details>
   </section>
 
@@ -167,7 +167,7 @@ details.advanced{background:#fff;border-color:#e2e8f0}details.advanced summary{f
   <section class="card">
     <details class="advanced">
       <summary>詳細設定</summary>
-      <div class="hint" style="margin-top:8px">保存・復元は上部のまとめて保存/復元に統一しています。全消去は現在の入力画面を消す操作です。</div>
+      <div class="hint" style="margin-top:8px">保存・は上部のまとめて保存/に統一しています。全消去は現在の入力画面を消す操作です。</div>
       <div class="advancedButtons"><button class="danger" id="clearAll">全消去</button></div>
     </details>
   </section>
@@ -412,7 +412,7 @@ function aoaToGoukakuTableHtml(aoa, maxRows=60, maxCols=20, editable=false){
 }
 function goukakuPanelHtml(name){
   const item=goukakuDesignSheets[name];
-  if(!item) return '<div class="goukakuBox"><div class="goukakuHeader"><span>未読み込み</span></div><div class="hint" style="padding:10px">③まとめて復元または④まとめて保存で保存用フォルダを選ぶと、生徒フォルダ直下の合格設計図PDF/Excelを探します。</div></div>';
+  if(!item) return '<div class="goukakuBox"><div class="goukakuHeader"><span>未読み込み</span></div><div class="hint" style="padding:10px">③まとめてまたは④まとめて保存で保存用フォルダを選ぶと、生徒フォルダ直下の合格設計図PDF/Excelを探します。</div></div>';
   if(item.error) return `<div class="goukakuBox"><div class="goukakuHeader"><span>読み込み失敗</span></div><div class="hint" style="padding:10px;color:#dc2626">${escapeHtml(item.error)}</div></div>`;
   if(item.kind === 'pdf'){
     return `<div class="goukakuBox"><div class="goukakuHeader"><div><div>合格設計図PDF</div><div class="goukakuMeta">${escapeHtml(item.fileName||'')}</div></div><button type="button" class="goukakuExpand" data-open-goukaku="${escapeHtml(name)}" title="全画面で拡大">↗</button></div><div class="goukakuPdfWrap"><iframe class="goukakuPdfFrame" src="${escapeHtml(item.pdfUrl||'')}"></iframe></div></div>`;
@@ -768,8 +768,8 @@ function applyExamValuesToCard(card,values=[]){
     const exact=map.get(item.dataset.examId);
     const itemTemplate=item.dataset.examTemplate||defaultTemplateNameForType(item.dataset.examType||'common');
     const sameTemplate=list.find(v=>(v.subjectTemplate||defaultTemplateNameForType(v.type||'common'))===itemTemplate && Array.isArray(v.subjects) && v.subjects.length);
-    // 完全一致する模試があれば当日/後日/不受験も復元する。
-    // 違う模試名でも科目型が同じなら、科目チェックだけ復元する。
+    // 完全一致する模試があれば当日/後日/不受験もする。
+    // 違う模試名でも科目型が同じなら、科目チェックだけする。
     const v=exact||sameTemplate;
     if(!v)return;
     if(exact&&v.status){const st=item.querySelector(`input[data-exam-status][value="${v.status}"]`);if(st)st.checked=true}
@@ -1157,7 +1157,7 @@ function saveSubjectTemplateFromEditor(){
 }
 
 /* =========================================================
-   5. 保存・復元
+   5. 保存・
    - 保存用フォルダが選択済みなら保存用フォルダを優先
    - 未選択ならブラウザ内 localStorage に保存
    - まとめて保存時は、全員分＋各個人データを必ず同時保存
@@ -1192,7 +1192,7 @@ function buildGroupMemory(savedAt=new Date().toISOString()){
 }
 function saveGroupToBrowser(mem){
   localStorage.setItem(groupKey(),JSON.stringify(mem));
-  // グループ保存した内容は、個人復元でも使えるように各個人へも同時保存する。
+  // グループ保存した内容は、個人でも使えるように各個人へも同時保存する。
   (mem.names||students).forEach(n=>saveOneToBrowser(n,mem.savedAt));
 }
 async function saveOne(name,showAlert=true){
@@ -1235,19 +1235,19 @@ async function loadOne(name){
   if(mem.weekStart) meetingPrepRestoredWeekStart = mem.weekStart;
   renderStudents();
   const savedAt=mem.savedAt?new Date(mem.savedAt).toLocaleString('ja-JP'):'保存日時不明';
-  showSaveInfo(`${name}を復元しました（${savedAt} / ${place}）`);
+  showSaveInfo(`${name}をしました（${savedAt} / ${place}）`);
   alert(`${name}の前回内容を読み込みました。`);
 }
 async function pickSaveRootFolder(forcePick=false){
   if(!window.showDirectoryPicker){
-    alert('このブラウザではフォルダへの直接保存・復元が使えません。ChromeまたはEdgeで、GitHub Pagesなどのhttpsページから開いてください。');
+    alert('このブラウザではフォルダへの直接保存・が使えません。ChromeまたはEdgeで、GitHub Pagesなどのhttpsページから開いてください。');
     return null;
   }
   if(!forcePick && sharedDirHandle) return sharedDirHandle;
   try{
     const dir = await window.showDirectoryPicker({mode:'readwrite'});
     // 保存用フォルダを選ぶ。
-    // 復元用JSON・模試/イベントマスタ・科目型は直下の「json」フォルダに保存し、
+    // 用JSON・模試/イベントマスタ・科目型は直下の「json」フォルダに保存し、
     // Excelはこの下の担任助手フォルダ→各生徒名フォルダへ保存する。
     sharedDirHandle = dir;
     excelOutputDirHandle = null;
@@ -1330,11 +1330,11 @@ async function saveGroup(){
   }
 
   try{
-    // 復元用データ・模試マスタ・イベントマスタ・コメントマスタ・科目型を、選択した担任名フォルダ直下に保存する。
+    // 用データ・模試マスタ・イベントマスタ・コメントマスタ・科目型を、選択した担任名フォルダ直下に保存する。
     await saveAllCurrentDataToShared(false);
-    status.push('保存用フォルダ/json：復元用データ・模試マスタ・イベントマスタ・コメントマスタ・科目型を保存しました。');
+    status.push('保存用フォルダ/json：用データ・模試マスタ・イベントマスタ・コメントマスタ・科目型を保存しました。');
   }catch(e){
-    status.push(`保存用フォルダ：復元用データ保存に失敗しました。${e?.message ? '\n' + e.message : ''}`);
+    status.push(`保存用フォルダ：用データ保存に失敗しました。${e?.message ? '\n' + e.message : ''}`);
   }
 
   try{
@@ -1368,7 +1368,7 @@ async function loadGroup(){
   let place='未取得';
   const details=[];
 
-  // 復元は「保存用フォルダのJSON」を最優先。
+  // は「保存用フォルダのJSON」を最優先。
   // 1) group_*.json を完全一致・名前集合一致で探す
   // 2) 見つからなければ student_*.json を人数分集める
   // 3) それでもなければ最後にブラウザ内保存へフォールバック
@@ -1406,7 +1406,7 @@ async function loadGroup(){
           };
           place='保存用フォルダの個人JSON';
           if(missing.length){
-            alert(`保存用フォルダの個人JSONから復元します。
+            alert(`保存用フォルダの個人JSONからします。
 見つからなかった生徒：${missing.join('、')}`);
           }
         }
@@ -1441,7 +1441,7 @@ async function loadGroup(){
       };
       place='ブラウザ内の個人保存データ';
       if(missing.length){
-        alert(`ブラウザ内の個人保存データから復元します。
+        alert(`ブラウザ内の個人保存データからします。
 未保存の生徒：${missing.join('、')}`);
       }
     }
@@ -1462,7 +1462,7 @@ async function loadGroup(){
   renderStudents();
   if(dir){
     try{
-      // まとめて復元 / 打ち込み結果 / 担任助手フォルダ / 生徒名フォルダ の構造を前提に、
+      // まとめて / 打ち込み結果 / 担任助手フォルダ / 生徒名フォルダ の構造を前提に、
       // 入力済み生徒名を全員含む担任助手フォルダを特定する。
       const studentParent=await findStudentFolderParentFromSaveRoot(dir, students);
       if(studentParent && studentParent.label) details.push(`担任助手フォルダ: ${studentParent.label}`);
@@ -1499,9 +1499,9 @@ async function loadGroup(){
   }
   const savedAt=mem.savedAt?new Date(mem.savedAt).toLocaleString('ja-JP'):'保存日時不明';
   const detailText = details.length ? '\n' + details.join('\n') : '';
-  showSaveInfo(`内容を復元しました：${students.join('、')}（${savedAt} / ${place}）${detailText}`);
-  alert(`内容を復元しました。
-復元元：${place}`);
+  showSaveInfo(`内容をしました：${students.join('、')}（${savedAt} / ${place}）${detailText}`);
+  alert(`内容をしました。
+元：${place}`);
 }
 
 function maxUsedLesson(data){let m=1;(data.schedule||[]).forEach(day=>[0,1,2].forEach(r=>{if(String(day?.[r]||'').trim())m=Math.max(m,r+1)}));return Math.min(MAX_SCHEDULE_ROWS,m)}
@@ -1767,7 +1767,7 @@ async function pickSharedFolder(){
     return null;
   }
   sharedDirHandle = await window.showDirectoryPicker({mode:'readwrite'});
-  showSaveInfo('保存用フォルダを選択しました。このページを開いている間、この保存用フォルダに復元用データ・マスタを保存/反映できます。');
+  showSaveInfo('保存用フォルダを選択しました。このページを開いている間、この保存用フォルダに用データ・マスタを保存/反映できます。');
   return sharedDirHandle;
 }
 async function ensureSharedFolder(){
@@ -1981,10 +1981,10 @@ async function loadSharedGroup(){
     renderExamMasterPanel(); renderEventMasterPanel(); renderCommentMasterPanel();
     renderStudents();
     const savedAt=mem.savedAt?new Date(mem.savedAt).toLocaleString('ja-JP'):'保存日時不明';
-    showSaveInfo(`保存用フォルダからまとめて復元しました：${students.join('、')}（${savedAt}）`);
-    alert(`保存用フォルダからグループ内容を復元しました。\n保存日時：${savedAt}`);
+    showSaveInfo(`保存用フォルダからまとめてしました：${students.join('、')}（${savedAt}）`);
+    alert(`保存用フォルダからグループ内容をしました。\n保存日時：${savedAt}`);
   }catch(e){
-    alert('保存用フォルダからのまとめて復元に失敗しました。');
+    alert('保存用フォルダからのまとめてに失敗しました。');
   }
 }
 async function loadSharedIndividuals(){
@@ -2003,11 +2003,11 @@ async function loadSharedIndividuals(){
     }
     students=names;
     renderStudents();
-    const msg=missing.length?`一部見つかりませんでした：${missing.join('、')}`:'全員分を復元しました。';
-    showSaveInfo(`保存用フォルダから個人復元：${names.join('、')}\n${msg}`);
+    const msg=missing.length?`一部見つかりませんでした：${missing.join('、')}`:'全員分をしました。';
+    showSaveInfo(`保存用フォルダから個人：${names.join('、')}\n${msg}`);
     alert(msg);
   }catch(e){
-    alert('保存用フォルダからの個人復元に失敗しました。');
+    alert('保存用フォルダからの個人に失敗しました。');
   }
 }
 
@@ -2190,9 +2190,9 @@ async function pickMasterSharedFolderAndLoad(){
 /* =========================================================
    10.5 面談準備資料の印刷
 ========================================================= */
-let meetingPrepWeeklyHtmlCache = '<p class="muted">復元フォルダから週面シートをまだ自動読込できていません。</p>';
+let meetingPrepWeeklyHtmlCache = '<p class="muted">フォルダから週面シートをまだ自動読込できていません。</p>';
 let meetingPrepWeeklyFileName = '';
-// 面談準備資料では、復元した週を「先週」として使う。
+// 面談準備資料では、した週を「先週」として使う。
 // 画面の週開始日を今週用に変更しても、印刷時の先週日付がずれないように保持する。
 let meetingPrepRestoredWeekStart = '';
 
@@ -2203,7 +2203,7 @@ function setMeetingPrepFolderInfo(message){
 
 function getPrepResultFiles(){
   // v14: 面談準備では個別の結果Excel選択欄を廃止。
-  // 結果Excelは「まとめて復元/学習結果」フォルダから自動読込する。
+  // 結果Excelは「まとめて/学習結果」フォルダから自動読込する。
   return [];
 }
 async function listExcelFilesFromDirectoryRecursive(dir, maxDepth=5, depth=0, pathParts=[]){
