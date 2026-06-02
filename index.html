@@ -106,7 +106,7 @@ details.advanced{background:#fff;border-color:#e2e8f0}details.advanced summary{f
         <div class="field"><label>週面シートExcel</label><input id="meetingPrepWeeklyInput" type="file" accept=".xlsx,.xls,.xlsm" /></div>
         <button class="secondary primaryBig" id="printMeetingPrep" type="button">印刷</button>
       </div>
-      <div id="meetingPrepFolderInfo" class="compactHint">復元した内容を先週分として使い、今週欄は印刷時だけ白紙にします。合格設計図は4枚目に追加されます。</div>
+      <div id="meetingPrepFolderInfo" class="compactHint">復元した内容を先週分として使い、今週欄は印刷時だけ白紙にします。結果は保存用フォルダ/json/result_history.jsonを優先して読み、必要なら結果Excelも追加で読めます。合格設計図は4枚目に追加されます。</div>
     </details>
   </section>
 
@@ -226,15 +226,18 @@ function parseDateTimeLoose(value, fallbackYear=new Date().getFullYear()){
   s=s.replace(/[（(].*?[）)]/g,' ');
   s=s.replace(/\s+/g,' ').trim();
 
-  let m=s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  // result_history.json は datetime を ISO 形式で保存することがある。
+  // 例: 2026-05-30T16:23:00.000Z
+  // 以前は日付部分だけ拾って 00:00 扱いになっていたため、T区切りの時刻も必ず読む。
+  let m=s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})(?:[T\s]+(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?)?(?:Z|[+\-]\d{2}:?\d{2})?$/);
   if(m){
     return new Date(Number(m[1]),Number(m[2])-1,Number(m[3]),Number(m[4]||0),Number(m[5]||0),Number(m[6]||0));
   }
-  m=s.match(/^(\d{1,2})[\/\-.](\d{1,2})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  m=s.match(/^(\d{1,2})[\/\-.](\d{1,2})(?:[T\s]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
   if(m){
     return new Date(fallbackYear,Number(m[1])-1,Number(m[2]),Number(m[3]||0),Number(m[4]||0),Number(m[5]||0));
   }
-  // Fallback for strings that the browser can parse, e.g. 2026/5/30 15:25:00
+  // Fallback for browser-parsable strings.
   const d=new Date(s);
   return isNaN(d) ? null : d;
 }
@@ -647,10 +650,10 @@ function examPanelHtml(name){
   return exams.map(ex=>{
     const tmpl=ex.subjectTemplate||defaultTemplateNameForType(ex.type), id=examId(ex), subjects=examSubjectsForType(ex.type,tmpl);
     const targetInfo=[(ex.grades||[]).join('・'), (ex.students||[]).join('・')].filter(Boolean).join(' / ');
-    return `<div class="examItem" data-exam-id="${escapeHtml(id)}" data-exam-name="${escapeHtml(ex.name)}" data-exam-date="${escapeHtml(ex.date)}" data-exam-type="${escapeHtml(ex.type||'common')}" data-exam-template="${escapeHtml(tmpl)}"><div class="examHead"><span>${escapeHtml(ex.name)}</span><span class="examDate">${escapeHtml(ex.date)} / ${escapeHtml(tmpl)}${targetInfo?' / 対象:'+escapeHtml(targetInfo):''}</span></div><div class="checkRow">${['当日','後日','不受験'].map(st=>`<label><input type="radio" name="exam_${escapeHtml(name)}_${escapeHtml(id)}" data-exam-status value="${st}">${st}</label>`).join('')}</div><div class="checkRow">${subjects.map(sub=>`<label><input type="checkbox" data-exam-subject value="${escapeHtml(sub)}">${escapeHtml(sub)}</label>`).join('')}</div></div>`;
+    return `<div class="examItem" data-exam-id="${escapeHtml(id)}" data-exam-name="${escapeHtml(ex.name)}" data-exam-date="${escapeHtml(ex.date)}" data-exam-type="${escapeHtml(ex.type||'common')}" data-exam-template="${escapeHtml(tmpl)}"><div class="examHead"><span>${escapeHtml(ex.name)}</span><span class="examDate">${escapeHtml(ex.date)} / ${escapeHtml(tmpl)}${targetInfo?' / 対象:'+escapeHtml(targetInfo):''}</span></div><div class="checkRow">${['当日','後日','不受験'].map(st=>`<label><input type="radio" name="exam_${escapeHtml(name)}_${escapeHtml(id)}" data-exam-status value="${st}">${st}</label>`).join('')}</div><div class="checkRow">${subjects.map(sub=>`<label><input type="checkbox" data-exam-subject value="${escapeHtml(sub)}">${escapeHtml(sub)}</label>`).join('')}</div><div class="checkRow"><label title="前回の同じ科目型の模試から、受験科目が変わった場合にチェック"><input type="checkbox" data-exam-subject-changed>科目変更あり</label></div></div>`;
   }).join('')
 }
-function getExamInputsForCard(card){return Array.from(card.querySelectorAll('.examItem')).map(item=>({id:item.dataset.examId||'',name:item.dataset.examName||'',date:item.dataset.examDate||'',type:item.dataset.examType||'common',subjectTemplate:item.dataset.examTemplate||defaultTemplateNameForType(item.dataset.examType||'common'),status:(item.querySelector('input[data-exam-status]:checked')||{}).value||'',subjects:Array.from(item.querySelectorAll('input[data-exam-subject]:checked')).map(x=>x.value)}))}
+function getExamInputsForCard(card){return Array.from(card.querySelectorAll('.examItem')).map(item=>({id:item.dataset.examId||'',name:item.dataset.examName||'',date:item.dataset.examDate||'',type:item.dataset.examType||'common',subjectTemplate:item.dataset.examTemplate||defaultTemplateNameForType(item.dataset.examType||'common'),status:(item.querySelector('input[data-exam-status]:checked')||{}).value||'',subjects:Array.from(item.querySelectorAll('input[data-exam-subject]:checked')).map(x=>x.value),subjectChanged:!!item.querySelector('input[data-exam-subject-changed]:checked')}))}
 function applyExamValuesToCard(card,values=[]){
   const list=Array.isArray(values)?values:[];
   const map=new Map(list.map(v=>[v.id||`${v.name}|${v.date}|${v.type||'common'}|${v.subjectTemplate||defaultTemplateNameForType(v.type||'common')}`,v]));
@@ -663,7 +666,7 @@ function applyExamValuesToCard(card,values=[]){
     const v=exact||sameTemplate;
     if(!v)return;
     if(exact&&v.status){const st=item.querySelector(`input[data-exam-status][value="${v.status}"]`);if(st)st.checked=true}
-    (v.subjects||[]).forEach(sub=>{const cb=Array.from(item.querySelectorAll('input[data-exam-subject]')).find(x=>x.value===sub);if(cb)cb.checked=true})
+    (v.subjects||[]).forEach(sub=>{const cb=Array.from(item.querySelectorAll('input[data-exam-subject]')).find(x=>x.value===sub);if(cb)cb.checked=true}); const changed=item.querySelector('input[data-exam-subject-changed]'); if(changed) changed.checked=!!v.subjectChanged
   })
 }
 function getEventInputsForCard(card){return Array.from(card.querySelectorAll('.eventItem')).map(row=>({id:row.dataset.eventId||'',name:row.querySelector('[data-event-name]')?.value||'',datetime:row.querySelector('[data-event-datetime]')?.value||'',status:(row.querySelector('input[data-event-status]:checked')||{}).value||'',note:row.querySelector('[data-event-note]')?.value||''})).filter(x=>x.name||x.datetime||x.status||x.note)}
@@ -1137,7 +1140,7 @@ async function pickSaveRootFolder(forcePick=false){
   try{
     const dir = await window.showDirectoryPicker({mode:'readwrite'});
     // 保存用フォルダを選ぶ。
-    // 復元用JSON・模試/イベントマスタ・科目型はこの直下に保存し、
+    // 復元用JSON・模試/イベントマスタ・科目型は直下の「json」フォルダに保存し、
     // Excelはこの下の担任助手フォルダ→各生徒名フォルダへ保存する。
     sharedDirHandle = dir;
     excelOutputDirHandle = null;
@@ -1222,7 +1225,7 @@ async function saveGroup(){
   try{
     // 復元用データ・模試マスタ・イベントマスタ・コメントマスタ・科目型を、選択した担任名フォルダ直下に保存する。
     await saveAllCurrentDataToShared(false);
-    status.push('保存用フォルダ：復元用データ・模試マスタ・イベントマスタ・コメントマスタ・科目型を保存しました。');
+    status.push('保存用フォルダ/json：復元用データ・模試マスタ・イベントマスタ・コメントマスタ・科目型を保存しました。');
   }catch(e){
     status.push(`保存用フォルダ：復元用データ保存に失敗しました。${e?.message ? '\n' + e.message : ''}`);
   }
@@ -1358,6 +1361,12 @@ async function loadGroup(){
     }catch(e){
       details.push(`合格設計図読込エラー: ${e?.message || e}`);
     }
+    try{
+      const hist=await readPrepResultHistoryFromShared();
+      if(hist.debug && hist.debug.length) details.push(hist.debug.join(' / '));
+    }catch(e){
+      details.push(`結果履歴JSON確認エラー: ${e?.message || e}`);
+    }
   }
   const savedAt=mem.savedAt?new Date(mem.savedAt).toLocaleString('ja-JP'):'保存日時不明';
   const detailText = details.length ? '\n' + details.join('\n') : '';
@@ -1382,7 +1391,7 @@ function cellXml(r,c,v,style=0){if(v===undefined||v===null||v==='')return '';ret
 function rowXml(r,cells){return `<row r="${r}">${cells.join('')}</row>`}
 function buildPlanSheetXml(name){const data=ensureStudent(name),dates=getDates();let rows=[],r=1;rows.push(rowXml(r,[cellXml(r,1,'予定入力表',1)]));r++;rows.push(rowXml(r,[cellXml(r,1,'生徒名',2),cellXml(r,2,name,0),cellXml(r,4,'週開始',2),cellXml(r,5,$('#weekStart').value,0)]));r+=2;rows.push(rowXml(r,[cellXml(r,1,'予定/日付',2),...dates.map((d,i)=>cellXml(r,2+i,`${jpDate(d)}（${DOW[d.getDay()]}）`,2))]));r++;LIMITS.forEach((lim,li)=>{rows.push(rowXml(r,[cellXml(r,1,lim,2),...data.schedule.map((day,di)=>cellXml(r,2+di,day[li]||'',0))]));r++});r++;const headerRow=r;rows.push(rowXml(r,[cellXml(r,1,'教科',2),cellXml(r,2,'問題集/高速マスター',2),cellXml(r,5,'内容',2)]));r++;data.materials.forEach(m=>{if(m.subject||m.book||m.content){rows.push(rowXml(r,[cellXml(r,1,m.subject,0),cellXml(r,2,m.book,0),cellXml(r,5,m.content,0)]));r++}});const remarksRow=r;rows.push(rowXml(r,[cellXml(r,1,'備考',2),cellXml(r,2,data.remarks,0)]));const merges=[`<mergeCell ref="A1:H1"/>`,`<mergeCell ref="B${headerRow}:D${headerRow}"/>`,`<mergeCell ref="E${headerRow}:H${headerRow}"/>`];for(let rr=headerRow+1;rr<remarksRow;rr++)merges.push(`<mergeCell ref="B${rr}:D${rr}"/>`,`<mergeCell ref="E${rr}:H${rr}"/>`);merges.push(`<mergeCell ref="B${remarksRow}:H${remarksRow}"/>`);return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="4" topLeftCell="A5" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols><col min="1" max="1" width="15" customWidth="1"/><col min="2" max="8" width="20" customWidth="1"/></cols><sheetData>${rows.join('')}</sheetData><mergeCells count="${merges.length}">${merges.join('')}</mergeCells><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`}
 function simpleSheetXml(aoa){const rows=[];aoa.forEach((row,idx)=>{const r=idx+1;rows.push(rowXml(r,row.map((v,c)=>cellXml(r,c+1,v,idx===0?2:0))))});return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols><col min="1" max="12" width="22" customWidth="1"/></cols><sheetData>${rows.join('')}</sheetData><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`}
-function buildExamSheetXml(name){const data=ensureStudent(name);const aoa=[['生徒名','生徒番号','週開始','模試名','実施日','種別','受験方法','科目','保存日時']];(data.exams||[]).forEach(ex=>{if(ex.name||ex.status||ex.subjects?.length)aoa.push([name,data.studentNo||'',$('#weekStart').value,ex.name,ex.date,ex.subjectTemplate||defaultTemplateNameForType(ex.type||'common'),ex.status,(ex.subjects||[]).join('、'),new Date().toLocaleString('ja-JP')])});return simpleSheetXml(aoa)}
+function buildExamSheetXml(name){const data=ensureStudent(name);const aoa=[['生徒名','生徒番号','週開始','模試名','実施日','種別','受験方法','科目','科目変更','保存日時']];(data.exams||[]).forEach(ex=>{if(ex.name||ex.status||ex.subjects?.length||ex.subjectChanged)aoa.push([name,data.studentNo||'',$('#weekStart').value,ex.name,ex.date,ex.subjectTemplate||defaultTemplateNameForType(ex.type||'common'),ex.status,(ex.subjects||[]).join('、'),ex.subjectChanged?'変更あり':'',new Date().toLocaleString('ja-JP')])});return simpleSheetXml(aoa)}
 function buildEventSheetXml(name){const data=ensureStudent(name);const aoa=[['生徒名','生徒番号','学年','週開始','イベント名','日時','参加/不参加','備考','保存日時']];(data.events||[]).forEach(ev=>{if(ev.name||ev.datetime||ev.status||ev.note)aoa.push([name,data.studentNo||'',data.grade||'',$('#weekStart').value,ev.name,ev.datetime||'',ev.status,ev.note,new Date().toLocaleString('ja-JP')])});return simpleSheetXml(aoa)}
 function buildCommentSheetXml(name){const data=ensureStudent(name);const aoa=[['生徒名','生徒番号','学年','週開始','タイトル','今週の方針/コメント','個別メモ','保存日時']];(data.comments||[]).forEach(cm=>{if(cm.title||cm.text||cm.note)aoa.push([name,data.studentNo||'',data.grade||'',$('#weekStart').value,cm.title||'',cm.text||'',cm.note||'',new Date().toLocaleString('ja-JP')])});return simpleSheetXml(aoa)}
 const enc=new TextEncoder();function bytes(s){return enc.encode(s)}function crcTable(){let t=[];for(let i=0;i<256;i++){let c=i;for(let k=0;k<8;k++)c=(c&1)?(0xedb88320^(c>>>1)):(c>>>1);t[i]=c>>>0}return t}const CRC_TABLE=crcTable();function crc32Bytes(arr){let crc=0xffffffff;for(let i=0;i<arr.length;i++)crc=(crc>>>8)^CRC_TABLE[(crc^arr[i])&0xff];return (crc^0xffffffff)>>>0}function put16(a,o,v){a[o]=v&255;a[o+1]=(v>>>8)&255}function put32(a,o,v){a[o]=v&255;a[o+1]=(v>>>8)&255;a[o+2]=(v>>>16)&255;a[o+3]=(v>>>24)&255}function concat(parts){let len=parts.reduce((s,p)=>s+p.length,0),out=new Uint8Array(len),pos=0;parts.forEach(p=>{out.set(p,pos);pos+=p.length});return out}
@@ -1636,31 +1645,109 @@ async function ensureSharedFolder(){
   if(sharedDirHandle) return sharedDirHandle;
   return await pickSharedFolder();
 }
-async function writeJsonToShared(filename, data){
+async function findDirectoryByNameRecursive(dir, targetName, maxDepth=5, depth=0){
+  if(!dir || !dir.values || depth > maxDepth) return null;
+  const target = String(targetName || '').toLowerCase();
+  try{
+    for await (const entry of dir.values()){
+      if(entry.kind !== 'directory') continue;
+      if(String(entry.name || '').toLowerCase() === target) return entry;
+      const found = await findDirectoryByNameRecursive(entry, targetName, maxDepth, depth + 1);
+      if(found) return found;
+    }
+  }catch(e){}
+  return null;
+}
+async function findFileByNameRecursive(dir, fileName, maxDepth=5, depth=0){
+  if(!dir || !dir.values || depth > maxDepth) return null;
+  try{
+    for await (const entry of dir.values()){
+      if(entry.kind === 'file' && entry.name === fileName) return entry;
+      if(entry.kind === 'directory'){
+        const found = await findFileByNameRecursive(entry, fileName, maxDepth, depth + 1);
+        if(found) return found;
+      }
+    }
+  }catch(e){}
+  return null;
+}
+async function getSharedJsonDir(create=false){
   const dir = await ensureSharedFolder();
-  if(!dir) return;
-  const handle = await dir.getFileHandle(filename, {create:true});
+  if(!dir) return null;
+
+  // もし利用者が保存用フォルダではなく json フォルダ自体を選んだ場合も、そのまま使う。
+  if(String(dir.name || '').toLowerCase() === 'json') return dir;
+
+  // 標準：保存用フォルダ直下の json フォルダを使う。
+  try{
+    return await dir.getDirectoryHandle('json', {create});
+  }catch(e){
+    if(create) throw e;
+  }
+
+  // 互換：保存用フォルダの下のどこかに json フォルダがある場合も探す。
+  if(!create){
+    const found = await findDirectoryByNameRecursive(dir, 'json', 5);
+    if(found) return found;
+  }
+  return null;
+}
+async function writeJsonToShared(filename, data){
+  const jsonDir = await getSharedJsonDir(true);
+  if(!jsonDir) return;
+  const handle = await jsonDir.getFileHandle(filename, {create:true});
   const writable = await handle.createWritable();
   await writable.write(JSON.stringify(data, null, 2));
   await writable.close();
 }
 async function readJsonFromShared(filename){
-  const dir = await ensureSharedFolder();
-  if(!dir) return null;
+  const rootDir = await ensureSharedFolder();
+  if(!rootDir) return null;
+
+  // 新仕様：保存用フォルダ/json/filename を最優先で読む。
+  const jsonDir = await getSharedJsonDir(false);
+  if(jsonDir){
+    try{
+      const handle = await jsonDir.getFileHandle(filename, {create:false});
+      const file = await handle.getFile();
+      return JSON.parse(await file.text());
+    }catch(e){}
+  }
+
+  // 旧仕様からの移行用：保存用フォルダ直下にあるJSONも読む。
   try{
-    const handle = await dir.getFileHandle(filename, {create:false});
+    const handle = await rootDir.getFileHandle(filename, {create:false});
     const file = await handle.getFile();
     return JSON.parse(await file.text());
-  }catch(e){
-    return null;
-  }
+  }catch(e){}
+
+  // さらに互換：保存用フォルダ配下を最大5階層まで探す。
+  // 「保存用フォルダ/json」を選ぶべきところで、1つ上や別階層を選んでも拾えるようにする。
+  try{
+    const found = await findFileByNameRecursive(rootDir, filename, 5);
+    if(found){
+      const file = await found.getFile();
+      return JSON.parse(await file.text());
+    }
+  }catch(e){}
+  return null;
 }
 
 async function listJsonFilesFromShared(){
-  const dir = await ensureSharedFolder();
+  const rootDir = await ensureSharedFolder();
   const out=[];
-  if(!dir || !dir.values) return out;
-  for await (const entry of dir.values()){
+  if(!rootDir || !rootDir.values) return out;
+
+  // 新仕様：jsonフォルダ内を優先して検索。
+  const jsonDir = await getSharedJsonDir(false);
+  if(jsonDir && jsonDir.values){
+    for await (const entry of jsonDir.values()){
+      if(entry.kind === 'file' && /\.json$/i.test(entry.name)) out.push(entry);
+    }
+  }
+
+  // 旧仕様からの移行用：直下のJSONも検索対象に残す。
+  for await (const entry of rootDir.values()){
     if(entry.kind === 'file' && /\.json$/i.test(entry.name)) out.push(entry);
   }
   return out;
@@ -1730,8 +1817,8 @@ async function saveSharedFolder(){
       await writeJsonToShared(sharedStudentFileName(name), mem);
     }
     await writeJsonToShared('settings_exam_master.json', {examMaster:getExamMaster(),eventMaster:getEventMaster(),examTargetHistory:getExamTargetHistory(),eventTargetHistory:getEventTargetHistory(), commentMaster:getCommentMaster(), commentTargetHistory:getCommentTargetHistory(), subjectTemplates:getSubjectTemplates(), savedAt:groupMem.savedAt});
-    showSaveInfo(`保存用フォルダに保存しました：${students.join('、')}（${new Date(groupMem.savedAt).toLocaleString('ja-JP')}）`);
-    alert('保存用フォルダにグループ内容・個人内容・模試設定を保存しました。');
+    showSaveInfo(`保存用フォルダ/jsonに保存しました：${students.join('、')}（${new Date(groupMem.savedAt).toLocaleString('ja-JP')}）`);
+    alert('保存用フォルダ直下の「json」フォルダに、グループ内容・個人内容・模試設定を保存しました。');
   }catch(e){
     alert('保存用フォルダへの保存に失敗しました。権限や保存先を確認してください。');
   }
@@ -1827,7 +1914,7 @@ async function saveAllCurrentDataToShared(showAlert=false){
     savedAt:mem.savedAt
   });
   if(showAlert){
-    alert('保存用フォルダに面談内容・個人保存データ・マスタをまとめて保存しました。');
+    alert('保存用フォルダ直下の「json」フォルダに、面談内容・個人保存データ・マスタをまとめて保存しました。');
   }
   return mem;
 }
@@ -1899,8 +1986,8 @@ async function syncAllSharedData(){
 
     renderExamMasterPanel(); renderEventMasterPanel(); renderCommentMasterPanel(); renderStudents();
     const target = students.length ? `面談内容：${students.join('、')}\n` : '';
-    showSaveInfo(`保存用フォルダと同期しました。\n${target}模試マスタ・イベントマスタ・コメントマスタ・科目型ストックも保存/反映済みです。`);
-    alert(`保存用フォルダと同期しました。\n${students.length ? '面談内容・個人保存データ・' : ''}模試マスタ・イベントマスタ・コメントマスタ・科目型ストックをまとめて保存/反映しました。`);
+    showSaveInfo(`保存用フォルダ/jsonと同期しました。\n${target}模試マスタ・イベントマスタ・コメントマスタ・科目型ストックも保存/反映済みです。`);
+    alert(`保存用フォルダ/jsonと同期しました。\n${students.length ? '面談内容・個人保存データ・' : ''}模試マスタ・イベントマスタ・コメントマスタ・科目型ストックをまとめて保存/反映しました。`);
   }catch(e){
     alert('保存用フォルダとの一括同期に失敗しました。フォルダの権限やブラウザを確認してください。');
   }
@@ -1927,7 +2014,7 @@ async function saveMasterSettingsToShared(showAlert=true){
     await writeJsonToShared('settings_exam_master.json', mem);
     if(showAlert){
       showSaveInfo(`模試・イベント・コメントマスタを保存用フォルダに保存しました（${new Date(mem.savedAt).toLocaleString('ja-JP')}）`);
-      alert('模試マスタ・イベントマスタ・コメントマスタ・科目型ストックを保存用フォルダに保存しました。');
+      alert('模試マスタ・イベントマスタ・コメントマスタ・科目型ストックを保存用フォルダ直下の「json」フォルダに保存しました。');
     }
     return true;
   }catch(e){
@@ -2028,6 +2115,61 @@ function prepResultSummary(study,result){
   return s || r;
 }
 
+function prepHistoryItemToResultRecord(item){
+  if(!item) return null;
+  const dt=parseDateTimeLoose(item.datetime || item.dateKey || item.date || '');
+  if(!dt) return null;
+  const dateOnly=new Date(dt.getFullYear(),dt.getMonth(),dt.getDate());
+  const study=norm(item.study || item['学習内容'] || '');
+  const result=norm(item.result || item['学習結果'] || '');
+  if(!study && !result) return null;
+  return {
+    student:norm(item.student || item.name || item['生徒名'] || ''),
+    rawName:norm(item.rawName || item.student || item.name || item['名前'] || item['生徒名'] || ''),
+    studentNo:norm(item.studentNo || item['生徒番号'] || ''),
+    grade:norm(item.grade || item['学年'] || ''),
+    type:norm(item.type || item['区分'] || ''),
+    study,
+    result,
+    dateObj:dateOnly,
+    dateKey:ymd(dateOnly),
+    timeLabel:hm(dt),
+    summary:prepResultSummary(study,result),
+    sourceFile:item.sourceFile || 'result_history.json',
+    sourceSheet:item.sourceSheet || '履歴JSON'
+  };
+}
+async function readPrepResultHistoryFromShared(){
+  const records=[];
+  const debug=[];
+  try{
+    // 復元/保存で保存用フォルダを選んでいれば、それを使う。
+    // 未選択の場合は、印刷ボタン操作中なのでここで保存用フォルダを選べるようにする。
+    if(!sharedDirHandle){
+      debug.push('結果履歴JSON: 保存用フォルダ未選択 → フォルダ選択を表示');
+      const dir = await pickSharedFolder();
+      if(!dir){
+        debug.push('結果履歴JSON: 保存用フォルダが選択されなかったため未読込');
+        return {records, debug};
+      }
+    }
+    const json=await readJsonFromShared('result_history.json');
+    if(!json){
+      debug.push('結果履歴JSON: json/result_history.json なし');
+      return {records, debug};
+    }
+    const items=Array.isArray(json) ? json : (Array.isArray(json.records) ? json.records : []);
+    for(const item of items){
+      const rec=prepHistoryItemToResultRecord(item);
+      if(rec) records.push(rec);
+    }
+    debug.push(`結果履歴JSON: ${records.length}件読込`);
+  }catch(e){
+    debug.push(`結果履歴JSON: 読込失敗 ${e?.message || e}`);
+  }
+  return {records, debug};
+}
+
 async function readWorkbookFromFileRobust(file){
   if(!file) throw new Error('ファイルが選択されていません。');
   if(/^~\$/i.test(file.name || '')) throw new Error('Excelの一時ファイル（~$）は読み込めません。元のExcelを選んでください。');
@@ -2115,7 +2257,19 @@ async function readPrepResultRecords(){
   const files=getPrepResultFiles();
   const records=[];
   const debug=[];
-  if(!files.length) return records;
+
+  // まず保存用フォルダ/json/result_history.json を読む。
+  // 結果Excelを毎回選ばなくても、保存済み履歴から先週結果を出すため。
+  const hist=await readPrepResultHistoryFromShared();
+  records.push(...hist.records);
+  debug.push(...hist.debug);
+
+  // 必要なときだけ、画面で選んだ結果Excelも追加で読む。
+  // 同じ結果が重複しても、後段で表示時に完全同一文字列は重複しにくい形にする。
+  if(!files.length){
+    if(debug.length) setMeetingPrepFolderInfo(`結果読取詳細:\n${debug.join('\n')}`);
+    return records;
+  }
   for(const file of files){
     try{
       const wb=await readWorkbookFromFileRobust(file);
@@ -2390,7 +2544,7 @@ function buildMeetingPrepPrintHtml(resultRecords, weeklyHtml){
   const currentPeriod=meetingPrepPeriodLabel(currentDates);
   let body='';
   names.forEach(name=>{
-    body+=`<section class="page"><h1>面談準備資料：${esc(name)}</h1><div class="subline">先週：${esc(prevPeriod)} / 作成：${now.toLocaleString('ja-JP')}</div><h2>1. 先週の予定・結果カレンダー</h2>${meetingPrepScheduleTableHtml(name,resultRecords)}</section>`;
+    body+=`<section class="page prevResultPage"><div class="fitPageShell"><div class="fitPageInner"><h1>面談準備資料：${esc(name)}</h1><div class="subline">先週：${esc(prevPeriod)} / 作成：${now.toLocaleString('ja-JP')}</div><h2>1. 先週の予定・結果カレンダー</h2>${meetingPrepScheduleTableHtml(name,resultRecords)}</div></div></section>`;
     body+=`<section class="page"><h1>面談準備資料：${esc(name)}</h1><div class="subline">今週：${esc(currentPeriod)}</div><h2>2. 今週の記入用予定表・模試・イベント</h2>${meetingPrepCurrentPlanHtml(name)}</section>`;
     body+=`<section class="page weeklyPage"><h1>面談準備資料：${esc(name)}</h1><h2>3. 週面シート</h2>${weeklyHtml}</section>`;
     body+=`<section class="page goukakuPrintPage"><h1>面談準備資料：${esc(name)}</h1><h2>4. 合格設計図</h2>${meetingPrepGoukakuDesignHtml(name)}</section>`;
@@ -2400,9 +2554,26 @@ function buildMeetingPrepPrintHtml(resultRecords, weeklyHtml){
     .page{box-sizing:border-box;width:210mm;min-height:297mm;padding:12mm;page-break-after:always;}
     h1{font-size:20px;margin:0 0 4px;} h2{font-size:16px;margin:12px 0 8px;border-left:5px solid #2563eb;padding-left:8px;} h3{font-size:14px;margin:10px 0 6px;}
     .subline,.muted{color:#667085;font-size:11px}.box{border:1px solid #9ca3af;padding:8px;border-radius:6px;white-space:pre-wrap;}
-    .prepTable{border-collapse:collapse;width:100%;font-size:11px;margin:6px 0 10px;}.prepTable th,.prepTable td{border:1px solid #9ca3af;padding:5px;vertical-align:top;word-break:break-word;}.prepTable th{background:#f3f4f6;text-align:center;font-weight:800;}.prepTable ul{margin:0;padding-left:1.2em;}.prepTable li{margin:1px 0;}.twoCols{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start}.weekly{font-size:10px}.weekly th,.weekly td{padding:4px;}.blankTable td{height:14mm}.blankLines div{height:7mm;border-bottom:1px solid #d1d5db}.blankBox{height:28mm}.goukakuPrintPage{padding:6mm;overflow:hidden}.goukakuPrintPage h1{font-size:16px;margin:0 0 2mm}.goukakuPrintPage h2{font-size:13px;margin:0 0 2mm}.goukakuPrintPdf{height:276mm;width:198mm;border:1px solid #9ca3af;background:#f8fafc;overflow:hidden}.goukakuPrintPdf iframe{width:100%;height:100%;border:0;background:#fff}.goukakuPrintTable{font-size:9px}.goukakuPrintTable th,.goukakuPrintTable td{padding:3px;min-width:36px;max-width:120px;}
+    .prepTable{border-collapse:collapse;width:100%;font-size:11px;margin:6px 0 10px;}.prepTable th,.prepTable td{border:1px solid #9ca3af;padding:5px;vertical-align:top;word-break:break-word;}.prepTable th{background:#f3f4f6;text-align:center;font-weight:800;}.prepTable ul{margin:0;padding-left:1.2em;}.prepTable li{margin:1px 0;}.twoCols{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start}.weekly{font-size:10px}.weekly th,.weekly td{padding:4px;}.blankTable td{height:14mm}.blankLines div{height:7mm;border-bottom:1px solid #d1d5db}.blankBox{height:28mm}.prevResultPage{padding:8mm;overflow:hidden}.fitPageShell{width:100%;height:281mm;overflow:hidden;position:relative}.fitPageInner{transform-origin:top left;width:100%;}.prevResultPage h1{font-size:18px}.prevResultPage h2{font-size:14px;margin:8px 0 6px}.prevResultPage h3{font-size:12px;margin:6px 0 4px}.prevResultPage .prepTable{font-size:10px;margin:4px 0 6px}.prevResultPage .prepTable th,.prevResultPage .prepTable td{padding:3px 4px}.prevResultPage .box{padding:5px}.goukakuPrintPage{padding:6mm;overflow:hidden}.goukakuPrintPage h1{font-size:16px;margin:0 0 2mm}.goukakuPrintPage h2{font-size:13px;margin:0 0 2mm}.goukakuPrintPdf{height:276mm;width:198mm;border:1px solid #9ca3af;background:#f8fafc;overflow:hidden}.goukakuPrintPdf iframe{width:100%;height:100%;border:0;background:#fff}.goukakuPrintTable{font-size:9px}.goukakuPrintTable th,.goukakuPrintTable td{padding:3px;min-width:36px;max-width:120px;}
     @page{size:A4 portrait;margin:0;} @media print{.page{page-break-after:always;} body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
-  </style></head><body>${body}</body></html>`;
+  </style></head><body>${body}<script>
+    function fitMeetingPrepFirstPages(){
+      document.querySelectorAll('.fitPageShell').forEach(function(shell){
+        var inner = shell.querySelector('.fitPageInner');
+        if(!inner) return;
+        inner.style.transform = 'scale(1)';
+        inner.style.width = '100%';
+        var sw = inner.scrollWidth || inner.offsetWidth || 1;
+        var sh = inner.scrollHeight || inner.offsetHeight || 1;
+        var scale = Math.min(1, shell.clientWidth / sw, shell.clientHeight / sh);
+        scale = Math.max(0.55, scale);
+        inner.style.transform = 'scale(' + scale + ')';
+        inner.style.width = (100 / scale) + '%';
+        shell.setAttribute('data-scale', scale.toFixed(2));
+      });
+    }
+    window.addEventListener('load', function(){ setTimeout(fitMeetingPrepFirstPages, 60); });
+  <\/script></body></html>`;
 }
 function printHtmlInHiddenIframe(html){
   const oldFrame=document.getElementById('meetingPrepPrintFrame');
