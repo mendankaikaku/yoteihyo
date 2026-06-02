@@ -3,8 +3,26 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>統合用HTML v7 タイトル修正版</title>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+  <title>統合用HTML 最終整理版（ローカルlibs版）</title>
+  <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
+  <script src="./libs/xlsx.bundle.js"></script>
+  <script>
+    if(!window.XLSX){
+      document.write('<script src="./libs/xlsx.full.min.js"><\/script>');
+    }
+  </script>
+  <script>
+    window.addEventListener('DOMContentLoaded', function(){
+      if(!window.XLSX){
+        const msg = 'Excel読み取りライブラリが見つかりません。\n' +
+          '外部CDNは使わない設定です。HTMLと同じ場所に libs フォルダを作り、\n' +
+          'libs/xlsx.bundle.js または libs/xlsx.full.min.js を置いてください。';
+        console.warn(msg);
+        const st = document.getElementById('status');
+        if(st) st.textContent = msg;
+      }
+    });
+  </script>
 <style>
 :root{
   --bg:#f4f6fb;--card:#fff;--line:#d8deea;--text:#172033;--muted:#667085;
@@ -84,7 +102,7 @@ th:first-child{z-index:3;background:#e5e7eb;}
 <header>
   <div class="headerInner">
     <div>
-      <h1>予定入力Excel 全体統合アプリ <span style="font-size:12px;color:#2563eb;vertical-align:middle;">v13 全体予定表手修正復元対応</span></h1>
+      <h1>予定入力Excel 全体統合アプリ 最終整理版 <span style="font-size:12px;color:#2563eb;vertical-align:middle;">ローカルlibs・外部通信なし</span></h1>
       <div class="headerHint">予定Excel・対応表・結果Excelをまとめて、管理用/掲示用カレンダー、模試科目、イベント確認を出力します。</div>
     </div>
     <div class="headerActions">
@@ -239,6 +257,21 @@ function setDownloadButtonsDisabled(disabled){
     const el = $(id);
     if(el) el.disabled = disabled;
   });
+}
+function updateMainOutputButtons(){
+  // まとめて復元フォルダーを読んだ時点で、上部の出力ボタンを押せるようにする。
+  // まだ統合プレビューを押していない場合は、出力ボタン側で自動的にプレビューを作成してから出力する。
+  const hasPlanFiles = Array.isArray(state.files) && state.files.length > 0;
+  setDownloadButtonsDisabled(!hasPlanFiles);
+}
+async function ensureWorkbookReadyForOutput(){
+  if(state.workbookReady) return true;
+  if(Array.isArray(state.files) && state.files.length > 0){
+    await merge();
+    return !!state.workbookReady;
+  }
+  alert("先にまとめて復元フォルダーを読み取ってください");
+  return false;
 }
 function log(msg){ $("status").textContent = msg; }
 function esc(s){ return String(s ?? "").replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
@@ -2326,8 +2359,8 @@ function inDateRange(rec, from, to){
 // ============================================================
 // 8. Excel出力
 // ============================================================
-function downloadWithRange(mode){
-  if(!state.workbookReady){ alert("先に統合プレビューを作成してください"); return; }
+async function downloadWithRange(mode){
+  if(!(await ensureWorkbookReadyForOutput())) return;
   const {from,to,label} = dateRangeForOutput(mode);
   const records = state.records.filter(r => inDateRange(r, from, to));
   const results = state.resultRecords.filter(r => inDateRange(r, from, to));
@@ -3477,8 +3510,8 @@ function styleAllStudentGradeSheet(ws, aoa){
   });
   return ws;
 }
-function downloadAllStudentList(){
-  if(!state.workbookReady){ alert('先に統合プレビューを作成してください'); return; }
+async function downloadAllStudentList(){
+  if(!(await ensureWorkbookReadyForOutput())) return;
 
   // 模試・イベントは期間指定がある場合だけ絞り込み、予定/結果カレンダーは常に基準日2日前〜1日後を表示する。
   const from = $('fromDate').value ? new Date($('fromDate').value + 'T00:00:00') : null;
@@ -3691,8 +3724,8 @@ async function setBundleFolderFiles(fileList){
   const allListRestoreLogs = await loadAllListRestoreFiles(allLists);
   const dailyPosterRestoreLogs = await loadDailyPosterRestoreFiles(dailyPosters);
   const wholeScheduleRestoreLogs = await loadWholeScheduleRestoreFiles(wholeSchedules);
-  setDownloadButtonsDisabled(true);
   state.posterSettings = normalizePosterSettings(DEFAULT_POSTER_SETTINGS);
+  updateMainOutputButtons();
   let rosterMsg = '対応表: 0件';
   if(rosters.length){
     try{
@@ -3718,18 +3751,21 @@ ${rosterMsg}`;
 }
 function setFiles(fileList){
   state.files = [...fileList].filter(f => !shouldSkipFile(f));
+  state.workbookReady = false;
   updateStats(state.files, [], [], [], state.resultRecords);
-  setDownloadButtonsDisabled(true);
-  log(`予定Excel選択完了\nExcelファイル: ${state.files.length}件\n「統合プレビュー作成」を押してください。`);
+  updateMainOutputButtons();
+  log(`予定Excel選択完了\nExcelファイル: ${state.files.length}件\n上部の出力ボタンも押せます。未プレビューの場合は自動で統合してから出力します。`);
 }
 function setResultFiles(fileList){
   state.resultFiles = [...fileList].filter(f => !shouldSkipFile(f));
-  setDownloadButtonsDisabled(true);
+  state.workbookReady = false;
+  updateMainOutputButtons();
   log(`結果Excel選択完了\n結果Excelファイル: ${state.resultFiles.length}件\n月間掲示用Excelだけなら、このまま「月間掲示用Excel」を押せます。`);
 }
 function setResultHistoryFiles(fileList){
   state.resultHistoryFiles = [...fileList].filter(f => /\.json$/i.test(f.name));
-  setDownloadButtonsDisabled(true);
+  state.workbookReady = false;
+  updateMainOutputButtons();
   log(`結果履歴JSON選択完了\nJSONファイル: ${state.resultHistoryFiles.length}件\n月間掲示用Excelだけなら、このまま「月間掲示用Excel」を押せます。`);
 }
 
