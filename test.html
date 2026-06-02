@@ -73,13 +73,27 @@ details.advanced{background:#fff;border-color:#e2e8f0}details.advanced summary{f
 .prepInside{margin-top:12px;grid-template-columns:minmax(220px,1fr) minmax(220px,1fr) auto}
 @media(max-width:900px){.prepCompactCard{max-width:none}.prepInside{grid-template-columns:1fr}}
 
+
+/* v18: 説明はクリックではなく？にカーソルを合わせると表示、保存忘れ警告 */
+.saveWarning{margin:10px 0 12px;padding:12px 14px;border:3px solid #dc2626;border-radius:12px;background:#fee2e2;color:#b91c1c;font-weight:1000;font-size:22px;text-align:center;letter-spacing:.04em;box-shadow:0 6px 16px rgba(220,38,38,.18)}
+.quickGuide{display:none!important}
+.helpHost{position:relative;display:inline-block;vertical-align:bottom}
+.topActions .helpHost{display:block;min-width:0}
+.helpHost>button:not(.buttonHelp){width:100%}
+.buttonHelp{position:absolute;right:-7px;top:-8px;z-index:20;width:22px;height:22px;min-height:22px;padding:0;border-radius:999px;background:#111827;color:#fff;font-size:13px;line-height:22px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.22)}
+.helpTip{display:none;position:absolute;right:-4px;bottom:22px;top:auto;z-index:30;min-width:180px;max-width:280px;background:#111827;color:#fff;border-radius:10px;padding:8px 10px;font-size:12px;line-height:1.45;font-weight:700;text-align:left;white-space:normal;box-shadow:0 12px 28px rgba(0,0,0,.22);pointer-events:none}
+.helpTip::after{content:"";position:absolute;right:10px;bottom:-6px;border-width:6px 6px 0 6px;border-style:solid;border-color:#111827 transparent transparent transparent}
+.helpHost:hover .helpTip,.buttonHelp:focus + .helpTip{display:block}
+@media(max-width:700px){.saveWarning{font-size:18px}.helpTip{right:auto;left:0}.helpTip::after{left:10px;right:auto}}
+
 </style>
 </head>
 <body>
-<header><div class="wrap"><h1>面談予定入力・準備資料アプリ <span style="font-size:13px;color:#2563eb">v15 復元→印刷対応・未チェック確認欄</span></h1><div class="sub">複数生徒の予定入力、前回内容の復元、結果Excel・週面シート・合格設計図を使った面談準備資料印刷まで、この画面で行います。</div></div></header>
+<header><div class="wrap"><h1>面談予定入力・準備資料アプリ <span style="font-size:13px;color:#2563eb">v18 保存警告・ホバー説明</span></h1><div class="sub">複数生徒の予定入力、前回内容の復元、結果Excel・週面シート・合格設計図を使った面談準備資料印刷まで、この画面で行います。</div></div></header>
 <main class="wrap">
   <section class="card">
     <p class="sectionTitle">基本操作</p>
+    <div class="saveWarning">保存を絶対に忘れるな！</div>
     <div class="topActions">
       <div class="field wide"><label>① 生徒名（複数はカンマ区切り）</label><input id="studentNames" placeholder="例：佐藤, 鈴木, 高橋" /></div>
       <div class="field"><label>開始日</label><input id="weekStart" type="date" /></div>
@@ -94,7 +108,7 @@ details.advanced{background:#fff;border-color:#e2e8f0}details.advanced summary{f
       <div class="quickStep"><b>3. 入力・確認</b>予定、模試、イベント、合格設計図を確認。</div>
       <div class="quickStep"><b>4. 保存・印刷</b>保存でExcel出力、印刷で面談準備資料作成。</div>
     </div>
-    <div class="compactHint">Enterで次の入力欄へ移動します。改行は Shift + Enter。保存時は選択した保存用フォルダ配下から生徒名フォルダを検索してExcelを保存します。</div>
+    <div class="compactHint">保存前に必ず「④ 保存」を押してください。</div>
     <div id="saveInfo"></div>
   </section>
 
@@ -282,7 +296,45 @@ function currentScheduleRowIndexes(name){const data=ensureStudent(name);return [
 /* =========================================================
    2. 画面構築
 ========================================================= */
-function init(){setDefaultDate(); if(!$('#studentNames').value) $('#studentNames').value=''; renderExamMasterPanel(); renderEventMasterPanel(); renderCommentMasterPanel(); renderCommentMasterPanel(); bindGlobalEvents(); applyStudents();}
+
+
+/* v18: 各ボタン右上の小さい？にカーソルを合わせると説明 */
+function installButtonHelps(){
+  const helpMap={
+    applyStudents:'入力した生徒名を画面に反映',
+    loadGroupMemory:'まとめて復元フォルダから復元',
+    saveGroupMemory:'入力内容を保存。忘れず押す',
+    exportXlsx:'入力内容をZIPで出力',
+    printMeetingPrep:'面談準備資料を印刷',
+    addExamMaster:'模試を追加',
+    saveExamMaster:'模試マスタを保存',
+    addEventMaster:'イベントを追加',
+    saveEventMaster:'イベントマスタを保存',
+    addCommentMaster:'コメントを追加',
+    saveCommentMaster:'コメントマスタを保存',
+    clearAll:'画面上の入力を全消去'
+  };
+  Object.entries(helpMap).forEach(([id,msg])=>{
+    const btn=document.getElementById(id);
+    if(!btn || btn.closest('.helpHost')) return;
+    const host=document.createElement('span');
+    host.className='helpHost';
+    btn.parentNode.insertBefore(host,btn);
+    host.appendChild(btn);
+    const q=document.createElement('button');
+    q.type='button';
+    q.className='buttonHelp';
+    q.textContent='?';
+    q.setAttribute('aria-label',id+'の説明');
+    const tip=document.createElement('div');
+    tip.className='helpTip';
+    tip.textContent=msg;
+    host.appendChild(q);
+    host.appendChild(tip);
+    // クリック不要。？にカーソルを合わせた時だけCSSで説明を表示する。
+  });
+}
+function init(){setDefaultDate(); if(!$('#studentNames').value) $('#studentNames').value=''; renderExamMasterPanel(); renderEventMasterPanel(); renderCommentMasterPanel(); renderCommentMasterPanel(); bindGlobalEvents(); installButtonHelps(); applyStudents();}
 function applyStudents(){
   syncFromDom();
   const names=splitNames();
@@ -2577,6 +2629,21 @@ function meetingPrepCurrentPlanHtml(name){
     }).join('<br>');
     return current ? html : html + '<div class="askNote">面談時確認</div>';
   }
+  function printExamSubjectCell(ex){
+    const status=String(ex.status||'').trim();
+    const selected=Array.isArray(ex.subjects) ? ex.subjects.map(x=>String(x||'').trim()).filter(Boolean) : [];
+    if(status==='不受験') return '<span class="muted">不要</span>';
+    const needsSubjectCheck = !status || ((status==='当日' || status==='後日') && !selected.length);
+    if(needsSubjectCheck){
+      const subjects=examSubjectsForType(ex.type||'common', ex.subjectTemplate||defaultTemplateNameForType(ex.type||'common'));
+      const checks=(subjects||[]).map(sub=>{
+        const checked=selected.includes(sub) ? '☑' : '□';
+        return `<span class="printCheck">${checked} ${esc(sub)}</span>`;
+      }).join('<br>');
+      return (checks || '<span class="muted">科目型なし</span>') + '<div class="askNote">科目確認</div>';
+    }
+    return selected.length ? esc(selected.join('、')) : '<span class="muted">科目なし</span>';
+  }
 
   let html='<div class="twoCols">';
   html+='<section><h3>今週の予定（記入用）</h3><table class="prepTable blankTable"><tbody>';
@@ -2596,7 +2663,7 @@ function meetingPrepCurrentPlanHtml(name){
   if(exams.length){
     html+='<table class="prepTable"><thead><tr><th>模試名</th><th>受験方法</th><th>科目</th></tr></thead><tbody>';
     exams.forEach(ex=>{
-      html+=`<tr><td>${esc(ex.name)}${ex.date?`<div class="muted">${esc(ex.date)}</div>`:''}</td><td>${printChoiceCell(ex.status,['当日','後日','不受験'])}</td><td>${esc((ex.subjects||[]).join('、'))}</td></tr>`;
+      html+=`<tr><td>${esc(ex.name)}${ex.date?`<div class="muted">${esc(ex.date)}</div>`:''}</td><td>${printChoiceCell(ex.status,['当日','後日','不受験'])}</td><td>${printExamSubjectCell(ex)}</td></tr>`;
     });
     html+='</tbody></table>';
   }else html+='<p class="muted">対象模試なし</p>';
@@ -2791,7 +2858,7 @@ function printHtmlInHiddenIframe(html){
 async function printMeetingPrep(){
   syncFromDom();
   if(!students.length) return alert('先に生徒名を入力して「② 生徒列・日付を反映」を押してください。');
-  if(!window.XLSX) return alert('Excel読み取りライブラリの読み込みに失敗しました。\nこの機能は結果Excel・週面シートを読むために xlsx ライブラリが必要です。\nインターネット接続がある状態で開くか、職場PCのセキュリティで CDN がブロックされていないか確認してください。');
+  if(!window.XLSX) return alert('Excel読み取りライブラリの読み込みに失敗しました。\nこの機能は結果Excel・週面シートを読むために xlsx ライブラリが必要です。\nHTMLと同じ場所の libs フォルダに xlsx.bundle.js または xlsx.full.min.js があるか確認してください。');
   const empty=students.filter(n=>!studentHasMeaningfulInputData(n));
   if(empty.length && !confirm(`入力内容が空の生徒がいます：${empty.join('、')}\nこのまま印刷しますか？`)) return;
   const resultRecords=await readPrepResultRecords();
