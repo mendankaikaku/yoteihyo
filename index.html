@@ -3,8 +3,10 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>予定入力HTML（面談準備・グループ対応版）</title>
-<script src="./libs/xlsx.full.min.js"></script>
+<title>予定入力HTML（面談準備・復元印刷v14 選択ボタン撤去）</title>
+<!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
+<script src="./libs/xlsx.bundle.js"></script>
+<script>if(!window.XLSX){document.write('<script src="./libs/xlsx.full.min.js"><\/script>');}</script>
 <style>
 :root{--bg:#f6f7fb;--card:#fff;--line:#d7dce8;--text:#172033;--muted:#667085;--accent:#2563eb;--accent2:#eef4ff;--danger:#dc2626;--ok:#16a34a;--soft:#f8fafc}
 *{box-sizing:border-box}
@@ -74,7 +76,7 @@ details.advanced{background:#fff;border-color:#e2e8f0}details.advanced summary{f
 </style>
 </head>
 <body>
-<header><div class="wrap"><h1>面談予定入力・準備資料アプリ</h1><div class="sub">複数生徒の予定入力、前回内容の復元、結果Excel・週面シート・合格設計図を使った面談準備資料印刷まで、この画面で行います。</div></div></header>
+<header><div class="wrap"><h1>面談予定入力・準備資料アプリ <span style="font-size:13px;color:#2563eb">v14 復元→印刷対応・選択ボタン撤去</span></h1><div class="sub">複数生徒の予定入力、前回内容の復元、結果Excel・週面シート・合格設計図を使った面談準備資料印刷まで、この画面で行います。</div></div></header>
 <main class="wrap">
   <section class="card">
     <p class="sectionTitle">基本操作</p>
@@ -101,12 +103,11 @@ details.advanced{background:#fff;border-color:#e2e8f0}details.advanced summary{f
   <section class="card prepCompactCard">
     <details id="meetingPrepDetails" class="prepDetails">
       <summary>面談準備資料を開く</summary>
-      <div class="printActions prepInside">
-        <div class="field"><label>結果Excel（複数可）</label><input id="prepResultInput" type="file" multiple accept=".xlsx,.xls,.xlsm" /></div>
-        <div class="field"><label>週面シートExcel</label><input id="meetingPrepWeeklyInput" type="file" accept=".xlsx,.xls,.xlsm" /></div>
+      <div class="printActions prepInside" style="grid-template-columns:minmax(260px,1fr) auto;">
+        <div class="compactHint" style="margin-top:0">復元ボタンで読み込んだ「まとめて復元」フォルダから、結果履歴JSON・学習結果Excel・週面シート・合格設計図を自動で使います。</div>
         <button class="secondary primaryBig" id="printMeetingPrep" type="button">印刷</button>
       </div>
-      <div id="meetingPrepFolderInfo" class="compactHint">復元した内容を先週分として使い、今週欄は印刷時だけ白紙にします。結果は保存用フォルダ/json/result_history.jsonを優先して読み、必要なら結果Excelも追加で読めます。合格設計図は4枚目に追加されます。</div>
+      <div id="meetingPrepFolderInfo" class="compactHint">復元した内容を先週分として使い、今週欄は印刷時だけ白紙にします。復元時に「まとめて復元」フォルダを選ぶと、json/result_history.json、学習結果フォルダ内の結果Excel、打ち込み結果/担任助手フォルダ内の週面シート、担任助手フォルダ/生徒名フォルダ内の合格設計図PDFまたはExcelを自動で読みます。</div>
     </details>
   </section>
 
@@ -523,6 +524,102 @@ function formatGoukakuLoadSummary(result){
   if(result.duplicate?.length) parts.push(`合格設計図 重複：\n${result.duplicate.join('\n')}`);
   if(result.failed?.length) parts.push(`合格設計図 読込失敗：\n${result.failed.join('\n')}`);
   return parts.join('\n\n');
+}
+
+function normalizeFolderNameForMatch(s){
+  return String(s||'').replace(/[\s\u3000]+/g,'').toLowerCase();
+}
+async function findDirectStudentDirectory(parentDir, studentName){
+  if(!parentDir || !parentDir.entries) return null;
+  const target=normalizeFolderNameForMatch(studentName);
+  try{
+    const exact=await parentDir.getDirectoryHandle(studentName,{create:false});
+    if(exact) return {dir:exact,label:studentName};
+  }catch(e){}
+  for await (const [entryName, handle] of parentDir.entries()){
+    if(handle.kind !== 'directory') continue;
+    const key=normalizeFolderNameForMatch(entryName);
+    if(key===target || key.includes(target) || target.includes(key)){
+      return {dir:handle,label:entryName};
+    }
+  }
+  return null;
+}
+async function loadGoukakuDesignsFromStudentParent(studentParentDir, names=students){
+  if(!studentParentDir || !names || !names.length) return {loaded:[],missing:[],failed:[],duplicate:[]};
+  const loaded=[], missing=[], failed=[], duplicate=[];
+  for(const name of names){
+    try{
+      const found=await findDirectStudentDirectory(studentParentDir, name);
+      if(!found){
+        missing.push(`${name}: 担任助手フォルダ直下に生徒フォルダなし`);
+        goukakuDesignSheets[name]={error:'担任助手フォルダ直下に生徒名フォルダが見つかりません。'};
+        renderGoukakuPanel(name);
+        continue;
+      }
+      const pdfHit=await findGoukakuPdfInStudentFolder(found.dir);
+      if(pdfHit){
+        const file=await pdfHit.handle.getFile();
+        const pdfUrl=URL.createObjectURL(file);
+        if(goukakuDesignSheets[name]?.pdfUrl) URL.revokeObjectURL(goukakuDesignSheets[name].pdfUrl);
+        goukakuDesignSheets[name]={kind:'pdf',fileName:pdfHit.name,pdfUrl,path:found.label,fileHandle:pdfHit.handle,dirty:false};
+        loaded.push(`${name}: ${found.label} / ${pdfHit.name}（PDF）`);
+        renderGoukakuPanel(name);
+        continue;
+      }
+      const hit=await findGoukakuExcelInStudentFolder(found.dir);
+      if(!hit){
+        missing.push(`${name}: 合格設計図PDF/Excelなし`);
+        goukakuDesignSheets[name]={error:'生徒フォルダ直下に「合格設計図」を含むPDFまたはExcelがありません。'};
+        renderGoukakuPanel(name);
+        continue;
+      }
+      const file=await hit.handle.getFile();
+      const parsed=await readGoukakuExcelFile(file);
+      goukakuDesignSheets[name]={kind:'excel',fileName:hit.name,sheetName:parsed.sheetName,aoa:parsed.aoa,workbook:parsed.workbook,fileHandle:hit.handle,path:found.label,dirty:false};
+      loaded.push(`${name}: ${found.label} / ${hit.name}（Excel簡易表示）`);
+      renderGoukakuPanel(name);
+    }catch(e){
+      failed.push(`${name}: ${e?.message||e}`);
+      goukakuDesignSheets[name]={error:e?.message||String(e)};
+      renderGoukakuPanel(name);
+    }
+  }
+  return {loaded,missing,failed,duplicate};
+}
+async function findWeeklySheetExcelInAssistantFolder(assistantDir){
+  if(!assistantDir || !assistantDir.entries) return null;
+  const candidates=[];
+  for await (const [entryName, handle] of assistantDir.entries()){
+    if(handle.kind !== 'file') continue;
+    if(/^~\$/.test(entryName)) continue;
+    if(!/\.(xlsx|xlsm|xls)$/i.test(entryName)) continue;
+    const name=String(entryName||'');
+    let score=0;
+    if(/週面|週面シート|週間面談|面談シート|週次|weekly/i.test(name)) score+=10;
+    if(/合格設計図/i.test(name)) score-=20;
+    if(/予定入力|模試確認|イベント確認|コメント確認/i.test(name)) score-=10;
+    let file=null;
+    try{file=await handle.getFile();}catch(e){}
+    candidates.push({name,handle,file,score,lastModified:file?.lastModified||0});
+  }
+  if(!candidates.length) return null;
+  candidates.sort((a,b)=>(b.score-a.score)||(b.lastModified-a.lastModified)||a.name.localeCompare(b.name,'ja'));
+  return candidates[0];
+}
+async function loadWeeklySheetFromAssistantFolder(assistantDir){
+  const hit=await findWeeklySheetExcelInAssistantFolder(assistantDir);
+  if(!hit){
+    meetingPrepWeeklyFileName='';
+    meetingPrepWeeklyHtmlCache='<p class="muted">担任助手フォルダ直下に週面シートExcelが見つかりませんでした。</p>';
+    return {loaded:false,msg:'週面シート: 担任助手フォルダ直下にExcelなし'};
+  }
+  const file=hit.file || await hit.handle.getFile();
+  meetingPrepWeeklyHtmlCache=await loadWeeklySheetHtmlFromFile(file);
+  if(meetingPrepWeeklyFileName){
+    return {loaded:true,msg:`週面シート: ${hit.name} を自動読込`};
+  }
+  return {loaded:false,msg:`週面シート: ${hit.name} の読込に失敗`};
 }
 
 function updateScheduleHeaders(){const dates=getDates();$$('[data-day-head]').forEach(th=>{const d=dates[Number(th.dataset.dayHead)];th.innerHTML=`<div>${jpDate(d)}</div><div style="font-size:12px;color:#667085">${DOW[d.getDay()]}曜日</div>`})}
@@ -1355,11 +1452,33 @@ async function loadGroup(){
   renderStudents();
   if(dir){
     try{
-      const goukakuResult=await loadGoukakuDesignsFromRoot(dir, students);
+      // まとめて復元 / 打ち込み結果 / 担任助手フォルダ / 生徒名フォルダ の構造を前提に、
+      // 入力済み生徒名を全員含む担任助手フォルダを特定する。
+      const studentParent=await findStudentFolderParentFromSaveRoot(dir, students);
+      if(studentParent && studentParent.label) details.push(`担任助手フォルダ: ${studentParent.label}`);
+
+      // 週面シートは各担任助手ごとに違うため、担任助手フォルダ直下のExcelから自動読込する。
+      try{
+        const weekly=await loadWeeklySheetFromAssistantFolder(studentParent.dir);
+        if(weekly && weekly.msg) details.push(weekly.msg);
+      }catch(we){
+        details.push(`週面シート自動読込エラー: ${we?.message || we}`);
+      }
+
+      // 合格設計図は 担任助手フォルダ / 生徒名フォルダ / 合格設計図PDFまたはExcel を読む。
+      const goukakuResult=await loadGoukakuDesignsFromStudentParent(studentParent.dir, students);
       const goukakuMsg=formatGoukakuLoadSummary(goukakuResult);
       if(goukakuMsg) details.push(goukakuMsg);
     }catch(e){
-      details.push(`合格設計図読込エラー: ${e?.message || e}`);
+      // 万一担任助手フォルダ特定が失敗した場合だけ、旧来の再帰探索でフォールバックする。
+      details.push(`担任助手フォルダ特定エラー: ${e?.message || e}`);
+      try{
+        const goukakuResult=await loadGoukakuDesignsFromRoot(dir, students);
+        const goukakuMsg=formatGoukakuLoadSummary(goukakuResult);
+        if(goukakuMsg) details.push(goukakuMsg);
+      }catch(ge){
+        details.push(`合格設計図読込エラー: ${ge?.message || ge}`);
+      }
     }
     try{
       const hist=await readPrepResultHistoryFromShared();
@@ -2061,7 +2180,7 @@ async function pickMasterSharedFolderAndLoad(){
 /* =========================================================
    10.5 面談準備資料の印刷
 ========================================================= */
-let meetingPrepWeeklyHtmlCache = '<p class="muted">週面シートExcelが未選択のため、週面シートは未読込です。</p>';
+let meetingPrepWeeklyHtmlCache = '<p class="muted">復元フォルダから週面シートをまだ自動読込できていません。</p>';
 let meetingPrepWeeklyFileName = '';
 // 面談準備資料では、復元した週を「先週」として使う。
 // 画面の週開始日を今週用に変更しても、印刷時の先週日付がずれないように保持する。
@@ -2073,8 +2192,53 @@ function setMeetingPrepFolderInfo(message){
 }
 
 function getPrepResultFiles(){
-  const input=$('#prepResultInput');
-  return input ? Array.from(input.files || []) : [];
+  // v14: 面談準備では個別の結果Excel選択欄を廃止。
+  // 結果Excelは「まとめて復元/学習結果」フォルダから自動読込する。
+  return [];
+}
+async function listExcelFilesFromDirectoryRecursive(dir, maxDepth=5, depth=0, pathParts=[]){
+  const out=[];
+  if(!dir || !dir.values || depth > maxDepth) return out;
+  try{
+    for await (const entry of dir.values()){
+      if(entry.kind === 'file'){
+        if(/^~\$/.test(entry.name || '')) continue;
+        if(/\.(xlsx|xlsm|xls)$/i.test(entry.name || '')){
+          try{
+            const file=await entry.getFile();
+            file._relativePath=[...pathParts, entry.name].join('/');
+            out.push(file);
+          }catch(e){}
+        }
+      }else if(entry.kind === 'directory'){
+        out.push(...await listExcelFilesFromDirectoryRecursive(entry, maxDepth, depth+1, [...pathParts, entry.name]));
+      }
+    }
+  }catch(e){}
+  return out;
+}
+async function getPrepResultFilesFromShared(){
+  const files=[];
+  const debug=[];
+  try{
+    if(!sharedDirHandle){
+      debug.push('結果Excel: 復元フォルダ未選択');
+      return {files, debug};
+    }
+    let resultDir=null;
+    if(String(sharedDirHandle.name || '') === '学習結果') resultDir=sharedDirHandle;
+    if(!resultDir) resultDir=await findDirectoryByNameRecursive(sharedDirHandle, '学習結果', 5);
+    if(!resultDir){
+      debug.push('結果Excel: 学習結果フォルダなし');
+      return {files, debug};
+    }
+    const found=await listExcelFilesFromDirectoryRecursive(resultDir, 5, 0, ['学習結果']);
+    files.push(...found);
+    debug.push(`結果Excel: 学習結果フォルダから${files.length}件自動読込`);
+  }catch(e){
+    debug.push(`結果Excel: 自動読込失敗 ${e?.message || e}`);
+  }
+  return {files, debug};
 }
 function prepNormalizeName(s){return String(s||'').replace(/[\s\u3000]+/g,'').trim();}
 function prepMatchesStudent(resultName, studentName){
@@ -2467,7 +2631,7 @@ function readFileAsArrayBufferCompat(file){
   });
 }
 async function loadWeeklySheetHtmlFromFile(file){
-  if(!file) return '<p class="muted">週面シートExcelが未選択のため、週面シートは未読込です。</p>';
+  if(!file) return '<p class="muted">復元フォルダから週面シートを自動読込できませんでした。</p>';
   try{
     if(/^~\$/i.test(file.name)) throw new Error('Excelの一時ファイル（~$で始まるファイル）を選んでいます。元のExcelファイルを選んでください。');
     if(!/\.(xlsx|xlsm|xls)$/i.test(file.name)) throw new Error('xlsx / xlsm / xls 形式のExcelファイルを選んでください。');
@@ -2515,13 +2679,13 @@ async function loadWeeklySheetHtmlFromFile(file){
 }
 
 async function handleMeetingPrepWeeklyFileChange(){
-  if(!window.XLSX) return alert('Excel読み取りライブラリの読み込みに失敗しました。インターネット接続や職場PCのセキュリティ設定を確認してください。');
+  if(!window.XLSX) return alert('Excel読み取りライブラリの読み込みに失敗しました。HTMLと同じ場所に libs フォルダを作り、libs/xlsx.bundle.js または libs/xlsx.full.min.js を置いてください。');
   const input = $('#meetingPrepWeeklyInput');
   const file = input && input.files && input.files[0];
   if(!file){
     meetingPrepWeeklyFileName = '';
-    meetingPrepWeeklyHtmlCache = '<p class="muted">週面シートExcelが未選択のため、週面シートは未読込です。</p>';
-    setMeetingPrepFolderInfo('週面シートExcelが未選択です。');
+    meetingPrepWeeklyHtmlCache = '<p class="muted">復元フォルダから週面シートを自動読込できませんでした。</p>';
+    setMeetingPrepFolderInfo('復元フォルダから週面シートを自動読込できませんでした。');
     return;
   }
   meetingPrepWeeklyHtmlCache = await loadWeeklySheetHtmlFromFile(file);
@@ -2533,7 +2697,7 @@ async function handleMeetingPrepWeeklyFileChange(){
 }
 
 function loadWeeklySheetHtml(){
-  return meetingPrepWeeklyHtmlCache || '<p class="muted">週面シートExcelが未選択のため、週面シートは未読込です。</p>';
+  return meetingPrepWeeklyHtmlCache || '<p class="muted">復元フォルダから週面シートを自動読込できませんでした。</p>';
 }
 function buildMeetingPrepPrintHtml(resultRecords, weeklyHtml){
   const now=new Date();
@@ -2607,6 +2771,13 @@ async function printMeetingPrep(){
   const empty=students.filter(n=>!studentHasMeaningfulInputData(n));
   if(empty.length && !confirm(`入力内容が空の生徒がいます：${empty.join('、')}\nこのまま印刷しますか？`)) return;
   const resultRecords=await readPrepResultRecords();
+  // 復元後に週面シートがまだ未読込の場合、印刷直前にも担任助手フォルダから自動読込を試す。
+  if(sharedDirHandle && (!meetingPrepWeeklyFileName || /未選択|未読込/.test(String(meetingPrepWeeklyHtmlCache||'')))){
+    try{
+      const studentParent=await findStudentFolderParentFromSaveRoot(sharedDirHandle, students);
+      await loadWeeklySheetFromAssistantFolder(studentParent.dir);
+    }catch(e){}
+  }
   const weeklyHtml=loadWeeklySheetHtml();
   const html=buildMeetingPrepPrintHtml(resultRecords, weeklyHtml);
   printHtmlInHiddenIframe(html);
@@ -2623,7 +2794,7 @@ function bindGlobalEvents(){
   $('#weekStart').onchange=()=>{syncFromDom();renderStudents()};
   $('#saveGroupMemory').onclick=saveGroup;
   $('#loadGroupMemory').onclick=loadGroup;
-  $('#exportXlsx').onclick=exportAll; const sae=$('#saveAllExcelToStudentFolders'); if(sae)sae.onclick=saveAllToExistingStudentFolders; const mpwi=$('#meetingPrepWeeklyInput'); if(mpwi)mpwi.onchange=handleMeetingPrepWeeklyFileChange; const pmp=$('#printMeetingPrep'); if(pmp)pmp.onclick=printMeetingPrep;
+  $('#exportXlsx').onclick=exportAll; const sae=$('#saveAllExcelToStudentFolders'); if(sae)sae.onclick=saveAllToExistingStudentFolders; const pmp=$('#printMeetingPrep'); if(pmp)pmp.onclick=printMeetingPrep;
   $('#addExamMaster').onclick=addExamMasterRow;
   $('#saveExamMaster').onclick=saveExamMasterFromPanel;
   const aem=$('#addEventMaster'); if(aem)aem.onclick=addEventMasterRow;
