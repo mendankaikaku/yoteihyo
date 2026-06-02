@@ -82,16 +82,16 @@ details.advanced{background:#fff;border-color:#e2e8f0}details.advanced summary{f
 </style>
 </head>
 <body>
-<header><div class="wrap"><h1>面談予定入力・準備資料アプリ <span style="font-size:13px;color:#2563eb">v18 保存警告・ホバー説明</span></h1><div class="sub">複数生徒の予定入力、前回内容の、結果Excel・週面シート・合格設計図を使った面談準備資料印刷まで、この画面で行います。</div></div></header>
+<header><div class="wrap"><h1>面談予定入力・準備資料アプリ <span style="font-size:13px;color:#2563eb">v18 保存警告・ホバー説明</span></h1><div class="sub">複数生徒の予定入力、前回内容の復元、結果Excel・週面シート・合格設計図を使った面談準備資料印刷まで、この画面で行います。</div></div></header>
 <main class="wrap">
   <section class="card">
     <p class="sectionTitle">基本操作</p>
-    <div class="saveWarning">席外す前保存を絶対忘れないで！（復元も保存も"復元保存"フォルダを選択）</div>
+    <div class="saveWarning">保存を絶対に忘れるな！（復元も保存も「復元保存」フォルダを選択）</div>
     <div class="topActions">
       <div class="field wide"><label>① 生徒名（複数はカンマ区切り）</label><input id="studentNames" placeholder="例：佐藤, 鈴木, 高橋" /></div>
       <div class="field"><label>開始日</label><input id="weekStart" type="date" /></div>
       <button id="applyStudents" class="primaryBig">② 反映</button>
-      <button class="primaryBig" id="loadGroupMemory">③ 復元</button>
+      <button class="secondary primaryBig" id="loadGroupMemory">③ 復元</button>
       <button class="ok primaryBig" id="saveGroupMemory">④ 保存</button>
       <button class="secondary" id="exportXlsx">ZIP出力</button>
     </div>
@@ -2756,63 +2756,47 @@ function buildMeetingPrepPrintHtml(resultRecords, weeklyHtml){
   const prevPeriod=meetingPrepPeriodLabel(prevDates);
   const currentPeriod=meetingPrepPeriodLabel(currentDates);
   let body='';
-  names.forEach(name=>{
-    body+=`<section class="page prevResultPage"><div class="fitPageShell"><div class="fitPageInner"><h1>面談準備資料：${esc(name)}</h1><div class="subline">先週：${esc(prevPeriod)} / 作成：${now.toLocaleString('ja-JP')}</div><h2>1. 先週の予定・結果カレンダー</h2>${meetingPrepScheduleTableHtml(name,resultRecords)}</div></div></section>`;
-    body+=`<section class="page"><h1>面談準備資料：${esc(name)}</h1><div class="subline">今週：${esc(currentPeriod)}</div><h2>2. 今週の記入用予定表・模試・イベント</h2>${meetingPrepCurrentPlanHtml(name)}</section>`;
-    body+=`<section class="page weeklyPage"><h1>面談準備資料：${esc(name)}</h1><h2>3. 週面シート</h2>${weeklyHtml}</section>`;
-    body+=`<section class="page goukakuPrintPage"><h1>面談準備資料：${esc(name)}</h1><h2>4. 合格設計図</h2>${meetingPrepGoukakuDesignHtml(name)}</section>`;
+  names.forEach((name,idx)=>{
+    const page1=`<div class="miniFitShell"><div class="miniFitInner"><h1>面談準備資料：${esc(name)}</h1><div class="subline">先週：${esc(prevPeriod)} / 作成：${now.toLocaleString('ja-JP')}</div><h2>1. 先週の予定・結果カレンダー</h2>${meetingPrepScheduleTableHtml(name,resultRecords)}</div></div>`;
+    const page2=`<div class="miniFitShell"><div class="miniFitInner"><h1>面談準備資料：${esc(name)}</h1><div class="subline">今週：${esc(currentPeriod)}</div><h2>2. 今週の記入用予定表・模試・イベント</h2>${meetingPrepCurrentPlanHtml(name)}</div></div>`;
+    const page3=`<div class="miniFitShell"><div class="miniFitInner"><h1>面談準備資料：${esc(name)}</h1><h2>3. 週面シート</h2>${weeklyHtml}</div></div>`;
+    const page4=`<div class="miniFitShell"><div class="miniFitInner"><h1>面談準備資料：${esc(name)}</h1><h2>4. 合格設計図</h2>${meetingPrepGoukakuDesignHtml(name)}</div></div>`;
+    body+=`<section class="printSheet sheetFront" data-student="${esc(name)}"><div class="sheetLabel">${idx+1}人目 表：1・2ページ</div><div class="miniPage">${page1}</div><div class="miniPage">${page2}</div></section>`;
+    body+=`<section class="printSheet sheetBack" data-student="${esc(name)}"><div class="sheetLabel">${idx+1}人目 裏：3・4ページ</div><div class="miniPage">${page3}</div><div class="miniPage">${page4}</div></section>`;
   });
   return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>面談準備資料</title><style>
+    @page{size:B4 landscape;margin:0;}
+    *{box-sizing:border-box;}
     body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif;color:#111827;margin:0;background:#fff;}
-    .page{box-sizing:border-box;width:210mm;min-height:297mm;padding:12mm;page-break-after:always;}
-    h1{font-size:20px;margin:0 0 4px;} h2{font-size:16px;margin:12px 0 8px;border-left:5px solid #2563eb;padding-left:8px;} h3{font-size:14px;margin:10px 0 6px;}
-    .subline,.muted{color:#667085;font-size:11px}.box{border:1px solid #9ca3af;padding:8px;border-radius:6px;white-space:pre-wrap;}
-    .prepTable{border-collapse:collapse;width:100%;font-size:11px;margin:6px 0 10px;}.prepTable th,.prepTable td{border:1px solid #9ca3af;padding:5px;vertical-align:top;word-break:break-word;}.prepTable th{background:#f3f4f6;text-align:center;font-weight:800;}.prepTable ul{margin:0;padding-left:1.2em;}.prepTable li{margin:1px 0;}.twoCols{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start}.weekly{font-size:10px}.weekly th,.weekly td{padding:4px;}.blankTable td{height:14mm}.blankLines div{height:7mm;border-bottom:1px solid #d1d5db}.blankBox{height:28mm}.printCheck{display:inline-block;white-space:nowrap;line-height:1.55}.askNote{font-size:10px;color:#dc2626;margin-top:2px;font-weight:800}.prevResultPage{padding:8mm;overflow:hidden}.fitPageShell{width:100%;height:281mm;overflow:hidden;position:relative}.fitPageInner{transform-origin:top left;width:100%;}.prevResultPage h1{font-size:18px}.prevResultPage h2{font-size:14px;margin:8px 0 6px}.prevResultPage h3{font-size:12px;margin:6px 0 4px}.prevResultPage .prepTable{font-size:10px;margin:4px 0 6px}.prevResultPage .prepTable th,.prevResultPage .prepTable td{padding:3px 4px}.prevResultPage .box{padding:5px}.goukakuPrintPage{padding:6mm;overflow:hidden}.goukakuPrintPage h1{font-size:16px;margin:0 0 2mm}.goukakuPrintPage h2{font-size:13px;margin:0 0 2mm}.goukakuPrintPdf{height:276mm;width:198mm;border:1px solid #9ca3af;background:#f8fafc;overflow:hidden}.goukakuPrintPdf iframe{width:100%;height:100%;border:0;background:#fff}.goukakuPrintTable{font-size:9px}.goukakuPrintTable th,.goukakuPrintTable td{padding:3px;min-width:36px;max-width:120px;}
-    @page{size:A4 portrait;margin:0;} @media print{.page{page-break-after:always;} body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
+    .printSheet{width:364mm;height:257mm;padding:8mm;display:grid;grid-template-columns:1fr 1fr;gap:6mm;page-break-after:always;break-after:page;position:relative;overflow:hidden;background:#fff;}
+    .sheetLabel{position:absolute;right:8mm;top:3mm;font-size:8px;color:#9ca3af;}
+    .miniPage{border:1px solid #d1d5db;border-radius:3mm;padding:4mm;overflow:hidden;position:relative;background:#fff;height:241mm;}
+    .miniFitShell{width:100%;height:100%;overflow:hidden;position:relative;}
+    .miniFitInner{transform-origin:top left;width:100%;}
+    h1{font-size:15px;margin:0 0 2px;} h2{font-size:12px;margin:6px 0 4px;border-left:4px solid #2563eb;padding-left:6px;} h3{font-size:10.5px;margin:5px 0 3px;}
+    .subline,.muted{color:#667085;font-size:8.5px}.box{border:1px solid #9ca3af;padding:5px;border-radius:4px;white-space:pre-wrap;}
+    .prepTable{border-collapse:collapse;width:100%;font-size:8.7px;margin:3px 0 5px;}.prepTable th,.prepTable td{border:1px solid #9ca3af;padding:2.5px;vertical-align:top;word-break:break-word;}.prepTable th{background:#f3f4f6;text-align:center;font-weight:800;}.prepTable ul{margin:0;padding-left:1em;}.prepTable li{margin:0;}.twoCols{display:grid;grid-template-columns:1fr 1fr;gap:5px;align-items:start}.weekly{font-size:7.6px}.weekly th,.weekly td{padding:2px;}.blankTable td{height:8mm}.blankLines div{height:4mm;border-bottom:1px solid #d1d5db}.blankBox{height:16mm}.printCheck{display:inline-block;white-space:nowrap;line-height:1.35}.askNote{font-size:8px;color:#dc2626;margin-top:1px;font-weight:800}
+    .goukakuPrintPdf{height:210mm!important;width:100%!important;border:1px solid #9ca3af;background:#f8fafc;overflow:hidden}.goukakuPrintPdf iframe{width:100%;height:100%;border:0;background:#fff}.goukakuPrintTable{font-size:7.2px}.goukakuPrintTable th,.goukakuPrintTable td{padding:1.8px;min-width:20px;max-width:70px;}
+    @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}.printSheet{page-break-after:always;break-after:page;}.sheetLabel{display:none;}}
   </style></head><body>${body}<script>
-    function fitMeetingPrepFirstPages(){
-      document.querySelectorAll('.fitPageShell').forEach(function(shell){
-        var inner = shell.querySelector('.fitPageInner');
+    function fitMiniPages(){
+      document.querySelectorAll('.miniFitShell').forEach(function(shell){
+        var inner=shell.querySelector('.miniFitInner');
         if(!inner) return;
-        inner.style.transform = 'scale(1)';
-        inner.style.width = '100%';
-        var sw = inner.scrollWidth || inner.offsetWidth || 1;
-        var sh = inner.scrollHeight || inner.offsetHeight || 1;
-        var scale = Math.min(1, shell.clientWidth / sw, shell.clientHeight / sh);
-        scale = Math.max(0.55, scale);
-        inner.style.transform = 'scale(' + scale + ')';
-        inner.style.width = (100 / scale) + '%';
-        shell.setAttribute('data-scale', scale.toFixed(2));
+        inner.style.transform='scale(1)';
+        inner.style.width='100%';
+        var sw=inner.scrollWidth||inner.offsetWidth||1;
+        var sh=inner.scrollHeight||inner.offsetHeight||1;
+        var scale=Math.min(1, shell.clientWidth/sw, shell.clientHeight/sh);
+        scale=Math.max(0.35, scale);
+        inner.style.transform='scale('+scale+')';
+        inner.style.width=(100/scale)+'%';
       });
     }
-    window.addEventListener('load', function(){ setTimeout(fitMeetingPrepFirstPages, 60); });
+    window.addEventListener('load',function(){setTimeout(fitMiniPages,80);setTimeout(fitMiniPages,350);});
   <\/script></body></html>`;
 }
-function printHtmlInHiddenIframe(html){
-  const oldFrame=document.getElementById('meetingPrepPrintFrame');
-  if(oldFrame) oldFrame.remove();
-  const frame=document.createElement('iframe');
-  frame.id='meetingPrepPrintFrame';
-  frame.style.position='fixed';
-  frame.style.right='0';
-  frame.style.bottom='0';
-  frame.style.width='0';
-  frame.style.height='0';
-  frame.style.border='0';
-  frame.style.opacity='0';
-  frame.onload=()=>{
-    setTimeout(()=>{
-      try{
-        frame.contentWindow.focus();
-        frame.contentWindow.print();
-      }catch(e){
-        alert('印刷プレビューを開けませんでした。ブラウザの印刷権限やポップアップ設定を確認してください。');
-      }
-    },700);
-  };
-  document.body.appendChild(frame);
-  frame.srcdoc=html;
-}
+
 async function printMeetingPrep(){
   syncFromDom();
   if(!students.length) return alert('先に生徒名を入力して「② 生徒列・日付を反映」を押してください。');
