@@ -84,7 +84,7 @@ th:first-child{z-index:3;background:#e5e7eb;}
 <header>
   <div class="headerInner">
     <div>
-      <h1>予定入力Excel 全体統合アプリ <span style="font-size:12px;color:#2563eb;vertical-align:middle;">v6 JSON読込修正</span></h1>
+      <h1>予定入力Excel 全体統合アプリ <span style="font-size:12px;color:#2563eb;vertical-align:middle;">v13 全体予定表手修正復元対応</span></h1>
       <div class="headerHint">予定Excel・対応表・結果Excelをまとめて、管理用/掲示用カレンダー、模試科目、イベント確認を出力します。</div>
     </div>
     <div class="headerActions">
@@ -103,10 +103,10 @@ th:first-child{z-index:3;background:#e5e7eb;}
   <section class="controlGrid">
     <div class="card">
       <p class="cardTitle"><span class="step">1</span>読み込み・保存</p>
-      <div class="hint" style="margin-bottom:10px;">「まとめて復元」フォルダーを選ぶだけで、json / 学習結果 / 打ち込み結果 / 対応表 / 全員分リスト を自動で振り分けます。</div>
+      <div class="hint" style="margin-bottom:10px;">「まとめて復元」フォルダーを選ぶだけで、json / 学習結果 / 打ち込み結果 / 対応表 / 全員分リスト / 毎日更新 / 全体予定表 を自動で振り分けます。</div>
       <div class="bundleActionGrid">
         <button id="readBundleBtn" class="ok primaryAction" type="button">まとめて復元フォルダーを読み取り</button>
-        <button id="saveResultHistoryBtn" class="ghost primaryAction" type="button">結果履歴・掲示設定を保存</button>
+        <button id="saveResultHistoryBtn" class="ghost primaryAction" type="button">結果履歴JSONを保存</button>
       </div>
       <div id="bundleReadSummary" class="hint" style="margin-top:10px;white-space:pre-wrap;">未読み取り</div>
       <div class="hint" style="margin-top:6px;color:#1d4ed8;font-weight:800;">この版では個別アップロード欄は表示されません。</div>
@@ -121,7 +121,7 @@ th:first-child{z-index:3;background:#e5e7eb;}
       <details>
         <summary>読み取り形式</summary>
         <div class="hint" style="margin-top:8px;">
-          予定Excelは「打ち込み結果」フォルダー、結果Excelは「学習結果」フォルダー、履歴JSONは「json」フォルダー、対応表は「対応表」フォルダーから自動で読みます。
+          予定Excelは「打ち込み結果」、結果Excelは「学習結果」、履歴JSONは「json」、対応表は「対応表」、全員分リストは「全員分リスト」、掲示用Excelの手修正版は「毎日更新」、全体予定表の手修正版は「全体予定表」フォルダーから自動で読みます。
         </div>
       </details>
     </div>
@@ -161,26 +161,7 @@ th:first-child{z-index:3;background:#e5e7eb;}
         <label><input id="colorWeekend" type="checkbox" checked />土日を色分け</label>
       </div>
       <div class="hint" style="margin-top:10px;">先にファイルを選び、右上の「統合プレビュー」を押してください。プレビュー後に各出力ボタンが使えます。</div>
-      <details open>
-        <summary>掲示用Excel設定</summary>
-        <div class="compactFields" style="margin-top:8px;">
-          <div>
-            <label>高速基礎ランキングタイトル</label>
-            <input id="posterRankingTitle" type="text" value="高速基礎マスターランキング" />
-          </div>
-          <div>
-            <label>日付の後ろにつける文字</label>
-            <input id="posterRankingDateSuffix" type="text" value="" placeholder="例：分（空欄なら何も付けない）" />
-          </div>
-        </div>
-        <div class="checkGrid" style="margin-top:8px;">
-          <label><input id="posterShowRankingDate" type="checkbox" checked />タイトルに前日の日付を表示</label>
-          <label><input id="posterLimitTop10" type="checkbox" />高速基礎ランキングを10位までにする</label>
-        </div>
-        <label>講座名短縮ルール（1行1ルール：長い言葉 =&gt; 短い言葉）</label>
-        <textarea id="posterShortNameRules" rows="5" style="min-height:92px;" placeholder="高速基礎マスター英語センター1800 => 英単語1800"></textarea>
-        <div class="hint" style="margin-top:6px;">この設定は保存ボタンで json/poster_settings.json に保存します。次回「まとめて復元」読み取り時に自動復元します。</div>
-      </details>
+      <div class="hint" style="margin-top:10px;">掲示用Excelの細かい文言や手修正は、まとめて復元フォルダー直下の「毎日更新」フォルダー内に保存したExcelから復元します。ブラウザ上の掲示設定欄は使いません。</div>
       <details>
         <summary>予定入力Excel形式</summary>
         <div class="hint" style="margin-top:8px;">
@@ -231,6 +212,10 @@ const state = {
   posterSettingsFiles: [],
   allListFiles: [],
   allListRestores: new Map(),
+  dailyPosterFiles: [],
+  dailyPosterRestores: new Map(),
+  wholeScheduleFiles: [],
+  wholeScheduleRestores: new Map(),
   resultHistoryRecords: [],
   resultSheetRows: [],
   records: [],
@@ -2509,7 +2494,9 @@ function applyPosterSettingsToDom(settings){
   if($('posterShortNameRules')) $('posterShortNameRules').value = s.shortNameRulesText || DEFAULT_POSTER_SETTINGS.shortNameRulesText;
 }
 function currentPosterSettings(){
-  const s = getPosterSettingsFromDom();
+  // 掲示用Excelの設定UIは廃止。
+  // タイトルなどの手修正は「毎日更新」フォルダー内の既存Excelから復元する。
+  const s = normalizePosterSettings(state.posterSettings || DEFAULT_POSTER_SETTINGS);
   state.posterSettings = s;
   return s;
 }
@@ -2567,7 +2554,224 @@ function downloadPosterSettingsPayload(settings){
   a.click();
   setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();}, 1000);
 }
-document.addEventListener('DOMContentLoaded', () => applyPosterSettingsToDom(DEFAULT_POSTER_SETTINGS));
+document.addEventListener('DOMContentLoaded', () => { state.posterSettings = normalizePosterSettings(DEFAULT_POSTER_SETTINGS); });
+
+
+// ============================================================
+// 8.3.6 毎日更新フォルダー内の掲示用Excel復元
+// ============================================================
+function normalizeDailyPosterSheetKey(name){
+  return String(name || '').replace(/[\s\u3000]/g,'').replace(/[（）()]/g,'').toLowerCase();
+}
+function dailyPosterSheetAliases(name){
+  const k = normalizeDailyPosterSheetKey(name);
+  const aliases = new Set([k]);
+  if(k.includes('連続')) aliases.add('連続実施');
+  if(k.includes('修得') && !k.includes('完全')) aliases.add('講座修得');
+  if(k.includes('完全')) aliases.add('完全修得');
+  if(k.includes('高速') || k.includes('ランキング')) aliases.add('高速基礎ランキング');
+  return [...aliases].map(normalizeDailyPosterSheetKey);
+}
+async function parseDailyPosterRestoreFile(file){
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, {type:'array', cellDates:true});
+  const map = new Map();
+  for(const sheetName of wb.SheetNames || []){
+    const ws = wb.Sheets[sheetName];
+    const aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:'', raw:false});
+    if(!aoa || !aoa.some(row => (row || []).some(v => norm(v)))) continue;
+    const data = {sourceFile:file.name, sheetName, aoa};
+    for(const alias of dailyPosterSheetAliases(sheetName)) map.set(alias, data);
+  }
+  return map;
+}
+async function loadDailyPosterRestoreFiles(files){
+  const merged = new Map();
+  const logs = [];
+  for(const file of files || []){
+    try{
+      const parsed = await parseDailyPosterRestoreFile(file);
+      for(const [key, data] of parsed.entries()) merged.set(key, data);
+      logs.push(`${file.name}: ${new Set([...parsed.values()].map(x=>x.sheetName)).size}シート`);
+    }catch(e){
+      logs.push(`${file.name}: 読み込み失敗 ${e.message || e}`);
+    }
+  }
+  state.dailyPosterRestores = merged;
+  return logs;
+}
+function findDailyPosterRestore(sheetName){
+  const restores = state.dailyPosterRestores || new Map();
+  for(const alias of dailyPosterSheetAliases(sheetName)){
+    if(restores.has(alias)) return restores.get(alias);
+  }
+  return null;
+}
+function posterRowKey(row, header){
+  const h = (header || []).map(x => String(x || '').replace(/\s/g,''));
+  const idxGrade = h.findIndex(x => x.includes('学年'));
+  const idxStudent = h.findIndex(x => x.includes('氏名') || x.includes('生徒'));
+  const idxContent = h.findIndex(x => x.includes('内容'));
+  const grade = idxGrade >= 0 ? norm(row[idxGrade]) : '';
+  const student = idxStudent >= 0 ? norm(row[idxStudent]) : '';
+  const content = idxContent >= 0 ? norm(row[idxContent]) : '';
+  return [grade, normalizeNameKey(student), content.replace(/\s+/g,'')].join('|');
+}
+function rankingRowKey(row, header){
+  const h = (header || []).map(x => String(x || '').replace(/\s/g,''));
+  const idxGrade = h.findIndex(x => x.includes('学年'));
+  const idxStudent = h.findIndex(x => x.includes('氏名') || x.includes('生徒'));
+  const grade = idxGrade >= 0 ? norm(row[idxGrade]) : '';
+  const student = idxStudent >= 0 ? norm(row[idxStudent]) : '';
+  return [grade, normalizeNameKey(student)].join('|');
+}
+function mergeRestoredDailyPosterAoa(sheetName, generatedAoa){
+  const restore = findDailyPosterRestore(sheetName);
+  if(!restore || !generatedAoa || generatedAoa.length < 2) return generatedAoa;
+  const restoredAoa = (restore.aoa || []).map(row => (row || []).map(v => norm(v)));
+  if(restoredAoa.length < 2) return generatedAoa;
+
+  const isRanking = normalizeDailyPosterSheetKey(sheetName).includes('ランキング') || normalizeDailyPosterSheetKey(sheetName).includes('高速');
+  const genHeader = (generatedAoa[1] || []).map(v => norm(v));
+  const restoreHeader = (restoredAoa[1] || []).map(v => norm(v));
+  const keyFn = isRanking ? rankingRowKey : posterRowKey;
+
+  // タイトルは手修正版Excelの1行目を優先。これにより「分」などの細かい表記もExcel側の手修正を正とする。
+  const titleRow = (restoredAoa[0] || []).some(v => norm(v)) ? restoredAoa[0] : generatedAoa[0];
+  const header = restoreHeader.length >= genHeader.length ? restoreHeader : genHeader;
+  const out = [titleRow, header];
+  const used = new Set();
+  const restoredRows = restoredAoa.slice(2).filter(row => row.some(v => norm(v)));
+  const restoreMap = new Map();
+  for(const row of restoredRows){
+    const key = keyFn(row, restoreHeader);
+    if(key && key !== '|') restoreMap.set(key, row);
+  }
+
+  // 生成側に存在する行は、同じ生徒・内容が手修正版にあれば手修正版を採用。
+  for(const grow of generatedAoa.slice(2)){
+    const key = keyFn(grow, genHeader);
+    const restored = restoreMap.get(key);
+    if(restored){
+      used.add(key);
+      out.push([...restored, ...Array(Math.max(0, header.length - restored.length)).fill('')]);
+    }else{
+      out.push([...grow, ...Array(Math.max(0, header.length - grow.length)).fill('')]);
+    }
+  }
+  // 手修正版にだけある行も消さずに残す。
+  for(const row of restoredRows){
+    const key = keyFn(row, restoreHeader);
+    if(key && used.has(key)) continue;
+    out.push([...row, ...Array(Math.max(0, header.length - row.length)).fill('')]);
+  }
+  return out;
+}
+
+
+// ============================================================
+// 8.3.7 全体予定表フォルダー内の手修正Excel復元
+// ============================================================
+function normalizeWholeScheduleSheetKey(name){
+  return String(name || '').replace(/[\s\u3000]/g,'').replace(/[（）()]/g,'').toLowerCase();
+}
+function wholeScheduleSheetAliases(name){
+  const k = normalizeWholeScheduleSheetKey(name);
+  const aliases = new Set([k]);
+  if(k.includes('全体') && k.includes('カレンダー')) aliases.add('全体カレンダー');
+  if(k.includes('掲示') && k.includes('カレンダー')) aliases.add('掲示用カレンダー');
+  if(k.includes('予定一覧')) aliases.add('予定一覧データ');
+  return [...aliases].map(normalizeWholeScheduleSheetKey);
+}
+async function parseWholeScheduleRestoreFile(file){
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, {type:'array', cellDates:true});
+  const map = new Map();
+  for(const sheetName of wb.SheetNames || []){
+    const ws = wb.Sheets[sheetName];
+    const aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:'', raw:false});
+    if(!aoa || !aoa.some(row => (row || []).some(v => norm(v)))) continue;
+    const data = {sourceFile:file.name, sheetName, aoa};
+    for(const alias of wholeScheduleSheetAliases(sheetName)) map.set(alias, data);
+  }
+  return map;
+}
+async function loadWholeScheduleRestoreFiles(files){
+  const merged = new Map();
+  const logs = [];
+  for(const file of files || []){
+    try{
+      const parsed = await parseWholeScheduleRestoreFile(file);
+      for(const [key, data] of parsed.entries()) merged.set(key, data);
+      logs.push(`${file.name}: ${new Set([...parsed.values()].map(x=>x.sheetName)).size}シート`);
+    }catch(e){
+      logs.push(`${file.name}: 読み込み失敗 ${e.message || e}`);
+    }
+  }
+  state.wholeScheduleRestores = merged;
+  return logs;
+}
+function findWholeScheduleRestore(sheetName){
+  const restores = state.wholeScheduleRestores || new Map();
+  for(const alias of wholeScheduleSheetAliases(sheetName)){
+    if(restores.has(alias)) return restores.get(alias);
+  }
+  return null;
+}
+function wholeScheduleRowKey(row, header){
+  const h = (header || []).map(x => String(x || '').replace(/\s/g,''));
+  let idxStudent = h.findIndex(x => x.includes('生徒名') || x.includes('氏名'));
+  let idxNo = h.findIndex(x => x.includes('生徒番号'));
+  let idxGrade = h.findIndex(x => x.includes('学年'));
+  if(idxStudent < 0 && h.length >= 2) idxStudent = Math.min(2, h.length - 1);
+  const grade = idxGrade >= 0 ? norm(row[idxGrade]) : '';
+  const student = idxStudent >= 0 ? normalizeNameKey(row[idxStudent]) : '';
+  const no = idxNo >= 0 ? normalizeStudentNoKey(row[idxNo]) : '';
+  return (no ? `no:${no}` : `name:${grade}|${student}`);
+}
+function mergeRestoredWholeScheduleAoa(sheetName, generatedAoa){
+  const restore = findWholeScheduleRestore(sheetName);
+  if(!restore || !generatedAoa || generatedAoa.length < 1) return generatedAoa;
+  const restoredAoa = (restore.aoa || []).map(row => (row || []).map(v => norm(v)));
+  if(restoredAoa.length < 1) return generatedAoa;
+
+  const genHeader = (generatedAoa[0] || []).map(v => norm(v));
+  const restoreHeader = (restoredAoa[0] || []).map(v => norm(v));
+  const header = genHeader.length >= restoreHeader.length ? genHeader : restoreHeader;
+  const out = [header];
+  const used = new Set();
+  const restoreRows = restoredAoa.slice(1).filter(row => row.some(v => norm(v)));
+  const restoreMap = new Map();
+  for(const row of restoreRows){
+    const key = wholeScheduleRowKey(row, restoreHeader);
+    if(key && !key.endsWith('|')) restoreMap.set(key, row);
+  }
+
+  for(const grow of generatedAoa.slice(1)){
+    const key = wholeScheduleRowKey(grow, genHeader);
+    const restored = restoreMap.get(key);
+    const newRow = [...grow, ...Array(Math.max(0, header.length - grow.length)).fill('')];
+    if(restored){
+      used.add(key);
+      for(let c=0;c<header.length;c++){
+        const gh = genHeader[c] || '';
+        let ri = restoreHeader.findIndex(h => h && gh && h === gh);
+        // 掲示用カレンダーは日付見出しの右列が空欄になりやすいので、見出し一致できない列は同じ列番号を使う。
+        if(ri < 0 && restored.length > c) ri = c;
+        if(ri >= 0 && norm(restored[ri]) !== '') newRow[c] = restored[ri];
+      }
+    }
+    out.push(newRow);
+  }
+
+  // 手修正版にだけある生徒行も消さずに残す。
+  for(const row of restoreRows){
+    const key = wholeScheduleRowKey(row, restoreHeader);
+    if(key && used.has(key)) continue;
+    out.push([...row, ...Array(Math.max(0, header.length - row.length)).fill('')]);
+  }
+  return out;
+}
 
 // ============================================================
 // 8.4 月間掲示用結果Excel出力
@@ -2851,16 +3055,18 @@ async function downloadMonthlyPosterResultWorkbook(){
     const used = new Set();
     for(const rule of MONTHLY_POSTER_RESULT_RULES){
       const aoa = buildMonthlyPosterResultAoa(results, rule, label);
-      const ws = aoaToSheet(aoa);
-      styleMonthlyPosterSheet(ws, aoa);
+      const mergedAoa = mergeRestoredDailyPosterAoa(rule.sheetName, aoa);
+      const ws = aoaToSheet(mergedAoa);
+      styleMonthlyPosterSheet(ws, mergedAoa);
       XLSX.utils.book_append_sheet(wb, ws, uniqueSheetName(rule.sheetName, used));
     }
     const rawSheets = await loadRawResultSheetsDirectly();
     const yesterday = previousDayRangeForOpenedPage(new Date());
     const highSpeedRows = extractHighSpeedRowsFromSheets(rawSheets.sheets, yesterday.from, yesterday.to);
     const rankingAoa = buildHighSpeedRankingAoa(highSpeedRows, yesterday.label);
-    const rankingWs = aoaToSheet(rankingAoa);
-    styleHighSpeedRankingSheet(rankingWs, rankingAoa);
+    const mergedRankingAoa = mergeRestoredDailyPosterAoa('高速基礎ランキング', rankingAoa);
+    const rankingWs = aoaToSheet(mergedRankingAoa);
+    styleHighSpeedRankingSheet(rankingWs, mergedRankingAoa);
     XLSX.utils.book_append_sheet(wb, rankingWs, uniqueSheetName('高速基礎ランキング', used));
     XLSX.writeFile(wb, `校舎掲示用_月間結果_${ymd(from)}-${ymd(to)}.xlsx`);
     const counts = MONTHLY_POSTER_RESULT_RULES.map(rule => `${rule.keyword}: ${results.filter(r => norm(r.result).includes(rule.keyword)).length}件`).join('\n');
@@ -3293,6 +3499,9 @@ function downloadAllStudentList(){
 }
 
 function downloadWorkbookFromAoa(calendarAoa, listAoa, resultAoa, rosterAoa, logAoa, label, examRecords=[], eventRecords=[]){
+  // 「全体予定表」フォルダー内に前回手修正したExcelがあれば、
+  // 全体カレンダー/掲示用カレンダーの手修正を優先して復元する。
+  calendarAoa = mergeRestoredWholeScheduleAoa("全体カレンダー", calendarAoa);
   const wb = XLSX.utils.book_new();
   const resultHeader = [["学年","生徒名","生徒番号","日付","時刻","区分","分類","学習内容","学習結果","カレンダー表示","元ファイル","元シート"]];
   const rosterHeader = [ROSTER_COLUMNS];
@@ -3301,7 +3510,7 @@ function downloadWorkbookFromAoa(calendarAoa, listAoa, resultAoa, rosterAoa, log
   const wsResult = aoaToSheet(resultAoa && resultAoa.length ? resultAoa : resultHeader);
   const wsRoster = aoaToSheet(rosterAoa && rosterAoa.length ? rosterAoa : rosterHeader);
   const wsLog = aoaToSheet(logAoa && logAoa.length ? logAoa : [["ファイル","結果","内容","シート名/詳細"]]);
-  const posterAoa = buildPosterCalendarAoa(calendarAoa);
+  const posterAoa = mergeRestoredWholeScheduleAoa("掲示用カレンダー", buildPosterCalendarAoa(calendarAoa));
   const wsPoster = aoaToSheet(posterAoa);
   applyPosterHeaderMerges(wsPoster, posterAoa);
   const examSheets = buildExamSubjectSheets(examRecords || []);
@@ -3455,6 +3664,8 @@ async function setBundleFolderFiles(fileList){
   const posterSettings = [];
   const rosters = [];
   const allLists = [];
+  const dailyPosters = [];
+  const wholeSchedules = [];
   for(const f of files){
     const name = f.name || '';
     const isExcel = /\.(xlsx|xlsm|xls)$/i.test(name);
@@ -3462,9 +3673,10 @@ async function setBundleFolderFiles(fileList){
     const isJson = /\.json$/i.test(name);
     const parts = pathPartsOfFile(f).map(p => p.toLowerCase());
     const relLower = String(f.webkitRelativePath || f.name || '').toLowerCase();
-    if(isJson && /poster[_-]?settings|掲示設定/.test(relLower)) posterSettings.push(f);
-    else if(isJson && (parts.some(p => p === 'json' || p.includes('json') || p.includes('履歴')) || /result[_-]?history|結果履歴/.test(relLower))) histories.push(f);
+    if(isJson && (parts.some(p => p === 'json' || p.includes('json') || p.includes('履歴')) || /result[_-]?history|結果履歴/.test(relLower))) histories.push(f);
+    else if(isExcel && filePathIncludes(f, '毎日更新')) dailyPosters.push(f);
     else if(isExcel && filePathIncludes(f, '全員分リスト')) allLists.push(f);
+    else if(isExcel && filePathIncludes(f, '全体予定表')) wholeSchedules.push(f);
     else if(isExcel && filePathIncludes(f, '学習結果')) results.push(f);
     else if(isExcel && filePathIncludes(f, '打ち込み結果')) planned.push(f);
     else if((isExcel || isCsv) && filePathIncludes(f, '対応表')) rosters.push(f);
@@ -3472,11 +3684,15 @@ async function setBundleFolderFiles(fileList){
   state.files = planned;
   state.resultFiles = results;
   state.resultHistoryFiles = histories;
-  state.posterSettingsFiles = posterSettings;
+  state.posterSettingsFiles = [];
   state.allListFiles = allLists;
+  state.dailyPosterFiles = dailyPosters;
+  state.wholeScheduleFiles = wholeSchedules;
   const allListRestoreLogs = await loadAllListRestoreFiles(allLists);
+  const dailyPosterRestoreLogs = await loadDailyPosterRestoreFiles(dailyPosters);
+  const wholeScheduleRestoreLogs = await loadWholeScheduleRestoreFiles(wholeSchedules);
   setDownloadButtonsDisabled(true);
-  const posterSettingsMsgObj = await loadSelectedPosterSettings();
+  state.posterSettings = normalizePosterSettings(DEFAULT_POSTER_SETTINGS);
   let rosterMsg = '対応表: 0件';
   if(rosters.length){
     try{
@@ -3491,8 +3707,9 @@ async function setBundleFolderFiles(fileList){
 予定Excel（打ち込み結果）: ${planned.length}件
 結果Excel（学習結果）: ${results.length}件
 結果履歴JSON（json）: ${histories.length}件
-掲示設定JSON（json）: ${posterSettings.length}件（${posterSettingsMsgObj.message}）
 全員分リスト復元Excel（全員分リスト）: ${allLists.length}件${allListRestoreLogs.length ? '（' + allListRestoreLogs.join(' / ') + '）' : ''}
+掲示用手修正Excel（毎日更新）: ${dailyPosters.length}件${dailyPosterRestoreLogs.length ? '（' + dailyPosterRestoreLogs.join(' / ') + '）' : ''}
+全体予定表手修正Excel（全体予定表）: ${wholeSchedules.length}件${wholeScheduleRestoreLogs.length ? '（' + wholeScheduleRestoreLogs.join(' / ') + '）' : ''}
 ${rosterMsg}`;
   if($("bundleReadSummary")) $("bundleReadSummary").textContent = summary;
   log(`${summary}
@@ -3538,7 +3755,7 @@ $("downloadBtn").addEventListener("click", () => downloadWithRange("custom"));
 $("downloadAllListBtn").addEventListener("click", downloadAllStudentList);
 $("downloadMonthlyPosterBtn").addEventListener("click", downloadMonthlyPosterResultWorkbook);
 $("clearBtn").addEventListener("click", () => {
-  state.files=[]; state.resultFiles=[]; state.resultHistoryFiles=[]; state.posterSettingsFiles=[]; state.allListFiles=[]; state.allListRestores=new Map(); state.resultHistoryRecords=[]; state.records=[]; state.resultRecords=[]; state.examRecords=[]; state.eventRecords=[]; state.calendarAoa=[]; state.listAoa=[]; state.resultAoa=[]; state.logAoa=[]; state.rosterAoa=[]; state.rosterMap=new Map(); state.rosterNoMap=new Map(); state.workbookReady=false;
+  state.files=[]; state.resultFiles=[]; state.resultHistoryFiles=[]; state.posterSettingsFiles=[]; state.allListFiles=[]; state.allListRestores=new Map(); state.dailyPosterFiles=[]; state.dailyPosterRestores=new Map(); state.wholeScheduleFiles=[]; state.wholeScheduleRestores=new Map(); state.resultHistoryRecords=[]; state.records=[]; state.resultRecords=[]; state.examRecords=[]; state.eventRecords=[]; state.calendarAoa=[]; state.listAoa=[]; state.resultAoa=[]; state.logAoa=[]; state.rosterAoa=[]; state.rosterMap=new Map(); state.rosterNoMap=new Map(); state.workbookReady=false;
   $("bundleFolderInput").value="";
   $("folderInput").value="";
   $("rosterInput").value="";
