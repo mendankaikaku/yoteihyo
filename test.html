@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>予定入力HTML（面談準備・復元印刷v19 週面欠席・未達理由・聞き取り欄対応）</title>
+<title>予定入力HTML（面談準備・復元印刷v20 欠席者印刷に予定結果聞き取り追加）</title>
 <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
 <script src="./libs/xlsx.bundle.js"></script>
 <script>if(!window.XLSX){document.write('<script src="./libs/xlsx.full.min.js"><\/script>');}</script>
@@ -76,7 +76,7 @@ details.advanced{background:#fff;border-color:#e2e8f0}details.advanced summary{f
 </style>
 </head>
 <body>
-<header><div class="wrap"><h1>面談予定入力・準備資料アプリ <span style="font-size:13px;color:#2563eb">v19 週面欠席・未達理由・聞き取り欄対応</span></h1><div class="sub">複数生徒の予定入力、前回内容の復元、結果Excel・週面シート・合格設計図を使った面談準備資料印刷まで、この画面で行います。</div></div></header>
+<header><div class="wrap"><h1>面談予定入力・準備資料アプリ <span style="font-size:13px;color:#2563eb">v20 欠席者印刷に予定結果聞き取り追加</span></h1><div class="sub">複数生徒の予定入力、前回内容の復元、結果Excel・週面シート・合格設計図を使った面談準備資料印刷まで、この画面で行います。</div></div></header>
 <main class="wrap">
   <section class="card">
     <p class="sectionTitle">基本操作</p>
@@ -2556,18 +2556,31 @@ function studentHasMeaningfulInputData(name){
   if((d.events||[]).some(ev=>ev.name||ev.status||ev.note||ev.datetime)) return true;
   return false;
 }
+function examPrintDetailHtml(ex){
+  const subjects=(ex?.subjects||[]).map(x=>String(x||'').trim()).filter(Boolean);
+  const parts=[];
+  parts.push(`受験方法：${esc(ex?.status||'未選択')}`);
+  parts.push(`受験科目：${subjects.length ? subjects.map(s=>'☑ '+esc(s)).join('、') : '未選択'}`);
+  if(ex?.subjectChanged) parts.push('科目変更あり');
+  return parts.join(' / ');
+}
+function eventPrintDetailHtml(ev){
+  const parts=[];
+  if(ev?.datetime) parts.push(`日時：${esc(ev.datetime)}`);
+  parts.push(`参加状況：${esc(ev?.status||'未選択')}`);
+  if(ev?.note) parts.push(`備考：${esc(ev.note)}`);
+  return parts.join(' / ');
+}
 function meetingPrepListenItemsHtml(name){
   const data=ensureStudent(name);
   const items=[];
   (data.exams||[]).forEach(ex=>{
-    if(!(ex.name||ex.status||(ex.subjects||[]).length)) return;
-    const detail=[ex.status,(ex.subjects||[]).join('、')].filter(Boolean).join(' / ');
-    items.push(`模試：${esc(ex.name||'名称未入力')}${detail ? '（'+esc(detail)+'）' : ''}`);
+    if(!(ex.name||ex.status||(ex.subjects||[]).length||ex.subjectChanged)) return;
+    items.push(`模試：${esc(ex.name||'名称未入力')}（${examPrintDetailHtml(ex)}）`);
   });
   (data.events||[]).forEach(ev=>{
     if(!(ev.name||ev.status||ev.note||ev.datetime)) return;
-    const detail=[ev.datetime,ev.status,ev.note].filter(Boolean).join(' / ');
-    items.push(`イベント：${esc(ev.name||'名称未入力')}${detail ? '（'+esc(detail)+'）' : ''}`);
+    items.push(`イベント：${esc(ev.name||'名称未入力')}（${eventPrintDetailHtml(ev)}）`);
   });
   return items.length ? items.join('<br>') : '<span class="muted">対象の模試・イベントなし</span>';
 }
@@ -2623,9 +2636,9 @@ function meetingPrepCurrentPlanHtml(name){
   html+='</section></div>';
   html+='<div class="twoCols">';
   html+='<section><h3>模試確認</h3>';
-  if(exams.length){html+='<table class="prepTable"><thead><tr><th>模試名</th><th>受験方法</th><th>科目</th></tr></thead><tbody>';exams.forEach(ex=>{html+=`<tr><td>${esc(ex.name)}</td><td>${esc(ex.status)}</td><td>${esc((ex.subjects||[]).join('、'))}</td></tr>`});html+='</tbody></table>';}else html+='<p class="muted">対象模試なし</p>';
+  if(exams.length){html+='<table class="prepTable"><thead><tr><th>模試名</th><th>チェック反映</th></tr></thead><tbody>';exams.forEach(ex=>{html+=`<tr><td>${esc(ex.name||'')}</td><td>${examPrintDetailHtml(ex)}</td></tr>`});html+='</tbody></table>';}else html+='<p class="muted">対象模試なし</p>';
   html+='</section><section><h3>イベント確認</h3>';
-  if(events.length){html+='<table class="prepTable"><thead><tr><th>イベント名</th><th>日時</th><th>参加</th><th>備考</th></tr></thead><tbody>';events.forEach(ev=>{html+=`<tr><td>${esc(ev.name)}</td><td>${esc(ev.datetime||'')}</td><td>${esc(ev.status)}</td><td>${esc(ev.note)}</td></tr>`});html+='</tbody></table>';}else html+='<p class="muted">対象イベントなし</p>';
+  if(events.length){html+='<table class="prepTable"><thead><tr><th>イベント名</th><th>チェック反映</th></tr></thead><tbody>';events.forEach(ev=>{html+=`<tr><td>${esc(ev.name||'')}</td><td>${eventPrintDetailHtml(ev)}</td></tr>`});html+='</tbody></table>';}else html+='<p class="muted">対象イベントなし</p>';
   html+='</section></div>';
   return html;
 }
@@ -2818,7 +2831,8 @@ function rowFromMemoryForAbsent(mem, fallbackName, targetDate){
   const name=String(mem.studentName || fallbackName || '').trim();
   if(!name) return null;
   const d=normalizeStudentData(mem);
-  return {name, grade:d.grade||'', studentNo:d.studentNo||'', weekStart:mem.weekStart||'', savedAt:mem.savedAt||''};
+  d.weekStart=mem.weekStart||d.weekStart||'';
+  return {name, grade:d.grade||'', studentNo:d.studentNo||'', weekStart:d.weekStart||'', savedAt:mem.savedAt||'', data:d};
 }
 function addAbsentRowUnique(map,row){
   if(!row) return;
@@ -2868,18 +2882,47 @@ async function collectWeeklyAbsentRowsForPrint(){
   try{ if(sharedSupported()){ await ensureSharedFolder(); const sharedRows=await collectWeeklyAbsentRowsFromShared(target); sharedRows.forEach(r=>addAbsentRowUnique(map,r)); } }catch(e){ console.warn('保存用フォルダの週面欠席者集計に失敗', e); }
   return Array.from(map.values()).sort((a,b)=>String(a.grade||'').localeCompare(String(b.grade||''),'ja')||String(a.name||'').localeCompare(String(b.name||''),'ja'));
 }
-function buildWeeklyAbsentCallListPrintHtml(absentRows){
+function listenItemsHtmlFromData(data){
+  const items=[];
+  (data?.exams||[]).forEach(ex=>{
+    if(!(ex.name||ex.status||(ex.subjects||[]).length||ex.subjectChanged)) return;
+    items.push(`模試：${esc(ex.name||'名称未入力')}（${examPrintDetailHtml(ex)}）`);
+  });
+  (data?.events||[]).forEach(ev=>{
+    if(!(ev.name||ev.status||ev.note||ev.datetime)) return;
+    items.push(`イベント：${esc(ev.name||'名称未入力')}（${eventPrintDetailHtml(ev)}）`);
+  });
+  return items.length ? items.join('<br>') : '<span class="muted">対象の模試・イベントなし</span>';
+}
+function absentPlansResultsHtml(row, resultRecords){
+  const data=normalizeStudentData(row.data||{});
+  if(row.weekStart && !data.weekStart) data.weekStart=row.weekStart;
+  const dates=getMeetingPrepPreviousDates();
+  let html='<div class="absentDetailTitle">対象日までの一週間の予定・結果</div>';
+  html+='<table class="detailTable"><thead><tr><th style="width:70px">日付</th><th>予定</th><th>結果</th></tr></thead><tbody>';
+  dates.forEach((d,di)=>{
+    const si=scheduleIndexForPrepDate(data,d,di);
+    const plans=(data.schedule?.[si]||[]).map((v,i)=>String(v||'').trim()?`<li>${esc(LIMITS[i])} ${esc(v).replace(/\n/g,'<br>')}</li>`:'').filter(Boolean).join('');
+    const results=resultForStudentDate(resultRecords||[],row.name,ymd(d)).map(r=>`<li>${esc(r.timeLabel? r.timeLabel+' ' : '')}${esc(r.summary)}</li>`).join('');
+    html+=`<tr><th>${jpDate(d)}<br>${DOW[d.getDay()]}曜</th><td>${plans?'<ul>'+plans+'</ul>':'<span class="muted">予定なし</span>'}</td><td>${results?'<ul>'+results+'</ul>':'<span class="muted">結果なし</span>'}</td></tr>`;
+  });
+  html+='</tbody></table>';
+  html+=`<div class="listenBox"><b>今週聞き取る内容（模試・イベント）</b><br>${listenItemsHtmlFromData(data)}</div>`;
+  return html;
+}
+function buildWeeklyAbsentCallListPrintHtml(absentRows, resultRecords){
   const now=new Date();
   const targetDate=getMeetingPrepTargetDate();
   const todayLabel=`${targetDate.getFullYear()}年${targetDate.getMonth()+1}月${targetDate.getDate()}日（${DOW[targetDate.getDay()]}）`;
   const weekStart=$('#weekStart')?.value || '';
-  const rows=absentRows.map((row,i)=>`<tr><td class="center">${i+1}</td><td>${esc(row.grade||'')}</td><td>${esc(row.studentNo||'')}</td><td class="nameCell">${esc(row.name)}</td><td class="checkCell">□</td><td class="checkCell">□</td><td class="memoCell"></td></tr>`).join('');
-  return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>週面欠席者 電話確認リスト</title><style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif;color:#111827;margin:0;background:#fff}.page{box-sizing:border-box;width:210mm;min-height:297mm;padding:12mm}h1{font-size:22px;margin:0 0 4px}.subline{font-size:12px;color:#667085;margin-bottom:14px}.summary{border:1px solid #9ca3af;border-radius:8px;padding:8px 10px;margin-bottom:12px;font-size:13px;background:#f8fafc}table{border-collapse:collapse;width:100%;font-size:13px}th,td{border:1px solid #6b7280;padding:7px 6px;vertical-align:middle}th{background:#f3f4f6;text-align:center;font-weight:800}.center{text-align:center}.nameCell{font-size:15px;font-weight:800}.checkCell{text-align:center;font-size:22px;width:20mm}.memoCell{height:11mm;width:58mm}.note{margin-top:10px;font-size:11px;color:#667085;line-height:1.6}.footerLine{margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:12mm;font-size:13px}.footerLine div{border-bottom:1px solid #9ca3af;height:12mm}@page{size:A4 portrait;margin:0}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.page{page-break-after:always}}</style></head><body><section class="page"><h1>週面欠席者 電話確認リスト</h1><div class="subline">対象日：${esc(todayLabel)} / 週開始：${esc(weekStart)} / 作成：${esc(now.toLocaleString('ja-JP'))}</div><div class="summary">週面欠席にチェックが入っている生徒：<b>${absentRows.length}名</b>　※電話後に「電話済み」欄へチェックしてください。</div><table><thead><tr><th>No.</th><th>学年</th><th>生徒番号</th><th>生徒名</th><th>未電話</th><th>電話済み</th><th>電話メモ</th></tr></thead><tbody>${rows}</tbody></table><div class="note">使い方：欠席確認前は「未電話」、電話完了後は「電話済み」にチェック。つながらなかった場合や保護者対応などは電話メモへ記入してください。</div><div class="footerLine"><div>担当者：</div><div>確認完了時刻：</div></div></section></body></html>`;
+  const rows=absentRows.map((row,i)=>`<tr class="mainRow"><td class="center">${i+1}</td><td>${esc(row.grade||'')}</td><td>${esc(row.studentNo||'')}</td><td class="nameCell">${esc(row.name)}</td><td class="checkCell">□</td><td class="checkCell">□</td><td class="memoCell"></td></tr><tr class="detailRow"><td colspan="7">${absentPlansResultsHtml(row,resultRecords)}</td></tr>`).join('');
+  return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>週面欠席者 電話確認リスト</title><style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif;color:#111827;margin:0;background:#fff}.page{box-sizing:border-box;width:210mm;min-height:297mm;padding:12mm}h1{font-size:22px;margin:0 0 4px}.subline{font-size:12px;color:#667085;margin-bottom:14px}.summary{border:1px solid #9ca3af;border-radius:8px;padding:8px 10px;margin-bottom:12px;font-size:13px;background:#f8fafc}table{border-collapse:collapse;width:100%;font-size:13px}th,td{border:1px solid #6b7280;padding:7px 6px;vertical-align:middle}th{background:#f3f4f6;text-align:center;font-weight:800}.center{text-align:center}.nameCell{font-size:15px;font-weight:800}.checkCell{text-align:center;font-size:22px;width:20mm}.memoCell{height:11mm;width:48mm}.detailRow td{background:#fff;padding:6px 8px}.absentDetailTitle{font-weight:800;margin:2px 0 5px;color:#1e40af}.detailTable{font-size:10.5px;margin:0 0 6px}.detailTable th,.detailTable td{padding:4px 5px;border:1px solid #cbd5e1;vertical-align:top}.detailTable th{background:#eef2ff}.detailTable ul{margin:0;padding-left:15px}.listenBox{border:1px solid #c7d2fe;background:#eef2ff;border-radius:6px;padding:5px 7px;font-size:11px;line-height:1.45}.muted{color:#667085}.note{margin-top:10px;font-size:11px;color:#667085;line-height:1.6}.footerLine{margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:12mm;font-size:13px}.footerLine div{border-bottom:1px solid #9ca3af;height:12mm}@page{size:A4 portrait;margin:0}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.page{page-break-after:always}}</style></head><body><section class="page"><h1>週面欠席者 電話確認リスト</h1><div class="subline">対象日：${esc(todayLabel)} / 週開始：${esc(weekStart)} / 作成：${esc(now.toLocaleString('ja-JP'))}</div><div class="summary">週面欠席にチェックが入っている生徒：<b>${absentRows.length}名</b>　※電話後に「電話済み」欄へチェックしてください。</div><table><thead><tr><th>No.</th><th>学年</th><th>生徒番号</th><th>生徒名</th><th>未電話</th><th>電話済み</th><th>電話メモ</th></tr></thead><tbody>${rows}</tbody></table><div class="note">使い方：欠席確認前は「未電話」、電話完了後は「電話済み」にチェック。つながらなかった場合や保護者対応などは電話メモへ記入してください。</div><div class="footerLine"><div>担当者：</div><div>確認完了時刻：</div></div></section></body></html>`;
 }
 async function printWeeklyAbsentList(){
   const absentRows=await collectWeeklyAbsentRowsForPrint();
   if(!absentRows.length) return alert('対象日を含む週で、週面欠席にチェックが入っている保存済み生徒はいません。');
-  const html=buildWeeklyAbsentCallListPrintHtml(absentRows);
+  const resultRecords=await readPrepResultRecords();
+  const html=buildWeeklyAbsentCallListPrintHtml(absentRows,resultRecords);
   printHtmlInHiddenIframe(html);
 }
 
