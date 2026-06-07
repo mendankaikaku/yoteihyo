@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>面談予定入力・準備資料アプリ v29（3人同時編集・右パネル整理版）</title>
+<title>面談予定入力・準備資料アプリ v31（上部整理・横スクロール版）</title>
 <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
 <script src="./libs/xlsx.bundle.js"></script>
 <script>if(!window.XLSX){document.write('<script src="./libs/xlsx.full.min.js"><\/script>');}</script>
@@ -87,7 +87,7 @@ details.advanced{background:#fff;border-color:#e2e8f0}details.advanced summary{f
 
 
 /* =========================================================
-   v31 コンパクト操作バー版：3ペイン・1人編集・赤い未保存表示
+   v32 ドラッグ横スクロール・印刷1回化版：3ペイン・1人編集・赤い未保存表示
 ========================================================= */
 html,body{height:100%;overflow:hidden}
 body{background:#eef2f7}
@@ -102,7 +102,7 @@ main.wrap{max-width:none;height:calc(100vh - 76px);padding:10px 12px;display:gri
 
 
 /* =========================================================
-   v31 コンパクト操作バー版：上部を薄く・生徒を横タブ化
+   v32 ドラッグ横スクロール・印刷1回化版：上部を薄く・生徒を横タブ化
 ========================================================= */
 .appHeader .wrap{padding:5px 12px!important}.appHeader h1{font-size:16px!important;margin:0!important}.appHeader .sub{font-size:11px!important;line-height:1.2!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:calc(100vw - 260px)}.versionBadge{font-size:11px!important;padding:2px 7px!important}.saveWarningBadge{min-width:86px!important;padding:6px 10px!important;font-size:12px!important}
 main.wrap{height:calc(100vh - 52px)!important;grid-template-rows:auto auto minmax(0,1fr)!important;gap:6px!important;padding:7px 10px!important}.workflowCard{padding:8px 10px!important;border-left:5px solid #2563eb!important;border-radius:14px!important}.topActions{grid-template-columns:minmax(260px,1fr) 135px auto auto auto auto!important;gap:7px!important;align-items:end!important}.topActions .field label{font-size:10px!important;margin-bottom:1px!important}.topActions .field input,.topActions button{min-height:30px!important;height:30px!important;padding:4px 9px!important;font-size:12px!important;border-radius:9px!important}.topActions #saveGroupMemory{font-size:13px!important}.saveInfoBox{margin-top:5px!important;min-height:0!important;max-height:24px!important;height:24px!important;padding:3px 7px!important;font-size:11px!important;line-height:17px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;color:#64748b!important;background:#f8fafc!important}.saveInfoBox br{display:none!important}
@@ -126,7 +126,7 @@ main.wrap{grid-template-rows:auto minmax(0,1fr)!important;}
 
 
 /* =========================================================
-   v31 コンパクト操作バー版
+   v32 ドラッグ横スクロール・印刷1回化版
 ========================================================= */
 main.wrap{grid-template-rows:auto minmax(0,1fr) auto!important;gap:8px!important;}
 .workflowCard{padding:8px 10px!important;}
@@ -173,7 +173,7 @@ main.wrap{grid-template-rows:auto minmax(0,1fr) auto!important;gap:8px!important
 
 
 /* =========================================================
-   v31 コンパクト操作バー版
+   v32 ドラッグ横スクロール・印刷1回化版
    - ページ全体スクロールを復帰
    - 生徒カードは従来どおり横スクロール
    - 右側パネルを廃止し、確認ログをヘッダー右側へ移動
@@ -233,47 +233,50 @@ main.wrap{max-width:none!important;height:auto!important;min-height:0!important;
 
 
 /* =========================================================
-   v31 コンパクト操作バー版
-   - 上部ログ欄を非表示
-   - 操作ボタンの重なりを防止
-   - ③前回を復元を②と同じ青色に統一
+   v32 ドラッグ横スクロール・印刷1回化版
+   - 生徒名未入力ログ行を非表示
+   - ②③④の重なりを防止
+   - ③前回を復元を②と同じ青色に変更
 ========================================================= */
 .workflowCard{padding:8px 12px!important;}
-.saveInfoBox{display:none!important;}
-#saveInfo{display:none!important;}
 .topActions{
-  display:flex!important;
-  flex-wrap:wrap!important;
+  display:grid!important;
+  grid-template-columns:minmax(360px,1fr) 150px max-content max-content max-content max-content!important;
+  gap:10px!important;
   align-items:end!important;
-  gap:8px!important;
 }
-.topActions .field.wide{
-  flex:1 1 520px!important;
-  min-width:360px!important;
-}
-.topActions .field:not(.wide){
-  flex:0 0 170px!important;
-  min-width:170px!important;
-}
+.topActions .field{min-width:0!important;}
+.topActions .field.wide{min-width:0!important;}
+.topActions input{width:100%!important;}
 .topActions button{
-  flex:0 0 auto!important;
+  position:relative!important;
+  z-index:1!important;
   white-space:nowrap!important;
   min-width:max-content!important;
+  height:36px!important;
+  min-height:36px!important;
+  padding:7px 13px!important;
+  font-size:13px!important;
 }
-.topActions #applyStudents,
-.topActions #loadGroupMemory{
+#loadGroupMemory{
   background:#2563eb!important;
   color:#fff!important;
-  border:0!important;
-  box-shadow:0 8px 18px rgba(37,99,235,.22)!important;
+  border:1px solid #2563eb!important;
+  box-shadow:0 8px 18px rgba(37,99,235,.18)!important;
 }
-.topActions #loadGroupMemory:hover,
-.topActions #applyStudents:hover{filter:brightness(.97)!important;}
-.topActions #exportXlsx{background:#e5e7eb!important;color:#111827!important;}
-@media(max-width:900px){
-  .topActions .field.wide,
-  .topActions .field:not(.wide),
-  .topActions button{flex:1 1 100%!important;width:100%!important;}
+#applyStudents{
+  background:#2563eb!important;
+  color:#fff!important;
+  border:1px solid #2563eb!important;
+}
+#saveInfo.saveInfoBox{display:none!important;}
+.workflowCard .prepCompactCard{margin-top:8px!important;}
+@media(max-width:1050px){
+  .topActions{grid-template-columns:1fr 150px repeat(4,max-content)!important;overflow-x:auto!important;padding-bottom:2px!important;}
+}
+@media(max-width:760px){
+  .topActions{grid-template-columns:1fr 1fr!important;overflow:visible!important;}
+  .topActions button{width:100%!important;min-width:0!important;}
 }
 
 </style>
@@ -281,8 +284,8 @@ main.wrap{max-width:none!important;height:auto!important;min-height:0!important;
 <body>
 <header class="appHeader"><div class="wrap appHeaderInner">
   <div>
-    <h1>面談予定入力・準備資料アプリ <span class="versionBadge">v31 コンパクト操作バー版</span></h1>
-    <div class="sub">生徒カードは横スクロールで同時編集できます。操作バーを重ならないように整理し、マスタ設定は下にまとめて表示します。</div>
+    <h1>面談予定入力・準備資料アプリ <span class="versionBadge">v32 ドラッグ横スクロール・印刷1回化版</span></h1>
+    <div class="sub">生徒カードは横スクロールで同時編集できます。印刷メニューは上部、確認ログは右上、マスタ設定は下にまとめて表示します。</div>
   </div>
   <div class="saveWarningBadge" id="uxHeaderSaveBadge">未保存</div>
 </div></header>
@@ -3030,7 +3033,7 @@ function buildMeetingPrepPrintHtml(resultRecords, weeklyHtml){
   
 
 /* =========================================================
-   v31 コンパクト操作バー版
+   v32 ドラッグ横スクロール・印刷1回化版
 ========================================================= */
 main.wrap{grid-template-rows:auto minmax(0,1fr) auto!important;gap:8px!important;}
 .workflowCard{padding:8px 10px!important;}
@@ -3093,7 +3096,12 @@ main.wrap{grid-template-rows:auto minmax(0,1fr) auto!important;gap:8px!important
     window.addEventListener('load', function(){ setTimeout(fitMeetingPrepFirstPages, 60); });
   <\/script></body></html>`;
 }
+let __meetingPrepPrintBusy=false;
 function printHtmlInHiddenIframe(html){
+  // 印刷キャンセルを2回押す問題の対策：
+  // 1) 既存iframeを必ず消す 2) onload印刷を1回だけにする 3) afterprint/focus復帰でiframeを破棄する
+  if(__meetingPrepPrintBusy) return;
+  __meetingPrepPrintBusy=true;
   const oldFrame=document.getElementById('meetingPrepPrintFrame');
   if(oldFrame) oldFrame.remove();
   const frame=document.createElement('iframe');
@@ -3101,19 +3109,47 @@ function printHtmlInHiddenIframe(html){
   frame.style.position='fixed';
   frame.style.right='0';
   frame.style.bottom='0';
-  frame.style.width='0';
-  frame.style.height='0';
+  frame.style.width='1px';
+  frame.style.height='1px';
   frame.style.border='0';
   frame.style.opacity='0';
+  frame.style.pointerEvents='none';
+  frame.setAttribute('aria-hidden','true');
+  let printed=false;
+  let cleaned=false;
+  const cleanup=()=>{
+    if(cleaned) return;
+    cleaned=true;
+    setTimeout(()=>{
+      try{ frame.remove(); }catch(e){}
+      __meetingPrepPrintBusy=false;
+    },120);
+  };
   frame.onload=()=>{
+    if(printed) return;
+    printed=true;
+    frame.onload=null;
     setTimeout(()=>{
       try{
-        frame.contentWindow.focus();
-        frame.contentWindow.print();
+        const w=frame.contentWindow;
+        if(!w){ cleanup(); return; }
+        w.onafterprint=cleanup;
+        // Chrome/Edgeではキャンセル後にafterprintが不安定なことがあるため、
+        // 親画面にフォーカスが戻った時も後始末する。
+        const parentFocusCleanup=()=>{
+          window.removeEventListener('focus',parentFocusCleanup,true);
+          cleanup();
+        };
+        window.addEventListener('focus',parentFocusCleanup,true);
+        w.focus();
+        w.print();
+        // 念のため一定時間後にロックだけ解除。iframeが残っても次回印刷を邪魔しない。
+        setTimeout(()=>{ __meetingPrepPrintBusy=false; },2500);
       }catch(e){
+        cleanup();
         alert('印刷プレビューを開けませんでした。ブラウザの印刷権限やポップアップ設定を確認してください。');
       }
-    },700);
+    },450);
   };
   document.body.appendChild(frame);
   frame.srcdoc=html;
@@ -3220,7 +3256,7 @@ function buildWeeklyAbsentCallListPrintHtml(absentRows, resultRecords){
   return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>週面欠席者 電話確認リスト</title><style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif;color:#111827;margin:0;background:#fff}.page{box-sizing:border-box;width:210mm;min-height:297mm;padding:12mm}h1{font-size:22px;margin:0 0 4px}.subline{font-size:12px;color:#667085;margin-bottom:14px}.summary{border:1px solid #9ca3af;border-radius:8px;padding:8px 10px;margin-bottom:12px;font-size:13px;background:#f8fafc}table{border-collapse:collapse;width:100%;font-size:13px}th,td{border:1px solid #6b7280;padding:7px 6px;vertical-align:middle}th{background:#f3f4f6;text-align:center;font-weight:800}.center{text-align:center}.nameCell{font-size:15px;font-weight:800}.checkCell{text-align:center;font-size:22px;width:20mm}.memoCell{height:11mm;width:48mm}.detailRow td{background:#fff;padding:6px 8px}.absentDetailTitle{font-weight:800;margin:2px 0 5px;color:#1e40af}.detailTable{font-size:10.5px;margin:0 0 6px}.detailTable th,.detailTable td{padding:4px 5px;border:1px solid #cbd5e1;vertical-align:top}.detailTable th{background:#eef2ff}.detailTable ul{margin:0;padding-left:15px}.listenBox{border:1px solid #c7d2fe;background:#eef2ff;border-radius:6px;padding:5px 7px;font-size:11px;line-height:1.45}.muted{color:#667085}.note{margin-top:10px;font-size:11px;color:#667085;line-height:1.6}.footerLine{margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:12mm;font-size:13px}.footerLine div{border-bottom:1px solid #9ca3af;height:12mm}@page{size:A4 portrait;margin:0}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.page{page-break-after:always}}
 
 /* =========================================================
-   v31 コンパクト操作バー版
+   v32 ドラッグ横スクロール・印刷1回化版
 ========================================================= */
 main.wrap{grid-template-rows:auto minmax(0,1fr) auto!important;gap:8px!important;}
 .workflowCard{padding:8px 10px!important;}
@@ -3412,7 +3448,7 @@ function initRealAppUX(){
 
 
 /* =========================================================
-   v31 コンパクト操作バー版
+   v32 ドラッグ横スクロール・印刷1回化版
 ========================================================= */
 const UX26_STATE={activeStudent:''};
 function ux26BuildWorkspace(){
@@ -3575,7 +3611,7 @@ function initNoScrollUX(){
 
 
 /* =========================================================
-   v31 コンパクト操作バー版 JS
+   v32 ドラッグ横スクロール・印刷1回化版 JS
 ========================================================= */
 function ux30EnsureHeaderLog(){
   const inner=document.querySelector('.appHeaderInner');
@@ -3670,7 +3706,111 @@ function initV30ClassicHorizontalUX(){
   ux30UpdateHeaderLog();
 }
 
+
+
+/* =========================================================
+   v32 ドラッグ横スクロール・印刷1回化
+========================================================= */
+(function injectV32Style(){
+  if(document.getElementById('v32DragScrollStyle')) return;
+  const style=document.createElement('style');
+  style.id='v32DragScrollStyle';
+  style.textContent=`
+    #studentGrid.studentGrid{cursor:grab;scrollbar-gutter:stable;}
+    #studentGrid.studentGrid.is-dragging{cursor:grabbing;user-select:none;}
+    #studentGrid.studentGrid textarea,
+    #studentGrid.studentGrid input,
+    #studentGrid.studentGrid select,
+    #studentGrid.studentGrid button,
+    #studentGrid.studentGrid label,
+    #studentGrid.studentGrid a{cursor:auto;}
+    #studentGrid.studentGrid .dragScrollHint{display:none;}
+    @media (pointer:fine){
+      #studentGrid.studentGrid::before{
+        content:'空白部分をつかんで横に動かせます';
+        display:block;
+        position:sticky;
+        left:4px;
+        width:max-content;
+        margin:0 0 6px 2px;
+        padding:3px 8px;
+        border-radius:999px;
+        background:#eff6ff;
+        border:1px solid #bfdbfe;
+        color:#1e40af;
+        font-size:11px;
+        font-weight:800;
+        z-index:2;
+      }
+    }
+  `;
+  document.head.appendChild(style);
+})();
+function initV32DragHorizontalScroll(){
+  const grid=document.getElementById('studentGrid');
+  if(!grid || grid.dataset.dragScrollReady==='1') return;
+  grid.dataset.dragScrollReady='1';
+  const interactive='textarea,input,select,button,a,label,summary,details,[contenteditable="true"],.goukakuBox,.goukakuModal,.modalInner';
+  let down=false;
+  let dragging=false;
+  let startX=0;
+  let startY=0;
+  let startLeft=0;
+  let pointerId=null;
+  grid.addEventListener('pointerdown',e=>{
+    if(e.button!==0) return;
+    if(e.target.closest(interactive)) return;
+    down=true;
+    dragging=false;
+    pointerId=e.pointerId;
+    startX=e.clientX;
+    startY=e.clientY;
+    startLeft=grid.scrollLeft;
+  });
+  grid.addEventListener('pointermove',e=>{
+    if(!down) return;
+    const dx=e.clientX-startX;
+    const dy=e.clientY-startY;
+    if(!dragging){
+      if(Math.abs(dx)<6 || Math.abs(dx)<Math.abs(dy)) return;
+      dragging=true;
+      grid.classList.add('is-dragging');
+      try{ grid.setPointerCapture(pointerId); }catch(err){}
+    }
+    grid.scrollLeft=startLeft-dx;
+    e.preventDefault();
+  },{passive:false});
+  const stop=()=>{
+    down=false;
+    if(dragging){
+      grid.classList.remove('is-dragging');
+      try{ grid.releasePointerCapture(pointerId); }catch(err){}
+    }
+    dragging=false;
+    pointerId=null;
+  };
+  grid.addEventListener('pointerup',stop);
+  grid.addEventListener('pointercancel',stop);
+  grid.addEventListener('mouseleave',()=>{ if(down) stop(); });
+  // Shift + ホイール、または横ホイールにも対応。縦スクロールを横移動に変換しすぎないようShift時だけ強める。
+  grid.addEventListener('wheel',e=>{
+    if(e.shiftKey && Math.abs(e.deltaY)>Math.abs(e.deltaX)){
+      grid.scrollLeft += e.deltaY;
+      e.preventDefault();
+    }
+  },{passive:false});
+}
+const V32_PREV_RENDER_STUDENTS=renderStudents;
+renderStudents=function(){
+  V32_PREV_RENDER_STUDENTS();
+  initV32DragHorizontalScroll();
+};
+function initV32(){
+  initV32DragHorizontalScroll();
+}
+
 init();
+initV32();
 initRealAppUX();
 initV30ClassicHorizontalUX();
 </script>
