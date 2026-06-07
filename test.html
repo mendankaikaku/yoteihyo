@@ -50,6 +50,7 @@ button{border:0;border-radius:11px;padding:9px 12px;background:var(--accent);col
 button.secondary{background:#475467;}
 button.ghost{background:#eef2ff;color:#1e40af;}
 button.ok{background:var(--ok);}
+button.saveImportant{background:#dc2626;color:#fff;}
 button:disabled{opacity:.45;cursor:not-allowed;}
 .btnRow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;}
 .primaryAction{font-size:14px;padding:11px 14px;}
@@ -141,15 +142,15 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
   <div class="headerInner">
     <div>
       <h1>予定統合アプリ</h1>
-      <div class="headerHint">予定・結果・対応表をまとめて、掲示用Excelと確認リストを作ります。</div>
+      <div class="headerHint">①フォルダー読取 → ②統合 → ③出力 → ④必ず保存</div>
     </div>
     <div class="headerActions">
-      <button id="mergeBtn" class="ok primaryAction">統合する</button>
-      <button id="download2wBtn" disabled>2週間出力</button>
-      <button id="download1mBtn" disabled>1か月出力</button>
-      <button id="downloadBtn" disabled>期間指定出力</button>
-      <button id="downloadAllListBtn" class="ghost" disabled>全員リスト</button>
-      <button id="downloadMonthlyPosterBtn" class="ghost">月間掲示</button>
+      <button id="mergeBtn" class="ok primaryAction">② 統合する</button>
+      <button id="download2wBtn" disabled>③ 2週間出力</button>
+      <button id="download1mBtn" disabled>③ 1か月出力</button>
+      <button id="downloadBtn" disabled>③ 期間指定出力</button>
+      <button id="downloadAllListBtn" class="ghost" disabled>③ 全員リスト</button>
+      <button id="downloadMonthlyPosterBtn" class="ghost">③ 月間掲示</button>
       <button id="clearBtn" class="secondary">リセット</button>
     </div>
   </div>
@@ -158,11 +159,11 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
 <div class="wrap">
   <section class="controlGrid">
     <div class="card">
-      <p class="cardTitle"><span class="step">1</span>フォルダーを選ぶ</p>
+      <p class="cardTitle"><span class="step">①</span>フォルダーを読み取る</p>
       <div class="hint" style="margin-bottom:10px;">「まとめて復元」フォルダーを選ぶだけで、json / 学習結果 / 打ち込み結果 / 対応表 / 全員リスト / 毎日更新 / 全体予定表 を自動で振り分けます。</div>
       <div class="bundleActionGrid">
-        <button id="readBundleBtn" class="ok primaryAction" type="button">フォルダーを読み取る</button>
-        <button id="saveResultHistoryBtn" class="ghost primaryAction" type="button">結果履歴を保存</button>
+        <button id="readBundleBtn" class="ok primaryAction" type="button">① フォルダーを読み取る</button>
+        <button id="saveResultHistoryBtn" class="saveImportant primaryAction" type="button">④ 結果履歴を必ず保存</button>
       </div>
       <div id="bundleReadSummary" class="hint" style="margin-top:10px;white-space:pre-wrap;">まだ読み込んでいません</div>
       
@@ -183,7 +184,7 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
     </div>
 
     <div class="card">
-      <p class="cardTitle"><span class="step">2</span>条件を決める</p>
+      <p class="cardTitle noStep">条件を決める</p>
       <div class="compactFields">
         <div>
           <label>基準日</label>
@@ -209,14 +210,14 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
     </div>
 
     <div class="card">
-      <p class="cardTitle"><span class="step">3</span>表示を選ぶ</p>
+      <p class="cardTitle noStep">表示を選ぶ</p>
       <div class="checkGrid">
         <label><input id="splitLines" type="checkbox" checked />改行予定を分割</label>
         <label><input id="includeRowName" type="checkbox" checked />時限/行名を表示</label>
         <label><input id="sortStudents" type="checkbox" checked />五十音順に並べる</label>
         <label><input id="colorWeekend" type="checkbox" checked />土日を色分け</label>
       </div>
-      <div class="hint" style="margin-top:10px;">フォルダーを読み取ったら、上の「統合する」を押してください。</div>
+      <div class="hint" style="margin-top:10px;">操作順は、①フォルダーを読み取る → ②統合する → ③出力ボタンを選ぶ → ④必ず保存、です。</div>
       <div class="hint" style="margin-top:10px;">月間掲示の手修正版は「毎日更新」フォルダーから復元します。</div>
       <details>
         <summary>Excel形式の確認</summary>
