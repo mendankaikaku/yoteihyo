@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>面談予定入力・準備資料アプリ v34（3人一画面・横スクロール版）</title>
+<title>面談予定入力・準備資料アプリ v31（上部整理・横スクロール版）</title>
 <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
 <script src="./libs/xlsx.bundle.js"></script>
 <script>if(!window.XLSX){document.write('<script src="./libs/xlsx.full.min.js"><\/script>');}</script>
@@ -284,8 +284,8 @@ main.wrap{max-width:none!important;height:auto!important;min-height:0!important;
 <body>
 <header class="appHeader"><div class="wrap appHeaderInner">
   <div>
-    <h1>面談予定入力・準備資料アプリ <span class="versionBadge">v34 3人一画面・横スクロール版</span></h1>
-    <div class="sub">生徒カードを3人まで一画面に収め、4人以上は横ドラッグで移動できます。印刷メニューは上部、確認ログは右上、マスタ設定は下にまとめて表示します。</div>
+    <h1>面談予定入力・準備資料アプリ <span class="versionBadge">v32 ドラッグ横スクロール・印刷1回化版</span></h1>
+    <div class="sub">生徒カードは横スクロールで同時編集できます。印刷メニューは上部、確認ログは右上、マスタ設定は下にまとめて表示します。</div>
   </div>
   <div class="saveWarningBadge" id="uxHeaderSaveBadge">未保存</div>
 </div></header>
@@ -3887,119 +3887,6 @@ renderStudents=function(){
   initV32DragHorizontalScroll();
   v33ResetStudentScrollLeft();
 };
-
-
-/* =========================================================
-   v34 3人一画面・横スクロール版
-   - 生徒カードを標準で3列表示
-   - 4人以上は横ドラッグ/横スクロール
-   - 入力欄と表を少しだけ圧縮して、3人表示でも読めるサイズに調整
-========================================================= */
-(function injectV34ThreeCardsOneScreen(){
-  if(document.getElementById('v34ThreeCardsOneScreenStyle')) return;
-  const style=document.createElement('style');
-  style.id='v34ThreeCardsOneScreenStyle';
-  style.textContent=`
-    :root{--v34-card-gap:10px;}
-    .wrap{max-width:none!important;width:100%!important;padding-left:14px!important;padding-right:14px!important;}
-
-    /* 3人が一画面に入る幅。4人目以降は横スクロール。 */
-    #studentGrid.studentGrid{
-      display:grid!important;
-      grid-auto-flow:column!important;
-      grid-auto-columns:calc((100% - (var(--v34-card-gap) * 2)) / 3)!important;
-      grid-template-columns:none!important;
-      gap:var(--v34-card-gap)!important;
-      overflow-x:auto!important;
-      overflow-y:visible!important;
-      padding:26px 2px 12px!important;
-      margin:0 0 10px!important;
-      align-items:start!important;
-      scroll-snap-type:x proximity!important;
-    }
-    #studentGrid .studentCard{
-      width:100%!important;
-      min-width:0!important;
-      max-width:none!important;
-      margin:0!important;
-      padding:11px!important;
-      scroll-snap-align:start!important;
-    }
-
-    /* カード上部を省スペース化。 */
-    #studentGrid .studentHead{
-      margin:0 0 7px!important;
-      padding:0 0 7px!important;
-      gap:6px!important;
-      align-items:flex-start!important;
-    }
-    #studentGrid .studentNameTitle{font-size:17px!important;line-height:1.2!important;}
-    #studentGrid .miniBar{gap:5px!important;justify-content:flex-end!important;}
-    #studentGrid .miniBar button,
-    #studentGrid .miniBar .tinyCheck{
-      min-height:28px!important;
-      padding:5px 7px!important;
-      font-size:11px!important;
-      border-radius:9px!important;
-    }
-
-    /* 学年・生徒番号は横並びのまま重ならないように。 */
-    #studentGrid .studentMeta{
-      display:grid!important;
-      grid-template-columns:minmax(72px,0.8fr) minmax(116px,1.2fr)!important;
-      gap:6px!important;
-      max-width:none!important;
-      margin-bottom:7px!important;
-      align-items:end!important;
-    }
-    #studentGrid .studentMeta .field{min-width:0!important;width:100%!important;}
-    #studentGrid .field label{font-size:10px!important;}
-    #studentGrid .field input,
-    #studentGrid .field select,
-    #studentGrid .field textarea{
-      min-height:32px!important;
-      padding:6px 7px!important;
-      font-size:12px!important;
-      min-width:0!important;
-      width:100%!important;
-    }
-
-    /* 予定表を3人表示用に圧縮。各カード内で必要なら表だけ横スクロール。 */
-    #studentGrid .studentSection{margin-top:8px!important;}
-    #studentGrid .studentSection .sectionTitle{font-size:13px!important;margin-bottom:5px!important;}
-    #studentGrid table{font-size:11px!important;table-layout:fixed!important;}
-    #studentGrid th,#studentGrid td{padding:3px!important;}
-    #studentGrid .scheduleTable th:first-child,
-    #studentGrid .scheduleTable td.label{width:72px!important;min-width:72px!important;}
-    #studentGrid .scheduleTable th:not(:first-child){min-width:56px!important;}
-    #studentGrid .scheduleTable textarea{
-      min-height:30px!important;
-      font-size:11px!important;
-      line-height:1.25!important;
-      padding:3px!important;
-    }
-    #studentGrid .materialTable th:first-child{width:60px!important;}
-    #studentGrid .materialTable th:last-child{width:46px!important;}
-    #studentGrid .materialTable textarea{
-      min-height:30px!important;
-      font-size:11px!important;
-      line-height:1.25!important;
-      padding:3px!important;
-    }
-    #studentGrid .actions{gap:5px!important;margin-top:6px!important;}
-    #studentGrid .actions button{min-height:27px!important;padding:5px 8px!important;font-size:11px!important;}
-
-    /* 画面幅が狭いときは2人→1人に自動調整。 */
-    @media(max-width:1300px){
-      #studentGrid.studentGrid{grid-auto-columns:calc((100% - var(--v34-card-gap)) / 2)!important;}
-    }
-    @media(max-width:820px){
-      #studentGrid.studentGrid{grid-auto-columns:92vw!important;}
-      #studentGrid .studentCard{min-width:92vw!important;}
-    }
-  `;
-  document.head.appendChild(style);
-})();
 
 init();
 initV32();
