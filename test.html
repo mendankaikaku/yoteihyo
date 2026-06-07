@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>予定入力HTML（面談準備・復元印刷v22 模試科目チェック全表示）</title>
+<title>面談予定入力・準備資料アプリ v26（ノースクロール実務UI版）</title>
 <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
 <script src="./libs/xlsx.bundle.js"></script>
 <script>if(!window.XLSX){document.write('<script src="./libs/xlsx.full.min.js"><\/script>');}</script>
@@ -73,40 +73,80 @@ details.advanced{background:#fff;border-color:#e2e8f0}details.advanced summary{f
 .prepInside{margin-top:12px;grid-template-columns:minmax(220px,1fr) minmax(220px,1fr) auto}
 @media(max-width:900px){.prepCompactCard{max-width:none}.prepInside{grid-template-columns:1fr}}
 
+
+
+/* =========================================================
+   v25 実務UI版：状態表示・操作順・保存忘れ防止
+========================================================= */
+.appHeader{background:rgba(248,250,252,.96);border-bottom:1px solid #dbe4ef;box-shadow:0 2px 14px rgba(15,23,42,.06)}
+.appHeaderInner{display:flex;justify-content:space-between;align-items:center;gap:16px}.versionBadge{font-size:12px;color:#1d4ed8;background:#dbeafe;border:1px solid #bfdbfe;border-radius:999px;padding:3px 8px;vertical-align:middle}.saveWarningBadge{min-width:92px;text-align:center;border-radius:999px;padding:8px 12px;font-weight:900;font-size:13px;border:1px solid #fecaca;background:#fee2e2;color:#991b1b}.saveWarningBadge.saved{border-color:#bbf7d0;background:#dcfce7;color:#166534}.saveWarningBadge.loaded{border-color:#bfdbfe;background:#dbeafe;color:#1e40af}
+.workflowCard{border-top:6px solid #2563eb}.workflowCard .sectionTitle{font-size:18px}.topActions{grid-template-columns:minmax(320px,1fr) 170px auto auto auto auto}.topActions button{white-space:nowrap}.topActions #saveGroupMemory{font-size:16px;box-shadow:0 8px 18px rgba(22,163,74,.22)}.topActions #loadGroupMemory{background:#eef2ff;color:#1e40af;border:1px solid #c7d2fe}.appSteps{grid-template-columns:repeat(4,minmax(0,1fr))}.appSteps .quickStep{position:relative;background:#f8fafc;border-color:#dbe4ef;color:#334155}.appSteps .quickStep b{font-size:14px}.appSteps .quickStep:not(:last-child)::after{content:"→";position:absolute;right:-14px;top:50%;transform:translateY(-50%);color:#94a3b8;font-weight:900}.saveInfoBox{margin-top:12px;border:1px solid #dbe4ef;background:#f8fafc;border-radius:12px;padding:10px 12px;min-height:40px;color:#475569;line-height:1.6}
+.uxDashboard{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;padding:14px;background:#0f172a;color:#fff;border:0}.uxStat{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px}.uxStat span{display:block;font-size:12px;color:#cbd5e1;font-weight:800}.uxStat b{display:block;font-size:22px;margin-top:3px}.uxStat small{display:block;font-size:11px;color:#94a3b8;margin-top:2px}.uxDashboard.saved{background:#14532d}.uxDashboard.loaded{background:#172554}.studentCard{transition:box-shadow .15s ease, transform .15s ease}.studentCard:hover{box-shadow:0 14px 32px rgba(15,23,42,.10);transform:translateY(-1px)}.studentCard.hasAbsent{border-top-color:#f97316}.studentCard.hasFailure{box-shadow:0 0 0 2px rgba(59,130,246,.16), var(--shadow)}.tinyCheck{transition:.12s}.tinyCheck:has(input:checked){background:#ffedd5;border-color:#fb923c;color:#9a3412}.studentSection .sectionTitle{color:#172033}.studentSection:has(textarea[data-kind="failureReason"]){background:linear-gradient(180deg,#fff 0%,#f8fafc 100%);border-radius:12px}.prepCompactCard{border-left:6px solid #7c3aed}.prepCompactCard summary{font-size:15px}.prepCompactCard button#printMeetingPrep{background:#7c3aed;color:#fff}.prepCompactCard button#printWeeklyAbsentList{background:#f97316;color:#fff}.masterGridHint::before{content:"普段は閉じたままでOK：";font-weight:900;color:#1e40af}.advancedButtons .danger{font-size:12px;opacity:.78}.uxActionDock{position:fixed;right:18px;bottom:18px;z-index:30;background:#fff;border:1px solid #dbe4ef;border-radius:18px;box-shadow:0 20px 50px rgba(15,23,42,.18);padding:10px;display:flex;gap:8px;align-items:center}.uxActionDock button{min-height:34px;padding:8px 10px;font-size:12px}.uxActionDock .uxDockSave{background:#16a34a}.uxActionDock .uxDockPrint{background:#7c3aed}.uxActionDock .uxDockAbsent{background:#f97316}.uxActionDock .uxDockStatus{font-size:12px;color:#475569;font-weight:800;padding:0 4px;max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:1100px){.appHeaderInner{align-items:flex-start;flex-direction:column}.uxDashboard{grid-template-columns:1fr 1fr}.appSteps{grid-template-columns:1fr 1fr}.appSteps .quickStep::after{display:none}.uxActionDock{left:10px;right:10px;bottom:10px;justify-content:space-between}.uxActionDock .uxDockStatus{display:none}}
+@media(max-width:640px){.uxDashboard{grid-template-columns:1fr}.appSteps{grid-template-columns:1fr}.topActions{grid-template-columns:1fr}.saveWarningBadge{width:100%}}
+
+
+/* =========================================================
+   v26 ノースクロール実務UI版：3ペイン・1人編集・赤い未保存表示
+========================================================= */
+html,body{height:100%;overflow:hidden}
+body{background:#eef2f7}
+.appHeader{position:sticky;top:0;z-index:50}
+.appHeader .wrap{max-width:none;padding:8px 14px}.appHeader h1{font-size:18px;margin:0 0 3px}.appHeader .sub{font-size:12px;line-height:1.35}.appHeaderInner{gap:10px}.saveWarningBadge{box-shadow:0 8px 22px rgba(153,27,27,.16)}.saveWarningBadge.dirty{border-color:#fca5a5;background:#dc2626;color:#fff}.saveWarningBadge.loaded{border-color:#bfdbfe;background:#dbeafe;color:#1e40af}.saveWarningBadge.saved{border-color:#86efac;background:#dcfce7;color:#166534}
+main.wrap{max-width:none;height:calc(100vh - 76px);padding:10px 12px;display:grid;grid-template-rows:auto auto minmax(0,1fr);gap:10px;overflow:hidden}.workflowCard{margin:0;padding:10px 12px;border-top:0;border-left:6px solid #2563eb}.workflowCard .sectionTitle{display:none}.topActions{grid-template-columns:minmax(260px,1fr) 145px auto auto auto auto;gap:8px}.topActions .field label{font-size:11px}.topActions .field input,.topActions button{min-height:34px;padding:7px 10px;font-size:13px}.workflowCard .compactHint{display:none}.appSteps{display:none}.saveInfoBox{margin-top:7px;min-height:30px;padding:6px 9px;font-size:12px;line-height:1.35}
+.uxDashboard{margin:0;padding:8px 10px;gap:8px;border-radius:14px}.uxDashboard.dirty{background:#991b1b}.uxDashboard.loaded{background:#172554}.uxDashboard.saved{background:#14532d}.uxStat{padding:8px 10px;border-radius:12px}.uxStat span{font-size:11px}.uxStat b{font-size:17px}.uxStat small{font-size:10px;margin-top:0}
+.uxWorkspace{min-height:0;display:grid;grid-template-columns:230px minmax(0,1fr) 320px;gap:10px;overflow:hidden}.uxPane{min-height:0;background:#fff;border:1px solid #dbe4ef;border-radius:16px;box-shadow:0 10px 30px rgba(15,23,42,.06);overflow:hidden}.uxPaneHead{height:42px;padding:10px 12px;border-bottom:1px solid #e5e7eb;background:#f8fafc;font-weight:900;display:flex;align-items:center;justify-content:space-between;gap:8px}.uxPaneBody{height:calc(100% - 42px);overflow:auto;padding:10px}.uxStudentSidebar .uxPaneBody{padding:8px}.uxStudentList{display:flex;flex-direction:column;gap:6px}.uxStudentBtn{width:100%;border:1px solid #dbe4ef;background:#fff;color:#172033;border-radius:12px;box-shadow:none;min-height:42px;text-align:left;padding:8px 9px;display:flex;align-items:center;justify-content:space-between;gap:7px}.uxStudentBtn.active{background:#dbeafe;border-color:#93c5fd;color:#1e3a8a}.uxStudentBtn .name{font-weight:900;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.uxStudentBadges{display:flex;gap:3px;flex-shrink:0}.uxMiniBadge{font-size:10px;border-radius:999px;padding:2px 5px;font-weight:900}.uxMiniBadge.absent{background:#ffedd5;color:#9a3412}.uxMiniBadge.failure{background:#dbeafe;color:#1e40af}.uxEmptySelect{height:100%;display:flex;align-items:center;justify-content:center;color:#64748b;font-weight:800;text-align:center;line-height:1.7}.uxStudentMain .uxPaneBody{padding:0}.uxStudentMain #studentGrid{height:100%;display:block;overflow:auto;padding:10px}.uxStudentMain .studentCard{min-width:0;margin:0;height:auto;border-top:0;border-left:5px solid #dbeafe}.uxStudentMain .studentCard:not(.uxActiveStudentCard){display:none}.uxStudentMain .studentCard.uxActiveStudentCard{display:block}.uxStudentMain .studentCard.hasAbsent{border-left-color:#f97316}.uxStudentMain .studentCard.hasFailure{box-shadow:0 0 0 2px rgba(37,99,235,.12),0 10px 30px rgba(15,23,42,.06)}.studentHead{position:sticky;top:0;background:#fff;z-index:5;margin:-16px -16px 12px;padding:12px 16px;border-radius:12px 12px 0 0}.studentSection{margin-top:12px}.scheduleTable textarea{min-height:38px}.materialTable textarea{min-height:36px}.studentMeta{margin-bottom:8px}.uxRightPanel .prepCompactCard,.uxRightPanel .card{margin:0 0 10px;padding:10px;border-radius:14px;box-shadow:none}.uxRightPanel .prepCompactCard{max-width:none;border-left:5px solid #7c3aed}.uxRightPanel .prepInside{grid-template-columns:1fr!important}.uxRightPanel .printActions{gap:8px}.uxRightPanel .compactHint{font-size:11px}.uxStatusList{display:flex;flex-direction:column;gap:7px}.uxStatusItem{border:1px solid #e5e7eb;background:#f8fafc;border-radius:12px;padding:8px;font-size:12px;line-height:1.45}.uxStatusItem b{display:block;font-size:13px;margin-bottom:2px}.uxStatusItem.warn{border-color:#fed7aa;background:#fff7ed;color:#9a3412}.uxStatusItem.info{border-color:#bfdbfe;background:#eff6ff;color:#1e40af}.uxSettingsBox details{border:1px solid #e5e7eb;border-radius:12px;background:#fff;margin-top:8px;padding:8px}.uxSettingsBox summary{cursor:pointer;font-weight:900;color:#334155}.uxHiddenOriginalSections{display:none!important}.uxActionDock{display:none}.prepCompactCard{margin:0}.card{margin:0}.notice{display:none!important}
+@media(max-width:1150px){html,body{overflow:auto}main.wrap{height:auto;overflow:visible;display:block}.uxWorkspace{grid-template-columns:1fr}.uxPane{margin-bottom:10px;min-height:220px}.uxStudentMain #studentGrid{max-height:none}.topActions{grid-template-columns:1fr 1fr}.uxDashboard{grid-template-columns:1fr 1fr}.uxActionDock{display:flex}.appSteps{display:grid}.workflowCard .compactHint{display:block}}
+@media(max-width:700px){.topActions{grid-template-columns:1fr}.uxDashboard{grid-template-columns:1fr}.appHeaderInner{align-items:flex-start;flex-direction:column}.saveWarningBadge{width:100%}}
+
 </style>
 </head>
 <body>
-<header><div class="wrap"><h1><span style="font-size:18px;color:#dc2626;font-weight:900">席外す前に保存忘れないで！</span> <span style="font-size:13px;color:#2563eb">v24 保存注意表示</span></h1><div class="sub">複数生徒の予定入力、前回内容の復元、結果Excel・週面シート・合格設計図を使った面談準備資料印刷まで、この画面で行います。</div></div></header>
+<header class="appHeader"><div class="wrap appHeaderInner">
+  <div>
+    <h1>面談予定入力・準備資料アプリ <span class="versionBadge">v26 ノースクロール実務UI版</span></h1>
+    <div class="sub">左の生徒一覧から1人ずつ編集し、右の確認・印刷パネルで状態を確認します。ページ全体のスクロールをできるだけ使わない画面に整理しました。</div>
+  </div>
+  <div class="saveWarningBadge" id="uxHeaderSaveBadge">未保存</div>
+</div></header>
 <main class="wrap">
-  <section class="card">
-    <p class="sectionTitle">基本操作</p>
+  <section class="card workflowCard" id="uxWorkflowCard">
+    <p class="sectionTitle">今日の操作</p>
     <div class="topActions">
       <div class="field wide"><label>① 生徒名（複数はカンマ区切り）</label><input id="studentNames" placeholder="例：佐藤, 鈴木, 高橋" /></div>
       <div class="field"><label>開始日</label><input id="weekStart" type="date" /></div>
-      <button id="applyStudents" class="primaryBig">② 反映</button>
-      <button class="secondary primaryBig" id="loadGroupMemory">③ 復元</button>
+      <button id="applyStudents" class="primaryBig">② 生徒欄を作る</button>
+      <button class="secondary primaryBig" id="loadGroupMemory">③ 前回を復元</button>
       <button class="ok primaryBig" id="saveGroupMemory">④ 保存</button>
-      <button class="secondary" id="exportXlsx">ZIP出力</button>
+      <button class="secondary" id="exportXlsx">予備ZIP出力</button>
     </div>
-    <div class="quickGuide">
-      <div class="quickStep"><b>1. 生徒を入力</b>カンマ区切りで複数人を同時表示。</div>
-      <div class="quickStep"><b>2. 復元</b>保存用フォルダのJSON、なければブラウザ内保存から復元。</div>
-      <div class="quickStep"><b>3. 入力・確認</b>予定、模試、イベント、合格設計図を確認。</div>
-      <div class="quickStep"><b>4. 保存・印刷</b>保存でExcel出力、印刷で面談準備資料作成。</div>
+    <div class="quickGuide appSteps">
+      <div class="quickStep"><b>1. 生徒を入力</b>複数人はカンマ区切り。ここが印刷対象になります。</div>
+      <div class="quickStep"><b>2. 前回を復元</b>保存用フォルダのJSONを優先して読み込みます。</div>
+      <div class="quickStep"><b>3. 入力・確認</b>予定、教材、模試、イベント、未達理由を確認します。</div>
+      <div class="quickStep"><b>4. 保存して印刷</b>席を外す前に保存。必要に応じて面談資料を印刷します。</div>
     </div>
     <div class="compactHint">Enterで次の入力欄へ移動します。改行は Shift + Enter。保存時は選択した保存用フォルダ配下から生徒名フォルダを検索してExcelを保存します。</div>
-    <div id="saveInfo"></div>
+    <div id="saveInfo" class="saveInfoBox"></div>
+  </section>
+
+  <section class="card uxDashboard" id="uxDashboard" aria-label="現在の状態">
+    <div class="uxStat"><span>保存状態</span><b id="uxSaveStatus">未保存</b><small id="uxLastSaveTime">まだ保存していません</small></div>
+    <div class="uxStat"><span>表示中</span><b id="uxStudentCount">0名</b><small>この画面の生徒</small></div>
+    <div class="uxStat"><span>週面欠席</span><b id="uxAbsentCount">0名</b><small>電話確認リスト対象</small></div>
+    <div class="uxStat"><span>未達理由あり</span><b id="uxFailureCount">0名</b><small>面談準備に反映</small></div>
+    <div class="uxStat"><span>印刷</span><b id="uxPrintTargetCount">0名</b><small>面談準備資料の対象</small></div>
   </section>
 
   <div id="studentGrid" class="studentGrid"></div>
 
   <section class="card prepCompactCard">
     <details id="meetingPrepDetails" class="prepDetails">
-      <summary>面談準備資料を開く</summary>
+      <summary>印刷メニューを開く</summary>
       <div class="printActions prepInside" style="grid-template-columns:minmax(260px,1fr) 170px auto auto;">
         <div class="compactHint" style="margin-top:0">復元ボタンで読み込んだ「まとめて復元」フォルダから、結果履歴JSON・学習結果Excel・週面シート・合格設計図を自動で使います。週面欠席チェックを付けた生徒だけの電話確認リストも印刷できます。</div>
         <div class="field"><label>週面欠席リスト対象日</label><input id="weeklyAbsentTargetDate" type="date"></div>
-        <button class="secondary primaryBig" id="printMeetingPrep" type="button">印刷</button>
+        <button class="secondary primaryBig" id="printMeetingPrep" type="button">面談準備を印刷</button>
         <button class="secondary primaryBig" id="printWeeklyAbsentList" type="button">週面欠席者リスト印刷</button>
       </div>
       <div id="meetingPrepFolderInfo" class="compactHint">復元した内容を先週分として使い、今週欄は印刷時だけ白紙にします。復元時に「まとめて復元」フォルダを選ぶと、json/result_history.json、学習結果フォルダ内の結果Excel、打ち込み結果/担任助手フォルダ内の週面シート、担任助手フォルダ/生徒名フォルダ内の合格設計図PDFまたはExcelを自動で読みます。</div>
@@ -3011,7 +3051,253 @@ function bindGlobalEvents(){
   const sts=$('#saveSubjectTemplate'); if(sts)sts.onclick=saveSubjectTemplateFromEditor;
   const clear=$('#clearAll'); if(clear)clear.onclick=()=>{if(confirm('入力内容をすべて消しますか？')){localStorage.removeItem(groupKey()); students.forEach(n=>localStorage.removeItem(indivKey(n))); location.reload()}};
 }
+
+/* =========================================================
+   v25 実務UI版：保存状態・一覧カウント・下部クイック操作
+========================================================= */
+const UX_STATE={dirty:true,lastSavedAt:null,mode:'dirty'};
+const UX_ORIGINAL_SHOW_SAVE_INFO=showSaveInfo;
+showSaveInfo=function(text){
+  UX_ORIGINAL_SHOW_SAVE_INFO(text);
+  const t=String(text||'');
+  if(/保存済み|保存が完了|保存しました|同期しました/.test(t)) uxSetSaved('saved');
+  else if(/復元しました|読み込みました|反映しました|選択しました/.test(t)) uxSetSaved('loaded');
+  uxUpdateSummary();
+};
+function uxEnsureDock(){
+  if(document.getElementById('uxActionDock')) return;
+  const dock=document.createElement('div');
+  dock.id='uxActionDock';
+  dock.className='uxActionDock';
+  dock.innerHTML='<span class="uxDockStatus" id="uxDockStatus">未保存</span><button type="button" class="uxDockSave">保存</button><button type="button" class="uxDockPrint">面談印刷</button><button type="button" class="uxDockAbsent">欠席リスト</button>';
+  document.body.appendChild(dock);
+  dock.querySelector('.uxDockSave').onclick=()=>document.getElementById('saveGroupMemory')?.click();
+  dock.querySelector('.uxDockPrint').onclick=()=>document.getElementById('printMeetingPrep')?.click();
+  dock.querySelector('.uxDockAbsent').onclick=()=>document.getElementById('printWeeklyAbsentList')?.click();
+}
+function uxSetDirty(){
+  if(!UX_STATE.dirty){UX_STATE.dirty=true;UX_STATE.mode='dirty';}
+  uxUpdateSummary();
+}
+function uxSetSaved(mode='saved'){
+  UX_STATE.dirty=false;
+  UX_STATE.mode=mode;
+  UX_STATE.lastSavedAt=new Date();
+  uxUpdateSummary();
+}
+function uxCountMeaningfulStudents(){
+  try{return students.filter(n=>studentHasMeaningfulData(ensureStudent(n))).length;}catch(e){return students.length||0;}
+}
+function uxUpdateSummary(){
+  try{ syncFromDom(); }catch(e){}
+  const count=students.length||0;
+  let absent=0, failure=0;
+  students.forEach(name=>{
+    const d=ensureStudent(name);
+    if(d.weeklyMeetingAbsent) absent++;
+    if(String(d.failureReason||'').trim()) failure++;
+  });
+  const statusText=UX_STATE.dirty?'未保存':(UX_STATE.mode==='loaded'?'復元済み':'保存済み');
+  const header=document.getElementById('uxHeaderSaveBadge');
+  const stat=document.getElementById('uxSaveStatus');
+  const dock=document.getElementById('uxDockStatus');
+  [header,stat,dock].forEach(el=>{if(el)el.textContent=statusText;});
+  if(header){header.classList.toggle('saved',!UX_STATE.dirty&&UX_STATE.mode==='saved');header.classList.toggle('loaded',!UX_STATE.dirty&&UX_STATE.mode==='loaded');}
+  const dash=document.getElementById('uxDashboard');
+  if(dash){dash.classList.toggle('saved',!UX_STATE.dirty&&UX_STATE.mode==='saved');dash.classList.toggle('loaded',!UX_STATE.dirty&&UX_STATE.mode==='loaded');}
+  const last=document.getElementById('uxLastSaveTime');
+  if(last) last.textContent=UX_STATE.lastSavedAt ? `最終更新：${UX_STATE.lastSavedAt.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}` : 'まだ保存していません';
+  const set=(id,val)=>{const el=document.getElementById(id); if(el)el.textContent=val;};
+  set('uxStudentCount',`${count}名`); set('uxAbsentCount',`${absent}名`); set('uxFailureCount',`${failure}名`); set('uxPrintTargetCount',`${uxCountMeaningfulStudents()}名`);
+  document.querySelectorAll('[data-student-card]').forEach(card=>{
+    const name=card.getAttribute('data-student-card')||'';
+    const d=ensureStudent(name);
+    card.classList.toggle('hasAbsent',!!d.weeklyMeetingAbsent);
+    card.classList.toggle('hasFailure',!!String(d.failureReason||'').trim());
+  });
+}
+function uxBindDirtyTracking(){
+  document.addEventListener('input',e=>{
+    if(e.target && e.target.closest('main')) uxSetDirty();
+  },true);
+  document.addEventListener('change',e=>{
+    if(e.target && e.target.closest('main')) uxSetDirty();
+  },true);
+  window.addEventListener('beforeunload',e=>{
+    if(!UX_STATE.dirty) return;
+    e.preventDefault();
+    e.returnValue='入力内容が保存されていない可能性があります。席を外す前に保存してください。';
+  });
+}
+const UX_ORIGINAL_RENDER_STUDENTS=renderStudents;
+renderStudents=function(){
+  UX_ORIGINAL_RENDER_STUDENTS();
+  uxUpdateSummary();
+};
+const UX_ORIGINAL_APPLY_STUDENTS=applyStudents;
+applyStudents=function(){
+  UX_ORIGINAL_APPLY_STUDENTS();
+  uxUpdateSummary();
+};
+function initRealAppUX(){
+  uxEnsureDock();
+  uxBindDirtyTracking();
+  uxUpdateSummary();
+}
+
+
+/* =========================================================
+   v26 ノースクロール実務UI版：左一覧・中央1人編集・右確認
+========================================================= */
+const UX26_STATE={activeStudent:''};
+function ux26BuildWorkspace(){
+  const main=document.querySelector('main.wrap');
+  const grid=document.getElementById('studentGrid');
+  const dash=document.getElementById('uxDashboard');
+  if(!main||!grid||document.getElementById('uxWorkspace')) return;
+  const workspace=document.createElement('section');
+  workspace.id='uxWorkspace';
+  workspace.className='uxWorkspace';
+  workspace.innerHTML=`
+    <aside class="uxPane uxStudentSidebar"><div class="uxPaneHead"><span>生徒一覧</span><small id="uxSidebarCount">0名</small></div><div class="uxPaneBody"><div id="uxStudentList" class="uxStudentList"></div></div></aside>
+    <section class="uxPane uxStudentMain"><div class="uxPaneHead"><span id="uxActiveStudentTitle">生徒を選択</span><small>1人ずつ編集</small></div><div class="uxPaneBody" id="uxStudentMainBody"></div></section>
+    <aside class="uxPane uxRightPanel"><div class="uxPaneHead"><span>確認・印刷</span><button type="button" class="small secondary" id="uxSettingsToggleBtn">設定</button></div><div class="uxPaneBody" id="uxRightPaneBody"><div id="uxStatusList" class="uxStatusList"></div></div></aside>`;
+  dash.insertAdjacentElement('afterend',workspace);
+  document.getElementById('uxStudentMainBody').appendChild(grid);
+  const right=document.getElementById('uxRightPaneBody');
+  const prep=document.querySelector('.prepCompactCard');
+  if(prep) right.appendChild(prep);
+  const settings=document.createElement('div');
+  settings.id='uxSettingsBox';
+  settings.className='uxSettingsBox';
+  settings.innerHTML='<details><summary>模試・イベント・コメント設定を開く</summary><div id="uxMovedSettings"></div></details>';
+  right.appendChild(settings);
+  const moved=settings.querySelector('#uxMovedSettings');
+  Array.from(main.children).forEach(el=>{
+    if(el===workspace||el===document.getElementById('uxWorkflowCard')||el===document.getElementById('uxDashboard')) return;
+    if(el.id==='studentGrid') return;
+    if(el.classList && el.classList.contains('prepCompactCard')) return;
+    const txt=el.textContent||'';
+    if(/模試マスタ|イベントマスタ|今週の方針|詳細設定|統合用HTML/.test(txt)) moved.appendChild(el);
+  });
+  const btn=document.getElementById('uxSettingsToggleBtn');
+  if(btn) btn.onclick=()=>{ const d=settings.querySelector('details'); if(d) d.open=!d.open; };
+}
+function ux26GetActiveStudent(){
+  if(UX26_STATE.activeStudent && students.includes(UX26_STATE.activeStudent)) return UX26_STATE.activeStudent;
+  UX26_STATE.activeStudent=students[0]||'';
+  return UX26_STATE.activeStudent;
+}
+function ux26SetActiveStudent(name){
+  UX26_STATE.activeStudent=name||'';
+  ux26RefreshStudentList();
+  ux26ShowActiveCard();
+  uxUpdateSummary();
+}
+function ux26RefreshStudentList(){
+  const list=document.getElementById('uxStudentList');
+  if(!list) return;
+  const active=ux26GetActiveStudent();
+  const escLocal=(s)=>String(s??'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  if(!students.length){
+    list.innerHTML='<div class="uxEmptySelect">上の欄に生徒名を入力して<br>「生徒欄を作る」を押してください。</div>';
+  }else{
+    list.innerHTML=students.map(name=>{
+      const d=ensureStudent(name);
+      const badges=[];
+      if(d.weeklyMeetingAbsent) badges.push('<span class="uxMiniBadge absent">欠席</span>');
+      if(String(d.failureReason||'').trim()) badges.push('<span class="uxMiniBadge failure">未達</span>');
+      return `<button type="button" class="uxStudentBtn ${name===active?'active':''}" data-ux-select-student="${escLocal(name)}"><span class="name">${escLocal(name)}</span><span class="uxStudentBadges">${badges.join('')}</span></button>`;
+    }).join('');
+    list.querySelectorAll('[data-ux-select-student]').forEach(btn=>{
+      btn.onclick=()=>ux26SetActiveStudent(btn.getAttribute('data-ux-select-student')||'');
+    });
+  }
+  const c=document.getElementById('uxSidebarCount'); if(c)c.textContent=`${students.length||0}名`;
+}
+function ux26ShowActiveCard(){
+  const active=ux26GetActiveStudent();
+  const title=document.getElementById('uxActiveStudentTitle');
+  if(title) title.textContent=active ? `${active} の入力` : '生徒を選択';
+  document.querySelectorAll('[data-student-card]').forEach(card=>{
+    const name=card.getAttribute('data-student-card')||'';
+    card.classList.toggle('uxActiveStudentCard',name===active);
+  });
+  const grid=document.getElementById('studentGrid');
+  if(grid && !students.length) grid.innerHTML='<div class="uxEmptySelect">生徒名を入力すると、ここに入力画面が表示されます。</div>';
+}
+function ux26UpdateRightStatus(){
+  const box=document.getElementById('uxStatusList');
+  if(!box) return;
+  let absent=[],failure=[],exam=0,event=0;
+  students.forEach(name=>{
+    const d=ensureStudent(name);
+    if(d.weeklyMeetingAbsent) absent.push(name);
+    if(String(d.failureReason||'').trim()) failure.push(name);
+    if((d.exams||[]).length) exam++;
+    if((d.events||[]).length) event++;
+  });
+  const active=ux26GetActiveStudent();
+  const activeData=active?ensureStudent(active):null;
+  box.innerHTML=`
+    <div class="uxStatusItem ${UX_STATE.dirty?'warn':'info'}"><b>${UX_STATE.dirty?'未保存です':'保存状態OK'}</b>${UX_STATE.dirty?'復元後・保存後に変更があります。席を外す前に保存してください。':'現在の内容は保存済みまたは復元直後です。'}</div>
+    <div class="uxStatusItem"><b>選択中</b>${active||'未選択'}</div>
+    <div class="uxStatusItem ${absent.length?'warn':''}"><b>週面欠席</b>${absent.length?absent.join('、'):'なし'}</div>
+    <div class="uxStatusItem ${failure.length?'info':''}"><b>未達理由あり</b>${failure.length?failure.join('、'):'なし'}</div>
+    <div class="uxStatusItem"><b>確認事項</b>模試確認 ${exam}名 / イベント確認 ${event}名</div>
+    <div class="uxStatusItem"><b>選択中の状態</b>${activeData?`受講行 ${activeData.lessonCount||1} / その他行 ${activeData.otherCount||1}`:'-'}</div>`;
+}
+const UX26_ORIGINAL_UPDATE_SUMMARY=uxUpdateSummary;
+uxUpdateSummary=function(){
+  UX26_ORIGINAL_UPDATE_SUMMARY();
+  const header=document.getElementById('uxHeaderSaveBadge');
+  const dash=document.getElementById('uxDashboard');
+  if(header){
+    header.classList.toggle('dirty',!!UX_STATE.dirty);
+    header.classList.toggle('saved',!UX_STATE.dirty&&UX_STATE.mode==='saved');
+    header.classList.toggle('loaded',!UX_STATE.dirty&&UX_STATE.mode==='loaded');
+  }
+  if(dash){
+    dash.classList.toggle('dirty',!!UX_STATE.dirty);
+    dash.classList.toggle('saved',!UX_STATE.dirty&&UX_STATE.mode==='saved');
+    dash.classList.toggle('loaded',!UX_STATE.dirty&&UX_STATE.mode==='loaded');
+  }
+  ux26RefreshStudentList();
+  ux26ShowActiveCard();
+  ux26UpdateRightStatus();
+};
+const UX26_ORIGINAL_RENDER_STUDENTS=renderStudents;
+renderStudents=function(){
+  UX26_ORIGINAL_RENDER_STUDENTS();
+  if(!students.includes(UX26_STATE.activeStudent)) UX26_STATE.activeStudent=students[0]||'';
+  ux26BuildWorkspace();
+  ux26RefreshStudentList();
+  ux26ShowActiveCard();
+  ux26UpdateRightStatus();
+};
+const UX26_ORIGINAL_UX_SET_DIRTY=uxSetDirty;
+uxSetDirty=function(){
+  UX_STATE.dirty=true;
+  UX_STATE.mode='dirty';
+  uxUpdateSummary();
+};
+const UX26_ORIGINAL_UX_SET_SAVED=uxSetSaved;
+uxSetSaved=function(mode='saved'){
+  UX_STATE.dirty=false;
+  UX_STATE.mode=mode;
+  UX_STATE.lastSavedAt=new Date();
+  uxUpdateSummary();
+};
+function initNoScrollUX(){
+  ux26BuildWorkspace();
+  ux26RefreshStudentList();
+  ux26ShowActiveCard();
+  ux26UpdateRightStatus();
+}
+
 init();
+initRealAppUX();
+initNoScrollUX();
 </script>
 </body>
 </html>
