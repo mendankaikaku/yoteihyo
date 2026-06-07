@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>統合用HTML 最終整理版（ローカルlibs版）</title>
+  <title>予定統合アプリ</title>
   <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
   <script src="./libs/xlsx.bundle.js"></script>
   <script>
@@ -50,6 +50,8 @@ button{border:0;border-radius:11px;padding:9px 12px;background:var(--accent);col
 button.secondary{background:#475467;}
 button.ghost{background:#eef2ff;color:#1e40af;}
 button.ok{background:var(--ok);}
+button.saveImportant{background:#dc2626;color:#fff;box-shadow:0 0 0 3px rgba(220,38,38,.14);}
+button.saveImportant:hover{background:#b91c1c;}
 button:disabled{opacity:.45;cursor:not-allowed;}
 .btnRow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;}
 .primaryAction{font-size:14px;padding:11px 14px;}
@@ -96,23 +98,61 @@ th:first-child{z-index:3;background:#e5e7eb;}
   .previewCard{border:0;box-shadow:none;padding:0;}
   .previewWrap{height:auto;overflow:visible;border:0;}
 }
+
+
+/* =========================================================
+   v2 app UI: 迷う文言を減らし、業務アプリらしく整理
+========================================================= */
+:root{--appTop:66px;}
+.headerInner{padding:10px 14px;gap:14px;}
+h1{font-size:22px;white-space:nowrap;}
+.headerHint{font-size:12px;max-width:560px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.headerActions{gap:7px;}
+.headerActions button{min-height:36px;padding:8px 11px;border-radius:10px;}
+#mergeBtn{background:var(--ok);font-size:14px;min-width:108px;}
+#clearBtn{background:#e5e7eb;color:#344054;}
+.wrap{padding-top:10px;}
+.controlGrid{grid-template-columns:minmax(330px,.95fr) minmax(430px,1.15fr) minmax(330px,.9fr) minmax(250px,.7fr);gap:10px;margin-bottom:10px;}
+.card{padding:12px;border-radius:14px;}
+.cardTitle{font-size:14px;margin-bottom:8px;}
+.step{min-width:22px;height:22px;font-size:12px;}
+label{margin:7px 0 4px;}
+input,select,textarea{min-height:36px;padding:7px 9px;}
+.bundleActionGrid{grid-template-columns:1fr 1fr;gap:8px;}
+.bundleActionGrid button{min-height:38px;}
+#saveResultHistoryBtn{background:#eef2ff;color:#1e40af;}
+#bundleReadSummary{border:1px solid #dbe4ef;background:#f8fafc;border-radius:10px;padding:8px;min-height:36px;max-height:54px;overflow:auto;}
+details{background:#fff;border-color:#e5e7eb;padding:7px;margin-top:8px;}
+summary{font-size:12px;color:#475569;}
+#status{background:#f8fafc;color:#172033;border:1px solid #dbe4ef;min-height:82px;max-height:82px;padding:8px;font-size:11.5px;}
+.stats{grid-template-columns:repeat(5,120px);gap:7px;overflow-x:auto;margin-bottom:8px;}
+.stat{padding:7px 9px;border-radius:10px;}
+.stat b{font-size:18px;}
+.tabs{top:57px;padding:6px 0;margin-bottom:8px;gap:6px;}
+.tabs button{min-height:34px;padding:7px 12px;}
+.previewCard{padding:10px;border-radius:14px;}
+.previewWrap{height:calc(100vh - 245px);min-height:420px;}
+button[data-pane].activePane{background:var(--accent);color:#fff;}
+@media (max-width:1400px){.controlGrid{grid-template-columns:1fr 1fr}.previewWrap{height:58vh}.headerHint{max-width:420px}}
+@media (max-width:860px){h1{white-space:normal}.headerHint{white-space:normal}.bundleActionGrid{grid-template-columns:1fr}.controlGrid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(5,110px)}.previewWrap{height:60vh}}
+
 </style>
 </head>
 <body>
 <header>
   <div class="headerInner">
     <div>
-      <h1>予定入力Excel 全体統合アプリ 最終整理版 <span style="font-size:12px;color:#2563eb;vertical-align:middle;">ローカルlibs・外部通信なし</span></h1>
-      <div class="headerHint">予定Excel・対応表・結果Excelをまとめて、管理用/掲示用カレンダー、模試科目、イベント確認を出力します。</div>
+      <h1>予定統合アプリ</h1>
+      <div class="headerHint">①フォルダー読取 → ②統合 → ③出力 → ④必ず保存</div>
     </div>
     <div class="headerActions">
-      <button id="mergeBtn" class="ok primaryAction">① 統合プレビュー</button>
-      <button id="download2wBtn" disabled>② 前後2週間</button>
-      <button id="download1mBtn" disabled>③ 前後1か月</button>
-      <button id="downloadBtn" disabled>期間指定</button>
-      <button id="downloadAllListBtn" class="ghost" disabled>全員分リスト</button>
-      <button id="downloadMonthlyPosterBtn" class="ghost">月間掲示用Excel</button>
-      <button id="clearBtn" class="secondary">クリア</button>
+      <button id="mergeBtn" class="ok primaryAction">② 統合する</button>
+      <button id="download2wBtn" disabled>③ 2週間出力＋科目リスト</button>
+      <button id="download1mBtn" disabled>③ 1か月出力</button>
+      <button id="downloadBtn" disabled>③ 期間指定出力</button>
+      <button id="downloadAllListBtn" class="ghost" disabled>③ 全員分リスト</button>
+      <button id="downloadMonthlyPosterBtn" class="ghost">③ 毎日更新</button>
+      <button id="clearBtn" class="secondary">リセット</button>
     </div>
   </div>
 </header>
@@ -120,14 +160,14 @@ th:first-child{z-index:3;background:#e5e7eb;}
 <div class="wrap">
   <section class="controlGrid">
     <div class="card">
-      <p class="cardTitle"><span class="step">1</span>読み込み・保存</p>
+      <p class="cardTitle"><span class="step">①</span>フォルダーを読み取る</p>
       <div class="hint" style="margin-bottom:10px;">「まとめて復元」フォルダーを選ぶだけで、json / 学習結果 / 打ち込み結果 / 対応表 / 全員分リスト / 毎日更新 / 全体予定表 を自動で振り分けます。</div>
       <div class="bundleActionGrid">
-        <button id="readBundleBtn" class="ok primaryAction" type="button">まとめて復元フォルダーを読み取り</button>
-        <button id="saveResultHistoryBtn" class="ghost primaryAction" type="button">結果履歴JSONを保存</button>
+        <button id="readBundleBtn" class="ok primaryAction" type="button">① フォルダーを読み取る</button>
+        <button id="saveResultHistoryBtn" class="saveImportant primaryAction" type="button">④ 結果履歴を必ず保存！</button>
       </div>
-      <div id="bundleReadSummary" class="hint" style="margin-top:10px;white-space:pre-wrap;">未読み取り</div>
-      <div class="hint" style="margin-top:6px;color:#1d4ed8;font-weight:800;">この版では個別アップロード欄は表示されません。</div>
+      <div id="bundleReadSummary" class="hint" style="margin-top:10px;white-space:pre-wrap;">まだ読み込んでいません</div>
+      
 
       <!-- 画面上のボタンは「読み取り」1個・「保存」1個に統一。下のinputは処理用に非表示で保持。 -->
       <input id="bundleFolderInput" class="hidden" type="file" webkitdirectory directory multiple accept=".xlsx,.xls,.xlsm,.csv,.json" />
@@ -137,7 +177,7 @@ th:first-child{z-index:3;background:#e5e7eb;}
       <input id="resultHistoryInput" class="hidden" type="file" accept=".json" />
       <div id="dropZone" class="drop hidden">Excelファイル/フォルダーをここへドラッグ</div>
       <details>
-        <summary>読み取り形式</summary>
+        <summary>読み取るフォルダーの中身</summary>
         <div class="hint" style="margin-top:8px;">
           予定Excelは「打ち込み結果」、結果Excelは「学習結果」、履歴JSONは「json」、対応表は「対応表」、全員分リストは「全員分リスト」、掲示用Excelの手修正版は「毎日更新」、全体予定表の手修正版は「全体予定表」フォルダーから自動で読みます。
         </div>
@@ -145,7 +185,7 @@ th:first-child{z-index:3;background:#e5e7eb;}
     </div>
 
     <div class="card">
-      <p class="cardTitle"><span class="step">2</span>日付・読み取り条件</p>
+      <p class="cardTitle noStep">条件を決める</p>
       <div class="compactFields">
         <div>
           <label>基準日</label>
@@ -156,7 +196,7 @@ th:first-child{z-index:3;background:#e5e7eb;}
           <input id="sheetName" type="text" value="予定入力" />
         </div>
       </div>
-      <label>期間指定</label>
+      <label>期間指定出力</label>
       <div class="smallrow">
         <input id="fromDate" type="date" />
         <span class="hint">〜</span>
@@ -171,19 +211,19 @@ th:first-child{z-index:3;background:#e5e7eb;}
     </div>
 
     <div class="card">
-      <p class="cardTitle"><span class="step">3</span>表示・出力設定</p>
+      <p class="cardTitle noStep">表示を選ぶ</p>
       <div class="checkGrid">
         <label><input id="splitLines" type="checkbox" checked />改行予定を分割</label>
         <label><input id="includeRowName" type="checkbox" checked />時限/行名を表示</label>
         <label><input id="sortStudents" type="checkbox" checked />五十音順に並べる</label>
         <label><input id="colorWeekend" type="checkbox" checked />土日を色分け</label>
       </div>
-      <div class="hint" style="margin-top:10px;">先にファイルを選び、右上の「統合プレビュー」を押してください。プレビュー後に各出力ボタンが使えます。</div>
-      <div class="hint" style="margin-top:10px;">掲示用Excelの細かい文言や手修正は、まとめて復元フォルダー直下の「毎日更新」フォルダー内に保存したExcelから復元します。ブラウザ上の掲示設定欄は使いません。</div>
+      <div class="hint" style="margin-top:10px;">操作順は、①フォルダーを読み取る → ②統合する → ③出力ボタンを選ぶ → ④必ず保存、です。</div>
+      <div class="hint" style="margin-top:10px;">毎日更新の手修正版は「毎日更新」フォルダーから復元します。</div>
       <details>
-        <summary>予定入力Excel形式</summary>
+        <summary>Excel形式の確認</summary>
         <div class="hint" style="margin-top:8px;">
-          B〜H列の日付、受講①〜③・その他①〜③、下段は A列=教科 / B列=問題集・高速マスター / E列=内容、備考はA列「備考」・B列内容。
+          予定入力シートから日付・受講・その他・学習内容・備考を読み取ります。
         </div>
       </details>
     </div>
@@ -196,25 +236,25 @@ th:first-child{z-index:3;background:#e5e7eb;}
 
   <main class="previewCard">
     <div class="stats">
-      <div class="stat"><span class="hint">読み込みExcel</span><b id="statFiles">0</b></div>
-      <div class="stat"><span class="hint">予定件数</span><b id="statRows">0</b></div>
-      <div class="stat"><span class="hint">結果件数</span><b id="statResults">0</b></div>
-      <div class="stat"><span class="hint">生徒数</span><b id="statStudents">0</b></div>
-      <div class="stat"><span class="hint">日付数</span><b id="statDates">0</b></div>
+      <div class="stat"><span class="hint">Excel</span><b id="statFiles">0</b></div>
+      <div class="stat"><span class="hint">予定</span><b id="statRows">0</b></div>
+      <div class="stat"><span class="hint">結果</span><b id="statResults">0</b></div>
+      <div class="stat"><span class="hint">生徒</span><b id="statStudents">0</b></div>
+      <div class="stat"><span class="hint">日付</span><b id="statDates">0</b></div>
     </div>
 
     <div class="tabs">
-      <button class="ghost" data-pane="calendarPane">全体カレンダー</button>
-      <button class="ghost" data-pane="listPane">予定一覧</button>
-      <button class="ghost" data-pane="resultPane">結果一覧</button>
-      <button class="ghost" data-pane="rosterPane">生徒対応表</button>
-      <button class="ghost" data-pane="logPane">読み取りログ</button>
+      <button class="ghost" data-pane="calendarPane">カレンダー</button>
+      <button class="ghost" data-pane="listPane">予定</button>
+      <button class="ghost" data-pane="resultPane">結果</button>
+      <button class="ghost" data-pane="rosterPane">対応表</button>
+      <button class="ghost" data-pane="logPane">ログ</button>
     </div>
 
-    <section id="calendarPane" class="previewWrap"><div class="hint" style="padding:14px;">まだ統合していません。</div></section>
-    <section id="listPane" class="previewWrap hidden"><div class="hint" style="padding:14px;">まだ統合していません。</div></section>
-    <section id="resultPane" class="previewWrap hidden"><div class="hint" style="padding:14px;">まだ結果Excelは読み込んでいません。</div></section>
-    <section id="rosterPane" class="previewWrap hidden"><div class="hint" style="padding:14px;">まだ対応表は読み込んでいません。</div></section>
+    <section id="calendarPane" class="previewWrap"><div class="hint" style="padding:14px;">まだ統合していません。フォルダーを読み取って「統合する」を押してください。</div></section>
+    <section id="listPane" class="previewWrap hidden"><div class="hint" style="padding:14px;">まだ統合していません。フォルダーを読み取って「統合する」を押してください。</div></section>
+    <section id="resultPane" class="previewWrap hidden"><div class="hint" style="padding:14px;">まだ結果を読み込んでいません。</div></section>
+    <section id="rosterPane" class="previewWrap hidden"><div class="hint" style="padding:14px;">まだ対応表を読み込んでいません。</div></section>
     <section id="logPane" class="previewWrap hidden"><div class="hint" style="padding:14px;">まだログはありません。</div></section>
   </main>
 </div>
@@ -363,7 +403,7 @@ function getHeaderMap(aoa){
 
 
 // ============================================================
-// 1. 生徒対応表の読み取り・名前照合
+// 1. 対応表の読み取り・名前照合
 // ============================================================
 const ROSTER_COLUMNS = ["生徒番号","学年","生徒名","読み仮名","担当","高校","備考"];
 function normalizeNameKey(s){ return String(s ?? "").replace(/[\s\u3000]+/g, "").trim(); }
@@ -1399,7 +1439,7 @@ async function buildResultHistoryPayload(extraRecords = [], extraLogs = [], extr
       version: 2,
       updatedAt: new Date().toISOString(),
       baseDate: ymd(getCenterDate()),
-      note: "統合用HTMLで作成。recordsは結果一覧、sheetsは結果Excelの各シートを行単位で保持します。datetimeはYYYY-MM-DD HH:mm:ssのローカル時刻で保存します。",
+      note: "統合用HTMLで作成。recordsは結果、sheetsは結果Excelの各シートを行単位で保持します。datetimeはYYYY-MM-DD HH:mm:ssのローカル時刻で保存します。",
       records: merged.map(resultRecordToHistoryItem),
       sheets: mergedSheets
     },
@@ -1411,7 +1451,7 @@ async function saveResultHistoryJson(){
     alert("結果Excelを選択してください。既存履歴を足す場合は結果履歴JSONも選択できます。");
     return;
   }
-  log("結果履歴JSONを保存中...");
+  log("結果履歴を保存中...");
 
   if("showDirectoryPicker" in window){
     try{
@@ -1420,7 +1460,7 @@ async function saveResultHistoryJson(){
       const folderHistory = await readResultHistoryFromJsonDirectory(jsonDirHandle);
       const built = await buildResultHistoryPayload(folderHistory.records, folderHistory.logRows, folderHistory.sheets || []);
       await writeResultHistoryToJsonDirectory(jsonDirHandle, built.payload);
-      log(`結果履歴JSONを保存しました\n保存先: 選択フォルダ/json/result_history.json\n保存件数: ${built.payload.records.length}件\n2か月より古い結果は除外済みです。\n\n${built.logs.map(x=>`${x[1]}: ${x[2]}`).join("\n")}`);
+      log(`結果履歴を保存しました\n保存先: 選択フォルダ/json/result_history.json\n保存件数: ${built.payload.records.length}件\n2か月より古い結果は除外済みです。\n\n${built.logs.map(x=>`${x[1]}: ${x[2]}`).join("\n")}`);
       return;
     }catch(e){
       if(e && e.name === "AbortError"){
@@ -2711,9 +2751,9 @@ function normalizeWholeScheduleSheetKey(name){
 function wholeScheduleSheetAliases(name){
   const k = normalizeWholeScheduleSheetKey(name);
   const aliases = new Set([k]);
-  if(k.includes('全体') && k.includes('カレンダー')) aliases.add('全体カレンダー');
+  if(k.includes('全体') && k.includes('カレンダー')) aliases.add('カレンダー');
   if(k.includes('掲示') && k.includes('カレンダー')) aliases.add('掲示用カレンダー');
-  if(k.includes('予定一覧')) aliases.add('予定一覧データ');
+  if(k.includes('予定')) aliases.add('予定データ');
   return [...aliases].map(normalizeWholeScheduleSheetKey);
 }
 async function parseWholeScheduleRestoreFile(file){
@@ -2807,7 +2847,7 @@ function mergeRestoredWholeScheduleAoa(sheetName, generatedAoa){
 }
 
 // ============================================================
-// 8.4 月間掲示用結果Excel出力
+// 8.4 毎日更新用結果Excel出力
 // ============================================================
 const MONTHLY_POSTER_RESULT_RULES = [
   {keyword:'連続で実施', sheetName:'連続実施'},
@@ -3080,7 +3120,7 @@ async function downloadMonthlyPosterResultWorkbook(){
   }
   $('downloadMonthlyPosterBtn').disabled = true;
   try{
-    log('月間掲示用Excelを作成中...\n結果Excelと結果履歴JSONから、今月分の結果を抽出しています。');
+    log('毎日更新を作成中...\n結果Excelと結果履歴JSONから、今月分の結果を抽出しています。');
     let results = state.resultRecords && state.resultRecords.length ? state.resultRecords : (await loadMonthlyPosterResultsDirectly()).records;
     const {from,to,label} = monthRangeForOpenedPage(new Date());
     results = mergeResultRecordsUnique(results).filter(r => inDateRange(r, from, to));
@@ -3101,12 +3141,12 @@ async function downloadMonthlyPosterResultWorkbook(){
     const rankingWs = aoaToSheet(mergedRankingAoa);
     styleHighSpeedRankingSheet(rankingWs, mergedRankingAoa);
     XLSX.utils.book_append_sheet(wb, rankingWs, uniqueSheetName('高速基礎ランキング', used));
-    XLSX.writeFile(wb, `校舎掲示用_月間結果_${ymd(from)}-${ymd(to)}.xlsx`);
+    XLSX.writeFile(wb, `校舎掲示用_毎日更新_${ymd(from)}-${ymd(to)}.xlsx`);
     const counts = MONTHLY_POSTER_RESULT_RULES.map(rule => `${rule.keyword}: ${results.filter(r => norm(r.result).includes(rule.keyword)).length}件`).join('\n');
-    log(`月間掲示用Excelを作成しました\n対象期間: ${ymd(from)}〜${ymd(to)}\n${counts}`);
+    log(`毎日更新を作成しました\n対象期間: ${ymd(from)}〜${ymd(to)}\n${counts}`);
   }catch(e){
     alert(e.message || String(e));
-    log('月間掲示用Excelの作成に失敗しました。');
+    log('毎日更新の作成に失敗しました。');
   }finally{
     $('downloadMonthlyPosterBtn').disabled = false;
   }
@@ -3513,7 +3553,7 @@ function styleAllStudentGradeSheet(ws, aoa){
 async function downloadAllStudentList(){
   if(!(await ensureWorkbookReadyForOutput())) return;
 
-  // 模試・イベントは期間指定がある場合だけ絞り込み、予定/結果カレンダーは常に基準日2日前〜1日後を表示する。
+  // 模試・イベントは期間指定出力がある場合だけ絞り込み、予定/結果カレンダーは常に基準日2日前〜1日後を表示する。
   const from = $('fromDate').value ? new Date($('fromDate').value + 'T00:00:00') : null;
   const to = $('toDate').value ? new Date($('toDate').value + 'T23:59:59') : null;
   const exams = state.examRecords.filter(r => (!from || r.examDateObj >= from) && (!to || r.examDateObj <= to));
@@ -3533,8 +3573,8 @@ async function downloadAllStudentList(){
 
 function downloadWorkbookFromAoa(calendarAoa, listAoa, resultAoa, rosterAoa, logAoa, label, examRecords=[], eventRecords=[]){
   // 「全体予定表」フォルダー内に前回手修正したExcelがあれば、
-  // 全体カレンダー/掲示用カレンダーの手修正を優先して復元する。
-  calendarAoa = mergeRestoredWholeScheduleAoa("全体カレンダー", calendarAoa);
+  // カレンダー/掲示用カレンダーの手修正を優先して復元する。
+  calendarAoa = mergeRestoredWholeScheduleAoa("カレンダー", calendarAoa);
   const wb = XLSX.utils.book_new();
   const resultHeader = [["学年","生徒名","生徒番号","日付","時刻","区分","分類","学習内容","学習結果","カレンダー表示","元ファイル","元シート"]];
   const rosterHeader = [ROSTER_COLUMNS];
@@ -3668,14 +3708,14 @@ function downloadWorkbookFromAoa(calendarAoa, listAoa, resultAoa, rosterAoa, log
   wsRoster["!freeze"] = {ySplit:1};
   wsLog["!freeze"] = {ySplit:1};
 
-  XLSX.utils.book_append_sheet(wb, wsCal, "全体カレンダー");
+  XLSX.utils.book_append_sheet(wb, wsCal, "カレンダー");
   XLSX.utils.book_append_sheet(wb, wsPoster, "掲示用カレンダー");
-  XLSX.utils.book_append_sheet(wb, wsList, "予定一覧データ");
-  XLSX.utils.book_append_sheet(wb, wsResult, "結果一覧データ");
-  XLSX.utils.book_append_sheet(wb, wsRoster, "生徒対応表");
+  XLSX.utils.book_append_sheet(wb, wsList, "予定データ");
+  XLSX.utils.book_append_sheet(wb, wsResult, "結果データ");
+  XLSX.utils.book_append_sheet(wb, wsRoster, "対応表");
   examSheetObjects.forEach(s => XLSX.utils.book_append_sheet(wb, s.ws, s.sheetName));
   eventSheetObjects.forEach(s => XLSX.utils.book_append_sheet(wb, s.ws, s.sheetName));
-  XLSX.utils.book_append_sheet(wb, wsLog, "読み取りログ");
+  XLSX.utils.book_append_sheet(wb, wsLog, "ログ");
   XLSX.writeFile(wb, `全体予定表_${label}.xlsx`);
 }
 
@@ -3708,7 +3748,7 @@ async function setBundleFolderFiles(fileList){
     const relLower = String(f.webkitRelativePath || f.name || '').toLowerCase();
     if(isJson && (parts.some(p => p === 'json' || p.includes('json') || p.includes('履歴')) || /result[_-]?history|結果履歴/.test(relLower))) histories.push(f);
     else if(isExcel && filePathIncludes(f, '毎日更新')) dailyPosters.push(f);
-    else if(isExcel && filePathIncludes(f, '全員分リスト')) allLists.push(f);
+    else if(isExcel && (filePathIncludes(f, '全員分リスト') || filePathIncludes(f, '全員リスト'))) allLists.push(f);
     else if(isExcel && filePathIncludes(f, '全体予定表')) wholeSchedules.push(f);
     else if(isExcel && filePathIncludes(f, '学習結果')) results.push(f);
     else if(isExcel && filePathIncludes(f, '打ち込み結果')) planned.push(f);
@@ -3747,7 +3787,7 @@ ${rosterMsg}`;
   if($("bundleReadSummary")) $("bundleReadSummary").textContent = summary;
   log(`${summary}
 
-必要ならこのまま「統合プレビュー」または「月間掲示用Excel」を押してください。`);
+必要ならこのまま「統合プレビュー」または「毎日更新」を押してください。`);
 }
 function setFiles(fileList){
   state.files = [...fileList].filter(f => !shouldSkipFile(f));
@@ -3760,13 +3800,13 @@ function setResultFiles(fileList){
   state.resultFiles = [...fileList].filter(f => !shouldSkipFile(f));
   state.workbookReady = false;
   updateMainOutputButtons();
-  log(`結果Excel選択完了\n結果Excelファイル: ${state.resultFiles.length}件\n月間掲示用Excelだけなら、このまま「月間掲示用Excel」を押せます。`);
+  log(`結果Excel選択完了\n結果Excelファイル: ${state.resultFiles.length}件\n毎日更新だけなら、このまま「毎日更新」を押せます。`);
 }
 function setResultHistoryFiles(fileList){
   state.resultHistoryFiles = [...fileList].filter(f => /\.json$/i.test(f.name));
   state.workbookReady = false;
   updateMainOutputButtons();
-  log(`結果履歴JSON選択完了\nJSONファイル: ${state.resultHistoryFiles.length}件\n月間掲示用Excelだけなら、このまま「月間掲示用Excel」を押せます。`);
+  log(`結果履歴JSON選択完了\nJSONファイル: ${state.resultHistoryFiles.length}件\n毎日更新だけなら、このまま「毎日更新」を押せます。`);
 }
 
 $("readBundleBtn").addEventListener("click", () => $("bundleFolderInput").click());
@@ -3797,9 +3837,9 @@ $("clearBtn").addEventListener("click", () => {
   $("rosterInput").value="";
   $("resultInput").value="";
   $("resultHistoryInput").value="";
-  if($("bundleReadSummary")) $("bundleReadSummary").textContent = "未読み取り";
+  if($("bundleReadSummary")) $("bundleReadSummary").textContent = "まだ読み込んでいません";
   updateStats([],[],[],[],[]);
-  ["calendarPane","listPane","resultPane","rosterPane","logPane"].forEach(id => $(id).innerHTML = `<div class="hint" style="padding:14px;">クリアしました。</div>`);
+  ["calendarPane","listPane","resultPane","rosterPane","logPane"].forEach(id => $(id).innerHTML = `<div class="hint" style="padding:14px;">リセットしました。</div>`);
   setDownloadButtonsDisabled(true);
   log("待機中");
 });
@@ -3819,5 +3859,18 @@ dz.addEventListener("drop", e => {
   setFiles(files);
 });
 </script>
+
+<script>
+// v2 UI補助：選択中タブを見やすくするだけ。既存処理には触らない。
+document.addEventListener('DOMContentLoaded', function(){
+  const tabButtons = Array.from(document.querySelectorAll('[data-pane]'));
+  function markActive(id){
+    tabButtons.forEach(btn => btn.classList.toggle('activePane', btn.getAttribute('data-pane') === id));
+  }
+  tabButtons.forEach(btn => btn.addEventListener('click', () => markActive(btn.getAttribute('data-pane'))));
+  markActive('calendarPane');
+});
+</script>
+
 </body>
 </html>
