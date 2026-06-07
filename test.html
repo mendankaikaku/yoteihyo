@@ -3809,6 +3809,85 @@ function initV32(){
   initV32DragHorizontalScroll();
 }
 
+
+
+/* =========================================================
+   v33 左の空白除去・学年/生徒番号重なり修正
+========================================================= */
+(function injectV33LayoutFix(){
+  if(document.getElementById('v33LayoutFixStyle')) return;
+  const style=document.createElement('style');
+  style.id='v33LayoutFixStyle';
+  style.textContent=`
+    /* v32の説明ラベルをgridの1列として数えさせない。これが左の大きな空白の原因。 */
+    #studentGrid.studentGrid{position:relative!important;padding-top:28px!important;}
+    @media (pointer:fine){
+      #studentGrid.studentGrid::before{
+        display:block!important;
+        position:absolute!important;
+        top:4px!important;
+        left:8px!important;
+        margin:0!important;
+        width:max-content!important;
+        pointer-events:none!important;
+      }
+    }
+
+    /* 学年・生徒番号の入力欄が互いに食い込まないようにする。 */
+    .studentMeta{
+      display:grid!important;
+      grid-template-columns:minmax(120px,150px) minmax(180px,240px)!important;
+      gap:10px!important;
+      align-items:end!important;
+      max-width:410px!important;
+    }
+    .studentMeta .field{min-width:0!important;width:100%!important;}
+    .studentMeta .field input,
+    .studentMeta .field select{width:100%!important;min-width:0!important;box-sizing:border-box!important;}
+
+    /* 横並びカードは左詰め。カード幅を安定させて、最初の1人目が左から始まるようにする。 */
+    #studentGrid.studentGrid{
+      justify-content:start!important;
+      align-content:start!important;
+      grid-auto-columns:minmax(720px,760px)!important;
+    }
+    #studentGrid.studentGrid .studentCard{
+      width:100%!important;
+      min-width:720px!important;
+      max-width:760px!important;
+    }
+
+    @media(max-width:900px){
+      .studentMeta{grid-template-columns:1fr 1fr!important;max-width:none!important;}
+      #studentGrid.studentGrid{grid-auto-columns:minmax(620px,90vw)!important;}
+      #studentGrid.studentGrid .studentCard{min-width:620px!important;max-width:none!important;}
+    }
+  `;
+  document.head.appendChild(style);
+})();
+
+function v33ResetStudentScrollLeft(){
+  const grid=document.getElementById('studentGrid');
+  if(grid && !grid.dataset.v33UserScrolled){
+    grid.scrollLeft=0;
+  }
+}
+(function initV33ScrollMemory(){
+  const grid=document.getElementById('studentGrid');
+  if(!grid || grid.dataset.v33ScrollMemory==='1') return;
+  grid.dataset.v33ScrollMemory='1';
+  grid.addEventListener('scroll',()=>{grid.dataset.v33UserScrolled='1';},{passive:true});
+})();
+
+const V33_PREV_RENDER_STUDENTS=renderStudents;
+renderStudents=function(){
+  const grid=document.getElementById('studentGrid');
+  if(grid) delete grid.dataset.v33UserScrolled;
+  V33_PREV_RENDER_STUDENTS();
+  initV32DragHorizontalScroll();
+  v33ResetStudentScrollLeft();
+};
+
 init();
 initV32();
 initRealAppUX();
