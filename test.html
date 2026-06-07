@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>面談予定入力・準備資料アプリ v26（ノースクロール実務UI版）</title>
+<title>面談予定入力・準備資料アプリ v27（横並びコンパクトUI版）</title>
 <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
 <script src="./libs/xlsx.bundle.js"></script>
 <script>if(!window.XLSX){document.write('<script src="./libs/xlsx.full.min.js"><\/script>');}</script>
@@ -87,7 +87,7 @@ details.advanced{background:#fff;border-color:#e2e8f0}details.advanced summary{f
 
 
 /* =========================================================
-   v26 ノースクロール実務UI版：3ペイン・1人編集・赤い未保存表示
+   v27 横並びコンパクトUI版：3ペイン・1人編集・赤い未保存表示
 ========================================================= */
 html,body{height:100%;overflow:hidden}
 body{background:#eef2f7}
@@ -99,13 +99,25 @@ main.wrap{max-width:none;height:calc(100vh - 76px);padding:10px 12px;display:gri
 @media(max-width:1150px){html,body{overflow:auto}main.wrap{height:auto;overflow:visible;display:block}.uxWorkspace{grid-template-columns:1fr}.uxPane{margin-bottom:10px;min-height:220px}.uxStudentMain #studentGrid{max-height:none}.topActions{grid-template-columns:1fr 1fr}.uxDashboard{grid-template-columns:1fr 1fr}.uxActionDock{display:flex}.appSteps{display:grid}.workflowCard .compactHint{display:block}}
 @media(max-width:700px){.topActions{grid-template-columns:1fr}.uxDashboard{grid-template-columns:1fr}.appHeaderInner{align-items:flex-start;flex-direction:column}.saveWarningBadge{width:100%}}
 
+
+
+/* =========================================================
+   v27 横並びコンパクトUI版：上部を薄く・生徒を横タブ化
+========================================================= */
+.appHeader .wrap{padding:5px 12px!important}.appHeader h1{font-size:16px!important;margin:0!important}.appHeader .sub{font-size:11px!important;line-height:1.2!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:calc(100vw - 260px)}.versionBadge{font-size:11px!important;padding:2px 7px!important}.saveWarningBadge{min-width:86px!important;padding:6px 10px!important;font-size:12px!important}
+main.wrap{height:calc(100vh - 52px)!important;grid-template-rows:auto auto minmax(0,1fr)!important;gap:6px!important;padding:7px 10px!important}.workflowCard{padding:8px 10px!important;border-left:5px solid #2563eb!important;border-radius:14px!important}.topActions{grid-template-columns:minmax(260px,1fr) 135px auto auto auto auto!important;gap:7px!important;align-items:end!important}.topActions .field label{font-size:10px!important;margin-bottom:1px!important}.topActions .field input,.topActions button{min-height:30px!important;height:30px!important;padding:4px 9px!important;font-size:12px!important;border-radius:9px!important}.topActions #saveGroupMemory{font-size:13px!important}.saveInfoBox{margin-top:5px!important;min-height:0!important;max-height:24px!important;height:24px!important;padding:3px 7px!important;font-size:11px!important;line-height:17px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;color:#64748b!important;background:#f8fafc!important}.saveInfoBox br{display:none!important}
+.uxDashboard{height:48px!important;padding:5px 7px!important;gap:7px!important;border-radius:12px!important;display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important}.uxStat{padding:5px 8px!important;border-radius:10px!important;display:flex!important;align-items:center!important;justify-content:space-between!important;gap:8px!important}.uxStat span{font-size:10px!important}.uxStat b{font-size:15px!important;margin:0!important;white-space:nowrap!important}.uxStat small{display:none!important}
+.uxWorkspace{grid-template-columns:minmax(0,1fr) 320px!important;grid-template-rows:56px minmax(0,1fr)!important;gap:8px!important}.uxStudentSidebar{grid-column:1!important;grid-row:1!important}.uxStudentMain{grid-column:1!important;grid-row:2!important}.uxRightPanel{grid-column:2!important;grid-row:1 / span 2!important}.uxPane{border-radius:14px!important}.uxPaneHead{height:32px!important;padding:6px 10px!important;font-size:13px!important}.uxPaneHead small{font-size:10px!important}.uxPaneBody{height:calc(100% - 32px)!important;padding:7px!important}.uxStudentSidebar .uxPaneBody{padding:6px!important;overflow-x:auto!important;overflow-y:hidden!important}.uxStudentList{display:flex!important;flex-direction:row!important;gap:6px!important;min-width:max-content!important}.uxStudentBtn{width:auto!important;min-width:118px!important;max-width:170px!important;min-height:30px!important;height:30px!important;padding:5px 8px!important;border-radius:999px!important;flex:0 0 auto!important}.uxStudentBtn .name{font-size:12px!important}.uxMiniBadge{font-size:9px!important;padding:1px 4px!important}.uxStudentMain #studentGrid{padding:8px!important}.uxStudentMain .studentCard{border-radius:14px!important;padding:12px!important}.studentHead{position:static!important;margin:0 0 8px!important;padding:0 0 8px!important}.studentNameTitle{font-size:18px!important}.studentMeta{grid-template-columns:120px 150px!important}.studentSection{margin-top:9px!important}.studentSection .sectionTitle{font-size:13px!important;margin-bottom:5px!important}.scheduleTable textarea{min-height:32px!important}.materialTable textarea{min-height:32px!important}.uxRightPanel .prepCompactCard,.uxRightPanel .card{padding:8px!important;margin:0 0 7px!important}.uxRightPanel .compactHint{font-size:10px!important;line-height:1.35!important}.uxStatusList{gap:5px!important}.uxStatusItem{padding:6px 7px!important;font-size:11px!important;line-height:1.3!important}.uxStatusItem b{font-size:12px!important;margin-bottom:1px!important}
+@media(max-width:1150px){main.wrap{height:auto!important;display:block!important}.uxWorkspace{grid-template-columns:1fr!important;grid-template-rows:auto!important}.uxStudentSidebar,.uxStudentMain,.uxRightPanel{grid-column:auto!important;grid-row:auto!important}.appHeader .sub{max-width:none;white-space:normal}.uxDashboard{height:auto!important;grid-template-columns:1fr 1fr!important}.uxStat{display:block!important}.uxStat small{display:block!important}.topActions{grid-template-columns:1fr 1fr!important}.saveInfoBox{height:auto!important;max-height:60px!important;white-space:normal!important}}
+@media(max-width:700px){.topActions{grid-template-columns:1fr!important}.uxDashboard{grid-template-columns:1fr!important}.appHeaderInner{flex-direction:column!important;align-items:flex-start!important}.saveWarningBadge{width:100%!important}}
+
 </style>
 </head>
 <body>
 <header class="appHeader"><div class="wrap appHeaderInner">
   <div>
-    <h1>面談予定入力・準備資料アプリ <span class="versionBadge">v26 ノースクロール実務UI版</span></h1>
-    <div class="sub">左の生徒一覧から1人ずつ編集し、右の確認・印刷パネルで状態を確認します。ページ全体のスクロールをできるだけ使わない画面に整理しました。</div>
+    <h1>面談予定入力・準備資料アプリ <span class="versionBadge">v27 横並びコンパクトUI版</span></h1>
+    <div class="sub">生徒は横並びタブで切り替え、上部は最小限に圧縮しました。右の確認・印刷パネルで状態を確認します。</div>
   </div>
   <div class="saveWarningBadge" id="uxHeaderSaveBadge">未保存</div>
 </div></header>
@@ -3147,7 +3159,7 @@ function initRealAppUX(){
 
 
 /* =========================================================
-   v26 ノースクロール実務UI版：左一覧・中央1人編集・右確認
+   v27 横並びコンパクトUI版：左一覧・中央1人編集・右確認
 ========================================================= */
 const UX26_STATE={activeStudent:''};
 function ux26BuildWorkspace(){
