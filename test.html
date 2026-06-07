@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>面談予定入力・準備資料アプリ v27（横並びコンパクトUI版）</title>
+<title>面談予定入力・準備資料アプリ v29（3人同時編集・右パネル整理版）</title>
 <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
 <script src="./libs/xlsx.bundle.js"></script>
 <script>if(!window.XLSX){document.write('<script src="./libs/xlsx.full.min.js"><\/script>');}</script>
@@ -87,7 +87,7 @@ details.advanced{background:#fff;border-color:#e2e8f0}details.advanced summary{f
 
 
 /* =========================================================
-   v27 横並びコンパクトUI版：3ペイン・1人編集・赤い未保存表示
+   v29 3人同時編集・右パネル整理版：3ペイン・1人編集・赤い未保存表示
 ========================================================= */
 html,body{height:100%;overflow:hidden}
 body{background:#eef2f7}
@@ -102,7 +102,7 @@ main.wrap{max-width:none;height:calc(100vh - 76px);padding:10px 12px;display:gri
 
 
 /* =========================================================
-   v27 横並びコンパクトUI版：上部を薄く・生徒を横タブ化
+   v29 3人同時編集・右パネル整理版：上部を薄く・生徒を横タブ化
 ========================================================= */
 .appHeader .wrap{padding:5px 12px!important}.appHeader h1{font-size:16px!important;margin:0!important}.appHeader .sub{font-size:11px!important;line-height:1.2!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:calc(100vw - 260px)}.versionBadge{font-size:11px!important;padding:2px 7px!important}.saveWarningBadge{min-width:86px!important;padding:6px 10px!important;font-size:12px!important}
 main.wrap{height:calc(100vh - 52px)!important;grid-template-rows:auto auto minmax(0,1fr)!important;gap:6px!important;padding:7px 10px!important}.workflowCard{padding:8px 10px!important;border-left:5px solid #2563eb!important;border-radius:14px!important}.topActions{grid-template-columns:minmax(260px,1fr) 135px auto auto auto auto!important;gap:7px!important;align-items:end!important}.topActions .field label{font-size:10px!important;margin-bottom:1px!important}.topActions .field input,.topActions button{min-height:30px!important;height:30px!important;padding:4px 9px!important;font-size:12px!important;border-radius:9px!important}.topActions #saveGroupMemory{font-size:13px!important}.saveInfoBox{margin-top:5px!important;min-height:0!important;max-height:24px!important;height:24px!important;padding:3px 7px!important;font-size:11px!important;line-height:17px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;color:#64748b!important;background:#f8fafc!important}.saveInfoBox br{display:none!important}
@@ -111,13 +111,72 @@ main.wrap{height:calc(100vh - 52px)!important;grid-template-rows:auto auto minma
 @media(max-width:1150px){main.wrap{height:auto!important;display:block!important}.uxWorkspace{grid-template-columns:1fr!important;grid-template-rows:auto!important}.uxStudentSidebar,.uxStudentMain,.uxRightPanel{grid-column:auto!important;grid-row:auto!important}.appHeader .sub{max-width:none;white-space:normal}.uxDashboard{height:auto!important;grid-template-columns:1fr 1fr!important}.uxStat{display:block!important}.uxStat small{display:block!important}.topActions{grid-template-columns:1fr 1fr!important}.saveInfoBox{height:auto!important;max-height:60px!important;white-space:normal!important}}
 @media(max-width:700px){.topActions{grid-template-columns:1fr!important}.uxDashboard{grid-template-columns:1fr!important}.appHeaderInner{flex-direction:column!important;align-items:flex-start!important}.saveWarningBadge{width:100%!important}}
 
+
+/* =========================================================
+   v28 状態バー非表示：赤い横長カードを廃止し、右上バッジと右パネルに集約
+========================================================= */
+#uxDashboard{display:none!important;}
+main.wrap{grid-template-rows:auto minmax(0,1fr)!important;}
+.uxWorkspace{margin-top:0!important;}
+.saveWarningBadge.dirty{background:#fee2e2!important;color:#991b1b!important;border-color:#fecaca!important;}
+.saveWarningBadge.loaded{background:#eff6ff!important;color:#1d4ed8!important;border-color:#bfdbfe!important;}
+.saveWarningBadge.saved{background:#dcfce7!important;color:#166534!important;border-color:#86efac!important;}
+@media(max-width:1150px){#uxDashboard{display:none!important;}}
+
+
+
+/* =========================================================
+   v29 3人同時編集・右パネル整理版
+========================================================= */
+main.wrap{grid-template-rows:auto minmax(0,1fr) auto!important;gap:8px!important;}
+.workflowCard{padding:8px 10px!important;}
+.saveInfoBox{height:28px!important;min-height:28px!important;max-height:28px!important;overflow:hidden!important;white-space:nowrap!important;text-overflow:ellipsis!important;}
+.uxWorkspace{display:grid!important;grid-template-columns:minmax(0,1fr) 330px!important;grid-template-rows:minmax(0,1fr)!important;gap:10px!important;min-height:0!important;}
+.uxStudentSidebar{display:none!important;}
+.uxStudentMain{grid-column:1!important;grid-row:1!important;}
+.uxRightPanel{grid-column:2!important;grid-row:1!important;}
+.uxStudentMain .uxPaneHead{height:42px!important;padding:6px 10px!important;}
+.uxStudentHeadLeft{display:flex;align-items:center;gap:8px;min-width:0;}
+.uxStudentModeHint{font-size:11px;color:#64748b;font-weight:800;white-space:nowrap;}
+.uxStudentTabs{display:flex!important;flex-direction:row!important;gap:6px!important;overflow-x:auto!important;overflow-y:hidden!important;max-width:70%;padding-bottom:1px;}
+.uxStudentTabs .uxStudentBtn{width:auto!important;min-width:92px!important;max-width:160px!important;height:30px!important;min-height:30px!important;border-radius:999px!important;padding:5px 8px!important;flex:0 0 auto!important;}
+.uxStudentTabs .uxStudentBtn .name{font-size:12px!important;}
+.uxStudentTabs .uxMiniBadge{font-size:9px!important;padding:1px 4px!important;}
+.uxStudentMain #studentGrid{height:100%!important;overflow:auto!important;padding:8px!important;gap:8px!important;}
+.uxStudentMain #studentGrid.uxMultiMode{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(410px,1fr))!important;align-items:start!important;}
+.uxStudentMain #studentGrid.uxSingleMode{display:block!important;}
+.uxStudentMain #studentGrid.uxMultiMode .studentCard{display:block!important;min-width:0!important;margin:0!important;}
+.uxStudentMain #studentGrid.uxSingleMode .studentCard:not(.uxActiveStudentCard){display:none!important;}
+.uxStudentMain #studentGrid.uxSingleMode .studentCard.uxActiveStudentCard{display:block!important;}
+.uxStudentMain #studentGrid.uxMultiMode .studentCard{height:auto!important;max-height:calc(100vh - 188px)!important;overflow:auto!important;}
+.uxStudentMain #studentGrid.uxMultiMode .studentHead{position:sticky!important;top:-8px!important;}
+.uxStudentMain #studentGrid.uxMultiMode .studentNameTitle{font-size:16px!important;}
+.uxStudentMain #studentGrid.uxMultiMode .studentMeta{grid-template-columns:1fr 1fr!important;gap:6px!important;}
+.uxStudentMain #studentGrid.uxMultiMode .scheduleTable th,.uxStudentMain #studentGrid.uxMultiMode .scheduleTable td{padding:4px!important;}
+.uxStudentMain #studentGrid.uxMultiMode .scheduleTable textarea{min-height:30px!important;font-size:12px!important;}
+.uxStudentMain #studentGrid.uxMultiMode .materialTable textarea{min-height:30px!important;font-size:12px!important;}
+.uxRightPanel .uxPaneBody{padding:8px!important;}
+.uxRightPanel .uxStatusList{gap:6px!important;}
+.uxRightPanel .uxStatusItem{padding:7px 8px!important;font-size:12px!important;}
+.uxRightPanel .prepCompactCard{margin-top:6px!important;}
+.uxRightPanel .prepDetails summary{font-size:13px!important;}
+.uxRightPanel .prepInside{margin-top:8px!important;}
+.uxSettingsBelow{background:#fff;border:1px solid #dbe4ef;border-radius:14px;box-shadow:0 8px 24px rgba(15,23,42,.05);overflow:hidden;}
+.uxSettingsBelow > details > summary{cursor:pointer;padding:10px 12px;font-weight:900;color:#1e40af;background:#f8fafc;border-bottom:1px solid #e5e7eb;}
+.uxSettingsBelow > details:not([open]) > summary{border-bottom:0;}
+.uxSettingsBelowBody{max-height:30vh;overflow:auto;padding:10px;display:grid;grid-template-columns:repeat(3,minmax(280px,1fr));gap:10px;align-items:start;}
+.uxSettingsBelowBody > .card{margin:0!important;box-shadow:none!important;border-radius:12px!important;padding:12px!important;}
+.uxSettingsBelowBody .examMasterRow,.uxSettingsBelowBody .eventMasterRow,.uxSettingsBelowBody .commentMasterRow{grid-template-columns:1fr!important;}
+@media(max-width:1300px){.uxWorkspace{grid-template-columns:minmax(0,1fr) 300px!important}.uxStudentMain #studentGrid.uxMultiMode{grid-template-columns:repeat(auto-fit,minmax(360px,1fr))!important}.uxStudentTabs{max-width:62%;}.uxSettingsBelowBody{grid-template-columns:1fr;}}
+@media(max-width:900px){html,body{overflow:auto!important}main.wrap{height:auto!important;display:block!important;overflow:visible!important}.uxWorkspace{grid-template-columns:1fr!important}.uxRightPanel{grid-column:1!important}.uxStudentMain #studentGrid.uxMultiMode{grid-template-columns:1fr!important}.uxStudentTabs{max-width:100%;}.uxSettingsBelowBody{max-height:none;}}
+
 </style>
 </head>
 <body>
 <header class="appHeader"><div class="wrap appHeaderInner">
   <div>
-    <h1>面談予定入力・準備資料アプリ <span class="versionBadge">v27 横並びコンパクトUI版</span></h1>
-    <div class="sub">生徒は横並びタブで切り替え、上部は最小限に圧縮しました。右の確認・印刷パネルで状態を確認します。</div>
+    <h1>面談予定入力・準備資料アプリ <span class="versionBadge">v29 3人同時編集・右パネル整理版</span></h1>
+    <div class="sub">生徒は3人まで同時編集、4人以上は横並びタブで切り替えます。確認・印刷は右側、マスタ設定は下に分けました。</div>
   </div>
   <div class="saveWarningBadge" id="uxHeaderSaveBadge">未保存</div>
 </div></header>
@@ -142,13 +201,6 @@ main.wrap{height:calc(100vh - 52px)!important;grid-template-rows:auto auto minma
     <div id="saveInfo" class="saveInfoBox"></div>
   </section>
 
-  <section class="card uxDashboard" id="uxDashboard" aria-label="現在の状態">
-    <div class="uxStat"><span>保存状態</span><b id="uxSaveStatus">未保存</b><small id="uxLastSaveTime">まだ保存していません</small></div>
-    <div class="uxStat"><span>表示中</span><b id="uxStudentCount">0名</b><small>この画面の生徒</small></div>
-    <div class="uxStat"><span>週面欠席</span><b id="uxAbsentCount">0名</b><small>電話確認リスト対象</small></div>
-    <div class="uxStat"><span>未達理由あり</span><b id="uxFailureCount">0名</b><small>面談準備に反映</small></div>
-    <div class="uxStat"><span>印刷</span><b id="uxPrintTargetCount">0名</b><small>面談準備資料の対象</small></div>
-  </section>
 
   <div id="studentGrid" class="studentGrid"></div>
 
@@ -2869,7 +2921,54 @@ function buildMeetingPrepPrintHtml(resultRecords, weeklyHtml){
     .subline,.muted{color:#667085;font-size:11px}.box{border:1px solid #9ca3af;padding:8px;border-radius:6px;white-space:pre-wrap;}
     .prepTable{border-collapse:collapse;width:100%;font-size:11px;margin:6px 0 10px;}.prepTable th,.prepTable td{border:1px solid #9ca3af;padding:5px;vertical-align:top;word-break:break-word;}.prepTable th{background:#f3f4f6;text-align:center;font-weight:800;}.prepTable ul{margin:0;padding-left:1.2em;}.prepTable li{margin:1px 0;}.listenTable th{background:#eef2ff}.listenTable td{font-size:12px;line-height:1.5}.twoCols{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start}.weekly{font-size:10px}.weekly th,.weekly td{padding:4px;}.blankTable td{height:14mm}.blankLines div{height:7mm;border-bottom:1px solid #d1d5db}.blankBox{height:28mm}.prevResultPage{padding:8mm;overflow:hidden}.fitPageShell{width:100%;height:281mm;overflow:hidden;position:relative}.fitPageInner{transform-origin:top left;width:100%;}.prevResultPage h1{font-size:18px}.prevResultPage h2{font-size:14px;margin:8px 0 6px}.prevResultPage h3{font-size:12px;margin:6px 0 4px}.prevResultPage .prepTable{font-size:10px;margin:4px 0 6px}.prevResultPage .prepTable th,.prevResultPage .prepTable td{padding:3px 4px}.prevResultPage .box{padding:5px}.goukakuPrintPage{padding:6mm;overflow:hidden}.goukakuPrintPage h1{font-size:16px;margin:0 0 2mm}.goukakuPrintPage h2{font-size:13px;margin:0 0 2mm}.goukakuPrintPdf{height:276mm;width:198mm;border:1px solid #9ca3af;background:#f8fafc;overflow:hidden}.goukakuPrintPdf iframe{width:100%;height:100%;border:0;background:#fff}.goukakuPrintTable{font-size:9px}.goukakuPrintTable th,.goukakuPrintTable td{padding:3px;min-width:36px;max-width:120px;}
     @page{size:A4 portrait;margin:0;} @media print{.page{page-break-after:always;} body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
-  </style></head><body>${body}<script>
+  
+
+/* =========================================================
+   v29 3人同時編集・右パネル整理版
+========================================================= */
+main.wrap{grid-template-rows:auto minmax(0,1fr) auto!important;gap:8px!important;}
+.workflowCard{padding:8px 10px!important;}
+.saveInfoBox{height:28px!important;min-height:28px!important;max-height:28px!important;overflow:hidden!important;white-space:nowrap!important;text-overflow:ellipsis!important;}
+.uxWorkspace{display:grid!important;grid-template-columns:minmax(0,1fr) 330px!important;grid-template-rows:minmax(0,1fr)!important;gap:10px!important;min-height:0!important;}
+.uxStudentSidebar{display:none!important;}
+.uxStudentMain{grid-column:1!important;grid-row:1!important;}
+.uxRightPanel{grid-column:2!important;grid-row:1!important;}
+.uxStudentMain .uxPaneHead{height:42px!important;padding:6px 10px!important;}
+.uxStudentHeadLeft{display:flex;align-items:center;gap:8px;min-width:0;}
+.uxStudentModeHint{font-size:11px;color:#64748b;font-weight:800;white-space:nowrap;}
+.uxStudentTabs{display:flex!important;flex-direction:row!important;gap:6px!important;overflow-x:auto!important;overflow-y:hidden!important;max-width:70%;padding-bottom:1px;}
+.uxStudentTabs .uxStudentBtn{width:auto!important;min-width:92px!important;max-width:160px!important;height:30px!important;min-height:30px!important;border-radius:999px!important;padding:5px 8px!important;flex:0 0 auto!important;}
+.uxStudentTabs .uxStudentBtn .name{font-size:12px!important;}
+.uxStudentTabs .uxMiniBadge{font-size:9px!important;padding:1px 4px!important;}
+.uxStudentMain #studentGrid{height:100%!important;overflow:auto!important;padding:8px!important;gap:8px!important;}
+.uxStudentMain #studentGrid.uxMultiMode{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(410px,1fr))!important;align-items:start!important;}
+.uxStudentMain #studentGrid.uxSingleMode{display:block!important;}
+.uxStudentMain #studentGrid.uxMultiMode .studentCard{display:block!important;min-width:0!important;margin:0!important;}
+.uxStudentMain #studentGrid.uxSingleMode .studentCard:not(.uxActiveStudentCard){display:none!important;}
+.uxStudentMain #studentGrid.uxSingleMode .studentCard.uxActiveStudentCard{display:block!important;}
+.uxStudentMain #studentGrid.uxMultiMode .studentCard{height:auto!important;max-height:calc(100vh - 188px)!important;overflow:auto!important;}
+.uxStudentMain #studentGrid.uxMultiMode .studentHead{position:sticky!important;top:-8px!important;}
+.uxStudentMain #studentGrid.uxMultiMode .studentNameTitle{font-size:16px!important;}
+.uxStudentMain #studentGrid.uxMultiMode .studentMeta{grid-template-columns:1fr 1fr!important;gap:6px!important;}
+.uxStudentMain #studentGrid.uxMultiMode .scheduleTable th,.uxStudentMain #studentGrid.uxMultiMode .scheduleTable td{padding:4px!important;}
+.uxStudentMain #studentGrid.uxMultiMode .scheduleTable textarea{min-height:30px!important;font-size:12px!important;}
+.uxStudentMain #studentGrid.uxMultiMode .materialTable textarea{min-height:30px!important;font-size:12px!important;}
+.uxRightPanel .uxPaneBody{padding:8px!important;}
+.uxRightPanel .uxStatusList{gap:6px!important;}
+.uxRightPanel .uxStatusItem{padding:7px 8px!important;font-size:12px!important;}
+.uxRightPanel .prepCompactCard{margin-top:6px!important;}
+.uxRightPanel .prepDetails summary{font-size:13px!important;}
+.uxRightPanel .prepInside{margin-top:8px!important;}
+.uxSettingsBelow{background:#fff;border:1px solid #dbe4ef;border-radius:14px;box-shadow:0 8px 24px rgba(15,23,42,.05);overflow:hidden;}
+.uxSettingsBelow > details > summary{cursor:pointer;padding:10px 12px;font-weight:900;color:#1e40af;background:#f8fafc;border-bottom:1px solid #e5e7eb;}
+.uxSettingsBelow > details:not([open]) > summary{border-bottom:0;}
+.uxSettingsBelowBody{max-height:30vh;overflow:auto;padding:10px;display:grid;grid-template-columns:repeat(3,minmax(280px,1fr));gap:10px;align-items:start;}
+.uxSettingsBelowBody > .card{margin:0!important;box-shadow:none!important;border-radius:12px!important;padding:12px!important;}
+.uxSettingsBelowBody .examMasterRow,.uxSettingsBelowBody .eventMasterRow,.uxSettingsBelowBody .commentMasterRow{grid-template-columns:1fr!important;}
+@media(max-width:1300px){.uxWorkspace{grid-template-columns:minmax(0,1fr) 300px!important}.uxStudentMain #studentGrid.uxMultiMode{grid-template-columns:repeat(auto-fit,minmax(360px,1fr))!important}.uxStudentTabs{max-width:62%;}.uxSettingsBelowBody{grid-template-columns:1fr;}}
+@media(max-width:900px){html,body{overflow:auto!important}main.wrap{height:auto!important;display:block!important;overflow:visible!important}.uxWorkspace{grid-template-columns:1fr!important}.uxRightPanel{grid-column:1!important}.uxStudentMain #studentGrid.uxMultiMode{grid-template-columns:1fr!important}.uxStudentTabs{max-width:100%;}.uxSettingsBelowBody{max-height:none;}}
+
+</style></head><body>${body}<script>
     function fitMeetingPrepFirstPages(){
       document.querySelectorAll('.fitPageShell').forEach(function(shell){
         var inner = shell.querySelector('.fitPageInner');
@@ -3012,7 +3111,54 @@ function buildWeeklyAbsentCallListPrintHtml(absentRows, resultRecords){
   const todayLabel=`${targetDate.getFullYear()}年${targetDate.getMonth()+1}月${targetDate.getDate()}日（${DOW[targetDate.getDay()]}）`;
   const weekStart=$('#weekStart')?.value || '';
   const rows=absentRows.map((row,i)=>`<tr class="mainRow"><td class="center">${i+1}</td><td>${esc(row.grade||'')}</td><td>${esc(row.studentNo||'')}</td><td class="nameCell">${esc(row.name)}</td><td class="checkCell">□</td><td class="checkCell">□</td><td class="memoCell"></td></tr><tr class="detailRow"><td colspan="7">${absentPlansResultsHtml(row,resultRecords)}</td></tr>`).join('');
-  return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>週面欠席者 電話確認リスト</title><style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif;color:#111827;margin:0;background:#fff}.page{box-sizing:border-box;width:210mm;min-height:297mm;padding:12mm}h1{font-size:22px;margin:0 0 4px}.subline{font-size:12px;color:#667085;margin-bottom:14px}.summary{border:1px solid #9ca3af;border-radius:8px;padding:8px 10px;margin-bottom:12px;font-size:13px;background:#f8fafc}table{border-collapse:collapse;width:100%;font-size:13px}th,td{border:1px solid #6b7280;padding:7px 6px;vertical-align:middle}th{background:#f3f4f6;text-align:center;font-weight:800}.center{text-align:center}.nameCell{font-size:15px;font-weight:800}.checkCell{text-align:center;font-size:22px;width:20mm}.memoCell{height:11mm;width:48mm}.detailRow td{background:#fff;padding:6px 8px}.absentDetailTitle{font-weight:800;margin:2px 0 5px;color:#1e40af}.detailTable{font-size:10.5px;margin:0 0 6px}.detailTable th,.detailTable td{padding:4px 5px;border:1px solid #cbd5e1;vertical-align:top}.detailTable th{background:#eef2ff}.detailTable ul{margin:0;padding-left:15px}.listenBox{border:1px solid #c7d2fe;background:#eef2ff;border-radius:6px;padding:5px 7px;font-size:11px;line-height:1.45}.muted{color:#667085}.note{margin-top:10px;font-size:11px;color:#667085;line-height:1.6}.footerLine{margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:12mm;font-size:13px}.footerLine div{border-bottom:1px solid #9ca3af;height:12mm}@page{size:A4 portrait;margin:0}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.page{page-break-after:always}}</style></head><body><section class="page"><h1>週面欠席者 電話確認リスト</h1><div class="subline">対象日：${esc(todayLabel)} / 週開始：${esc(weekStart)} / 作成：${esc(now.toLocaleString('ja-JP'))}</div><div class="summary">週面欠席にチェックが入っている生徒：<b>${absentRows.length}名</b>　※電話後に「電話済み」欄へチェックしてください。</div><table><thead><tr><th>No.</th><th>学年</th><th>生徒番号</th><th>生徒名</th><th>未電話</th><th>電話済み</th><th>電話メモ</th></tr></thead><tbody>${rows}</tbody></table><div class="note">使い方：欠席確認前は「未電話」、電話完了後は「電話済み」にチェック。つながらなかった場合や保護者対応などは電話メモへ記入してください。</div><div class="footerLine"><div>担当者：</div><div>確認完了時刻：</div></div></section></body></html>`;
+  return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>週面欠席者 電話確認リスト</title><style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif;color:#111827;margin:0;background:#fff}.page{box-sizing:border-box;width:210mm;min-height:297mm;padding:12mm}h1{font-size:22px;margin:0 0 4px}.subline{font-size:12px;color:#667085;margin-bottom:14px}.summary{border:1px solid #9ca3af;border-radius:8px;padding:8px 10px;margin-bottom:12px;font-size:13px;background:#f8fafc}table{border-collapse:collapse;width:100%;font-size:13px}th,td{border:1px solid #6b7280;padding:7px 6px;vertical-align:middle}th{background:#f3f4f6;text-align:center;font-weight:800}.center{text-align:center}.nameCell{font-size:15px;font-weight:800}.checkCell{text-align:center;font-size:22px;width:20mm}.memoCell{height:11mm;width:48mm}.detailRow td{background:#fff;padding:6px 8px}.absentDetailTitle{font-weight:800;margin:2px 0 5px;color:#1e40af}.detailTable{font-size:10.5px;margin:0 0 6px}.detailTable th,.detailTable td{padding:4px 5px;border:1px solid #cbd5e1;vertical-align:top}.detailTable th{background:#eef2ff}.detailTable ul{margin:0;padding-left:15px}.listenBox{border:1px solid #c7d2fe;background:#eef2ff;border-radius:6px;padding:5px 7px;font-size:11px;line-height:1.45}.muted{color:#667085}.note{margin-top:10px;font-size:11px;color:#667085;line-height:1.6}.footerLine{margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:12mm;font-size:13px}.footerLine div{border-bottom:1px solid #9ca3af;height:12mm}@page{size:A4 portrait;margin:0}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.page{page-break-after:always}}
+
+/* =========================================================
+   v29 3人同時編集・右パネル整理版
+========================================================= */
+main.wrap{grid-template-rows:auto minmax(0,1fr) auto!important;gap:8px!important;}
+.workflowCard{padding:8px 10px!important;}
+.saveInfoBox{height:28px!important;min-height:28px!important;max-height:28px!important;overflow:hidden!important;white-space:nowrap!important;text-overflow:ellipsis!important;}
+.uxWorkspace{display:grid!important;grid-template-columns:minmax(0,1fr) 330px!important;grid-template-rows:minmax(0,1fr)!important;gap:10px!important;min-height:0!important;}
+.uxStudentSidebar{display:none!important;}
+.uxStudentMain{grid-column:1!important;grid-row:1!important;}
+.uxRightPanel{grid-column:2!important;grid-row:1!important;}
+.uxStudentMain .uxPaneHead{height:42px!important;padding:6px 10px!important;}
+.uxStudentHeadLeft{display:flex;align-items:center;gap:8px;min-width:0;}
+.uxStudentModeHint{font-size:11px;color:#64748b;font-weight:800;white-space:nowrap;}
+.uxStudentTabs{display:flex!important;flex-direction:row!important;gap:6px!important;overflow-x:auto!important;overflow-y:hidden!important;max-width:70%;padding-bottom:1px;}
+.uxStudentTabs .uxStudentBtn{width:auto!important;min-width:92px!important;max-width:160px!important;height:30px!important;min-height:30px!important;border-radius:999px!important;padding:5px 8px!important;flex:0 0 auto!important;}
+.uxStudentTabs .uxStudentBtn .name{font-size:12px!important;}
+.uxStudentTabs .uxMiniBadge{font-size:9px!important;padding:1px 4px!important;}
+.uxStudentMain #studentGrid{height:100%!important;overflow:auto!important;padding:8px!important;gap:8px!important;}
+.uxStudentMain #studentGrid.uxMultiMode{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(410px,1fr))!important;align-items:start!important;}
+.uxStudentMain #studentGrid.uxSingleMode{display:block!important;}
+.uxStudentMain #studentGrid.uxMultiMode .studentCard{display:block!important;min-width:0!important;margin:0!important;}
+.uxStudentMain #studentGrid.uxSingleMode .studentCard:not(.uxActiveStudentCard){display:none!important;}
+.uxStudentMain #studentGrid.uxSingleMode .studentCard.uxActiveStudentCard{display:block!important;}
+.uxStudentMain #studentGrid.uxMultiMode .studentCard{height:auto!important;max-height:calc(100vh - 188px)!important;overflow:auto!important;}
+.uxStudentMain #studentGrid.uxMultiMode .studentHead{position:sticky!important;top:-8px!important;}
+.uxStudentMain #studentGrid.uxMultiMode .studentNameTitle{font-size:16px!important;}
+.uxStudentMain #studentGrid.uxMultiMode .studentMeta{grid-template-columns:1fr 1fr!important;gap:6px!important;}
+.uxStudentMain #studentGrid.uxMultiMode .scheduleTable th,.uxStudentMain #studentGrid.uxMultiMode .scheduleTable td{padding:4px!important;}
+.uxStudentMain #studentGrid.uxMultiMode .scheduleTable textarea{min-height:30px!important;font-size:12px!important;}
+.uxStudentMain #studentGrid.uxMultiMode .materialTable textarea{min-height:30px!important;font-size:12px!important;}
+.uxRightPanel .uxPaneBody{padding:8px!important;}
+.uxRightPanel .uxStatusList{gap:6px!important;}
+.uxRightPanel .uxStatusItem{padding:7px 8px!important;font-size:12px!important;}
+.uxRightPanel .prepCompactCard{margin-top:6px!important;}
+.uxRightPanel .prepDetails summary{font-size:13px!important;}
+.uxRightPanel .prepInside{margin-top:8px!important;}
+.uxSettingsBelow{background:#fff;border:1px solid #dbe4ef;border-radius:14px;box-shadow:0 8px 24px rgba(15,23,42,.05);overflow:hidden;}
+.uxSettingsBelow > details > summary{cursor:pointer;padding:10px 12px;font-weight:900;color:#1e40af;background:#f8fafc;border-bottom:1px solid #e5e7eb;}
+.uxSettingsBelow > details:not([open]) > summary{border-bottom:0;}
+.uxSettingsBelowBody{max-height:30vh;overflow:auto;padding:10px;display:grid;grid-template-columns:repeat(3,minmax(280px,1fr));gap:10px;align-items:start;}
+.uxSettingsBelowBody > .card{margin:0!important;box-shadow:none!important;border-radius:12px!important;padding:12px!important;}
+.uxSettingsBelowBody .examMasterRow,.uxSettingsBelowBody .eventMasterRow,.uxSettingsBelowBody .commentMasterRow{grid-template-columns:1fr!important;}
+@media(max-width:1300px){.uxWorkspace{grid-template-columns:minmax(0,1fr) 300px!important}.uxStudentMain #studentGrid.uxMultiMode{grid-template-columns:repeat(auto-fit,minmax(360px,1fr))!important}.uxStudentTabs{max-width:62%;}.uxSettingsBelowBody{grid-template-columns:1fr;}}
+@media(max-width:900px){html,body{overflow:auto!important}main.wrap{height:auto!important;display:block!important;overflow:visible!important}.uxWorkspace{grid-template-columns:1fr!important}.uxRightPanel{grid-column:1!important}.uxStudentMain #studentGrid.uxMultiMode{grid-template-columns:1fr!important}.uxStudentTabs{max-width:100%;}.uxSettingsBelowBody{max-height:none;}}
+
+</style></head><body><section class="page"><h1>週面欠席者 電話確認リスト</h1><div class="subline">対象日：${esc(todayLabel)} / 週開始：${esc(weekStart)} / 作成：${esc(now.toLocaleString('ja-JP'))}</div><div class="summary">週面欠席にチェックが入っている生徒：<b>${absentRows.length}名</b>　※電話後に「電話済み」欄へチェックしてください。</div><table><thead><tr><th>No.</th><th>学年</th><th>生徒番号</th><th>生徒名</th><th>未電話</th><th>電話済み</th><th>電話メモ</th></tr></thead><tbody>${rows}</tbody></table><div class="note">使い方：欠席確認前は「未電話」、電話完了後は「電話済み」にチェック。つながらなかった場合や保護者対応などは電話メモへ記入してください。</div><div class="footerLine"><div>担当者：</div><div>確認完了時刻：</div></div></section></body></html>`;
 }
 async function printWeeklyAbsentList(){
   const absentRows=await collectWeeklyAbsentRowsForPrint();
@@ -3158,42 +3304,49 @@ function initRealAppUX(){
 }
 
 
+
 /* =========================================================
-   v27 横並びコンパクトUI版：左一覧・中央1人編集・右確認
+   v29 3人同時編集・右パネル整理版
 ========================================================= */
 const UX26_STATE={activeStudent:''};
 function ux26BuildWorkspace(){
   const main=document.querySelector('main.wrap');
   const grid=document.getElementById('studentGrid');
-  const dash=document.getElementById('uxDashboard');
+  const anchor=document.getElementById('uxWorkflowCard')||grid;
   if(!main||!grid||document.getElementById('uxWorkspace')) return;
   const workspace=document.createElement('section');
   workspace.id='uxWorkspace';
   workspace.className='uxWorkspace';
   workspace.innerHTML=`
-    <aside class="uxPane uxStudentSidebar"><div class="uxPaneHead"><span>生徒一覧</span><small id="uxSidebarCount">0名</small></div><div class="uxPaneBody"><div id="uxStudentList" class="uxStudentList"></div></div></aside>
-    <section class="uxPane uxStudentMain"><div class="uxPaneHead"><span id="uxActiveStudentTitle">生徒を選択</span><small>1人ずつ編集</small></div><div class="uxPaneBody" id="uxStudentMainBody"></div></section>
-    <aside class="uxPane uxRightPanel"><div class="uxPaneHead"><span>確認・印刷</span><button type="button" class="small secondary" id="uxSettingsToggleBtn">設定</button></div><div class="uxPaneBody" id="uxRightPaneBody"><div id="uxStatusList" class="uxStatusList"></div></div></aside>`;
-  dash.insertAdjacentElement('afterend',workspace);
+    <section class="uxPane uxStudentMain">
+      <div class="uxPaneHead">
+        <div class="uxStudentHeadLeft"><span id="uxActiveStudentTitle">生徒入力</span><small class="uxStudentModeHint" id="uxStudentModeHint">3人まで同時編集</small></div>
+        <div id="uxStudentList" class="uxStudentList uxStudentTabs"></div>
+      </div>
+      <div class="uxPaneBody" id="uxStudentMainBody"></div>
+    </section>
+    <aside class="uxPane uxRightPanel">
+      <div class="uxPaneHead"><span>確認・印刷</span></div>
+      <div class="uxPaneBody" id="uxRightPaneBody"><div id="uxStatusList" class="uxStatusList"></div></div>
+    </aside>`;
+  anchor.insertAdjacentElement('afterend',workspace);
   document.getElementById('uxStudentMainBody').appendChild(grid);
   const right=document.getElementById('uxRightPaneBody');
   const prep=document.querySelector('.prepCompactCard');
   if(prep) right.appendChild(prep);
-  const settings=document.createElement('div');
-  settings.id='uxSettingsBox';
-  settings.className='uxSettingsBox';
-  settings.innerHTML='<details><summary>模試・イベント・コメント設定を開く</summary><div id="uxMovedSettings"></div></details>';
-  right.appendChild(settings);
+  const settings=document.createElement('section');
+  settings.id='uxSettingsBelow';
+  settings.className='uxSettingsBelow';
+  settings.innerHTML='<details><summary>模試マスタ・イベントマスタ・コメントマスタ・詳細設定を開く</summary><div id="uxMovedSettings" class="uxSettingsBelowBody"></div></details>';
+  workspace.insertAdjacentElement('afterend',settings);
   const moved=settings.querySelector('#uxMovedSettings');
   Array.from(main.children).forEach(el=>{
-    if(el===workspace||el===document.getElementById('uxWorkflowCard')||el===document.getElementById('uxDashboard')) return;
+    if(el===workspace||el===settings||el===document.getElementById('uxWorkflowCard')||el===document.getElementById('uxDashboard')) return;
     if(el.id==='studentGrid') return;
     if(el.classList && el.classList.contains('prepCompactCard')) return;
     const txt=el.textContent||'';
     if(/模試マスタ|イベントマスタ|今週の方針|詳細設定|統合用HTML/.test(txt)) moved.appendChild(el);
   });
-  const btn=document.getElementById('uxSettingsToggleBtn');
-  if(btn) btn.onclick=()=>{ const d=settings.querySelector('details'); if(d) d.open=!d.open; };
 }
 function ux26GetActiveStudent(){
   if(UX26_STATE.activeStudent && students.includes(UX26_STATE.activeStudent)) return UX26_STATE.activeStudent;
@@ -3210,32 +3363,39 @@ function ux26RefreshStudentList(){
   const list=document.getElementById('uxStudentList');
   if(!list) return;
   const active=ux26GetActiveStudent();
-  const escLocal=(s)=>String(s??'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const escLocal=(s)=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   if(!students.length){
-    list.innerHTML='<div class="uxEmptySelect">上の欄に生徒名を入力して<br>「生徒欄を作る」を押してください。</div>';
+    list.innerHTML='<div class="uxEmptySelect">生徒名を入力してください</div>';
   }else{
     list.innerHTML=students.map(name=>{
       const d=ensureStudent(name);
       const badges=[];
       if(d.weeklyMeetingAbsent) badges.push('<span class="uxMiniBadge absent">欠席</span>');
       if(String(d.failureReason||'').trim()) badges.push('<span class="uxMiniBadge failure">未達</span>');
-      return `<button type="button" class="uxStudentBtn ${name===active?'active':''}" data-ux-select-student="${escLocal(name)}"><span class="name">${escLocal(name)}</span><span class="uxStudentBadges">${badges.join('')}</span></button>`;
+      const isActive=(students.length<=3) || name===active;
+      return `<button type="button" class="uxStudentBtn ${isActive?'active':''}" data-ux-select-student="${escLocal(name)}"><span class="name">${escLocal(name)}</span><span class="uxStudentBadges">${badges.join('')}</span></button>`;
     }).join('');
     list.querySelectorAll('[data-ux-select-student]').forEach(btn=>{
       btn.onclick=()=>ux26SetActiveStudent(btn.getAttribute('data-ux-select-student')||'');
     });
   }
-  const c=document.getElementById('uxSidebarCount'); if(c)c.textContent=`${students.length||0}名`;
 }
 function ux26ShowActiveCard(){
   const active=ux26GetActiveStudent();
   const title=document.getElementById('uxActiveStudentTitle');
-  if(title) title.textContent=active ? `${active} の入力` : '生徒を選択';
+  const hint=document.getElementById('uxStudentModeHint');
+  const grid=document.getElementById('studentGrid');
+  const multi=students.length>0 && students.length<=3;
+  if(title) title.textContent=multi ? `生徒入力（${students.length}人同時）` : (active ? `${active} の入力` : '生徒入力');
+  if(hint) hint.textContent=multi ? '3人まで同時編集できます' : '4人以上はタブで切替';
+  if(grid){
+    grid.classList.toggle('uxMultiMode',multi);
+    grid.classList.toggle('uxSingleMode',!multi);
+  }
   document.querySelectorAll('[data-student-card]').forEach(card=>{
     const name=card.getAttribute('data-student-card')||'';
-    card.classList.toggle('uxActiveStudentCard',name===active);
+    card.classList.toggle('uxActiveStudentCard',multi || name===active);
   });
-  const grid=document.getElementById('studentGrid');
   if(grid && !students.length) grid.innerHTML='<div class="uxEmptySelect">生徒名を入力すると、ここに入力画面が表示されます。</div>';
 }
 function ux26UpdateRightStatus(){
@@ -3250,14 +3410,13 @@ function ux26UpdateRightStatus(){
     if((d.events||[]).length) event++;
   });
   const active=ux26GetActiveStudent();
-  const activeData=active?ensureStudent(active):null;
+  const selectedText=students.length<=3 && students.length ? students.join('、') : (active||'未選択');
   box.innerHTML=`
     <div class="uxStatusItem ${UX_STATE.dirty?'warn':'info'}"><b>${UX_STATE.dirty?'未保存です':'保存状態OK'}</b>${UX_STATE.dirty?'復元後・保存後に変更があります。席を外す前に保存してください。':'現在の内容は保存済みまたは復元直後です。'}</div>
-    <div class="uxStatusItem"><b>選択中</b>${active||'未選択'}</div>
+    <div class="uxStatusItem"><b>編集中</b>${selectedText}</div>
     <div class="uxStatusItem ${absent.length?'warn':''}"><b>週面欠席</b>${absent.length?absent.join('、'):'なし'}</div>
     <div class="uxStatusItem ${failure.length?'info':''}"><b>未達理由あり</b>${failure.length?failure.join('、'):'なし'}</div>
-    <div class="uxStatusItem"><b>確認事項</b>模試確認 ${exam}名 / イベント確認 ${event}名</div>
-    <div class="uxStatusItem"><b>選択中の状態</b>${activeData?`受講行 ${activeData.lessonCount||1} / その他行 ${activeData.otherCount||1}`:'-'}</div>`;
+    <div class="uxStatusItem"><b>確認事項</b>模試確認 ${exam}名 / イベント確認 ${event}名</div>`;
 }
 const UX26_ORIGINAL_UPDATE_SUMMARY=uxUpdateSummary;
 uxUpdateSummary=function(){
