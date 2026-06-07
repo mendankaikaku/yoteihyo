@@ -50,7 +50,8 @@ button{border:0;border-radius:11px;padding:9px 12px;background:var(--accent);col
 button.secondary{background:#475467;}
 button.ghost{background:#eef2ff;color:#1e40af;}
 button.ok{background:var(--ok);}
-button.saveImportant{background:#dc2626;color:#fff;}
+button.saveImportant{background:#dc2626;color:#fff;box-shadow:0 0 0 3px rgba(220,38,38,.14);}
+button.saveImportant:hover{background:#b91c1c;}
 button:disabled{opacity:.45;cursor:not-allowed;}
 .btnRow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;}
 .primaryAction{font-size:14px;padding:11px 14px;}
@@ -146,11 +147,11 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
     </div>
     <div class="headerActions">
       <button id="mergeBtn" class="ok primaryAction">② 統合する</button>
-      <button id="download2wBtn" disabled>③ 2週間出力</button>
+      <button id="download2wBtn" disabled>③ 2週間出力＋科目リスト</button>
       <button id="download1mBtn" disabled>③ 1か月出力</button>
       <button id="downloadBtn" disabled>③ 期間指定出力</button>
-      <button id="downloadAllListBtn" class="ghost" disabled>③ 全員リスト</button>
-      <button id="downloadMonthlyPosterBtn" class="ghost">③ 月間掲示</button>
+      <button id="downloadAllListBtn" class="ghost" disabled>③ 全員分リスト</button>
+      <button id="downloadMonthlyPosterBtn" class="ghost">③ 毎日更新</button>
       <button id="clearBtn" class="secondary">リセット</button>
     </div>
   </div>
@@ -160,10 +161,10 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
   <section class="controlGrid">
     <div class="card">
       <p class="cardTitle"><span class="step">①</span>フォルダーを読み取る</p>
-      <div class="hint" style="margin-bottom:10px;">「まとめて復元」フォルダーを選ぶだけで、json / 学習結果 / 打ち込み結果 / 対応表 / 全員リスト / 毎日更新 / 全体予定表 を自動で振り分けます。</div>
+      <div class="hint" style="margin-bottom:10px;">「まとめて復元」フォルダーを選ぶだけで、json / 学習結果 / 打ち込み結果 / 対応表 / 全員分リスト / 毎日更新 / 全体予定表 を自動で振り分けます。</div>
       <div class="bundleActionGrid">
         <button id="readBundleBtn" class="ok primaryAction" type="button">① フォルダーを読み取る</button>
-        <button id="saveResultHistoryBtn" class="saveImportant primaryAction" type="button">④ 結果履歴を必ず保存</button>
+        <button id="saveResultHistoryBtn" class="saveImportant primaryAction" type="button">④ 結果履歴を必ず保存！</button>
       </div>
       <div id="bundleReadSummary" class="hint" style="margin-top:10px;white-space:pre-wrap;">まだ読み込んでいません</div>
       
@@ -178,7 +179,7 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
       <details>
         <summary>読み取るフォルダーの中身</summary>
         <div class="hint" style="margin-top:8px;">
-          予定Excelは「打ち込み結果」、結果Excelは「学習結果」、履歴JSONは「json」、対応表は「対応表」、全員リストは「全員リスト」、掲示用Excelの手修正版は「毎日更新」、全体予定表の手修正版は「全体予定表」フォルダーから自動で読みます。
+          予定Excelは「打ち込み結果」、結果Excelは「学習結果」、履歴JSONは「json」、対応表は「対応表」、全員分リストは「全員分リスト」、掲示用Excelの手修正版は「毎日更新」、全体予定表の手修正版は「全体予定表」フォルダーから自動で読みます。
         </div>
       </details>
     </div>
@@ -218,7 +219,7 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
         <label><input id="colorWeekend" type="checkbox" checked />土日を色分け</label>
       </div>
       <div class="hint" style="margin-top:10px;">操作順は、①フォルダーを読み取る → ②統合する → ③出力ボタンを選ぶ → ④必ず保存、です。</div>
-      <div class="hint" style="margin-top:10px;">月間掲示の手修正版は「毎日更新」フォルダーから復元します。</div>
+      <div class="hint" style="margin-top:10px;">毎日更新の手修正版は「毎日更新」フォルダーから復元します。</div>
       <details>
         <summary>Excel形式の確認</summary>
         <div class="hint" style="margin-top:8px;">
@@ -2846,7 +2847,7 @@ function mergeRestoredWholeScheduleAoa(sheetName, generatedAoa){
 }
 
 // ============================================================
-// 8.4 月間掲示用結果Excel出力
+// 8.4 毎日更新用結果Excel出力
 // ============================================================
 const MONTHLY_POSTER_RESULT_RULES = [
   {keyword:'連続で実施', sheetName:'連続実施'},
@@ -3119,7 +3120,7 @@ async function downloadMonthlyPosterResultWorkbook(){
   }
   $('downloadMonthlyPosterBtn').disabled = true;
   try{
-    log('月間掲示を作成中...\n結果Excelと結果履歴JSONから、今月分の結果を抽出しています。');
+    log('毎日更新を作成中...\n結果Excelと結果履歴JSONから、今月分の結果を抽出しています。');
     let results = state.resultRecords && state.resultRecords.length ? state.resultRecords : (await loadMonthlyPosterResultsDirectly()).records;
     const {from,to,label} = monthRangeForOpenedPage(new Date());
     results = mergeResultRecordsUnique(results).filter(r => inDateRange(r, from, to));
@@ -3140,12 +3141,12 @@ async function downloadMonthlyPosterResultWorkbook(){
     const rankingWs = aoaToSheet(mergedRankingAoa);
     styleHighSpeedRankingSheet(rankingWs, mergedRankingAoa);
     XLSX.utils.book_append_sheet(wb, rankingWs, uniqueSheetName('高速基礎ランキング', used));
-    XLSX.writeFile(wb, `校舎掲示用_月間結果_${ymd(from)}-${ymd(to)}.xlsx`);
+    XLSX.writeFile(wb, `校舎掲示用_毎日更新_${ymd(from)}-${ymd(to)}.xlsx`);
     const counts = MONTHLY_POSTER_RESULT_RULES.map(rule => `${rule.keyword}: ${results.filter(r => norm(r.result).includes(rule.keyword)).length}件`).join('\n');
-    log(`月間掲示を作成しました\n対象期間: ${ymd(from)}〜${ymd(to)}\n${counts}`);
+    log(`毎日更新を作成しました\n対象期間: ${ymd(from)}〜${ymd(to)}\n${counts}`);
   }catch(e){
     alert(e.message || String(e));
-    log('月間掲示の作成に失敗しました。');
+    log('毎日更新の作成に失敗しました。');
   }finally{
     $('downloadMonthlyPosterBtn').disabled = false;
   }
@@ -3154,7 +3155,7 @@ async function downloadMonthlyPosterResultWorkbook(){
 
 
 // ============================================================
-// 8.5 全員リスト出力
+// 8.5 全員分リスト出力
 //     学年別シート＋当日基準4日分（2日前〜1日後）の予定/結果カレンダー
 //     印刷はB4横向き・各学年1ページ想定
 // ============================================================
@@ -3276,7 +3277,7 @@ function buildExamEventMaps(examRecords=[], eventRecords=[]){
     const key = studentKeyForList(meta['生徒名'] || r.student, meta['生徒番号'] || r.studentNo || '');
     const g = examKeyOf(r);
     if(!examByStudent.has(key)) examByStudent.set(key, new Map());
-    // 全員リストでは模試の科目は出さず、受験方法だけを表示する。
+    // 全員分リストでは模試の科目は出さず、受験方法だけを表示する。
     // 表示は「当日」「後日」「不受験」のいずれかを基本にする。
     const status = norm(r.status || '');
     const cell = status.includes('不受験') ? '不受験' : (status.includes('後日') ? '後日' : (status.includes('当日') ? '当日' : status));
@@ -3476,7 +3477,7 @@ function buildAllStudentListAoaByGrade(examRecords=[], eventRecords=[]){
 
   const gradeAoas = [];
   for(const [grade, students] of byGrade.entries()){
-    const title = `${grade} 全員リスト（${mmdd(windowDates[0])}〜${mmdd(windowDates[windowDates.length-1])}の予定・結果）`;
+    const title = `${grade} 全員分リスト（${mmdd(windowDates[0])}〜${mmdd(windowDates[windowDates.length-1])}の予定・結果）`;
     const header = ['学年','生徒番号','生徒名','読み仮名','担当','高校','備考', ...examGroups.map(g=>g.label), ...eventGroups.map(g=>g.label)];
     for(const d of windowDates){
       header.push(`${mmdd(d)}(${WEEK_JA[d.getDay()]})\n予定`);
@@ -3567,7 +3568,7 @@ async function downloadAllStudentList(){
     XLSX.utils.book_append_sheet(wb, ws, safeSheetName(item.grade));
   }
   const base = allListBaseDate();
-  XLSX.writeFile(wb, `全員リスト_学年別_B4横_${ymd(base)}基準.xlsx`);
+  XLSX.writeFile(wb, `全員分リスト_学年別_B4横_${ymd(base)}基準.xlsx`);
 }
 
 function downloadWorkbookFromAoa(calendarAoa, listAoa, resultAoa, rosterAoa, logAoa, label, examRecords=[], eventRecords=[]){
@@ -3747,7 +3748,7 @@ async function setBundleFolderFiles(fileList){
     const relLower = String(f.webkitRelativePath || f.name || '').toLowerCase();
     if(isJson && (parts.some(p => p === 'json' || p.includes('json') || p.includes('履歴')) || /result[_-]?history|結果履歴/.test(relLower))) histories.push(f);
     else if(isExcel && filePathIncludes(f, '毎日更新')) dailyPosters.push(f);
-    else if(isExcel && filePathIncludes(f, '全員リスト')) allLists.push(f);
+    else if(isExcel && (filePathIncludes(f, '全員分リスト') || filePathIncludes(f, '全員リスト'))) allLists.push(f);
     else if(isExcel && filePathIncludes(f, '全体予定表')) wholeSchedules.push(f);
     else if(isExcel && filePathIncludes(f, '学習結果')) results.push(f);
     else if(isExcel && filePathIncludes(f, '打ち込み結果')) planned.push(f);
@@ -3779,14 +3780,14 @@ async function setBundleFolderFiles(fileList){
 予定Excel（打ち込み結果）: ${planned.length}件
 結果Excel（学習結果）: ${results.length}件
 結果履歴JSON（json）: ${histories.length}件
-全員リスト復元Excel（全員リスト）: ${allLists.length}件${allListRestoreLogs.length ? '（' + allListRestoreLogs.join(' / ') + '）' : ''}
+全員分リスト復元Excel（全員分リスト）: ${allLists.length}件${allListRestoreLogs.length ? '（' + allListRestoreLogs.join(' / ') + '）' : ''}
 掲示用手修正Excel（毎日更新）: ${dailyPosters.length}件${dailyPosterRestoreLogs.length ? '（' + dailyPosterRestoreLogs.join(' / ') + '）' : ''}
 全体予定表手修正Excel（全体予定表）: ${wholeSchedules.length}件${wholeScheduleRestoreLogs.length ? '（' + wholeScheduleRestoreLogs.join(' / ') + '）' : ''}
 ${rosterMsg}`;
   if($("bundleReadSummary")) $("bundleReadSummary").textContent = summary;
   log(`${summary}
 
-必要ならこのまま「統合プレビュー」または「月間掲示」を押してください。`);
+必要ならこのまま「統合プレビュー」または「毎日更新」を押してください。`);
 }
 function setFiles(fileList){
   state.files = [...fileList].filter(f => !shouldSkipFile(f));
@@ -3799,13 +3800,13 @@ function setResultFiles(fileList){
   state.resultFiles = [...fileList].filter(f => !shouldSkipFile(f));
   state.workbookReady = false;
   updateMainOutputButtons();
-  log(`結果Excel選択完了\n結果Excelファイル: ${state.resultFiles.length}件\n月間掲示だけなら、このまま「月間掲示」を押せます。`);
+  log(`結果Excel選択完了\n結果Excelファイル: ${state.resultFiles.length}件\n毎日更新だけなら、このまま「毎日更新」を押せます。`);
 }
 function setResultHistoryFiles(fileList){
   state.resultHistoryFiles = [...fileList].filter(f => /\.json$/i.test(f.name));
   state.workbookReady = false;
   updateMainOutputButtons();
-  log(`結果履歴JSON選択完了\nJSONファイル: ${state.resultHistoryFiles.length}件\n月間掲示だけなら、このまま「月間掲示」を押せます。`);
+  log(`結果履歴JSON選択完了\nJSONファイル: ${state.resultHistoryFiles.length}件\n毎日更新だけなら、このまま「毎日更新」を押せます。`);
 }
 
 $("readBundleBtn").addEventListener("click", () => $("bundleFolderInput").click());
