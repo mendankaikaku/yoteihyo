@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>面談予定入力・準備資料アプリ v25（実務UI版）</title>
+<title>面談予定入力・準備資料アプリ v31（上部整理・横スクロール版）</title>
 <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
 <script src="./libs/xlsx.bundle.js"></script>
 <script>if(!window.XLSX){document.write('<script src="./libs/xlsx.full.min.js"><\/script>');}</script>
@@ -85,13 +85,207 @@ details.advanced{background:#fff;border-color:#e2e8f0}details.advanced summary{f
 @media(max-width:1100px){.appHeaderInner{align-items:flex-start;flex-direction:column}.uxDashboard{grid-template-columns:1fr 1fr}.appSteps{grid-template-columns:1fr 1fr}.appSteps .quickStep::after{display:none}.uxActionDock{left:10px;right:10px;bottom:10px;justify-content:space-between}.uxActionDock .uxDockStatus{display:none}}
 @media(max-width:640px){.uxDashboard{grid-template-columns:1fr}.appSteps{grid-template-columns:1fr}.topActions{grid-template-columns:1fr}.saveWarningBadge{width:100%}}
 
+
+/* =========================================================
+   v32 ドラッグ横スクロール・印刷1回化版：3ペイン・1人編集・赤い未保存表示
+========================================================= */
+html,body{height:100%;overflow:hidden}
+body{background:#eef2f7}
+.appHeader{position:sticky;top:0;z-index:50}
+.appHeader .wrap{max-width:none;padding:8px 14px}.appHeader h1{font-size:18px;margin:0 0 3px}.appHeader .sub{font-size:12px;line-height:1.35}.appHeaderInner{gap:10px}.saveWarningBadge{box-shadow:0 8px 22px rgba(153,27,27,.16)}.saveWarningBadge.dirty{border-color:#fca5a5;background:#dc2626;color:#fff}.saveWarningBadge.loaded{border-color:#bfdbfe;background:#dbeafe;color:#1e40af}.saveWarningBadge.saved{border-color:#86efac;background:#dcfce7;color:#166534}
+main.wrap{max-width:none;height:calc(100vh - 76px);padding:10px 12px;display:grid;grid-template-rows:auto auto minmax(0,1fr);gap:10px;overflow:hidden}.workflowCard{margin:0;padding:10px 12px;border-top:0;border-left:6px solid #2563eb}.workflowCard .sectionTitle{display:none}.topActions{grid-template-columns:minmax(260px,1fr) 145px auto auto auto auto;gap:8px}.topActions .field label{font-size:11px}.topActions .field input,.topActions button{min-height:34px;padding:7px 10px;font-size:13px}.workflowCard .compactHint{display:none}.appSteps{display:none}.saveInfoBox{margin-top:7px;min-height:30px;padding:6px 9px;font-size:12px;line-height:1.35}
+.uxDashboard{margin:0;padding:8px 10px;gap:8px;border-radius:14px}.uxDashboard.dirty{background:#991b1b}.uxDashboard.loaded{background:#172554}.uxDashboard.saved{background:#14532d}.uxStat{padding:8px 10px;border-radius:12px}.uxStat span{font-size:11px}.uxStat b{font-size:17px}.uxStat small{font-size:10px;margin-top:0}
+.uxWorkspace{min-height:0;display:grid;grid-template-columns:230px minmax(0,1fr) 320px;gap:10px;overflow:hidden}.uxPane{min-height:0;background:#fff;border:1px solid #dbe4ef;border-radius:16px;box-shadow:0 10px 30px rgba(15,23,42,.06);overflow:hidden}.uxPaneHead{height:42px;padding:10px 12px;border-bottom:1px solid #e5e7eb;background:#f8fafc;font-weight:900;display:flex;align-items:center;justify-content:space-between;gap:8px}.uxPaneBody{height:calc(100% - 42px);overflow:auto;padding:10px}.uxStudentSidebar .uxPaneBody{padding:8px}.uxStudentList{display:flex;flex-direction:column;gap:6px}.uxStudentBtn{width:100%;border:1px solid #dbe4ef;background:#fff;color:#172033;border-radius:12px;box-shadow:none;min-height:42px;text-align:left;padding:8px 9px;display:flex;align-items:center;justify-content:space-between;gap:7px}.uxStudentBtn.active{background:#dbeafe;border-color:#93c5fd;color:#1e3a8a}.uxStudentBtn .name{font-weight:900;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.uxStudentBadges{display:flex;gap:3px;flex-shrink:0}.uxMiniBadge{font-size:10px;border-radius:999px;padding:2px 5px;font-weight:900}.uxMiniBadge.absent{background:#ffedd5;color:#9a3412}.uxMiniBadge.failure{background:#dbeafe;color:#1e40af}.uxEmptySelect{height:100%;display:flex;align-items:center;justify-content:center;color:#64748b;font-weight:800;text-align:center;line-height:1.7}.uxStudentMain .uxPaneBody{padding:0}.uxStudentMain #studentGrid{height:100%;display:block;overflow:auto;padding:10px}.uxStudentMain .studentCard{min-width:0;margin:0;height:auto;border-top:0;border-left:5px solid #dbeafe}.uxStudentMain .studentCard:not(.uxActiveStudentCard){display:none}.uxStudentMain .studentCard.uxActiveStudentCard{display:block}.uxStudentMain .studentCard.hasAbsent{border-left-color:#f97316}.uxStudentMain .studentCard.hasFailure{box-shadow:0 0 0 2px rgba(37,99,235,.12),0 10px 30px rgba(15,23,42,.06)}.studentHead{position:sticky;top:0;background:#fff;z-index:5;margin:-16px -16px 12px;padding:12px 16px;border-radius:12px 12px 0 0}.studentSection{margin-top:12px}.scheduleTable textarea{min-height:38px}.materialTable textarea{min-height:36px}.studentMeta{margin-bottom:8px}.uxRightPanel .prepCompactCard,.uxRightPanel .card{margin:0 0 10px;padding:10px;border-radius:14px;box-shadow:none}.uxRightPanel .prepCompactCard{max-width:none;border-left:5px solid #7c3aed}.uxRightPanel .prepInside{grid-template-columns:1fr!important}.uxRightPanel .printActions{gap:8px}.uxRightPanel .compactHint{font-size:11px}.uxStatusList{display:flex;flex-direction:column;gap:7px}.uxStatusItem{border:1px solid #e5e7eb;background:#f8fafc;border-radius:12px;padding:8px;font-size:12px;line-height:1.45}.uxStatusItem b{display:block;font-size:13px;margin-bottom:2px}.uxStatusItem.warn{border-color:#fed7aa;background:#fff7ed;color:#9a3412}.uxStatusItem.info{border-color:#bfdbfe;background:#eff6ff;color:#1e40af}.uxSettingsBox details{border:1px solid #e5e7eb;border-radius:12px;background:#fff;margin-top:8px;padding:8px}.uxSettingsBox summary{cursor:pointer;font-weight:900;color:#334155}.uxHiddenOriginalSections{display:none!important}.uxActionDock{display:none}.prepCompactCard{margin:0}.card{margin:0}.notice{display:none!important}
+@media(max-width:1150px){html,body{overflow:auto}main.wrap{height:auto;overflow:visible;display:block}.uxWorkspace{grid-template-columns:1fr}.uxPane{margin-bottom:10px;min-height:220px}.uxStudentMain #studentGrid{max-height:none}.topActions{grid-template-columns:1fr 1fr}.uxDashboard{grid-template-columns:1fr 1fr}.uxActionDock{display:flex}.appSteps{display:grid}.workflowCard .compactHint{display:block}}
+@media(max-width:700px){.topActions{grid-template-columns:1fr}.uxDashboard{grid-template-columns:1fr}.appHeaderInner{align-items:flex-start;flex-direction:column}.saveWarningBadge{width:100%}}
+
+
+
+/* =========================================================
+   v32 ドラッグ横スクロール・印刷1回化版：上部を薄く・生徒を横タブ化
+========================================================= */
+.appHeader .wrap{padding:5px 12px!important}.appHeader h1{font-size:16px!important;margin:0!important}.appHeader .sub{font-size:11px!important;line-height:1.2!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:calc(100vw - 260px)}.versionBadge{font-size:11px!important;padding:2px 7px!important}.saveWarningBadge{min-width:86px!important;padding:6px 10px!important;font-size:12px!important}
+main.wrap{height:calc(100vh - 52px)!important;grid-template-rows:auto auto minmax(0,1fr)!important;gap:6px!important;padding:7px 10px!important}.workflowCard{padding:8px 10px!important;border-left:5px solid #2563eb!important;border-radius:14px!important}.topActions{grid-template-columns:minmax(260px,1fr) 135px auto auto auto auto!important;gap:7px!important;align-items:end!important}.topActions .field label{font-size:10px!important;margin-bottom:1px!important}.topActions .field input,.topActions button{min-height:30px!important;height:30px!important;padding:4px 9px!important;font-size:12px!important;border-radius:9px!important}.topActions #saveGroupMemory{font-size:13px!important}.saveInfoBox{margin-top:5px!important;min-height:0!important;max-height:24px!important;height:24px!important;padding:3px 7px!important;font-size:11px!important;line-height:17px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;color:#64748b!important;background:#f8fafc!important}.saveInfoBox br{display:none!important}
+.uxDashboard{height:48px!important;padding:5px 7px!important;gap:7px!important;border-radius:12px!important;display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important}.uxStat{padding:5px 8px!important;border-radius:10px!important;display:flex!important;align-items:center!important;justify-content:space-between!important;gap:8px!important}.uxStat span{font-size:10px!important}.uxStat b{font-size:15px!important;margin:0!important;white-space:nowrap!important}.uxStat small{display:none!important}
+.uxWorkspace{grid-template-columns:minmax(0,1fr) 320px!important;grid-template-rows:56px minmax(0,1fr)!important;gap:8px!important}.uxStudentSidebar{grid-column:1!important;grid-row:1!important}.uxStudentMain{grid-column:1!important;grid-row:2!important}.uxRightPanel{grid-column:2!important;grid-row:1 / span 2!important}.uxPane{border-radius:14px!important}.uxPaneHead{height:32px!important;padding:6px 10px!important;font-size:13px!important}.uxPaneHead small{font-size:10px!important}.uxPaneBody{height:calc(100% - 32px)!important;padding:7px!important}.uxStudentSidebar .uxPaneBody{padding:6px!important;overflow-x:auto!important;overflow-y:hidden!important}.uxStudentList{display:flex!important;flex-direction:row!important;gap:6px!important;min-width:max-content!important}.uxStudentBtn{width:auto!important;min-width:118px!important;max-width:170px!important;min-height:30px!important;height:30px!important;padding:5px 8px!important;border-radius:999px!important;flex:0 0 auto!important}.uxStudentBtn .name{font-size:12px!important}.uxMiniBadge{font-size:9px!important;padding:1px 4px!important}.uxStudentMain #studentGrid{padding:8px!important}.uxStudentMain .studentCard{border-radius:14px!important;padding:12px!important}.studentHead{position:static!important;margin:0 0 8px!important;padding:0 0 8px!important}.studentNameTitle{font-size:18px!important}.studentMeta{grid-template-columns:120px 150px!important}.studentSection{margin-top:9px!important}.studentSection .sectionTitle{font-size:13px!important;margin-bottom:5px!important}.scheduleTable textarea{min-height:32px!important}.materialTable textarea{min-height:32px!important}.uxRightPanel .prepCompactCard,.uxRightPanel .card{padding:8px!important;margin:0 0 7px!important}.uxRightPanel .compactHint{font-size:10px!important;line-height:1.35!important}.uxStatusList{gap:5px!important}.uxStatusItem{padding:6px 7px!important;font-size:11px!important;line-height:1.3!important}.uxStatusItem b{font-size:12px!important;margin-bottom:1px!important}
+@media(max-width:1150px){main.wrap{height:auto!important;display:block!important}.uxWorkspace{grid-template-columns:1fr!important;grid-template-rows:auto!important}.uxStudentSidebar,.uxStudentMain,.uxRightPanel{grid-column:auto!important;grid-row:auto!important}.appHeader .sub{max-width:none;white-space:normal}.uxDashboard{height:auto!important;grid-template-columns:1fr 1fr!important}.uxStat{display:block!important}.uxStat small{display:block!important}.topActions{grid-template-columns:1fr 1fr!important}.saveInfoBox{height:auto!important;max-height:60px!important;white-space:normal!important}}
+@media(max-width:700px){.topActions{grid-template-columns:1fr!important}.uxDashboard{grid-template-columns:1fr!important}.appHeaderInner{flex-direction:column!important;align-items:flex-start!important}.saveWarningBadge{width:100%!important}}
+
+
+/* =========================================================
+   v28 状態バー非表示：赤い横長カードを廃止し、右上バッジと右パネルに集約
+========================================================= */
+#uxDashboard{display:none!important;}
+main.wrap{grid-template-rows:auto minmax(0,1fr)!important;}
+.uxWorkspace{margin-top:0!important;}
+.saveWarningBadge.dirty{background:#fee2e2!important;color:#991b1b!important;border-color:#fecaca!important;}
+.saveWarningBadge.loaded{background:#eff6ff!important;color:#1d4ed8!important;border-color:#bfdbfe!important;}
+.saveWarningBadge.saved{background:#dcfce7!important;color:#166534!important;border-color:#86efac!important;}
+@media(max-width:1150px){#uxDashboard{display:none!important;}}
+
+
+
+/* =========================================================
+   v32 ドラッグ横スクロール・印刷1回化版
+========================================================= */
+main.wrap{grid-template-rows:auto minmax(0,1fr) auto!important;gap:8px!important;}
+.workflowCard{padding:8px 10px!important;}
+.saveInfoBox{height:28px!important;min-height:28px!important;max-height:28px!important;overflow:hidden!important;white-space:nowrap!important;text-overflow:ellipsis!important;}
+.uxWorkspace{display:grid!important;grid-template-columns:minmax(0,1fr) 330px!important;grid-template-rows:minmax(0,1fr)!important;gap:10px!important;min-height:0!important;}
+.uxStudentSidebar{display:none!important;}
+.uxStudentMain{grid-column:1!important;grid-row:1!important;}
+.uxRightPanel{grid-column:2!important;grid-row:1!important;}
+.uxStudentMain .uxPaneHead{height:42px!important;padding:6px 10px!important;}
+.uxStudentHeadLeft{display:flex;align-items:center;gap:8px;min-width:0;}
+.uxStudentModeHint{font-size:11px;color:#64748b;font-weight:800;white-space:nowrap;}
+.uxStudentTabs{display:flex!important;flex-direction:row!important;gap:6px!important;overflow-x:auto!important;overflow-y:hidden!important;max-width:70%;padding-bottom:1px;}
+.uxStudentTabs .uxStudentBtn{width:auto!important;min-width:92px!important;max-width:160px!important;height:30px!important;min-height:30px!important;border-radius:999px!important;padding:5px 8px!important;flex:0 0 auto!important;}
+.uxStudentTabs .uxStudentBtn .name{font-size:12px!important;}
+.uxStudentTabs .uxMiniBadge{font-size:9px!important;padding:1px 4px!important;}
+.uxStudentMain #studentGrid{height:100%!important;overflow:auto!important;padding:8px!important;gap:8px!important;}
+.uxStudentMain #studentGrid.uxMultiMode{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(410px,1fr))!important;align-items:start!important;}
+.uxStudentMain #studentGrid.uxSingleMode{display:block!important;}
+.uxStudentMain #studentGrid.uxMultiMode .studentCard{display:block!important;min-width:0!important;margin:0!important;}
+.uxStudentMain #studentGrid.uxSingleMode .studentCard:not(.uxActiveStudentCard){display:none!important;}
+.uxStudentMain #studentGrid.uxSingleMode .studentCard.uxActiveStudentCard{display:block!important;}
+.uxStudentMain #studentGrid.uxMultiMode .studentCard{height:auto!important;max-height:calc(100vh - 188px)!important;overflow:auto!important;}
+.uxStudentMain #studentGrid.uxMultiMode .studentHead{position:sticky!important;top:-8px!important;}
+.uxStudentMain #studentGrid.uxMultiMode .studentNameTitle{font-size:16px!important;}
+.uxStudentMain #studentGrid.uxMultiMode .studentMeta{grid-template-columns:1fr 1fr!important;gap:6px!important;}
+.uxStudentMain #studentGrid.uxMultiMode .scheduleTable th,.uxStudentMain #studentGrid.uxMultiMode .scheduleTable td{padding:4px!important;}
+.uxStudentMain #studentGrid.uxMultiMode .scheduleTable textarea{min-height:30px!important;font-size:12px!important;}
+.uxStudentMain #studentGrid.uxMultiMode .materialTable textarea{min-height:30px!important;font-size:12px!important;}
+.uxRightPanel .uxPaneBody{padding:8px!important;}
+.uxRightPanel .uxStatusList{gap:6px!important;}
+.uxRightPanel .uxStatusItem{padding:7px 8px!important;font-size:12px!important;}
+.uxRightPanel .prepCompactCard{margin-top:6px!important;}
+.uxRightPanel .prepDetails summary{font-size:13px!important;}
+.uxRightPanel .prepInside{margin-top:8px!important;}
+.uxSettingsBelow{background:#fff;border:1px solid #dbe4ef;border-radius:14px;box-shadow:0 8px 24px rgba(15,23,42,.05);overflow:hidden;}
+.uxSettingsBelow > details > summary{cursor:pointer;padding:10px 12px;font-weight:900;color:#1e40af;background:#f8fafc;border-bottom:1px solid #e5e7eb;}
+.uxSettingsBelow > details:not([open]) > summary{border-bottom:0;}
+.uxSettingsBelowBody{max-height:30vh;overflow:auto;padding:10px;display:grid;grid-template-columns:repeat(3,minmax(280px,1fr));gap:10px;align-items:start;}
+.uxSettingsBelowBody > .card{margin:0!important;box-shadow:none!important;border-radius:12px!important;padding:12px!important;}
+.uxSettingsBelowBody .examMasterRow,.uxSettingsBelowBody .eventMasterRow,.uxSettingsBelowBody .commentMasterRow{grid-template-columns:1fr!important;}
+@media(max-width:1300px){.uxWorkspace{grid-template-columns:minmax(0,1fr) 300px!important}.uxStudentMain #studentGrid.uxMultiMode{grid-template-columns:repeat(auto-fit,minmax(360px,1fr))!important}.uxStudentTabs{max-width:62%;}.uxSettingsBelowBody{grid-template-columns:1fr;}}
+@media(max-width:900px){html,body{overflow:auto!important}main.wrap{height:auto!important;display:block!important;overflow:visible!important}.uxWorkspace{grid-template-columns:1fr!important}.uxRightPanel{grid-column:1!important}.uxStudentMain #studentGrid.uxMultiMode{grid-template-columns:1fr!important}.uxStudentTabs{max-width:100%;}.uxSettingsBelowBody{max-height:none;}}
+
+
+
+/* =========================================================
+   v32 ドラッグ横スクロール・印刷1回化版
+   - ページ全体スクロールを復帰
+   - 生徒カードは従来どおり横スクロール
+   - 右側パネルを廃止し、確認ログをヘッダー右側へ移動
+   - 印刷メニューは上部操作ボタン直下へ配置
+========================================================= */
+html,body{height:auto!important;overflow:auto!important;}
+body{background:#eef2f7!important;}
+.appHeader{position:sticky!important;top:0!important;z-index:80!important;background:rgba(248,250,252,.96)!important;}
+.appHeader .wrap{max-width:none!important;padding:8px 14px!important;}
+.appHeaderInner{display:grid!important;grid-template-columns:minmax(320px,auto) minmax(360px,1fr) auto!important;align-items:center!important;gap:12px!important;}
+.appHeader h1{font-size:18px!important;margin:0 0 2px!important;white-space:nowrap!important;}
+.appHeader .sub{font-size:11px!important;line-height:1.25!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;max-width:760px!important;}
+.saveWarningBadge{min-width:86px!important;padding:7px 10px!important;font-size:13px!important;}
+#uxHeaderLog{display:flex;align-items:center;justify-content:flex-end;gap:6px;min-width:0;overflow:hidden;}
+.uxHeaderChip{display:inline-flex;align-items:center;gap:4px;max-width:190px;border:1px solid #dbe4ef;background:#fff;color:#334155;border-radius:999px;padding:5px 8px;font-size:11px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 1px 2px rgba(15,23,42,.04)}
+.uxHeaderChip strong{font-size:12px;color:#172033;overflow:hidden;text-overflow:ellipsis;}
+.uxHeaderChip.warn{border-color:#fed7aa;background:#fff7ed;color:#9a3412;}
+.uxHeaderChip.danger{border-color:#fecaca;background:#fef2f2;color:#991b1b;}
+.uxHeaderChip.info{border-color:#bfdbfe;background:#eff6ff;color:#1e40af;}
+main.wrap{max-width:none!important;height:auto!important;min-height:0!important;padding:10px 12px!important;display:block!important;overflow:visible!important;}
+.workflowCard{margin:0 0 10px!important;padding:10px 12px!important;border-top:0!important;border-left:6px solid #2563eb!important;border-radius:16px!important;box-shadow:0 10px 30px rgba(15,23,42,.06)!important;}
+.workflowCard .sectionTitle{display:none!important;}
+.topActions{display:grid!important;grid-template-columns:minmax(280px,1fr) 150px auto auto auto auto!important;gap:8px!important;align-items:end!important;}
+.topActions .field label{font-size:11px!important;}
+.topActions .field input,.topActions button{min-height:34px!important;padding:7px 10px!important;font-size:13px!important;}
+.workflowCard .compactHint,.appSteps,#uxDashboard{display:none!important;}
+.saveInfoBox{height:26px!important;min-height:26px!important;max-height:26px!important;margin-top:6px!important;padding:5px 8px!important;overflow:hidden!important;white-space:nowrap!important;text-overflow:ellipsis!important;font-size:12px!important;line-height:1.25!important;}
+.prepCompactCard{max-width:none!important;margin:8px 0 0!important;padding:8px 10px!important;border-left:5px solid #7c3aed!important;border-radius:14px!important;box-shadow:none!important;background:#fff!important;}
+.workflowCard .prepDetails summary{font-size:13px!important;color:#1e40af!important;}
+.workflowCard .prepInside{margin-top:8px!important;grid-template-columns:minmax(260px,1fr) 160px auto auto!important;gap:8px!important;align-items:end!important;}
+.workflowCard .prepInside .compactHint{display:block!important;font-size:11px!important;line-height:1.35!important;margin:0!important;}
+.workflowCard .prepInside button{min-height:34px!important;padding:7px 10px!important;font-size:12px!important;}
+.workflowCard #meetingPrepFolderInfo{display:none!important;}
+#studentGrid.studentGrid{display:grid!important;grid-auto-flow:column!important;grid-auto-columns:minmax(560px,1fr)!important;grid-template-columns:none!important;gap:12px!important;overflow-x:auto!important;overflow-y:visible!important;padding:4px 2px 12px!important;margin:0 0 10px!important;align-items:start!important;}
+#studentGrid .studentCard{display:block!important;min-width:560px!important;margin:0!important;height:auto!important;max-height:none!important;overflow:visible!important;border-top:5px solid #dbeafe!important;border-left:1px solid #dbe4ef!important;border-radius:16px!important;box-shadow:0 8px 24px rgba(15,23,42,.05)!important;padding:14px!important;background:#fff!important;}
+#studentGrid .studentCard.hasAbsent{border-top-color:#f97316!important;}
+#studentGrid .studentCard.hasFailure{box-shadow:0 0 0 2px rgba(37,99,235,.12),0 8px 24px rgba(15,23,42,.05)!important;}
+.studentHead{position:static!important;top:auto!important;background:#fff!important;margin:0 0 10px!important;padding:0 0 10px!important;border-radius:0!important;border-bottom:1px solid #e5e7eb!important;}
+.studentNameTitle{font-size:20px!important;}
+.studentMeta{grid-template-columns:140px 170px!important;margin-bottom:10px!important;}
+.studentSection{margin-top:14px!important;}
+.scheduleTable textarea{min-height:42px!important;}
+.materialTable textarea{min-height:38px!important;}
+.card{margin:10px 0!important;}
+.notice{display:none!important;}
+.uxWorkspace,.uxStudentSidebar,.uxRightPanel,.uxSettingsBelow{display:none!important;}
+.uxActionDock{display:none!important;}
+@media(max-width:1150px){
+  .appHeaderInner{grid-template-columns:1fr!important;align-items:flex-start!important;}
+  #uxHeaderLog{justify-content:flex-start!important;flex-wrap:wrap!important;}
+  .topActions{grid-template-columns:1fr 1fr!important;}
+  .workflowCard .prepInside{grid-template-columns:1fr!important;}
+  #studentGrid.studentGrid{grid-auto-columns:minmax(480px,86vw)!important;}
+}
+@media(max-width:700px){.topActions{grid-template-columns:1fr!important;}#studentGrid.studentGrid{grid-auto-columns:92vw!important;}#studentGrid .studentCard{min-width:92vw!important;}.saveWarningBadge{width:auto!important;}}
+
+
+
+/* =========================================================
+   v32 ドラッグ横スクロール・印刷1回化版
+   - 生徒名未入力ログ行を非表示
+   - ②③④の重なりを防止
+   - ③前回を復元を②と同じ青色に変更
+========================================================= */
+.workflowCard{padding:8px 12px!important;}
+.topActions{
+  display:grid!important;
+  grid-template-columns:minmax(360px,1fr) 150px max-content max-content max-content max-content!important;
+  gap:10px!important;
+  align-items:end!important;
+}
+.topActions .field{min-width:0!important;}
+.topActions .field.wide{min-width:0!important;}
+.topActions input{width:100%!important;}
+.topActions button{
+  position:relative!important;
+  z-index:1!important;
+  white-space:nowrap!important;
+  min-width:max-content!important;
+  height:36px!important;
+  min-height:36px!important;
+  padding:7px 13px!important;
+  font-size:13px!important;
+}
+#loadGroupMemory{
+  background:#2563eb!important;
+  color:#fff!important;
+  border:1px solid #2563eb!important;
+  box-shadow:0 8px 18px rgba(37,99,235,.18)!important;
+}
+#applyStudents{
+  background:#2563eb!important;
+  color:#fff!important;
+  border:1px solid #2563eb!important;
+}
+#saveInfo.saveInfoBox{display:none!important;}
+.workflowCard .prepCompactCard{margin-top:8px!important;}
+@media(max-width:1050px){
+  .topActions{grid-template-columns:1fr 150px repeat(4,max-content)!important;overflow-x:auto!important;padding-bottom:2px!important;}
+}
+@media(max-width:760px){
+  .topActions{grid-template-columns:1fr 1fr!important;overflow:visible!important;}
+  .topActions button{width:100%!important;min-width:0!important;}
+}
+
 </style>
 </head>
 <body>
 <header class="appHeader"><div class="wrap appHeaderInner">
   <div>
-    <h1>面談予定入力・準備資料アプリ <span class="versionBadge">v25 実務UI版</span></h1>
-    <div class="sub">入力 → 復元 → 保存 → 印刷まで、上から順に操作できるように整理しました。個人情報はブラウザ内または選択した保存用フォルダにのみ保存します。</div>
+    <h1>面談予定入力・準備資料アプリ <span class="versionBadge">v32 ドラッグ横スクロール・印刷1回化版</span></h1>
+    <div class="sub">生徒カードは横スクロールで同時編集できます。印刷メニューは上部、確認ログは右上、マスタ設定は下にまとめて表示します。</div>
   </div>
   <div class="saveWarningBadge" id="uxHeaderSaveBadge">未保存</div>
 </div></header>
@@ -116,13 +310,6 @@ details.advanced{background:#fff;border-color:#e2e8f0}details.advanced summary{f
     <div id="saveInfo" class="saveInfoBox"></div>
   </section>
 
-  <section class="card uxDashboard" id="uxDashboard" aria-label="現在の状態">
-    <div class="uxStat"><span>保存状態</span><b id="uxSaveStatus">未保存</b><small id="uxLastSaveTime">まだ保存していません</small></div>
-    <div class="uxStat"><span>表示中</span><b id="uxStudentCount">0名</b><small>この画面の生徒</small></div>
-    <div class="uxStat"><span>週面欠席</span><b id="uxAbsentCount">0名</b><small>電話確認リスト対象</small></div>
-    <div class="uxStat"><span>未達理由あり</span><b id="uxFailureCount">0名</b><small>面談準備に反映</small></div>
-    <div class="uxStat"><span>印刷</span><b id="uxPrintTargetCount">0名</b><small>面談準備資料の対象</small></div>
-  </section>
 
   <div id="studentGrid" class="studentGrid"></div>
 
@@ -2843,7 +3030,54 @@ function buildMeetingPrepPrintHtml(resultRecords, weeklyHtml){
     .subline,.muted{color:#667085;font-size:11px}.box{border:1px solid #9ca3af;padding:8px;border-radius:6px;white-space:pre-wrap;}
     .prepTable{border-collapse:collapse;width:100%;font-size:11px;margin:6px 0 10px;}.prepTable th,.prepTable td{border:1px solid #9ca3af;padding:5px;vertical-align:top;word-break:break-word;}.prepTable th{background:#f3f4f6;text-align:center;font-weight:800;}.prepTable ul{margin:0;padding-left:1.2em;}.prepTable li{margin:1px 0;}.listenTable th{background:#eef2ff}.listenTable td{font-size:12px;line-height:1.5}.twoCols{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start}.weekly{font-size:10px}.weekly th,.weekly td{padding:4px;}.blankTable td{height:14mm}.blankLines div{height:7mm;border-bottom:1px solid #d1d5db}.blankBox{height:28mm}.prevResultPage{padding:8mm;overflow:hidden}.fitPageShell{width:100%;height:281mm;overflow:hidden;position:relative}.fitPageInner{transform-origin:top left;width:100%;}.prevResultPage h1{font-size:18px}.prevResultPage h2{font-size:14px;margin:8px 0 6px}.prevResultPage h3{font-size:12px;margin:6px 0 4px}.prevResultPage .prepTable{font-size:10px;margin:4px 0 6px}.prevResultPage .prepTable th,.prevResultPage .prepTable td{padding:3px 4px}.prevResultPage .box{padding:5px}.goukakuPrintPage{padding:6mm;overflow:hidden}.goukakuPrintPage h1{font-size:16px;margin:0 0 2mm}.goukakuPrintPage h2{font-size:13px;margin:0 0 2mm}.goukakuPrintPdf{height:276mm;width:198mm;border:1px solid #9ca3af;background:#f8fafc;overflow:hidden}.goukakuPrintPdf iframe{width:100%;height:100%;border:0;background:#fff}.goukakuPrintTable{font-size:9px}.goukakuPrintTable th,.goukakuPrintTable td{padding:3px;min-width:36px;max-width:120px;}
     @page{size:A4 portrait;margin:0;} @media print{.page{page-break-after:always;} body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
-  </style></head><body>${body}<script>
+  
+
+/* =========================================================
+   v32 ドラッグ横スクロール・印刷1回化版
+========================================================= */
+main.wrap{grid-template-rows:auto minmax(0,1fr) auto!important;gap:8px!important;}
+.workflowCard{padding:8px 10px!important;}
+.saveInfoBox{height:28px!important;min-height:28px!important;max-height:28px!important;overflow:hidden!important;white-space:nowrap!important;text-overflow:ellipsis!important;}
+.uxWorkspace{display:grid!important;grid-template-columns:minmax(0,1fr) 330px!important;grid-template-rows:minmax(0,1fr)!important;gap:10px!important;min-height:0!important;}
+.uxStudentSidebar{display:none!important;}
+.uxStudentMain{grid-column:1!important;grid-row:1!important;}
+.uxRightPanel{grid-column:2!important;grid-row:1!important;}
+.uxStudentMain .uxPaneHead{height:42px!important;padding:6px 10px!important;}
+.uxStudentHeadLeft{display:flex;align-items:center;gap:8px;min-width:0;}
+.uxStudentModeHint{font-size:11px;color:#64748b;font-weight:800;white-space:nowrap;}
+.uxStudentTabs{display:flex!important;flex-direction:row!important;gap:6px!important;overflow-x:auto!important;overflow-y:hidden!important;max-width:70%;padding-bottom:1px;}
+.uxStudentTabs .uxStudentBtn{width:auto!important;min-width:92px!important;max-width:160px!important;height:30px!important;min-height:30px!important;border-radius:999px!important;padding:5px 8px!important;flex:0 0 auto!important;}
+.uxStudentTabs .uxStudentBtn .name{font-size:12px!important;}
+.uxStudentTabs .uxMiniBadge{font-size:9px!important;padding:1px 4px!important;}
+.uxStudentMain #studentGrid{height:100%!important;overflow:auto!important;padding:8px!important;gap:8px!important;}
+.uxStudentMain #studentGrid.uxMultiMode{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(410px,1fr))!important;align-items:start!important;}
+.uxStudentMain #studentGrid.uxSingleMode{display:block!important;}
+.uxStudentMain #studentGrid.uxMultiMode .studentCard{display:block!important;min-width:0!important;margin:0!important;}
+.uxStudentMain #studentGrid.uxSingleMode .studentCard:not(.uxActiveStudentCard){display:none!important;}
+.uxStudentMain #studentGrid.uxSingleMode .studentCard.uxActiveStudentCard{display:block!important;}
+.uxStudentMain #studentGrid.uxMultiMode .studentCard{height:auto!important;max-height:calc(100vh - 188px)!important;overflow:auto!important;}
+.uxStudentMain #studentGrid.uxMultiMode .studentHead{position:sticky!important;top:-8px!important;}
+.uxStudentMain #studentGrid.uxMultiMode .studentNameTitle{font-size:16px!important;}
+.uxStudentMain #studentGrid.uxMultiMode .studentMeta{grid-template-columns:1fr 1fr!important;gap:6px!important;}
+.uxStudentMain #studentGrid.uxMultiMode .scheduleTable th,.uxStudentMain #studentGrid.uxMultiMode .scheduleTable td{padding:4px!important;}
+.uxStudentMain #studentGrid.uxMultiMode .scheduleTable textarea{min-height:30px!important;font-size:12px!important;}
+.uxStudentMain #studentGrid.uxMultiMode .materialTable textarea{min-height:30px!important;font-size:12px!important;}
+.uxRightPanel .uxPaneBody{padding:8px!important;}
+.uxRightPanel .uxStatusList{gap:6px!important;}
+.uxRightPanel .uxStatusItem{padding:7px 8px!important;font-size:12px!important;}
+.uxRightPanel .prepCompactCard{margin-top:6px!important;}
+.uxRightPanel .prepDetails summary{font-size:13px!important;}
+.uxRightPanel .prepInside{margin-top:8px!important;}
+.uxSettingsBelow{background:#fff;border:1px solid #dbe4ef;border-radius:14px;box-shadow:0 8px 24px rgba(15,23,42,.05);overflow:hidden;}
+.uxSettingsBelow > details > summary{cursor:pointer;padding:10px 12px;font-weight:900;color:#1e40af;background:#f8fafc;border-bottom:1px solid #e5e7eb;}
+.uxSettingsBelow > details:not([open]) > summary{border-bottom:0;}
+.uxSettingsBelowBody{max-height:30vh;overflow:auto;padding:10px;display:grid;grid-template-columns:repeat(3,minmax(280px,1fr));gap:10px;align-items:start;}
+.uxSettingsBelowBody > .card{margin:0!important;box-shadow:none!important;border-radius:12px!important;padding:12px!important;}
+.uxSettingsBelowBody .examMasterRow,.uxSettingsBelowBody .eventMasterRow,.uxSettingsBelowBody .commentMasterRow{grid-template-columns:1fr!important;}
+@media(max-width:1300px){.uxWorkspace{grid-template-columns:minmax(0,1fr) 300px!important}.uxStudentMain #studentGrid.uxMultiMode{grid-template-columns:repeat(auto-fit,minmax(360px,1fr))!important}.uxStudentTabs{max-width:62%;}.uxSettingsBelowBody{grid-template-columns:1fr;}}
+@media(max-width:900px){html,body{overflow:auto!important}main.wrap{height:auto!important;display:block!important;overflow:visible!important}.uxWorkspace{grid-template-columns:1fr!important}.uxRightPanel{grid-column:1!important}.uxStudentMain #studentGrid.uxMultiMode{grid-template-columns:1fr!important}.uxStudentTabs{max-width:100%;}.uxSettingsBelowBody{max-height:none;}}
+
+</style></head><body>${body}<script>
     function fitMeetingPrepFirstPages(){
       document.querySelectorAll('.fitPageShell').forEach(function(shell){
         var inner = shell.querySelector('.fitPageInner');
@@ -2862,7 +3096,12 @@ function buildMeetingPrepPrintHtml(resultRecords, weeklyHtml){
     window.addEventListener('load', function(){ setTimeout(fitMeetingPrepFirstPages, 60); });
   <\/script></body></html>`;
 }
+let __meetingPrepPrintBusy=false;
 function printHtmlInHiddenIframe(html){
+  // 印刷キャンセルを2回押す問題の対策：
+  // 1) 既存iframeを必ず消す 2) onload印刷を1回だけにする 3) afterprint/focus復帰でiframeを破棄する
+  if(__meetingPrepPrintBusy) return;
+  __meetingPrepPrintBusy=true;
   const oldFrame=document.getElementById('meetingPrepPrintFrame');
   if(oldFrame) oldFrame.remove();
   const frame=document.createElement('iframe');
@@ -2870,19 +3109,47 @@ function printHtmlInHiddenIframe(html){
   frame.style.position='fixed';
   frame.style.right='0';
   frame.style.bottom='0';
-  frame.style.width='0';
-  frame.style.height='0';
+  frame.style.width='1px';
+  frame.style.height='1px';
   frame.style.border='0';
   frame.style.opacity='0';
+  frame.style.pointerEvents='none';
+  frame.setAttribute('aria-hidden','true');
+  let printed=false;
+  let cleaned=false;
+  const cleanup=()=>{
+    if(cleaned) return;
+    cleaned=true;
+    setTimeout(()=>{
+      try{ frame.remove(); }catch(e){}
+      __meetingPrepPrintBusy=false;
+    },120);
+  };
   frame.onload=()=>{
+    if(printed) return;
+    printed=true;
+    frame.onload=null;
     setTimeout(()=>{
       try{
-        frame.contentWindow.focus();
-        frame.contentWindow.print();
+        const w=frame.contentWindow;
+        if(!w){ cleanup(); return; }
+        w.onafterprint=cleanup;
+        // Chrome/Edgeではキャンセル後にafterprintが不安定なことがあるため、
+        // 親画面にフォーカスが戻った時も後始末する。
+        const parentFocusCleanup=()=>{
+          window.removeEventListener('focus',parentFocusCleanup,true);
+          cleanup();
+        };
+        window.addEventListener('focus',parentFocusCleanup,true);
+        w.focus();
+        w.print();
+        // 念のため一定時間後にロックだけ解除。iframeが残っても次回印刷を邪魔しない。
+        setTimeout(()=>{ __meetingPrepPrintBusy=false; },2500);
       }catch(e){
+        cleanup();
         alert('印刷プレビューを開けませんでした。ブラウザの印刷権限やポップアップ設定を確認してください。');
       }
-    },700);
+    },450);
   };
   document.body.appendChild(frame);
   frame.srcdoc=html;
@@ -2986,7 +3253,54 @@ function buildWeeklyAbsentCallListPrintHtml(absentRows, resultRecords){
   const todayLabel=`${targetDate.getFullYear()}年${targetDate.getMonth()+1}月${targetDate.getDate()}日（${DOW[targetDate.getDay()]}）`;
   const weekStart=$('#weekStart')?.value || '';
   const rows=absentRows.map((row,i)=>`<tr class="mainRow"><td class="center">${i+1}</td><td>${esc(row.grade||'')}</td><td>${esc(row.studentNo||'')}</td><td class="nameCell">${esc(row.name)}</td><td class="checkCell">□</td><td class="checkCell">□</td><td class="memoCell"></td></tr><tr class="detailRow"><td colspan="7">${absentPlansResultsHtml(row,resultRecords)}</td></tr>`).join('');
-  return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>週面欠席者 電話確認リスト</title><style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif;color:#111827;margin:0;background:#fff}.page{box-sizing:border-box;width:210mm;min-height:297mm;padding:12mm}h1{font-size:22px;margin:0 0 4px}.subline{font-size:12px;color:#667085;margin-bottom:14px}.summary{border:1px solid #9ca3af;border-radius:8px;padding:8px 10px;margin-bottom:12px;font-size:13px;background:#f8fafc}table{border-collapse:collapse;width:100%;font-size:13px}th,td{border:1px solid #6b7280;padding:7px 6px;vertical-align:middle}th{background:#f3f4f6;text-align:center;font-weight:800}.center{text-align:center}.nameCell{font-size:15px;font-weight:800}.checkCell{text-align:center;font-size:22px;width:20mm}.memoCell{height:11mm;width:48mm}.detailRow td{background:#fff;padding:6px 8px}.absentDetailTitle{font-weight:800;margin:2px 0 5px;color:#1e40af}.detailTable{font-size:10.5px;margin:0 0 6px}.detailTable th,.detailTable td{padding:4px 5px;border:1px solid #cbd5e1;vertical-align:top}.detailTable th{background:#eef2ff}.detailTable ul{margin:0;padding-left:15px}.listenBox{border:1px solid #c7d2fe;background:#eef2ff;border-radius:6px;padding:5px 7px;font-size:11px;line-height:1.45}.muted{color:#667085}.note{margin-top:10px;font-size:11px;color:#667085;line-height:1.6}.footerLine{margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:12mm;font-size:13px}.footerLine div{border-bottom:1px solid #9ca3af;height:12mm}@page{size:A4 portrait;margin:0}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.page{page-break-after:always}}</style></head><body><section class="page"><h1>週面欠席者 電話確認リスト</h1><div class="subline">対象日：${esc(todayLabel)} / 週開始：${esc(weekStart)} / 作成：${esc(now.toLocaleString('ja-JP'))}</div><div class="summary">週面欠席にチェックが入っている生徒：<b>${absentRows.length}名</b>　※電話後に「電話済み」欄へチェックしてください。</div><table><thead><tr><th>No.</th><th>学年</th><th>生徒番号</th><th>生徒名</th><th>未電話</th><th>電話済み</th><th>電話メモ</th></tr></thead><tbody>${rows}</tbody></table><div class="note">使い方：欠席確認前は「未電話」、電話完了後は「電話済み」にチェック。つながらなかった場合や保護者対応などは電話メモへ記入してください。</div><div class="footerLine"><div>担当者：</div><div>確認完了時刻：</div></div></section></body></html>`;
+  return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>週面欠席者 電話確認リスト</title><style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif;color:#111827;margin:0;background:#fff}.page{box-sizing:border-box;width:210mm;min-height:297mm;padding:12mm}h1{font-size:22px;margin:0 0 4px}.subline{font-size:12px;color:#667085;margin-bottom:14px}.summary{border:1px solid #9ca3af;border-radius:8px;padding:8px 10px;margin-bottom:12px;font-size:13px;background:#f8fafc}table{border-collapse:collapse;width:100%;font-size:13px}th,td{border:1px solid #6b7280;padding:7px 6px;vertical-align:middle}th{background:#f3f4f6;text-align:center;font-weight:800}.center{text-align:center}.nameCell{font-size:15px;font-weight:800}.checkCell{text-align:center;font-size:22px;width:20mm}.memoCell{height:11mm;width:48mm}.detailRow td{background:#fff;padding:6px 8px}.absentDetailTitle{font-weight:800;margin:2px 0 5px;color:#1e40af}.detailTable{font-size:10.5px;margin:0 0 6px}.detailTable th,.detailTable td{padding:4px 5px;border:1px solid #cbd5e1;vertical-align:top}.detailTable th{background:#eef2ff}.detailTable ul{margin:0;padding-left:15px}.listenBox{border:1px solid #c7d2fe;background:#eef2ff;border-radius:6px;padding:5px 7px;font-size:11px;line-height:1.45}.muted{color:#667085}.note{margin-top:10px;font-size:11px;color:#667085;line-height:1.6}.footerLine{margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:12mm;font-size:13px}.footerLine div{border-bottom:1px solid #9ca3af;height:12mm}@page{size:A4 portrait;margin:0}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.page{page-break-after:always}}
+
+/* =========================================================
+   v32 ドラッグ横スクロール・印刷1回化版
+========================================================= */
+main.wrap{grid-template-rows:auto minmax(0,1fr) auto!important;gap:8px!important;}
+.workflowCard{padding:8px 10px!important;}
+.saveInfoBox{height:28px!important;min-height:28px!important;max-height:28px!important;overflow:hidden!important;white-space:nowrap!important;text-overflow:ellipsis!important;}
+.uxWorkspace{display:grid!important;grid-template-columns:minmax(0,1fr) 330px!important;grid-template-rows:minmax(0,1fr)!important;gap:10px!important;min-height:0!important;}
+.uxStudentSidebar{display:none!important;}
+.uxStudentMain{grid-column:1!important;grid-row:1!important;}
+.uxRightPanel{grid-column:2!important;grid-row:1!important;}
+.uxStudentMain .uxPaneHead{height:42px!important;padding:6px 10px!important;}
+.uxStudentHeadLeft{display:flex;align-items:center;gap:8px;min-width:0;}
+.uxStudentModeHint{font-size:11px;color:#64748b;font-weight:800;white-space:nowrap;}
+.uxStudentTabs{display:flex!important;flex-direction:row!important;gap:6px!important;overflow-x:auto!important;overflow-y:hidden!important;max-width:70%;padding-bottom:1px;}
+.uxStudentTabs .uxStudentBtn{width:auto!important;min-width:92px!important;max-width:160px!important;height:30px!important;min-height:30px!important;border-radius:999px!important;padding:5px 8px!important;flex:0 0 auto!important;}
+.uxStudentTabs .uxStudentBtn .name{font-size:12px!important;}
+.uxStudentTabs .uxMiniBadge{font-size:9px!important;padding:1px 4px!important;}
+.uxStudentMain #studentGrid{height:100%!important;overflow:auto!important;padding:8px!important;gap:8px!important;}
+.uxStudentMain #studentGrid.uxMultiMode{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(410px,1fr))!important;align-items:start!important;}
+.uxStudentMain #studentGrid.uxSingleMode{display:block!important;}
+.uxStudentMain #studentGrid.uxMultiMode .studentCard{display:block!important;min-width:0!important;margin:0!important;}
+.uxStudentMain #studentGrid.uxSingleMode .studentCard:not(.uxActiveStudentCard){display:none!important;}
+.uxStudentMain #studentGrid.uxSingleMode .studentCard.uxActiveStudentCard{display:block!important;}
+.uxStudentMain #studentGrid.uxMultiMode .studentCard{height:auto!important;max-height:calc(100vh - 188px)!important;overflow:auto!important;}
+.uxStudentMain #studentGrid.uxMultiMode .studentHead{position:sticky!important;top:-8px!important;}
+.uxStudentMain #studentGrid.uxMultiMode .studentNameTitle{font-size:16px!important;}
+.uxStudentMain #studentGrid.uxMultiMode .studentMeta{grid-template-columns:1fr 1fr!important;gap:6px!important;}
+.uxStudentMain #studentGrid.uxMultiMode .scheduleTable th,.uxStudentMain #studentGrid.uxMultiMode .scheduleTable td{padding:4px!important;}
+.uxStudentMain #studentGrid.uxMultiMode .scheduleTable textarea{min-height:30px!important;font-size:12px!important;}
+.uxStudentMain #studentGrid.uxMultiMode .materialTable textarea{min-height:30px!important;font-size:12px!important;}
+.uxRightPanel .uxPaneBody{padding:8px!important;}
+.uxRightPanel .uxStatusList{gap:6px!important;}
+.uxRightPanel .uxStatusItem{padding:7px 8px!important;font-size:12px!important;}
+.uxRightPanel .prepCompactCard{margin-top:6px!important;}
+.uxRightPanel .prepDetails summary{font-size:13px!important;}
+.uxRightPanel .prepInside{margin-top:8px!important;}
+.uxSettingsBelow{background:#fff;border:1px solid #dbe4ef;border-radius:14px;box-shadow:0 8px 24px rgba(15,23,42,.05);overflow:hidden;}
+.uxSettingsBelow > details > summary{cursor:pointer;padding:10px 12px;font-weight:900;color:#1e40af;background:#f8fafc;border-bottom:1px solid #e5e7eb;}
+.uxSettingsBelow > details:not([open]) > summary{border-bottom:0;}
+.uxSettingsBelowBody{max-height:30vh;overflow:auto;padding:10px;display:grid;grid-template-columns:repeat(3,minmax(280px,1fr));gap:10px;align-items:start;}
+.uxSettingsBelowBody > .card{margin:0!important;box-shadow:none!important;border-radius:12px!important;padding:12px!important;}
+.uxSettingsBelowBody .examMasterRow,.uxSettingsBelowBody .eventMasterRow,.uxSettingsBelowBody .commentMasterRow{grid-template-columns:1fr!important;}
+@media(max-width:1300px){.uxWorkspace{grid-template-columns:minmax(0,1fr) 300px!important}.uxStudentMain #studentGrid.uxMultiMode{grid-template-columns:repeat(auto-fit,minmax(360px,1fr))!important}.uxStudentTabs{max-width:62%;}.uxSettingsBelowBody{grid-template-columns:1fr;}}
+@media(max-width:900px){html,body{overflow:auto!important}main.wrap{height:auto!important;display:block!important;overflow:visible!important}.uxWorkspace{grid-template-columns:1fr!important}.uxRightPanel{grid-column:1!important}.uxStudentMain #studentGrid.uxMultiMode{grid-template-columns:1fr!important}.uxStudentTabs{max-width:100%;}.uxSettingsBelowBody{max-height:none;}}
+
+</style></head><body><section class="page"><h1>週面欠席者 電話確認リスト</h1><div class="subline">対象日：${esc(todayLabel)} / 週開始：${esc(weekStart)} / 作成：${esc(now.toLocaleString('ja-JP'))}</div><div class="summary">週面欠席にチェックが入っている生徒：<b>${absentRows.length}名</b>　※電話後に「電話済み」欄へチェックしてください。</div><table><thead><tr><th>No.</th><th>学年</th><th>生徒番号</th><th>生徒名</th><th>未電話</th><th>電話済み</th><th>電話メモ</th></tr></thead><tbody>${rows}</tbody></table><div class="note">使い方：欠席確認前は「未電話」、電話完了後は「電話済み」にチェック。つながらなかった場合や保護者対応などは電話メモへ記入してください。</div><div class="footerLine"><div>担当者：</div><div>確認完了時刻：</div></div></section></body></html>`;
 }
 async function printWeeklyAbsentList(){
   const absentRows=await collectWeeklyAbsentRowsForPrint();
@@ -3131,8 +3445,453 @@ function initRealAppUX(){
   uxUpdateSummary();
 }
 
+
+
+/* =========================================================
+   v32 ドラッグ横スクロール・印刷1回化版
+========================================================= */
+const UX26_STATE={activeStudent:''};
+function ux26BuildWorkspace(){
+  const main=document.querySelector('main.wrap');
+  const grid=document.getElementById('studentGrid');
+  const anchor=document.getElementById('uxWorkflowCard')||grid;
+  if(!main||!grid||document.getElementById('uxWorkspace')) return;
+  const workspace=document.createElement('section');
+  workspace.id='uxWorkspace';
+  workspace.className='uxWorkspace';
+  workspace.innerHTML=`
+    <section class="uxPane uxStudentMain">
+      <div class="uxPaneHead">
+        <div class="uxStudentHeadLeft"><span id="uxActiveStudentTitle">生徒入力</span><small class="uxStudentModeHint" id="uxStudentModeHint">3人まで同時編集</small></div>
+        <div id="uxStudentList" class="uxStudentList uxStudentTabs"></div>
+      </div>
+      <div class="uxPaneBody" id="uxStudentMainBody"></div>
+    </section>
+    <aside class="uxPane uxRightPanel">
+      <div class="uxPaneHead"><span>確認・印刷</span></div>
+      <div class="uxPaneBody" id="uxRightPaneBody"><div id="uxStatusList" class="uxStatusList"></div></div>
+    </aside>`;
+  anchor.insertAdjacentElement('afterend',workspace);
+  document.getElementById('uxStudentMainBody').appendChild(grid);
+  const right=document.getElementById('uxRightPaneBody');
+  const prep=document.querySelector('.prepCompactCard');
+  if(prep) right.appendChild(prep);
+  const settings=document.createElement('section');
+  settings.id='uxSettingsBelow';
+  settings.className='uxSettingsBelow';
+  settings.innerHTML='<details><summary>模試マスタ・イベントマスタ・コメントマスタ・詳細設定を開く</summary><div id="uxMovedSettings" class="uxSettingsBelowBody"></div></details>';
+  workspace.insertAdjacentElement('afterend',settings);
+  const moved=settings.querySelector('#uxMovedSettings');
+  Array.from(main.children).forEach(el=>{
+    if(el===workspace||el===settings||el===document.getElementById('uxWorkflowCard')||el===document.getElementById('uxDashboard')) return;
+    if(el.id==='studentGrid') return;
+    if(el.classList && el.classList.contains('prepCompactCard')) return;
+    const txt=el.textContent||'';
+    if(/模試マスタ|イベントマスタ|今週の方針|詳細設定|統合用HTML/.test(txt)) moved.appendChild(el);
+  });
+}
+function ux26GetActiveStudent(){
+  if(UX26_STATE.activeStudent && students.includes(UX26_STATE.activeStudent)) return UX26_STATE.activeStudent;
+  UX26_STATE.activeStudent=students[0]||'';
+  return UX26_STATE.activeStudent;
+}
+function ux26SetActiveStudent(name){
+  UX26_STATE.activeStudent=name||'';
+  ux26RefreshStudentList();
+  ux26ShowActiveCard();
+  uxUpdateSummary();
+}
+function ux26RefreshStudentList(){
+  const list=document.getElementById('uxStudentList');
+  if(!list) return;
+  const active=ux26GetActiveStudent();
+  const escLocal=(s)=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  if(!students.length){
+    list.innerHTML='<div class="uxEmptySelect">生徒名を入力してください</div>';
+  }else{
+    list.innerHTML=students.map(name=>{
+      const d=ensureStudent(name);
+      const badges=[];
+      if(d.weeklyMeetingAbsent) badges.push('<span class="uxMiniBadge absent">欠席</span>');
+      if(String(d.failureReason||'').trim()) badges.push('<span class="uxMiniBadge failure">未達</span>');
+      const isActive=(students.length<=3) || name===active;
+      return `<button type="button" class="uxStudentBtn ${isActive?'active':''}" data-ux-select-student="${escLocal(name)}"><span class="name">${escLocal(name)}</span><span class="uxStudentBadges">${badges.join('')}</span></button>`;
+    }).join('');
+    list.querySelectorAll('[data-ux-select-student]').forEach(btn=>{
+      btn.onclick=()=>ux26SetActiveStudent(btn.getAttribute('data-ux-select-student')||'');
+    });
+  }
+}
+function ux26ShowActiveCard(){
+  const active=ux26GetActiveStudent();
+  const title=document.getElementById('uxActiveStudentTitle');
+  const hint=document.getElementById('uxStudentModeHint');
+  const grid=document.getElementById('studentGrid');
+  const multi=students.length>0 && students.length<=3;
+  if(title) title.textContent=multi ? `生徒入力（${students.length}人同時）` : (active ? `${active} の入力` : '生徒入力');
+  if(hint) hint.textContent=multi ? '3人まで同時編集できます' : '4人以上はタブで切替';
+  if(grid){
+    grid.classList.toggle('uxMultiMode',multi);
+    grid.classList.toggle('uxSingleMode',!multi);
+  }
+  document.querySelectorAll('[data-student-card]').forEach(card=>{
+    const name=card.getAttribute('data-student-card')||'';
+    card.classList.toggle('uxActiveStudentCard',multi || name===active);
+  });
+  if(grid && !students.length) grid.innerHTML='<div class="uxEmptySelect">生徒名を入力すると、ここに入力画面が表示されます。</div>';
+}
+function ux26UpdateRightStatus(){
+  const box=document.getElementById('uxStatusList');
+  if(!box) return;
+  let absent=[],failure=[],exam=0,event=0;
+  students.forEach(name=>{
+    const d=ensureStudent(name);
+    if(d.weeklyMeetingAbsent) absent.push(name);
+    if(String(d.failureReason||'').trim()) failure.push(name);
+    if((d.exams||[]).length) exam++;
+    if((d.events||[]).length) event++;
+  });
+  const active=ux26GetActiveStudent();
+  const selectedText=students.length<=3 && students.length ? students.join('、') : (active||'未選択');
+  box.innerHTML=`
+    <div class="uxStatusItem ${UX_STATE.dirty?'warn':'info'}"><b>${UX_STATE.dirty?'未保存です':'保存状態OK'}</b>${UX_STATE.dirty?'復元後・保存後に変更があります。席を外す前に保存してください。':'現在の内容は保存済みまたは復元直後です。'}</div>
+    <div class="uxStatusItem"><b>編集中</b>${selectedText}</div>
+    <div class="uxStatusItem ${absent.length?'warn':''}"><b>週面欠席</b>${absent.length?absent.join('、'):'なし'}</div>
+    <div class="uxStatusItem ${failure.length?'info':''}"><b>未達理由あり</b>${failure.length?failure.join('、'):'なし'}</div>
+    <div class="uxStatusItem"><b>確認事項</b>模試確認 ${exam}名 / イベント確認 ${event}名</div>`;
+}
+const UX26_ORIGINAL_UPDATE_SUMMARY=uxUpdateSummary;
+uxUpdateSummary=function(){
+  UX26_ORIGINAL_UPDATE_SUMMARY();
+  const header=document.getElementById('uxHeaderSaveBadge');
+  const dash=document.getElementById('uxDashboard');
+  if(header){
+    header.classList.toggle('dirty',!!UX_STATE.dirty);
+    header.classList.toggle('saved',!UX_STATE.dirty&&UX_STATE.mode==='saved');
+    header.classList.toggle('loaded',!UX_STATE.dirty&&UX_STATE.mode==='loaded');
+  }
+  if(dash){
+    dash.classList.toggle('dirty',!!UX_STATE.dirty);
+    dash.classList.toggle('saved',!UX_STATE.dirty&&UX_STATE.mode==='saved');
+    dash.classList.toggle('loaded',!UX_STATE.dirty&&UX_STATE.mode==='loaded');
+  }
+  ux26RefreshStudentList();
+  ux26ShowActiveCard();
+  ux26UpdateRightStatus();
+};
+const UX26_ORIGINAL_RENDER_STUDENTS=renderStudents;
+renderStudents=function(){
+  UX26_ORIGINAL_RENDER_STUDENTS();
+  if(!students.includes(UX26_STATE.activeStudent)) UX26_STATE.activeStudent=students[0]||'';
+  ux26BuildWorkspace();
+  ux26RefreshStudentList();
+  ux26ShowActiveCard();
+  ux26UpdateRightStatus();
+};
+const UX26_ORIGINAL_UX_SET_DIRTY=uxSetDirty;
+uxSetDirty=function(){
+  UX_STATE.dirty=true;
+  UX_STATE.mode='dirty';
+  uxUpdateSummary();
+};
+const UX26_ORIGINAL_UX_SET_SAVED=uxSetSaved;
+uxSetSaved=function(mode='saved'){
+  UX_STATE.dirty=false;
+  UX_STATE.mode=mode;
+  UX_STATE.lastSavedAt=new Date();
+  uxUpdateSummary();
+};
+function initNoScrollUX(){
+  ux26BuildWorkspace();
+  ux26RefreshStudentList();
+  ux26ShowActiveCard();
+  ux26UpdateRightStatus();
+}
+
+
+
+/* =========================================================
+   v32 ドラッグ横スクロール・印刷1回化版 JS
+========================================================= */
+function ux30EnsureHeaderLog(){
+  const inner=document.querySelector('.appHeaderInner');
+  if(!inner) return null;
+  let log=document.getElementById('uxHeaderLog');
+  if(!log){
+    log=document.createElement('div');
+    log.id='uxHeaderLog';
+    const badge=document.getElementById('uxHeaderSaveBadge');
+    if(badge) inner.insertBefore(log,badge); else inner.appendChild(log);
+  }
+  return log;
+}
+function ux30InlinePrintMenu(){
+  const workflow=document.getElementById('uxWorkflowCard');
+  const prep=document.querySelector('.prepCompactCard');
+  const saveInfo=document.getElementById('saveInfo');
+  if(workflow && prep && prep.parentElement!==workflow){
+    if(saveInfo) saveInfo.insertAdjacentElement('afterend',prep);
+    else workflow.appendChild(prep);
+  }
+}
+function ux30RestoreOriginalFlow(){
+  const main=document.querySelector('main.wrap');
+  const workflow=document.getElementById('uxWorkflowCard');
+  const grid=document.getElementById('studentGrid');
+  if(!main||!workflow||!grid) return;
+  // v29 のワークスペース内へ移動されていた場合は、元の縦フローへ戻す。
+  if(grid.parentElement!==main){
+    workflow.insertAdjacentElement('afterend',grid);
+  }
+  const moved=document.getElementById('uxMovedSettings');
+  if(moved){
+    Array.from(moved.children).forEach(el=>main.appendChild(el));
+  }
+  const workspace=document.getElementById('uxWorkspace');
+  if(workspace) workspace.remove();
+  const settings=document.getElementById('uxSettingsBelow');
+  if(settings) settings.remove();
+  ux30InlinePrintMenu();
+}
+function ux30UpdateHeaderLog(){
+  const log=ux30EnsureHeaderLog();
+  if(!log) return;
+  let absent=[],failure=[],exam=0,event=0;
+  students.forEach(name=>{
+    const d=ensureStudent(name);
+    if(d.weeklyMeetingAbsent) absent.push(name);
+    if(String(d.failureReason||'').trim()) failure.push(name);
+    if((d.exams||[]).length) exam++;
+    if((d.events||[]).length) event++;
+  });
+  const editing=students.length?students.join('、'):'未選択';
+  log.innerHTML=`
+    <span class="uxHeaderChip ${UX_STATE.dirty?'danger':'info'}">${UX_STATE.dirty?'未保存':'保存OK'}</span>
+    <span class="uxHeaderChip"><span>編集中</span><strong>${escapeHtml(editing)}</strong></span>
+    <span class="uxHeaderChip ${absent.length?'warn':''}">欠席 <strong>${absent.length?absent.length+'名':'なし'}</strong></span>
+    <span class="uxHeaderChip ${failure.length?'info':''}">未達 <strong>${failure.length?failure.length+'名':'なし'}</strong></span>
+    <span class="uxHeaderChip">確認 <strong>模試${exam} / イベント${event}</strong></span>`;
+}
+function ux30MarkCards(){
+  document.querySelectorAll('[data-student-card]').forEach(card=>{
+    const name=card.getAttribute('data-student-card')||'';
+    const d=ensureStudent(name);
+    card.classList.toggle('hasAbsent',!!d.weeklyMeetingAbsent);
+    card.classList.toggle('hasFailure',!!String(d.failureReason||'').trim());
+    card.classList.add('uxActiveStudentCard');
+  });
+  const grid=document.getElementById('studentGrid');
+  if(grid){
+    grid.classList.remove('uxMultiMode','uxSingleMode');
+  }
+}
+const UX30_PREV_UPDATE_SUMMARY=uxUpdateSummary;
+uxUpdateSummary=function(){
+  UX30_PREV_UPDATE_SUMMARY();
+  ux30RestoreOriginalFlow();
+  ux30MarkCards();
+  ux30UpdateHeaderLog();
+};
+const UX30_RENDER_STUDENTS=(typeof UX26_ORIGINAL_RENDER_STUDENTS!=='undefined')?UX26_ORIGINAL_RENDER_STUDENTS:renderStudents;
+renderStudents=function(){
+  UX30_RENDER_STUDENTS();
+  ux30RestoreOriginalFlow();
+  ux30MarkCards();
+  ux30UpdateHeaderLog();
+};
+function initV30ClassicHorizontalUX(){
+  ux30EnsureHeaderLog();
+  ux30RestoreOriginalFlow();
+  ux30MarkCards();
+  ux30UpdateHeaderLog();
+}
+
+
+
+/* =========================================================
+   v32 ドラッグ横スクロール・印刷1回化
+========================================================= */
+(function injectV32Style(){
+  if(document.getElementById('v32DragScrollStyle')) return;
+  const style=document.createElement('style');
+  style.id='v32DragScrollStyle';
+  style.textContent=`
+    #studentGrid.studentGrid{cursor:grab;scrollbar-gutter:stable;}
+    #studentGrid.studentGrid.is-dragging{cursor:grabbing;user-select:none;}
+    #studentGrid.studentGrid textarea,
+    #studentGrid.studentGrid input,
+    #studentGrid.studentGrid select,
+    #studentGrid.studentGrid button,
+    #studentGrid.studentGrid label,
+    #studentGrid.studentGrid a{cursor:auto;}
+    #studentGrid.studentGrid .dragScrollHint{display:none;}
+    @media (pointer:fine){
+      #studentGrid.studentGrid::before{
+        content:'空白部分をつかんで横に動かせます';
+        display:block;
+        position:sticky;
+        left:4px;
+        width:max-content;
+        margin:0 0 6px 2px;
+        padding:3px 8px;
+        border-radius:999px;
+        background:#eff6ff;
+        border:1px solid #bfdbfe;
+        color:#1e40af;
+        font-size:11px;
+        font-weight:800;
+        z-index:2;
+      }
+    }
+  `;
+  document.head.appendChild(style);
+})();
+function initV32DragHorizontalScroll(){
+  const grid=document.getElementById('studentGrid');
+  if(!grid || grid.dataset.dragScrollReady==='1') return;
+  grid.dataset.dragScrollReady='1';
+  const interactive='textarea,input,select,button,a,label,summary,details,[contenteditable="true"],.goukakuBox,.goukakuModal,.modalInner';
+  let down=false;
+  let dragging=false;
+  let startX=0;
+  let startY=0;
+  let startLeft=0;
+  let pointerId=null;
+  grid.addEventListener('pointerdown',e=>{
+    if(e.button!==0) return;
+    if(e.target.closest(interactive)) return;
+    down=true;
+    dragging=false;
+    pointerId=e.pointerId;
+    startX=e.clientX;
+    startY=e.clientY;
+    startLeft=grid.scrollLeft;
+  });
+  grid.addEventListener('pointermove',e=>{
+    if(!down) return;
+    const dx=e.clientX-startX;
+    const dy=e.clientY-startY;
+    if(!dragging){
+      if(Math.abs(dx)<6 || Math.abs(dx)<Math.abs(dy)) return;
+      dragging=true;
+      grid.classList.add('is-dragging');
+      try{ grid.setPointerCapture(pointerId); }catch(err){}
+    }
+    grid.scrollLeft=startLeft-dx;
+    e.preventDefault();
+  },{passive:false});
+  const stop=()=>{
+    down=false;
+    if(dragging){
+      grid.classList.remove('is-dragging');
+      try{ grid.releasePointerCapture(pointerId); }catch(err){}
+    }
+    dragging=false;
+    pointerId=null;
+  };
+  grid.addEventListener('pointerup',stop);
+  grid.addEventListener('pointercancel',stop);
+  grid.addEventListener('mouseleave',()=>{ if(down) stop(); });
+  // Shift + ホイール、または横ホイールにも対応。縦スクロールを横移動に変換しすぎないようShift時だけ強める。
+  grid.addEventListener('wheel',e=>{
+    if(e.shiftKey && Math.abs(e.deltaY)>Math.abs(e.deltaX)){
+      grid.scrollLeft += e.deltaY;
+      e.preventDefault();
+    }
+  },{passive:false});
+}
+const V32_PREV_RENDER_STUDENTS=renderStudents;
+renderStudents=function(){
+  V32_PREV_RENDER_STUDENTS();
+  initV32DragHorizontalScroll();
+};
+function initV32(){
+  initV32DragHorizontalScroll();
+}
+
+
+
+/* =========================================================
+   v33 左の空白除去・学年/生徒番号重なり修正
+========================================================= */
+(function injectV33LayoutFix(){
+  if(document.getElementById('v33LayoutFixStyle')) return;
+  const style=document.createElement('style');
+  style.id='v33LayoutFixStyle';
+  style.textContent=`
+    /* v32の説明ラベルをgridの1列として数えさせない。これが左の大きな空白の原因。 */
+    #studentGrid.studentGrid{position:relative!important;padding-top:28px!important;}
+    @media (pointer:fine){
+      #studentGrid.studentGrid::before{
+        display:block!important;
+        position:absolute!important;
+        top:4px!important;
+        left:8px!important;
+        margin:0!important;
+        width:max-content!important;
+        pointer-events:none!important;
+      }
+    }
+
+    /* 学年・生徒番号の入力欄が互いに食い込まないようにする。 */
+    .studentMeta{
+      display:grid!important;
+      grid-template-columns:minmax(120px,150px) minmax(180px,240px)!important;
+      gap:10px!important;
+      align-items:end!important;
+      max-width:410px!important;
+    }
+    .studentMeta .field{min-width:0!important;width:100%!important;}
+    .studentMeta .field input,
+    .studentMeta .field select{width:100%!important;min-width:0!important;box-sizing:border-box!important;}
+
+    /* 横並びカードは左詰め。カード幅を安定させて、最初の1人目が左から始まるようにする。 */
+    #studentGrid.studentGrid{
+      justify-content:start!important;
+      align-content:start!important;
+      grid-auto-columns:minmax(720px,760px)!important;
+    }
+    #studentGrid.studentGrid .studentCard{
+      width:100%!important;
+      min-width:720px!important;
+      max-width:760px!important;
+    }
+
+    @media(max-width:900px){
+      .studentMeta{grid-template-columns:1fr 1fr!important;max-width:none!important;}
+      #studentGrid.studentGrid{grid-auto-columns:minmax(620px,90vw)!important;}
+      #studentGrid.studentGrid .studentCard{min-width:620px!important;max-width:none!important;}
+    }
+  `;
+  document.head.appendChild(style);
+})();
+
+function v33ResetStudentScrollLeft(){
+  const grid=document.getElementById('studentGrid');
+  if(grid && !grid.dataset.v33UserScrolled){
+    grid.scrollLeft=0;
+  }
+}
+(function initV33ScrollMemory(){
+  const grid=document.getElementById('studentGrid');
+  if(!grid || grid.dataset.v33ScrollMemory==='1') return;
+  grid.dataset.v33ScrollMemory='1';
+  grid.addEventListener('scroll',()=>{grid.dataset.v33UserScrolled='1';},{passive:true});
+})();
+
+const V33_PREV_RENDER_STUDENTS=renderStudents;
+renderStudents=function(){
+  const grid=document.getElementById('studentGrid');
+  if(grid) delete grid.dataset.v33UserScrolled;
+  V33_PREV_RENDER_STUDENTS();
+  initV32DragHorizontalScroll();
+  v33ResetStudentScrollLeft();
+};
+
 init();
+initV32();
 initRealAppUX();
+initV30ClassicHorizontalUX();
 </script>
 </body>
 </html>
