@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>予定入力HTML（面談準備・復元印刷v14 選択ボタン撤去）</title>
+<title>予定入力HTML（面談準備・復元印刷v22 模試科目チェック全表示）</title>
 <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
 <script src="./libs/xlsx.bundle.js"></script>
 <script>if(!window.XLSX){document.write('<script src="./libs/xlsx.full.min.js"><\/script>');}</script>
@@ -57,7 +57,7 @@ h1{font-size:22px;letter-spacing:.02em}.sub{max-width:980px}
 button{min-height:40px;box-shadow:0 1px 2px rgba(15,23,42,.08)}button:hover{filter:brightness(.98)}button.primaryBig{font-size:15px;padding:12px 16px}button.small{min-height:30px}
 .topActions{display:grid;grid-template-columns:minmax(300px,1fr) 190px auto auto auto auto;gap:12px;align-items:end}.topActions .wide{min-width:0}.quickGuide{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:12px}.quickStep{border:1px solid #dbeafe;background:#eff6ff;border-radius:12px;padding:10px;font-size:12px;line-height:1.45;color:#1e3a8a}.quickStep b{display:block;font-size:13px;color:#172033;margin-bottom:2px}
 .printActions{display:grid;grid-template-columns:minmax(260px,1fr) minmax(230px,360px) auto;gap:12px;align-items:end}.printActions input[type=file]{min-height:40px}.compactHint{margin-top:8px;color:var(--muted);font-size:12px;line-height:1.55}
-.studentGrid{grid-auto-columns:minmax(620px,1fr);gap:18px}.studentCard{min-width:620px;border-top:5px solid #dbeafe}.studentHead{border-bottom:1px solid #e5e7eb;padding-bottom:10px}.studentNameTitle{font-size:22px}.miniBar button{white-space:nowrap}.studentMeta{display:grid;grid-template-columns:150px 180px;gap:10px;margin-bottom:12px}.studentSection{margin-top:18px}.studentSection:first-of-type{margin-top:8px}.studentSection .sectionTitle{font-size:15px;margin-bottom:8px}.studentSection .hint{margin-bottom:8px}.scheduleTable th,.materialTable th{font-size:12px}.scheduleTable textarea{min-height:46px}.materialTable textarea{min-height:42px}.actions{margin-top:8px}.actions .secondary{background:#f1f5f9;color:#334155;border:1px solid #cbd5e1}
+.studentGrid{grid-auto-columns:minmax(620px,1fr);gap:18px}.studentCard{min-width:620px;border-top:5px solid #dbeafe}.studentHead{border-bottom:1px solid #e5e7eb;padding-bottom:10px}.studentNameTitle{font-size:22px}.miniBar button{white-space:nowrap}.studentMeta{display:grid;grid-template-columns:150px 180px;gap:10px;margin-bottom:12px}.tinyCheck{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:800;color:#475569;background:#f8fafc;border:1px solid #dbe4ef;border-radius:999px;padding:4px 8px;white-space:nowrap}.tinyCheck input{width:auto;margin:0}.studentSection{margin-top:18px}.studentSection:first-of-type{margin-top:8px}.studentSection .sectionTitle{font-size:15px;margin-bottom:8px}.studentSection .hint{margin-bottom:8px}.scheduleTable th,.materialTable th{font-size:12px}.scheduleTable textarea{min-height:46px}.materialTable textarea{min-height:42px}.actions{margin-top:8px}.actions .secondary{background:#f1f5f9;color:#334155;border:1px solid #cbd5e1}
 .examItem,.eventItem,.commentItem{border-color:#e2e8f0;background:#fcfcfd}.checkRow label{background:#fff;border-color:#dbe4ef}.checkRow label:hover{border-color:#93c5fd}.goukakuBox{border-color:#e2e8f0}.goukakuHeader{background:#f8fafc}.goukakuExpand{min-height:30px;box-shadow:none}
 details.advanced{background:#fff;border-color:#e2e8f0}details.advanced summary{font-size:14px}.notice{display:none}
 .masterGridHint{font-size:12px;color:var(--muted);line-height:1.55;margin:0 0 8px}.dangerLite{background:#fee2e2!important;color:#991b1b!important;border:1px solid #fecaca!important}
@@ -76,7 +76,7 @@ details.advanced{background:#fff;border-color:#e2e8f0}details.advanced summary{f
 </style>
 </head>
 <body>
-<header><div class="wrap"><h1>面談予定入力・準備資料アプリ <span style="font-size:13px;color:#2563eb">v14 復元→印刷対応・選択ボタン撤去</span></h1><div class="sub">複数生徒の予定入力、前回内容の復元、結果Excel・週面シート・合格設計図を使った面談準備資料印刷まで、この画面で行います。</div></div></header>
+<header><div class="wrap"><h1><span style="font-size:18px;color:#dc2626;font-weight:900">席外す前に保存忘れないで！</span> <span style="font-size:13px;color:#2563eb">v24 保存注意表示</span></h1><div class="sub">複数生徒の予定入力、前回内容の復元、結果Excel・週面シート・合格設計図を使った面談準備資料印刷まで、この画面で行います。</div></div></header>
 <main class="wrap">
   <section class="card">
     <p class="sectionTitle">基本操作</p>
@@ -103,9 +103,11 @@ details.advanced{background:#fff;border-color:#e2e8f0}details.advanced summary{f
   <section class="card prepCompactCard">
     <details id="meetingPrepDetails" class="prepDetails">
       <summary>面談準備資料を開く</summary>
-      <div class="printActions prepInside" style="grid-template-columns:minmax(260px,1fr) auto;">
-        <div class="compactHint" style="margin-top:0">復元ボタンで読み込んだ「まとめて復元」フォルダから、結果履歴JSON・学習結果Excel・週面シート・合格設計図を自動で使います。</div>
+      <div class="printActions prepInside" style="grid-template-columns:minmax(260px,1fr) 170px auto auto;">
+        <div class="compactHint" style="margin-top:0">復元ボタンで読み込んだ「まとめて復元」フォルダから、結果履歴JSON・学習結果Excel・週面シート・合格設計図を自動で使います。週面欠席チェックを付けた生徒だけの電話確認リストも印刷できます。</div>
+        <div class="field"><label>週面欠席リスト対象日</label><input id="weeklyAbsentTargetDate" type="date"></div>
         <button class="secondary primaryBig" id="printMeetingPrep" type="button">印刷</button>
+        <button class="secondary primaryBig" id="printWeeklyAbsentList" type="button">週面欠席者リスト印刷</button>
       </div>
       <div id="meetingPrepFolderInfo" class="compactHint">復元した内容を先週分として使い、今週欄は印刷時だけ白紙にします。復元時に「まとめて復元」フォルダを選ぶと、json/result_history.json、学習結果フォルダ内の結果Excel、打ち込み結果/担任助手フォルダ内の週面シート、担任助手フォルダ/生徒名フォルダ内の合格設計図PDFまたはExcelを自動で読みます。</div>
     </details>
@@ -263,7 +265,7 @@ function showSaveInfo(text){$('#saveInfo').textContent=text||''}
 function colName(n){let s='';while(n>0){let m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=Math.floor((n-1)/26)}return s}
 function cellRef(r,c){return colName(c)+r}
 function splitNames(){return ($('#studentNames').value||'').split(/[、，,]/).map(x=>x.trim()).filter(Boolean)}
-function emptyStudentData(){return {studentNo:'',grade:'',lessonCount:1,otherCount:1,schedule:Array.from({length:7},()=>Array(6).fill('')),materials:[{subject:'',book:'',content:''}],remarks:'',exams:[],events:[],comments:[]}}
+function emptyStudentData(){return {studentNo:'',grade:'',weeklyMeetingAbsent:false,lessonCount:1,otherCount:1,schedule:Array.from({length:7},()=>Array(6).fill('')),materials:[{subject:'',book:'',content:''}],remarks:'',failureReason:'',exams:[],events:[],comments:[]}}
 function normalizeStudentData(data){
   const d=Object.assign(emptyStudentData(),data||{});
   if(!Array.isArray(d.schedule)) d.schedule=Array.from({length:7},()=>Array(6).fill(''));
@@ -282,7 +284,7 @@ function currentScheduleRowIndexes(name){const data=ensureStudent(name);return [
 /* =========================================================
    2. 画面構築
 ========================================================= */
-function init(){setDefaultDate(); if(!$('#studentNames').value) $('#studentNames').value=''; renderExamMasterPanel(); renderEventMasterPanel(); renderCommentMasterPanel(); renderCommentMasterPanel(); bindGlobalEvents(); applyStudents();}
+function init(){setDefaultDate(); if($('#weeklyAbsentTargetDate') && !$('#weeklyAbsentTargetDate').value) $('#weeklyAbsentTargetDate').value=$('#weekStart').value||ymd(new Date()); if(!$('#studentNames').value) $('#studentNames').value=''; renderExamMasterPanel(); renderEventMasterPanel(); renderCommentMasterPanel(); renderCommentMasterPanel(); bindGlobalEvents(); applyStudents();}
 function applyStudents(){
   syncFromDom();
   const names=splitNames();
@@ -302,7 +304,7 @@ function renderStudents(){
 }
 function studentCardHtml(name){
   return `<section class="card studentCard" data-student-card="${escapeHtml(name)}">
-    <div class="studentHead"><div class="studentNameTitle">${escapeHtml(name)}</div><div class="miniBar"><button class="small" data-copy-one="${escapeHtml(name)}">POSへコピー</button><button class="small secondary" data-copy-only="${escapeHtml(name)}">コピーのみ</button><button class="small dangerLite" data-clear-student-content="${escapeHtml(name)}">入力内容を削除</button></div></div>
+    <div class="studentHead"><div class="studentNameTitle">${escapeHtml(name)}</div><div class="miniBar"><label class="tinyCheck" title="週面に欠席した場合だけチェック"><input type="checkbox" data-student="${escapeHtml(name)}" data-kind="weeklyMeetingAbsent">週面欠席</label><button class="small" data-copy-one="${escapeHtml(name)}">POSへコピー</button><button class="small secondary" data-copy-only="${escapeHtml(name)}">コピーのみ</button><button class="small dangerLite" data-clear-student-content="${escapeHtml(name)}">入力内容を削除</button></div></div>
     <div class="studentMeta">
       <div class="field"><label>学年</label><select data-student="${escapeHtml(name)}" data-kind="grade">${GRADE_OPTIONS.map(g=>`<option value="${escapeHtml(g)}">${g?escapeHtml(g):'未指定'}</option>`).join('')}</select></div>
       <div class="field"><label>生徒番号</label><input data-student="${escapeHtml(name)}" data-kind="studentNo" placeholder="例：33135165"></div>
@@ -315,6 +317,8 @@ function studentCardHtml(name){
     <div class="actions"><button class="secondary small" data-add-material="${escapeHtml(name)}">学習内容を追加</button></div></div>
     <div class="studentSection"><p class="sectionTitle">備考</p>
     <table><tbody><tr><td class="label" style="width:95px">備考</td><td colspan="7"><textarea data-student="${escapeHtml(name)}" data-kind="remarks" placeholder="週全体の備考、注意事項、変更点など"></textarea></td></tr></tbody></table></div>
+    <div class="studentSection"><p class="sectionTitle">達成できなかった理由</p>
+    <table><tbody><tr><td class="label" style="width:130px">未達理由</td><td colspan="7"><textarea data-student="${escapeHtml(name)}" data-kind="failureReason" placeholder="予定を達成できなかった理由、次週への改善点など"></textarea></td></tr></tbody></table></div>
     <div class="studentSection"><p class="sectionTitle">模試</p>
     <div data-exam-panel>${examPanelHtml(name)}</div></div>
     <div class="studentSection"><p class="sectionTitle">イベント</p>
@@ -642,9 +646,9 @@ function addScheduleRow(kind,name){
 /* =========================================================
    3. 生徒別データ同期
 ========================================================= */
-function syncFromDom(){if(!students.length)return; students.forEach(name=>{const card=document.querySelector(`[data-student-card="${cssEscape(name)}"]`); if(!card)return; const data=ensureStudent(name); data.grade=card.querySelector('[data-kind="grade"]')?.value||''; data.studentNo=card.querySelector('[data-kind="studentNo"]')?.value||''; data.schedule=Array.from({length:7},(_,d)=>LIMITS.map((_,r)=>card.querySelector(`textarea[data-kind="schedule"][data-day="${d}"][data-row="${r}"]`)?.value||'')); data.materials=Array.from(card.querySelectorAll('tbody[data-material-body] tr')).map((tr,i)=>({subject:tr.querySelector(`[data-kind="subj"]`)?.value||'',book:tr.querySelector(`[data-kind="book"]`)?.value||'',content:tr.querySelector(`[data-kind="content"]`)?.value||''})); if(!data.materials.length)data.materials=[{subject:'',book:'',content:''}]; data.remarks=card.querySelector('textarea[data-kind="remarks"]')?.value||''; data.exams=getExamInputsForCard(card); data.events=getEventInputsForCard(card); data.comments=getCommentInputsForCard(card);});}
+function syncFromDom(){if(!students.length)return; students.forEach(name=>{const card=document.querySelector(`[data-student-card="${cssEscape(name)}"]`); if(!card)return; const data=ensureStudent(name); data.grade=card.querySelector('[data-kind="grade"]')?.value||''; data.studentNo=card.querySelector('[data-kind="studentNo"]')?.value||''; data.schedule=Array.from({length:7},(_,d)=>LIMITS.map((_,r)=>card.querySelector(`textarea[data-kind="schedule"][data-day="${d}"][data-row="${r}"]`)?.value||'')); data.materials=Array.from(card.querySelectorAll('tbody[data-material-body] tr')).map((tr,i)=>({subject:tr.querySelector(`[data-kind="subj"]`)?.value||'',book:tr.querySelector(`[data-kind="book"]`)?.value||'',content:tr.querySelector(`[data-kind="content"]`)?.value||''})); if(!data.materials.length)data.materials=[{subject:'',book:'',content:''}]; data.remarks=card.querySelector('textarea[data-kind="remarks"]')?.value||''; data.failureReason=card.querySelector('textarea[data-kind="failureReason"]')?.value||''; data.weeklyMeetingAbsent=!!card.querySelector('input[data-kind="weeklyMeetingAbsent"]')?.checked; data.exams=getExamInputsForCard(card); data.events=getEventInputsForCard(card); data.comments=getCommentInputsForCard(card);});}
 function cssEscape(s){return String(s).replace(/\\/g,'\\\\').replace(/"/g,'\\"')}
-function fillStudentValues(name){const card=document.querySelector(`[data-student-card="${cssEscape(name)}"]`);if(!card)return; const data=ensureStudent(name); const gradeEl=card.querySelector('[data-kind="grade"]'); if(gradeEl)gradeEl.value=data.grade||''; const noEl=card.querySelector('[data-kind="studentNo"]'); if(noEl)noEl.value=data.studentNo||''; data.schedule.forEach((day,d)=>day.forEach((v,r)=>{const el=card.querySelector(`textarea[data-kind="schedule"][data-day="${d}"][data-row="${r}"]`);if(el)el.value=v||''})); (data.materials||[]).forEach((m,i)=>{const tr=card.querySelectorAll('tbody[data-material-body] tr')[i]; if(!tr)return; tr.querySelector('[data-kind="subj"]').value=m.subject||''; tr.querySelector('[data-kind="book"]').value=m.book||''; tr.querySelector('[data-kind="content"]').value=m.content||'';}); const rem=card.querySelector('textarea[data-kind="remarks"]'); if(rem)rem.value=data.remarks||''; applyExamValuesToCard(card,data.exams||[]); applyEventValuesToCard(card,data.events||[]); applyCommentValuesToCard(card,data.comments||[]);}
+function fillStudentValues(name){const card=document.querySelector(`[data-student-card="${cssEscape(name)}"]`);if(!card)return; const data=ensureStudent(name); const gradeEl=card.querySelector('[data-kind="grade"]'); if(gradeEl)gradeEl.value=data.grade||''; const noEl=card.querySelector('[data-kind="studentNo"]'); if(noEl)noEl.value=data.studentNo||''; data.schedule.forEach((day,d)=>day.forEach((v,r)=>{const el=card.querySelector(`textarea[data-kind="schedule"][data-day="${d}"][data-row="${r}"]`);if(el)el.value=v||''})); (data.materials||[]).forEach((m,i)=>{const tr=card.querySelectorAll('tbody[data-material-body] tr')[i]; if(!tr)return; tr.querySelector('[data-kind="subj"]').value=m.subject||''; tr.querySelector('[data-kind="book"]').value=m.book||''; tr.querySelector('[data-kind="content"]').value=m.content||'';}); const rem=card.querySelector('textarea[data-kind="remarks"]'); if(rem)rem.value=data.remarks||''; const fr=card.querySelector('textarea[data-kind="failureReason"]'); if(fr)fr.value=data.failureReason||''; const absent=card.querySelector('input[data-kind="weeklyMeetingAbsent"]'); if(absent)absent.checked=!!data.weeklyMeetingAbsent; applyExamValuesToCard(card,data.exams||[]); applyEventValuesToCard(card,data.events||[]); applyCommentValuesToCard(card,data.comments||[]);}
 function bindInputs(){
   $$('input,textarea,select').forEach(el=>{
     el.oninput=()=>{
@@ -1499,7 +1503,7 @@ function maxUsedOther(data){let m=1;(data.schedule||[]).forEach(day=>[3,4,5].for
 /* =========================================================
    6. コピー・POS
 ========================================================= */
-function buildCopyText(name){syncFromDom(); const data=ensureStudent(name),dates=getDates(),lines=[]; lines.push(`${name} 面談内容`); if(data.studentNo)lines.push(`生徒番号 ${data.studentNo}`); dates.forEach((d,di)=>{const items=data.schedule[di].map((v,i)=>String(v||'').trim()?`${LIMITS[i]} ${String(v||'').trim().replace(/\s*\n\s*/g,' / ')}`:'').filter(Boolean).join(' / '); lines.push(`${jpDate(d)}（${DOW[d.getDay()]}） ${items}`.trim())}); data.materials.forEach(m=>{const subject=String(m.subject||'').trim().replace(/\s*\n\s*/g,' / '),book=String(m.book||'').trim().replace(/\s*\n\s*/g,' / '),content=String(m.content||'').trim().replace(/\s*\n\s*/g,' / '); if(subject||book||content)lines.push([subject,book,content].filter(Boolean).join('　'))}); const remarks=String(data.remarks||'').trim().replace(/\s*\n\s*/g,' / '); if(remarks)lines.push(`備考 ${remarks}`); (data.exams||[]).forEach(ex=>{if(ex.name||ex.status||ex.subjects?.length)lines.push(`模試 ${ex.name} ${ex.status} ${(ex.subjects||[]).join('、')}`.trim())}); (data.events||[]).forEach(ev=>{if(ev.name||ev.status||ev.note)lines.push(`イベント ${ev.name} ${ev.datetime||''} ${ev.status} ${ev.note}`.trim())}); (data.comments||[]).forEach(cm=>{if(cm.title||cm.text||cm.note)lines.push(`今週の方針/コメント ${cm.title||''} ${cm.text||''} ${cm.note||''}`.trim())}); return lines.join('\n')}
+function buildCopyText(name){syncFromDom(); const data=ensureStudent(name),dates=getDates(),lines=[]; lines.push(`${name} 面談内容`); if(data.studentNo)lines.push(`生徒番号 ${data.studentNo}`); dates.forEach((d,di)=>{const items=data.schedule[di].map((v,i)=>String(v||'').trim()?`${LIMITS[i]} ${String(v||'').trim().replace(/\s*\n\s*/g,' / ')}`:'').filter(Boolean).join(' / '); lines.push(`${jpDate(d)}（${DOW[d.getDay()]}） ${items}`.trim())}); data.materials.forEach(m=>{const subject=String(m.subject||'').trim().replace(/\s*\n\s*/g,' / '),book=String(m.book||'').trim().replace(/\s*\n\s*/g,' / '),content=String(m.content||'').trim().replace(/\s*\n\s*/g,' / '); if(subject||book||content)lines.push([subject,book,content].filter(Boolean).join('　'))}); const remarks=String(data.remarks||'').trim().replace(/\s*\n\s*/g,' / '); if(remarks)lines.push(`備考 ${remarks}`); const failureReason=String(data.failureReason||'').trim().replace(/\s*\n\s*/g,' / '); if(failureReason)lines.push(`達成できなかった理由 ${failureReason}`); if(data.weeklyMeetingAbsent)lines.push('週面欠席'); (data.exams||[]).forEach(ex=>{if(ex.name||ex.status||ex.subjects?.length)lines.push(`模試 ${ex.name} ${ex.status} ${(ex.subjects||[]).join('、')}`.trim())}); (data.events||[]).forEach(ev=>{if(ev.name||ev.status||ev.note)lines.push(`イベント ${ev.name} ${ev.datetime||''} ${ev.status} ${ev.note}`.trim())}); (data.comments||[]).forEach(cm=>{if(cm.title||cm.text||cm.note)lines.push(`今週の方針/コメント ${cm.title||''} ${cm.text||''} ${cm.note||''}`.trim())}); return lines.join('\n')}
 async function copyOne(name){const text=buildCopyText(name); try{if(navigator.clipboard&&window.isSecureContext)await navigator.clipboard.writeText(text); else{const ta=document.createElement('textarea');ta.value=text;ta.setAttribute('readonly','');ta.style.position='fixed';ta.style.left='-9999px';document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta)} alert(`${name}の面談内容をコピーしました。POSを開きます。`); const opened=window.open(POS_URL,'_blank','noopener'); if(!opened)alert('POSを開けませんでした。ポップアップブロック設定を確認してください。')}catch(e){alert('自動コピーに失敗しました。')}}
 async function copyOnly(name){const text=buildCopyText(name); try{if(navigator.clipboard&&window.isSecureContext)await navigator.clipboard.writeText(text); else{const ta=document.createElement('textarea');ta.value=text;ta.setAttribute('readonly','');ta.style.position='fixed';ta.style.left='-9999px';document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta)} alert(`${name}の面談内容をコピーしました。`);}catch(e){alert('自動コピーに失敗しました。')}}
 
@@ -1508,7 +1512,7 @@ async function copyOnly(name){const text=buildCopyText(name); try{if(navigator.c
 ========================================================= */
 function cellXml(r,c,v,style=0){if(v===undefined||v===null||v==='')return '';return `<c r="${cellRef(r,c)}" t="inlineStr" s="${style}"><is><t>${escapeXml(v)}</t></is></c>`}
 function rowXml(r,cells){return `<row r="${r}">${cells.join('')}</row>`}
-function buildPlanSheetXml(name){const data=ensureStudent(name),dates=getDates();let rows=[],r=1;rows.push(rowXml(r,[cellXml(r,1,'予定入力表',1)]));r++;rows.push(rowXml(r,[cellXml(r,1,'生徒名',2),cellXml(r,2,name,0),cellXml(r,4,'週開始',2),cellXml(r,5,$('#weekStart').value,0)]));r+=2;rows.push(rowXml(r,[cellXml(r,1,'予定/日付',2),...dates.map((d,i)=>cellXml(r,2+i,`${jpDate(d)}（${DOW[d.getDay()]}）`,2))]));r++;LIMITS.forEach((lim,li)=>{rows.push(rowXml(r,[cellXml(r,1,lim,2),...data.schedule.map((day,di)=>cellXml(r,2+di,day[li]||'',0))]));r++});r++;const headerRow=r;rows.push(rowXml(r,[cellXml(r,1,'教科',2),cellXml(r,2,'問題集/高速マスター',2),cellXml(r,5,'内容',2)]));r++;data.materials.forEach(m=>{if(m.subject||m.book||m.content){rows.push(rowXml(r,[cellXml(r,1,m.subject,0),cellXml(r,2,m.book,0),cellXml(r,5,m.content,0)]));r++}});const remarksRow=r;rows.push(rowXml(r,[cellXml(r,1,'備考',2),cellXml(r,2,data.remarks,0)]));const merges=[`<mergeCell ref="A1:H1"/>`,`<mergeCell ref="B${headerRow}:D${headerRow}"/>`,`<mergeCell ref="E${headerRow}:H${headerRow}"/>`];for(let rr=headerRow+1;rr<remarksRow;rr++)merges.push(`<mergeCell ref="B${rr}:D${rr}"/>`,`<mergeCell ref="E${rr}:H${rr}"/>`);merges.push(`<mergeCell ref="B${remarksRow}:H${remarksRow}"/>`);return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="4" topLeftCell="A5" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols><col min="1" max="1" width="15" customWidth="1"/><col min="2" max="8" width="20" customWidth="1"/></cols><sheetData>${rows.join('')}</sheetData><mergeCells count="${merges.length}">${merges.join('')}</mergeCells><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`}
+function buildPlanSheetXml(name){const data=ensureStudent(name),dates=getDates();let rows=[],r=1;rows.push(rowXml(r,[cellXml(r,1,'予定入力表',1)]));r++;rows.push(rowXml(r,[cellXml(r,1,'生徒名',2),cellXml(r,2,name,0),cellXml(r,4,'週開始',2),cellXml(r,5,$('#weekStart').value,0)]));r+=2;rows.push(rowXml(r,[cellXml(r,1,'予定/日付',2),...dates.map((d,i)=>cellXml(r,2+i,`${jpDate(d)}（${DOW[d.getDay()]}）`,2))]));r++;LIMITS.forEach((lim,li)=>{rows.push(rowXml(r,[cellXml(r,1,lim,2),...data.schedule.map((day,di)=>cellXml(r,2+di,day[li]||'',0))]));r++});r++;const headerRow=r;rows.push(rowXml(r,[cellXml(r,1,'教科',2),cellXml(r,2,'問題集/高速マスター',2),cellXml(r,5,'内容',2)]));r++;data.materials.forEach(m=>{if(m.subject||m.book||m.content){rows.push(rowXml(r,[cellXml(r,1,m.subject,0),cellXml(r,2,m.book,0),cellXml(r,5,m.content,0)]));r++}});const remarksRow=r;rows.push(rowXml(r,[cellXml(r,1,'備考',2),cellXml(r,2,data.remarks,0)]));r++;const failureRow=r;rows.push(rowXml(r,[cellXml(r,1,'達成できなかった理由',2),cellXml(r,2,data.failureReason||'',0)]));r++;const absentRow=r;rows.push(rowXml(r,[cellXml(r,1,'週面欠席',2),cellXml(r,2,data.weeklyMeetingAbsent?'欠席':'',0)]));const merges=[`<mergeCell ref="A1:H1"/>`,`<mergeCell ref="B${headerRow}:D${headerRow}"/>`,`<mergeCell ref="E${headerRow}:H${headerRow}"/>`];for(let rr=headerRow+1;rr<remarksRow;rr++)merges.push(`<mergeCell ref="B${rr}:D${rr}"/>`,`<mergeCell ref="E${rr}:H${rr}"/>`);merges.push(`<mergeCell ref="B${remarksRow}:H${remarksRow}"/>`,`<mergeCell ref="B${failureRow}:H${failureRow}"/>`,`<mergeCell ref="B${absentRow}:H${absentRow}"/>`);return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="4" topLeftCell="A5" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols><col min="1" max="1" width="15" customWidth="1"/><col min="2" max="8" width="20" customWidth="1"/></cols><sheetData>${rows.join('')}</sheetData><mergeCells count="${merges.length}">${merges.join('')}</mergeCells><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`}
 function simpleSheetXml(aoa){const rows=[];aoa.forEach((row,idx)=>{const r=idx+1;rows.push(rowXml(r,row.map((v,c)=>cellXml(r,c+1,v,idx===0?2:0))))});return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols><col min="1" max="12" width="22" customWidth="1"/></cols><sheetData>${rows.join('')}</sheetData><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`}
 function buildExamSheetXml(name){const data=ensureStudent(name);const aoa=[['生徒名','生徒番号','週開始','模試名','実施日','種別','受験方法','科目','科目変更','保存日時']];(data.exams||[]).forEach(ex=>{if(ex.name||ex.status||ex.subjects?.length||ex.subjectChanged)aoa.push([name,data.studentNo||'',$('#weekStart').value,ex.name,ex.date,ex.subjectTemplate||defaultTemplateNameForType(ex.type||'common'),ex.status,(ex.subjects||[]).join('、'),ex.subjectChanged?'変更あり':'',new Date().toLocaleString('ja-JP')])});return simpleSheetXml(aoa)}
 function buildEventSheetXml(name){const data=ensureStudent(name);const aoa=[['生徒名','生徒番号','学年','週開始','イベント名','日時','参加/不参加','備考','保存日時']];(data.events||[]).forEach(ev=>{if(ev.name||ev.datetime||ev.status||ev.note)aoa.push([name,data.studentNo||'',data.grade||'',$('#weekStart').value,ev.name,ev.datetime||'',ev.status,ev.note,new Date().toLocaleString('ja-JP')])});return simpleSheetXml(aoa)}
@@ -2006,6 +2010,8 @@ function studentHasMeaningfulData(data){
   if(!data) return false;
   if(String(data.grade||'').trim()) return true;
   if(String(data.remarks||'').trim()) return true;
+  if(String(data.failureReason||'').trim()) return true;
+  if(!!data.weeklyMeetingAbsent) return true;
   if((data.schedule||[]).some(day => (day||[]).some(v => String(v||'').trim()))) return true;
   if((data.materials||[]).some(m => String(m.subject||m.book||m.content||'').trim())) return true;
   if((data.exams||[]).some(ex => String(ex.status||'').trim() || (ex.subjects||[]).length)) return true;
@@ -2513,13 +2519,26 @@ function getMeetingPrepCurrentDates(){
   // ここは白紙の記入用ページに使うため、復元データの週開始日には引っ張られない。
   return getDates();
 }
+function getMeetingPrepTargetDate(){
+  // 面談準備印刷・週面欠席リストの基準日。
+  // 「その日までの一週間」を出すため、週面欠席リスト対象日を優先し、未入力なら開始日を使う。
+  const v = $('#weeklyAbsentTargetDate')?.value || $('#weekStart')?.value || ymd(new Date());
+  return parseYmdLocal(v) || new Date();
+}
 function getMeetingPrepPreviousDates(){
-  // 先週ページは、画面の開始日（今週）の7日前を使う。
-  // 復元された予定内容は先週分として扱い、結果Excelもこの先週日付と生徒名で照合する。
-  const current = getDates()[0] || parseYmdLocal($('#weekStart').value) || new Date();
-  const prev = new Date(current.getFullYear(), current.getMonth(), current.getDate());
-  prev.setDate(prev.getDate() - 7);
-  return datesFromStartDateObj(prev);
+  // 予定と結果は「対象日までの一週間」。例：対象日が6/4なら、5/29〜6/4を表示。
+  const target = getMeetingPrepTargetDate();
+  const start = new Date(target.getFullYear(), target.getMonth(), target.getDate());
+  start.setDate(start.getDate() - 6);
+  return datesFromStartDateObj(start);
+}
+function scheduleIndexForPrepDate(data, dateObj, fallbackIndex){
+  const base = parseYmdLocal(data?.weekStart || meetingPrepRestoredWeekStart || $('#weekStart')?.value);
+  if(base){
+    const idx = daysBetween(base, dateObj);
+    if(idx >= 0 && idx < 7) return idx;
+  }
+  return fallbackIndex;
 }
 function meetingPrepPeriodLabel(dates){
   if(!dates || !dates.length) return '';
@@ -2531,24 +2550,98 @@ function studentHasMeaningfulInputData(name){
   if((d.schedule||[]).some(day=>(day||[]).some(v=>String(v||'').trim()))) return true;
   if((d.materials||[]).some(m=>m.subject||m.book||m.content)) return true;
   if(String(d.remarks||'').trim()) return true;
+  if(String(d.failureReason||'').trim()) return true;
+  if(!!d.weeklyMeetingAbsent) return true;
   if((d.exams||[]).some(ex=>ex.name||ex.status||(ex.subjects||[]).length)) return true;
   if((d.events||[]).some(ev=>ev.name||ev.status||ev.note||ev.datetime)) return true;
   return false;
 }
+function checkboxMark(label, checked){return `${checked?'☑':'□'} ${esc(label)}`;}
+function findExamMasterForPrint(ex){
+  const masters=getExamMaster();
+  return masters.find(m=>examId(m)===(ex?.id||'')) || masters.find(m=>String(m.name||'')===String(ex?.name||'') && String(m.date||'')===String(ex?.date||'')) || null;
+}
+function examSubjectChecksForPrint(ex){
+  const master=findExamMasterForPrint(ex);
+  const type=ex?.type || master?.type || 'common';
+  const tmpl=ex?.subjectTemplate || master?.subjectTemplate || defaultTemplateNameForType(type);
+  const masterSubjects=examSubjectsForType(type,tmpl).map(x=>String(x||'').trim()).filter(Boolean);
+  const selected=(ex?.subjects||[]).map(x=>String(x||'').trim()).filter(Boolean);
+  const selectedSet=new Set(selected);
+  const extraSelected=selected.filter(s=>!masterSubjects.includes(s));
+  const allSubjects=[...masterSubjects,...extraSelected];
+  if(!allSubjects.length) return '科目設定なし';
+  return allSubjects.map(sub=>checkboxMark(sub,selectedSet.has(sub))).join('、');
+}
+function examStatusChecksForPrint(ex){
+  const status=String(ex?.status||'');
+  return ['当日','後日','不受験'].map(st=>checkboxMark(st,status===st)).join('　');
+}
+function examPrintDetailHtml(ex){
+  const parts=[];
+  parts.push(`受験方法：${examStatusChecksForPrint(ex)}`);
+  parts.push(`受験科目：${examSubjectChecksForPrint(ex)}`);
+  if(ex?.subjectChanged) parts.push('☑ 科目変更あり');
+  return parts.join(' / ');
+}
+function eventStatusChecksForPrint(ev){
+  const status=String(ev?.status||'');
+  return ['参加','不参加'].map(st=>checkboxMark(st,status===st)).join('　');
+}
+function eventPrintDetailHtml(ev){
+  const parts=[];
+  if(ev?.datetime) parts.push(`日時：${esc(ev.datetime)}`);
+  parts.push(`参加状況：${eventStatusChecksForPrint(ev)}`);
+  if(ev?.note) parts.push(`備考：${esc(ev.note)}`);
+  return parts.join(' / ');
+}
+function examPendingListenDetailHtml(ex){
+  const parts=[];
+  const status=String(ex?.status||'').trim();
+  const selectedSubjects=(ex?.subjects||[]).map(x=>String(x||'').trim()).filter(Boolean);
+  // すでに入力済みのものは聞き取り欄には出さない。未選択だけ印刷で聞き取る。
+  if(!status) parts.push(`受験方法：${examStatusChecksForPrint(Object.assign({},ex,{status:''}))}`);
+  if(!selectedSubjects.length) parts.push(`受験科目：${examSubjectChecksForPrint(Object.assign({},ex,{subjects:[]}))}`);
+  return parts.join(' / ');
+}
+function eventPendingListenDetailHtml(ev){
+  const parts=[];
+  const status=String(ev?.status||'').trim();
+  if(!status) parts.push(`参加状況：${eventStatusChecksForPrint(Object.assign({},ev,{status:''}))}`);
+  return parts.join(' / ');
+}
+function meetingPrepListenItemsHtml(name){
+  const data=ensureStudent(name);
+  const items=[];
+  (data.exams||[]).forEach(ex=>{
+    if(!(ex.name||ex.status||(ex.subjects||[]).length||ex.subjectChanged)) return;
+    const pending=examPendingListenDetailHtml(ex);
+    if(pending) items.push(`模試：${esc(ex.name||'名称未入力')}（${pending}）`);
+  });
+  (data.events||[]).forEach(ev=>{
+    if(!(ev.name||ev.status||ev.note||ev.datetime)) return;
+    const pending=eventPendingListenDetailHtml(ev);
+    if(pending) items.push(`イベント：${esc(ev.name||'名称未入力')}（${pending}）`);
+  });
+  return items.length ? items.join('<br>') : '<span class="muted">未入力の模試・イベント確認なし</span>';
+}
+
 function meetingPrepScheduleTableHtml(name, resultRecords){
   const data=ensureStudent(name), dates=getMeetingPrepPreviousDates();
-  let html='<h3>先週の予定・結果</h3>';
-  html+='<table class="prepTable"><thead><tr><th style="width:90px">日付</th><th>先週の予定</th><th>結果</th></tr></thead><tbody>';
+  let html='<h3>対象日までの一週間の予定・結果</h3>';
+  html+='<table class="prepTable"><thead><tr><th style="width:90px">日付</th><th>予定</th><th>結果</th></tr></thead><tbody>';
   dates.forEach((d,di)=>{
     const dateKey=ymd(d);
-    const plans=(data.schedule[di]||[]).map((v,i)=>String(v||'').trim()?`<li>${esc(LIMITS[i])} ${esc(v).replace(/\n/g,'<br>')}</li>`:'').filter(Boolean).join('');
+    const si=scheduleIndexForPrepDate(data,d,di);
+    const plans=(data.schedule[si]||[]).map((v,i)=>String(v||'').trim()?`<li>${esc(LIMITS[i])} ${esc(v).replace(/\n/g,'<br>')}</li>`:'').filter(Boolean).join('');
     const results=resultForStudentDate(resultRecords,name,dateKey).map(r=>`<li>${esc(r.timeLabel? r.timeLabel+' ' : '')}${esc(r.summary)}</li>`).join('');
     html+=`<tr><th>${jpDate(d)}<br>${DOW[d.getDay()]}曜</th><td>${plans?'<ul>'+plans+'</ul>':'<span class="muted">予定なし</span>'}</td><td>${results?'<ul>'+results+'</ul>':'<span class="muted">結果なし</span>'}</td></tr>`;
   });
   html+='</tbody></table>';
+  html+='<table class="prepTable listenTable"><tbody><tr><th style="width:120px">今週聞き取る内容<br><span class="muted">模試・イベント</span></th><td>'+meetingPrepListenItemsHtml(name)+'</td></tr></tbody></table>';
 
   const materials=(data.materials||[]).filter(m=>String(m.subject||m.book||m.content||'').trim());
-  html+='<h3>先週の学習内容</h3>';
+  html+='<h3>対象期間の学習内容</h3>';
   if(materials.length){
     html+='<table class="prepTable"><thead><tr><th>教科</th><th>問題集/高速マスター</th><th>内容</th></tr></thead><tbody>';
     materials.forEach(m=>{html+=`<tr><td>${esc(m.subject||'')}</td><td>${esc(m.book||'')}</td><td>${esc(m.content||'').replace(/\n/g,'<br>')}</td></tr>`});
@@ -2556,8 +2649,11 @@ function meetingPrepScheduleTableHtml(name, resultRecords){
   }else{
     html+='<p class="muted">学習内容なし</p>';
   }
-  html+='<h3>先週の備考</h3>';
+  html+='<h3>対象期間の備考</h3>';
   html+=String(data.remarks||'').trim()?`<div class="box">${esc(data.remarks).replace(/\n/g,'<br>')}</div>`:'<p class="muted">備考なし</p>';
+  html+='<h3>達成できなかった理由</h3>';
+  html+=String(data.failureReason||'').trim()?`<div class="box">${esc(data.failureReason).replace(/\n/g,'<br>')}</div>`:'<p class="muted">未入力</p>';
+  if(data.weeklyMeetingAbsent) html+='<div class="box"><b>週面欠席</b></div>';
   return html;
 }
 function meetingPrepCurrentPlanHtml(name){
@@ -2578,12 +2674,13 @@ function meetingPrepCurrentPlanHtml(name){
   for(let i=0;i<5;i++) html+='<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>';
   html+='</tbody></table>';
   html+='<h3>備考（記入用）</h3><div class="box blankBox"></div>';
+  html+='<h3>達成できなかった理由（記入用）</h3><div class="box blankBox"></div>';
   html+='</section></div>';
   html+='<div class="twoCols">';
   html+='<section><h3>模試確認</h3>';
-  if(exams.length){html+='<table class="prepTable"><thead><tr><th>模試名</th><th>受験方法</th><th>科目</th></tr></thead><tbody>';exams.forEach(ex=>{html+=`<tr><td>${esc(ex.name)}</td><td>${esc(ex.status)}</td><td>${esc((ex.subjects||[]).join('、'))}</td></tr>`});html+='</tbody></table>';}else html+='<p class="muted">対象模試なし</p>';
+  if(exams.length){html+='<table class="prepTable"><thead><tr><th>模試名</th><th>チェック反映</th></tr></thead><tbody>';exams.forEach(ex=>{html+=`<tr><td>${esc(ex.name||'')}</td><td>${examPrintDetailHtml(ex)}</td></tr>`});html+='</tbody></table>';}else html+='<p class="muted">対象模試なし</p>';
   html+='</section><section><h3>イベント確認</h3>';
-  if(events.length){html+='<table class="prepTable"><thead><tr><th>イベント名</th><th>日時</th><th>参加</th><th>備考</th></tr></thead><tbody>';events.forEach(ev=>{html+=`<tr><td>${esc(ev.name)}</td><td>${esc(ev.datetime||'')}</td><td>${esc(ev.status)}</td><td>${esc(ev.note)}</td></tr>`});html+='</tbody></table>';}else html+='<p class="muted">対象イベントなし</p>';
+  if(events.length){html+='<table class="prepTable"><thead><tr><th>イベント名</th><th>チェック反映</th></tr></thead><tbody>';events.forEach(ev=>{html+=`<tr><td>${esc(ev.name||'')}</td><td>${eventPrintDetailHtml(ev)}</td></tr>`});html+='</tbody></table>';}else html+='<p class="muted">対象イベントなし</p>';
   html+='</section></div>';
   return html;
 }
@@ -2708,7 +2805,7 @@ function buildMeetingPrepPrintHtml(resultRecords, weeklyHtml){
   const currentPeriod=meetingPrepPeriodLabel(currentDates);
   let body='';
   names.forEach(name=>{
-    body+=`<section class="page prevResultPage"><div class="fitPageShell"><div class="fitPageInner"><h1>面談準備資料：${esc(name)}</h1><div class="subline">先週：${esc(prevPeriod)} / 作成：${now.toLocaleString('ja-JP')}</div><h2>1. 先週の予定・結果カレンダー</h2>${meetingPrepScheduleTableHtml(name,resultRecords)}</div></div></section>`;
+    body+=`<section class="page prevResultPage"><div class="fitPageShell"><div class="fitPageInner"><h1>面談準備資料：${esc(name)}</h1><div class="subline">対象日までの一週間：${esc(prevPeriod)} / 作成：${now.toLocaleString('ja-JP')}</div><h2>1. 予定・結果カレンダー</h2>${meetingPrepScheduleTableHtml(name,resultRecords)}</div></div></section>`;
     body+=`<section class="page"><h1>面談準備資料：${esc(name)}</h1><div class="subline">今週：${esc(currentPeriod)}</div><h2>2. 今週の記入用予定表・模試・イベント</h2>${meetingPrepCurrentPlanHtml(name)}</section>`;
     body+=`<section class="page weeklyPage"><h1>面談準備資料：${esc(name)}</h1><h2>3. 週面シート</h2>${weeklyHtml}</section>`;
     body+=`<section class="page goukakuPrintPage"><h1>面談準備資料：${esc(name)}</h1><h2>4. 合格設計図</h2>${meetingPrepGoukakuDesignHtml(name)}</section>`;
@@ -2718,7 +2815,7 @@ function buildMeetingPrepPrintHtml(resultRecords, weeklyHtml){
     .page{box-sizing:border-box;width:210mm;min-height:297mm;padding:12mm;page-break-after:always;}
     h1{font-size:20px;margin:0 0 4px;} h2{font-size:16px;margin:12px 0 8px;border-left:5px solid #2563eb;padding-left:8px;} h3{font-size:14px;margin:10px 0 6px;}
     .subline,.muted{color:#667085;font-size:11px}.box{border:1px solid #9ca3af;padding:8px;border-radius:6px;white-space:pre-wrap;}
-    .prepTable{border-collapse:collapse;width:100%;font-size:11px;margin:6px 0 10px;}.prepTable th,.prepTable td{border:1px solid #9ca3af;padding:5px;vertical-align:top;word-break:break-word;}.prepTable th{background:#f3f4f6;text-align:center;font-weight:800;}.prepTable ul{margin:0;padding-left:1.2em;}.prepTable li{margin:1px 0;}.twoCols{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start}.weekly{font-size:10px}.weekly th,.weekly td{padding:4px;}.blankTable td{height:14mm}.blankLines div{height:7mm;border-bottom:1px solid #d1d5db}.blankBox{height:28mm}.prevResultPage{padding:8mm;overflow:hidden}.fitPageShell{width:100%;height:281mm;overflow:hidden;position:relative}.fitPageInner{transform-origin:top left;width:100%;}.prevResultPage h1{font-size:18px}.prevResultPage h2{font-size:14px;margin:8px 0 6px}.prevResultPage h3{font-size:12px;margin:6px 0 4px}.prevResultPage .prepTable{font-size:10px;margin:4px 0 6px}.prevResultPage .prepTable th,.prevResultPage .prepTable td{padding:3px 4px}.prevResultPage .box{padding:5px}.goukakuPrintPage{padding:6mm;overflow:hidden}.goukakuPrintPage h1{font-size:16px;margin:0 0 2mm}.goukakuPrintPage h2{font-size:13px;margin:0 0 2mm}.goukakuPrintPdf{height:276mm;width:198mm;border:1px solid #9ca3af;background:#f8fafc;overflow:hidden}.goukakuPrintPdf iframe{width:100%;height:100%;border:0;background:#fff}.goukakuPrintTable{font-size:9px}.goukakuPrintTable th,.goukakuPrintTable td{padding:3px;min-width:36px;max-width:120px;}
+    .prepTable{border-collapse:collapse;width:100%;font-size:11px;margin:6px 0 10px;}.prepTable th,.prepTable td{border:1px solid #9ca3af;padding:5px;vertical-align:top;word-break:break-word;}.prepTable th{background:#f3f4f6;text-align:center;font-weight:800;}.prepTable ul{margin:0;padding-left:1.2em;}.prepTable li{margin:1px 0;}.listenTable th{background:#eef2ff}.listenTable td{font-size:12px;line-height:1.5}.twoCols{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start}.weekly{font-size:10px}.weekly th,.weekly td{padding:4px;}.blankTable td{height:14mm}.blankLines div{height:7mm;border-bottom:1px solid #d1d5db}.blankBox{height:28mm}.prevResultPage{padding:8mm;overflow:hidden}.fitPageShell{width:100%;height:281mm;overflow:hidden;position:relative}.fitPageInner{transform-origin:top left;width:100%;}.prevResultPage h1{font-size:18px}.prevResultPage h2{font-size:14px;margin:8px 0 6px}.prevResultPage h3{font-size:12px;margin:6px 0 4px}.prevResultPage .prepTable{font-size:10px;margin:4px 0 6px}.prevResultPage .prepTable th,.prevResultPage .prepTable td{padding:3px 4px}.prevResultPage .box{padding:5px}.goukakuPrintPage{padding:6mm;overflow:hidden}.goukakuPrintPage h1{font-size:16px;margin:0 0 2mm}.goukakuPrintPage h2{font-size:13px;margin:0 0 2mm}.goukakuPrintPdf{height:276mm;width:198mm;border:1px solid #9ca3af;background:#f8fafc;overflow:hidden}.goukakuPrintPdf iframe{width:100%;height:100%;border:0;background:#fff}.goukakuPrintTable{font-size:9px}.goukakuPrintTable th,.goukakuPrintTable td{padding:3px;min-width:36px;max-width:120px;}
     @page{size:A4 portrait;margin:0;} @media print{.page{page-break-after:always;} body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
   </style></head><body>${body}<script>
     function fitMeetingPrepFirstPages(){
@@ -2764,6 +2861,115 @@ function printHtmlInHiddenIframe(html){
   document.body.appendChild(frame);
   frame.srcdoc=html;
 }
+function memoryWeekContainsDate(mem, targetDate){
+  const base=parseYmdLocal(mem?.weekStart || '');
+  if(!base) return true;
+  const diff=daysBetween(base,targetDate);
+  return diff>=0 && diff<7;
+}
+function rowFromMemoryForAbsent(mem, fallbackName, targetDate){
+  if(!mem || !mem.weeklyMeetingAbsent) return null;
+  if(!memoryWeekContainsDate(mem,targetDate)) return null;
+  const name=String(mem.studentName || fallbackName || '').trim();
+  if(!name) return null;
+  const d=normalizeStudentData(mem);
+  d.weekStart=mem.weekStart||d.weekStart||'';
+  return {name, grade:d.grade||'', studentNo:d.studentNo||'', weekStart:d.weekStart||'', savedAt:mem.savedAt||'', data:d};
+}
+function addAbsentRowUnique(map,row){
+  if(!row) return;
+  const key=(row.studentNo?`no:${prepNormalizeStudentNo(row.studentNo)}`:`name:${String(row.name||'').replace(/[\s\u3000]+/g,'')}`);
+  if(!map.has(key)) map.set(key,row);
+}
+function collectWeeklyAbsentRowsFromBrowser(targetDate){
+  const map=new Map();
+  try{
+    for(let i=0;i<localStorage.length;i++){
+      const key=localStorage.key(i);
+      if(!key || !key.startsWith('yoteiStudentMemory:')) continue;
+      try{const mem=JSON.parse(localStorage.getItem(key)||'null'); const fallback=key.replace(/^yoteiStudentMemory:/,''); addAbsentRowUnique(map,rowFromMemoryForAbsent(mem,fallback,targetDate));}catch(e){}
+    }
+    for(let i=0;i<localStorage.length;i++){
+      const key=localStorage.key(i);
+      if(!key || !key.startsWith('yoteiGroupMemory:')) continue;
+      try{const mem=JSON.parse(localStorage.getItem(key)||'null'); const names=mem?.names||[]; const sd=mem?.studentData||{}; names.forEach(name=>{const one=Object.assign({studentName:name,weekStart:mem.weekStart,savedAt:mem.savedAt},sd[name]||{}); addAbsentRowUnique(map,rowFromMemoryForAbsent(one,name,targetDate));});}catch(e){}
+    }
+  }catch(e){}
+  return Array.from(map.values());
+}
+async function collectWeeklyAbsentRowsFromShared(targetDate){
+  const map=new Map();
+  const files=await listJsonFilesFromShared();
+  for(const handle of files){
+    try{
+      const file=await handle.getFile();
+      const mem=JSON.parse(await file.text());
+      if(/^student_.*\.json$/i.test(handle.name)){
+        const fallback=handle.name.replace(/^student_/i,'').replace(/\.json$/i,'').replace(/_/g,' ');
+        addAbsentRowUnique(map,rowFromMemoryForAbsent(mem,fallback,targetDate));
+      }else if(/^group_.*\.json$/i.test(handle.name)){
+        const names=mem?.names||[]; const sd=mem?.studentData||{};
+        names.forEach(name=>{const one=Object.assign({studentName:name,weekStart:mem.weekStart,savedAt:mem.savedAt},sd[name]||{}); addAbsentRowUnique(map,rowFromMemoryForAbsent(one,name,targetDate));});
+      }
+    }catch(e){}
+  }
+  return Array.from(map.values());
+}
+async function collectWeeklyAbsentRowsForPrint(){
+  syncFromDom();
+  const target=getMeetingPrepTargetDate();
+  const map=new Map();
+  students.forEach(name=>{const one=Object.assign({studentName:name,weekStart:$('#weekStart')?.value||'',savedAt:'画面表示中'},ensureStudent(name)); addAbsentRowUnique(map,rowFromMemoryForAbsent(one,name,target));});
+  collectWeeklyAbsentRowsFromBrowser(target).forEach(r=>addAbsentRowUnique(map,r));
+  try{ if(sharedSupported()){ await ensureSharedFolder(); const sharedRows=await collectWeeklyAbsentRowsFromShared(target); sharedRows.forEach(r=>addAbsentRowUnique(map,r)); } }catch(e){ console.warn('保存用フォルダの週面欠席者集計に失敗', e); }
+  return Array.from(map.values()).sort((a,b)=>String(a.grade||'').localeCompare(String(b.grade||''),'ja')||String(a.name||'').localeCompare(String(b.name||''),'ja'));
+}
+function listenItemsHtmlFromData(data){
+  const items=[];
+  (data?.exams||[]).forEach(ex=>{
+    if(!(ex.name||ex.status||(ex.subjects||[]).length||ex.subjectChanged)) return;
+    const pending=examPendingListenDetailHtml(ex);
+    if(pending) items.push(`模試：${esc(ex.name||'名称未入力')}（${pending}）`);
+  });
+  (data?.events||[]).forEach(ev=>{
+    if(!(ev.name||ev.status||ev.note||ev.datetime)) return;
+    const pending=eventPendingListenDetailHtml(ev);
+    if(pending) items.push(`イベント：${esc(ev.name||'名称未入力')}（${pending}）`);
+  });
+  return items.length ? items.join('<br>') : '<span class="muted">未入力の模試・イベント確認なし</span>';
+}
+function absentPlansResultsHtml(row, resultRecords){
+  const data=normalizeStudentData(row.data||{});
+  if(row.weekStart && !data.weekStart) data.weekStart=row.weekStart;
+  const dates=getMeetingPrepPreviousDates();
+  let html='<div class="absentDetailTitle">対象日までの一週間の予定・結果</div>';
+  html+='<table class="detailTable"><thead><tr><th style="width:70px">日付</th><th>予定</th><th>結果</th></tr></thead><tbody>';
+  dates.forEach((d,di)=>{
+    const si=scheduleIndexForPrepDate(data,d,di);
+    const plans=(data.schedule?.[si]||[]).map((v,i)=>String(v||'').trim()?`<li>${esc(LIMITS[i])} ${esc(v).replace(/\n/g,'<br>')}</li>`:'').filter(Boolean).join('');
+    const results=resultForStudentDate(resultRecords||[],row.name,ymd(d)).map(r=>`<li>${esc(r.timeLabel? r.timeLabel+' ' : '')}${esc(r.summary)}</li>`).join('');
+    html+=`<tr><th>${jpDate(d)}<br>${DOW[d.getDay()]}曜</th><td>${plans?'<ul>'+plans+'</ul>':'<span class="muted">予定なし</span>'}</td><td>${results?'<ul>'+results+'</ul>':'<span class="muted">結果なし</span>'}</td></tr>`;
+  });
+  html+='</tbody></table>';
+  html+=`<div class="listenBox"><b>今週聞き取る内容（模試・イベント）</b><br>${listenItemsHtmlFromData(data)}</div>`;
+  return html;
+}
+function buildWeeklyAbsentCallListPrintHtml(absentRows, resultRecords){
+  const now=new Date();
+  const targetDate=getMeetingPrepTargetDate();
+  const todayLabel=`${targetDate.getFullYear()}年${targetDate.getMonth()+1}月${targetDate.getDate()}日（${DOW[targetDate.getDay()]}）`;
+  const weekStart=$('#weekStart')?.value || '';
+  const rows=absentRows.map((row,i)=>`<tr class="mainRow"><td class="center">${i+1}</td><td>${esc(row.grade||'')}</td><td>${esc(row.studentNo||'')}</td><td class="nameCell">${esc(row.name)}</td><td class="checkCell">□</td><td class="checkCell">□</td><td class="memoCell"></td></tr><tr class="detailRow"><td colspan="7">${absentPlansResultsHtml(row,resultRecords)}</td></tr>`).join('');
+  return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>週面欠席者 電話確認リスト</title><style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif;color:#111827;margin:0;background:#fff}.page{box-sizing:border-box;width:210mm;min-height:297mm;padding:12mm}h1{font-size:22px;margin:0 0 4px}.subline{font-size:12px;color:#667085;margin-bottom:14px}.summary{border:1px solid #9ca3af;border-radius:8px;padding:8px 10px;margin-bottom:12px;font-size:13px;background:#f8fafc}table{border-collapse:collapse;width:100%;font-size:13px}th,td{border:1px solid #6b7280;padding:7px 6px;vertical-align:middle}th{background:#f3f4f6;text-align:center;font-weight:800}.center{text-align:center}.nameCell{font-size:15px;font-weight:800}.checkCell{text-align:center;font-size:22px;width:20mm}.memoCell{height:11mm;width:48mm}.detailRow td{background:#fff;padding:6px 8px}.absentDetailTitle{font-weight:800;margin:2px 0 5px;color:#1e40af}.detailTable{font-size:10.5px;margin:0 0 6px}.detailTable th,.detailTable td{padding:4px 5px;border:1px solid #cbd5e1;vertical-align:top}.detailTable th{background:#eef2ff}.detailTable ul{margin:0;padding-left:15px}.listenBox{border:1px solid #c7d2fe;background:#eef2ff;border-radius:6px;padding:5px 7px;font-size:11px;line-height:1.45}.muted{color:#667085}.note{margin-top:10px;font-size:11px;color:#667085;line-height:1.6}.footerLine{margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:12mm;font-size:13px}.footerLine div{border-bottom:1px solid #9ca3af;height:12mm}@page{size:A4 portrait;margin:0}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.page{page-break-after:always}}</style></head><body><section class="page"><h1>週面欠席者 電話確認リスト</h1><div class="subline">対象日：${esc(todayLabel)} / 週開始：${esc(weekStart)} / 作成：${esc(now.toLocaleString('ja-JP'))}</div><div class="summary">週面欠席にチェックが入っている生徒：<b>${absentRows.length}名</b>　※電話後に「電話済み」欄へチェックしてください。</div><table><thead><tr><th>No.</th><th>学年</th><th>生徒番号</th><th>生徒名</th><th>未電話</th><th>電話済み</th><th>電話メモ</th></tr></thead><tbody>${rows}</tbody></table><div class="note">使い方：欠席確認前は「未電話」、電話完了後は「電話済み」にチェック。つながらなかった場合や保護者対応などは電話メモへ記入してください。</div><div class="footerLine"><div>担当者：</div><div>確認完了時刻：</div></div></section></body></html>`;
+}
+async function printWeeklyAbsentList(){
+  const absentRows=await collectWeeklyAbsentRowsForPrint();
+  if(!absentRows.length) return alert('対象日を含む週で、週面欠席にチェックが入っている保存済み生徒はいません。');
+  const resultRecords=await readPrepResultRecords();
+  const html=buildWeeklyAbsentCallListPrintHtml(absentRows,resultRecords);
+  printHtmlInHiddenIframe(html);
+}
+
 async function printMeetingPrep(){
   syncFromDom();
   if(!students.length) return alert('先に生徒名を入力して「② 生徒列・日付を反映」を押してください。');
@@ -2791,10 +2997,10 @@ function bindGlobalEvents(){
   const modal=$('#goukakuModal'); if(modal) modal.addEventListener('click', e=>{ if(e.target===modal) closeGoukakuModal(); });
   document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeGoukakuModal(); });
   $('#applyStudents').onclick=applyStudents;
-  $('#weekStart').onchange=()=>{syncFromDom();renderStudents()};
+  $('#weekStart').onchange=()=>{syncFromDom(); const a=$('#weeklyAbsentTargetDate'); if(a && !a.value) a.value=$('#weekStart').value; renderStudents()};
   $('#saveGroupMemory').onclick=saveGroup;
   $('#loadGroupMemory').onclick=loadGroup;
-  $('#exportXlsx').onclick=exportAll; const sae=$('#saveAllExcelToStudentFolders'); if(sae)sae.onclick=saveAllToExistingStudentFolders; const pmp=$('#printMeetingPrep'); if(pmp)pmp.onclick=printMeetingPrep;
+  $('#exportXlsx').onclick=exportAll; const sae=$('#saveAllExcelToStudentFolders'); if(sae)sae.onclick=saveAllToExistingStudentFolders; const pmp=$('#printMeetingPrep'); if(pmp)pmp.onclick=printMeetingPrep; const pwa=$('#printWeeklyAbsentList'); if(pwa)pwa.onclick=printWeeklyAbsentList;
   $('#addExamMaster').onclick=addExamMasterRow;
   $('#saveExamMaster').onclick=saveExamMasterFromPanel;
   const aem=$('#addEventMaster'); if(aem)aem.onclick=addEventMasterRow;
