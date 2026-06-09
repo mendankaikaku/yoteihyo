@@ -2491,6 +2491,73 @@ function prepHeaderMap(aoa){
 }
 function prepLooksLikeHeader(row){return /生徒番号|名前|生徒名|学習内容|学習結果|日時|区分/.test((row||[]).map(v=>norm(v)).join('|'));}
 function prepFixedResultMap(){return {studentNo:0,student:1,grade:2,type:3,study:4,result:5,datetime:7};}
+
+function prepFixedResultCell(row, idx){return norm((row || [])[idx]);}
+function prepFixedLikeIndex(){return 6;}
+function prepIsBlankFixedCells(row, indexes){return indexes.every(idx => !prepFixedResultCell(row, idx));}
+function prepHasAnyFixedCells(row, indexes){return indexes.some(idx => !!prepFixedResultCell(row, idx));}
+function prepDateTimeAt(row, idx){return parseDateTimeLoose((row || [])[idx]);}
+function prepLooksLikeTwoRowHeaderPair(top, bottom){
+  const joined=`${(top || []).map(v=>norm(v)).join('|')}|${(bottom || []).map(v=>norm(v)).join('|')}`;
+  return /生徒番号/.test(joined) && /学習内容/.test(joined) && /学習結果/.test(joined);
+}
+function prepLooksLikeTwoRowMetaRow(row){
+  const h=prepFixedResultMap();
+  // 1行形式との誤結合防止：同じ行のE/Fに内容・結果が入っていれば2行形式ではない。
+  if(prepFixedResultCell(row,h.study) || prepFixedResultCell(row,h.result)) return false;
+  // 2行形式の上段は、H列に日時がある場合、またはA列に生徒番号がある場合を許可する。
+  const hasDateTime=!!prepDateTimeAt(row,h.datetime);
+  const hasStudentNo=!!prepFixedResultCell(row,h.studentNo);
+  if(!(hasDateTime || hasStudentNo)) return false;
+  // 生徒情報行なので、A/B/C/D のどれかは入っている必要がある。
+  return prepHasAnyFixedCells(row,[h.studentNo,h.student,h.grade,h.type]);
+}
+function prepLooksLikeTwoRowDetailRow(row){
+  const h=prepFixedResultMap();
+  // 下段はA〜Dが空白で、E/Fに学習内容・学習結果が入る。
+  // H列に日時が入る場合もあるため、日時の有無では除外しない。
+  if(!prepIsBlankFixedCells(row,[h.studentNo,h.student,h.grade,h.type])) return false;
+  return !!(prepFixedResultCell(row,h.study) || prepFixedResultCell(row,h.result));
+}
+function prepParseTwoRowResultSheet(aoa, file, sheetName){
+  const records=[];
+  const debug=[];
+  const h=prepFixedResultMap();
+  let skippedDate=0;
+  let skippedNoId=0;
+  for(let r=0;r<aoa.length-1;r++){
+    const top=aoa[r] || [];
+    const bottom=aoa[r+1] || [];
+    if(prepLooksLikeTwoRowHeaderPair(top,bottom) || prepLooksLikeHeader(top)) continue;
+    if(!prepLooksLikeTwoRowMetaRow(top)) continue;
+    if(!prepLooksLikeTwoRowDetailRow(bottom)) continue;
+
+    const study=prepFixedResultCell(bottom,h.study);
+    const result=prepFixedResultCell(bottom,h.result);
+    const dt=prepDateTimeAt(top,h.datetime) || prepDateTimeAt(bottom,h.datetime);
+    if(!dt){skippedDate++; continue;}
+    const student=prepFixedResultCell(top,h.student);
+    const studentNo=prepFixedResultCell(top,h.studentNo);
+    if(!studentNo && !student){skippedNoId++; continue;}
+    const dateOnly=new Date(dt.getFullYear(),dt.getMonth(),dt.getDate());
+    records.push({
+      student, rawName:student, studentNo,
+      dateObj:dateOnly, dateKey:ymd(dateOnly), timeLabel:hm(dt),
+      type:prepFixedResultCell(top,h.type),
+      study, result,
+      summary:prepResultSummary(study,result),
+      sourceFile:file.name,
+      sourceSheet:sheetName,
+      sourceRow:`${r+1}-${r+2}`,
+      sourceFormat:'2行形式'
+    });
+    r++;
+  }
+  if(records.length || skippedDate || skippedNoId){
+    debug.push(`${file.name}/${sheetName}: ${records.length}件（2行形式）${skippedNoId?` / 生徒番号・名前空欄${skippedNoId}件除外`:''}${skippedDate?` / 日時読取不可${skippedDate}件`:''}`);
+  }
+  return {records, debug};
+}
 function prepResultSummary(study,result){
   const s=norm(study), r=norm(result).replace(/！/g,'');
   if(!s && !r) return '';
@@ -2648,7 +2715,7 @@ async function readPrepResultRecords(){
   debug.push(...hist.debug);
 
   // 必要なときだけ、画面で選んだ結果Excelも追加で読む。
-  // 同じ結果が重複しても、後段で表示時に完全同一文字列は重複しにくい形にする。
+  // 従来1行形式と、2行形式（上段=A〜D生徒情報/E-F空白、下段=E学習内容/F学習結果）に対応する。
   if(!files.length){
     if(debug.length) setMeetingPrepFolderInfo(`結果読取詳細:\n${debug.join('\n')}`);
     return records;
@@ -2660,6 +2727,17 @@ async function readPrepResultRecords(){
         const ws=wb.Sheets[sheetName];
         const aoa=sheetToAoaRobust(ws,true);
         if(!aoa.length){debug.push(`${file.name}/${sheetName}: 空シート`); continue;}
+
+        // 2行形式を先に安全判定する。
+        // 従来形式は同じ行のE/Fに内容・結果が入るため、2行形式とは判定しない。
+        const twoRow=prepParseTwoRowResultSheet(aoa,file,sheetName);
+        if(twoRow.records.length){
+          records.push(...twoRow.records);
+          debug.push(...twoRow.debug);
+          continue;
+        }
+        if(twoRow.debug.length) debug.push(...twoRow.debug);
+
         const headerRow=findPrepResultHeaderRow(aoa);
         const hasHeader=headerRow>=0;
         const h=hasHeader?prepHeaderMapFromRow(aoa[headerRow]):prepFixedResultMap();
@@ -2685,7 +2763,8 @@ async function readPrepResultRecords(){
             summary:prepResultSummary(study,result),
             sourceFile:file.name,
             sourceSheet:sheetName,
-            sourceRow:r+1
+            sourceRow:r+1,
+            sourceFormat:'1行形式'
           });
           sheetCount++;
         }
