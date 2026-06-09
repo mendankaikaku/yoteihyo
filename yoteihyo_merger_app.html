@@ -1160,6 +1160,153 @@ function fixedResultHeaderMap(){
   return {studentNo:0, student:1, grade:2, type:3, study:4, result:5, like:6, datetime:7};
 }
 
+function fixedTwoRowResultMap(){
+  // 2行1セット形式も、列配置は従来形式と同じ A〜H 固定。
+  // 上の行: A:生徒番号 B:名前 C:学年 D:区分 E/F:空白 G:いいね H:日時
+  // 下の行: A〜D:空白 E:学習内容 F:学習結果 G:いいねなど H:空白
+  return {studentNo:0, student:1, grade:2, type:3, study:4, result:5, like:6, datetime:7};
+}
+
+function fixedCell(row, idx){ return norm((row || [])[idx]); }
+function isBlankFixedCells(row, indexes){
+  return indexes.every(idx => !fixedCell(row, idx));
+}
+function hasAnyFixedCells(row, indexes){
+  return indexes.some(idx => !!fixedCell(row, idx));
+}
+function fixedDateTimeAt(row, idx){
+  return parseDateTimeLoose((row || [])[idx]);
+}
+
+function looksLikeTwoRowMetaRow(row){
+  const map = fixedTwoRowResultMap();
+
+  // 従来1行形式との誤結合を防ぐ最重要条件。
+  // 上の行に E/F（学習内容・学習結果）が入っているなら、これは2行形式ではなく従来1行形式。
+  if(fixedCell(row, map.study) || fixedCell(row, map.result)) return false;
+
+  // 2行形式の上段は、日時がある場合もあれば、日時欄が空のまま
+  // A列の生徒番号だけで生徒情報行だと分かる場合もある。
+  // そのため「H列に日時がある」または「A列に生徒番号がある」のORで判定する。
+  const hasDateTime = !!fixedDateTimeAt(row, map.datetime);
+  const hasStudentNo = !!fixedCell(row, map.studentNo);
+  if(!(hasDateTime || hasStudentNo)) return false;
+
+  // 生徒情報行なので、A/B/C/D のどれかは入っている必要がある。
+  return hasAnyFixedCells(row, [map.studentNo, map.student, map.grade, map.type]);
+}
+
+function looksLikeTwoRowDetailRow(row){
+  const map = fixedTwoRowResultMap();
+
+  // 下の行は名前・番号などが空で、E/F に内容と結果が入る形式だけを採用。
+  // H列に日時が入っている場合もあるため、ここでは日時の有無で除外しない。
+  if(!isBlankFixedCells(row, [map.studentNo, map.student, map.grade, map.type])) return false;
+
+  const study = fixedCell(row, map.study);
+  const result = fixedCell(row, map.result);
+  return !!(study || result);
+}
+
+function looksLikeTwoRowHeaderPair(top, bottom){
+  const joined = `${(top || []).map(v=>norm(v)).join('|')}|${(bottom || []).map(v=>norm(v)).join('|')}`;
+  return /生徒番号/.test(joined) && /学習内容/.test(joined) && /学習結果/.test(joined);
+}
+
+function parseTwoRowResultSheet(aoa, file, sheetName){
+  const records = [];
+  const logRows = [];
+  const map = fixedTwoRowResultMap();
+  let skippedHeaders = 0;
+  for(let r=0; r<aoa.length-1; r++){
+    const top = aoa[r] || [];
+    const bottom = aoa[r+1] || [];
+
+    if(looksLikeTwoRowHeaderPair(top, bottom) || looksLikeResultHeader(top)){
+      skippedHeaders++;
+      continue;
+    }
+    if(!looksLikeTwoRowMetaRow(top)) continue;
+    if(!looksLikeTwoRowDetailRow(bottom)) continue;
+
+    const study = fixedCell(bottom, map.study);
+    const result = fixedCell(bottom, map.result);
+    const dt = fixedDateTimeAt(top, map.datetime) || fixedDateTimeAt(bottom, map.datetime);
+    if(!dt){
+      logRows.push([file.name, "注意", `日時を読めない2行形式の結果をスキップ: ${sheetName} ${r+1}-${r+2}行目`, `${fixedCell(top, map.studentNo)} ${fixedCell(top, map.student)} / ${study} / ${result}`]);
+      continue;
+    }
+
+    const rawName = fixedCell(top, map.student);
+    const studentNo = fixedCell(top, map.studentNo);
+    const student = resolveResultStudent(rawName, studentNo);
+    const grade = fixedCell(top, map.grade);
+    const type = fixedCell(top, map.type);
+    const like = fixedCell(bottom, map.like) || fixedCell(top, map.like);
+    const dateOnly = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
+    records.push({
+      student, rawName, studentNo, grade, type, study, result, like,
+      dateObj: dateOnly, dateKey: ymd(dateOnly), dateLabel: `${mmdd(dateOnly)}(${WEEK_JA[dateOnly.getDay()]})`,
+      datetime: dt, timeLabel: hm(dt), category: classifyResult(study, result),
+      summary: summarizeResult(study, result), sourceFile:file.name, sourceSheet:sheetName, sourceFormat:"2行形式（A〜H固定）"
+    });
+    r++;
+  }
+  if(records.length){
+    logRows.push([file.name, "成功", `結果 ${records.length}件読み込み（2行形式：1行目=A〜D生徒情報、日時は上下どちらのH列でも可、2行目=E学習内容/F学習結果）`, sheetName]);
+    if(skippedHeaders) logRows.push([file.name, "情報", `2行形式の見出し行を${skippedHeaders}行スキップしました`, sheetName]);
+  }
+  return {records, logRows};
+}
+
+function parseOneRowResultSheet(aoa, file, sheetName){
+  const logRows = [];
+  const records = [];
+  const hasHeader = looksLikeResultHeader(aoa[0]);
+  const h = hasHeader ? getResultHeaderMap(aoa) : fixedResultHeaderMap();
+  const startRow = hasHeader ? 1 : 0;
+
+  if(h.study < 0 || h.result < 0 || h.datetime < 0){
+    logRows.push([file.name, "注意", `結果Excelの列不足のためスキップ: ${sheetName}`, "1行形式は A:生徒番号 B:名前 C:学年 D:区分 E:学習内容 F:学習結果 G:いいね H:日時。2行形式は1行目=A〜D生徒情報/E-F空白、2行目=A〜D空白/E学習内容/F学習結果、日時は上下どちらかのH列が必要です"]);
+    return {records, logRows};
+  }
+  let count = 0;
+  for(let r=startRow;r<aoa.length;r++){
+    const row = aoa[r] || [];
+    const study = norm(row[h.study]);
+    const result = norm(row[h.result]);
+    if(!study && !result) continue;
+    const dt = parseDateTimeLoose(row[h.datetime]);
+    if(!dt){
+      logRows.push([file.name, "注意", `日時を読めない行: ${sheetName} ${r+1}行目`, norm(row[h.datetime])]);
+      continue;
+    }
+    // 氏名・生徒番号は、見出し名が「フルネーム」「生徒コード」などで拾えない場合があるため、
+    // 最後にA列/B列の固定位置も見る。これで student/rawName/studentNo が空の履歴を作りにくくする。
+    let rawName = h.student >= 0 ? norm(row[h.student]) : "";
+    let studentNo = h.studentNo >= 0 ? norm(row[h.studentNo]) : "";
+    if(!studentNo && row.length > 0) studentNo = norm(row[0]);
+    if(!rawName && row.length > 1) rawName = norm(row[1]);
+    const student = resolveResultStudent(rawName, studentNo);
+    if(!student && !rawName && !studentNo){
+      logRows.push([file.name, "注意", `氏名・生徒番号が空のため未照合: ${sheetName} ${r+1}行目`, `学年=${h.grade>=0?norm(row[h.grade]):""} / 学習内容=${study} / 結果=${result}`]);
+    }
+    const grade = h.grade >= 0 ? norm(row[h.grade]) : "";
+    const type = h.type >= 0 ? norm(row[h.type]) : "";
+    const like = h.like >= 0 ? norm(row[h.like]) : "";
+    const dateOnly = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
+    records.push({
+      student, rawName, studentNo, grade, type, study, result, like,
+      dateObj: dateOnly, dateKey: ymd(dateOnly), dateLabel: `${mmdd(dateOnly)}(${WEEK_JA[dateOnly.getDay()]})`,
+      datetime: dt, timeLabel: hm(dt), category: classifyResult(study, result),
+      summary: summarizeResult(study, result), sourceFile:file.name, sourceSheet:sheetName, sourceFormat: hasHeader ? "見出し行あり" : "A〜H固定列"
+    });
+    count++;
+  }
+  logRows.push([file.name, "成功", `結果 ${count}件読み込み${hasHeader ? "（見出し行あり）" : "（A〜H固定列）"}`, sheetName]);
+  return {records, logRows};
+}
+
 async function parseResultFile(file){
   const logRows = [];
   const records = [];
@@ -1171,48 +1318,16 @@ async function parseResultFile(file){
       const aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:"", raw:true}).filter(row => (row || []).some(v => norm(v)));
       if(aoa.length < 1) continue;
 
-      const hasHeader = looksLikeResultHeader(aoa[0]);
-      const h = hasHeader ? getResultHeaderMap(aoa) : fixedResultHeaderMap();
-      const startRow = hasHeader ? 1 : 0;
-
-      if(h.study < 0 || h.result < 0 || h.datetime < 0){
-        logRows.push([file.name, "注意", `結果Excelの列不足のためスキップ: ${sheetName}`, "A:生徒番号 B:名前 C:学年 D:区分 E:学習内容 F:学習結果 G:いいね H:日時、または見出し行が必要です"]);
+      const twoRowParsed = parseTwoRowResultSheet(aoa, file, sheetName);
+      if(twoRowParsed.records.length){
+        records.push(...twoRowParsed.records);
+        logRows.push(...twoRowParsed.logRows);
         continue;
       }
-      let count = 0;
-      for(let r=startRow;r<aoa.length;r++){
-        const row = aoa[r] || [];
-        const study = norm(row[h.study]);
-        const result = norm(row[h.result]);
-        if(!study && !result) continue;
-        const dt = parseDateTimeLoose(row[h.datetime]);
-        if(!dt){
-          logRows.push([file.name, "注意", `日時を読めない行: ${sheetName} ${r+1}行目`, norm(row[h.datetime])]);
-          continue;
-        }
-        // 氏名・生徒番号は、見出し名が「フルネーム」「生徒コード」などで拾えない場合があるため、
-        // 最後にA列/B列の固定位置も見る。これで student/rawName/studentNo が空の履歴を作りにくくする。
-        let rawName = h.student >= 0 ? norm(row[h.student]) : "";
-        let studentNo = h.studentNo >= 0 ? norm(row[h.studentNo]) : "";
-        if(!studentNo && row.length > 0) studentNo = norm(row[0]);
-        if(!rawName && row.length > 1) rawName = norm(row[1]);
-        const student = resolveResultStudent(rawName, studentNo);
-        if(!student && !rawName && !studentNo){
-          logRows.push([file.name, "注意", `氏名・生徒番号が空のため未照合: ${sheetName} ${r+1}行目`, `学年=${h.grade>=0?norm(row[h.grade]):""} / 学習内容=${study} / 結果=${result}`]);
-        }
-        const grade = h.grade >= 0 ? norm(row[h.grade]) : "";
-        const type = h.type >= 0 ? norm(row[h.type]) : "";
-        const like = h.like >= 0 ? norm(row[h.like]) : "";
-        const dateOnly = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
-        records.push({
-          student, rawName, studentNo, grade, type, study, result, like,
-          dateObj: dateOnly, dateKey: ymd(dateOnly), dateLabel: `${mmdd(dateOnly)}(${WEEK_JA[dateOnly.getDay()]})`,
-          datetime: dt, timeLabel: hm(dt), category: classifyResult(study, result),
-          summary: summarizeResult(study, result), sourceFile:file.name, sourceSheet:sheetName
-        });
-        count++;
-      }
-      logRows.push([file.name, "成功", `結果 ${count}件読み込み${hasHeader ? "（見出し行あり）" : "（A〜H固定列）"}`, sheetName]);
+
+      const oneRowParsed = parseOneRowResultSheet(aoa, file, sheetName);
+      records.push(...oneRowParsed.records);
+      logRows.push(...oneRowParsed.logRows);
     }
   }catch(e){
     logRows.push([file.name, "失敗", e.message || String(e), "結果Excel"]);
