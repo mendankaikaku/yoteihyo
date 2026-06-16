@@ -506,7 +506,7 @@ function currentScheduleRowIndexes(name){const data=ensureStudent(name);return [
 /* =========================================================
    2. 画面構築
 ========================================================= */
-function init(){setDefaultDate(); if($('#weeklyAbsentTargetDate') && !$('#weeklyAbsentTargetDate').value) $('#weeklyAbsentTargetDate').value=$('#weekStart').value||ymd(new Date()); if(!$('#studentNames').value) $('#studentNames').value=''; renderExamMasterPanel(); renderEventMasterPanel(); renderCommentMasterPanel(); renderCommentMasterPanel(); bindGlobalEvents(); applyStudents();}
+function init(){setDefaultDate(); if($('#weeklyAbsentTargetDate') && !$('#weeklyAbsentTargetDate').value) $('#weeklyAbsentTargetDate').value=$('#weekStart').value||ymd(new Date()); if(!$('#studentNames').value) $('#studentNames').value=''; renderExamMasterPanel(); renderEventMasterPanel(); renderCommentMasterPanel(); bindGlobalEvents(); applyStudents();}
 function applyStudents(){
   syncFromDom();
   const names=splitNames();
@@ -517,7 +517,7 @@ function applyStudents(){
 }
 function renderStudents(){
   const grid=$('#studentGrid');
-  if(!students.length){grid.innerHTML='<section class="card"><span class="empty">生徒名を入力して「② 生徒列・日付を反映」を押してください。</span></section>';return;}
+  if(!students.length){grid.innerHTML='<section class="card"><span class="empty">生徒名を入力して「② 生徒欄を作る」を押してください。</span></section>';return;}
   grid.innerHTML=students.map(name=>studentCardHtml(name)).join('');
   students.forEach(name=>fillStudentValues(name));
   updateScheduleHeaders();
@@ -3816,7 +3816,7 @@ async function printWeeklyAbsentList(){
 
 async function printMeetingPrep(){
   syncFromDom();
-  if(!students.length) return alert('先に生徒名を入力して「② 生徒列・日付を反映」を押してください。');
+  if(!students.length) return alert('先に生徒名を入力して「② 生徒欄を作る」を押してください。');
   if(!window.XLSX) return alert('Excel読み取りライブラリの読み込みに失敗しました。\nこの機能は結果Excel・週面シートを読むために xlsx ライブラリが必要です。\nインターネット接続がある状態で開くか、職場PCのセキュリティで CDN がブロックされていないか確認してください。');
   const empty=students.filter(n=>!studentHasMeaningfulInputData(n));
   if(empty.length && !confirm(`入力内容が空の生徒がいます：${empty.join('、')}\nこのまま印刷しますか？`)) return;
