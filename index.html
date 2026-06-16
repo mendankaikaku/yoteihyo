@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>面談予定入力・準備資料アプリ v33（合格設計図PDF全体1ページ縮小版）</title>
+<title>面談予定入力・準備資料アプリ v34（合格設計図Excel A列固定・印刷PDF優先版）</title>
 <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
 <script src="./libs/xlsx.bundle.js"></script>
 <script>if(!window.XLSX){document.write('<script src="./libs/xlsx.full.min.js"><\/script>');}</script>
@@ -293,7 +293,7 @@ main.wrap{max-width:none!important;height:auto!important;min-height:0!important;
 <body>
 <header class="appHeader"><div class="wrap appHeaderInner">
   <div>
-    <h1>面談予定入力・準備資料アプリ <span class="versionBadge">v33 合格設計図PDF全体1ページ縮小版</span></h1>
+    <h1>面談予定入力・準備資料アプリ <span class="versionBadge">v34 Excel A列固定・印刷PDF優先版</span></h1>
     <div class="sub">生徒カードは横スクロールで同時編集できます。印刷メニューは上部、確認ログは右上、マスタ設定は下にまとめて表示します。</div>
   </div>
   <div class="saveWarningBadge" id="uxHeaderSaveBadge">未保存</div>
@@ -656,15 +656,20 @@ function excelRowHeightPx(row){
 function buildGoukakuExcelModel(ws){
   if(!ws) return {rows:[], merges:[], cols:[], rowHeights:[], range:null};
   const ref=ws['!ref'] || 'A1:A1';
-  const range=XLSX.utils.decode_range(ref);
-  const maxR=Math.min(range.e.r, range.s.r + 199);
-  const maxC=Math.min(range.e.c, range.s.c + 59);
-  const merges=(ws['!merges'] || []).map(m=>({s:{r:m.s.r-range.s.r,c:m.s.c-range.s.c},e:{r:m.e.r-range.s.r,c:m.e.c-range.s.c}}))
-    .filter(m=>m.e.r>=0 && m.e.c>=0 && m.s.r<=maxR-range.s.r && m.s.c<=maxC-range.s.c);
+  const usedRange=XLSX.utils.decode_range(ref);
+  // 合格設計図は「空白のマス目」に数字を入れる用途なので、値がなくても必ず A1 から表示する。
+  // 以前は実データ範囲が B1 以降だと A列が表示されなかった。
+  const startR=0;
+  const startC=0;
+  // 最低でも A1:Z60 を表示。実データがそれより右/下にあれば最大 200行×60列まで広げる。
+  const maxR=Math.min(Math.max(usedRange.e.r, 59), 199);
+  const maxC=Math.min(Math.max(usedRange.e.c, 25), 59);
+  const merges=(ws['!merges'] || []).map(m=>({s:{r:m.s.r-startR,c:m.s.c-startC},e:{r:m.e.r-startR,c:m.e.c-startC}}))
+    .filter(m=>m.e.r>=0 && m.e.c>=0 && m.s.r<=maxR-startR && m.s.c<=maxC-startC);
   const rows=[];
-  for(let r=range.s.r;r<=maxR;r++){
+  for(let r=startR;r<=maxR;r++){
     const row=[];
-    for(let c=range.s.c;c<=maxC;c++){
+    for(let c=startC;c<=maxC;c++){
       const addr=XLSX.utils.encode_cell({r,c});
       const cell=ws[addr];
       let text='';
@@ -677,9 +682,11 @@ function buildGoukakuExcelModel(ws){
     }
     rows.push(row);
   }
-  const cols=(ws['!cols'] || []).slice(range.s.c,maxC+1).map(excelColWidthPx);
-  const rowHeights=(ws['!rows'] || []).slice(range.s.r,maxR+1).map(excelRowHeightPx);
-  return {rows, merges, cols, rowHeights, range:{s:{r:range.s.r,c:range.s.c},e:{r:maxR,c:maxC}}, originalRef:ref};
+  const cols=[];
+  for(let c=startC;c<=maxC;c++) cols.push(excelColWidthPx((ws['!cols'] || [])[c]));
+  const rowHeights=[];
+  for(let r=startR;r<=maxR;r++) rowHeights.push(excelRowHeightPx((ws['!rows'] || [])[r]));
+  return {rows, merges, cols, rowHeights, range:{s:{r:startR,c:startC},e:{r:maxR,c:maxC}}, originalRef:ref, usedRef:ref};
 }
 function goukakuCellAddressFromModel(model, ri, c){
   const baseR = model?.range?.s?.r || 0;
@@ -951,6 +958,17 @@ async function findGoukakuPdfInStudentFolder(studentDir){
   candidates.sort((a,b)=>a.name.localeCompare(b.name,'ja'));
   return candidates[0] || null;
 }
+async function readGoukakuPdfPrintSource(pdfHit){
+  if(!pdfHit) return null;
+  const file=await pdfHit.handle.getFile();
+  const pdfUrl=URL.createObjectURL(file);
+  const pdfBase64=arrayBufferToBase64(await readFileAsArrayBufferCompat(file));
+  return {kind:'pdf',fileName:pdfHit.name,pdfUrl,pdfBase64,fileHandle:pdfHit.handle};
+}
+function revokeGoukakuPdfUrls(item){
+  try{ if(item?.pdfUrl) URL.revokeObjectURL(item.pdfUrl); }catch(e){}
+  try{ if(item?.printPdf?.pdfUrl) URL.revokeObjectURL(item.printPdf.pdfUrl); }catch(e){}
+}
 async function findGoukakuExcelInStudentFolder(studentDir){
   if(!studentDir || !studentDir.entries) return null;
   const candidates=[];
@@ -992,32 +1010,30 @@ async function loadGoukakuDesignsFromRoot(root, names=students){
       const dirs=await findStudentFoldersRecursive(root, name, 5);
       if(!dirs.length){missing.push(`${name}: 生徒フォルダなし`);goukakuDesignSheets[name]={error:'生徒名フォルダが見つかりません。'};renderGoukakuPanel(name);continue;}
       if(dirs.length>1){duplicate.push(`${name}: ${dirs.map(d=>d.label).join(' / ')}`);goukakuDesignSheets[name]={error:'同じ生徒名フォルダが複数見つかったため読み込みませんでした。'};renderGoukakuPanel(name);continue;}
-      const hit=await findGoukakuExcelInStudentFolder(dirs[0].dir);
-      // アプリ編集済みExcelがある場合は、PDFよりもそれを優先して読み込む。
-      if(hit?.isEdited){
-        const file=await hit.handle.getFile();
+      const studentDir=dirs[0].dir;
+      const pdfHit=await findGoukakuPdfInStudentFolder(studentDir);
+      const excelHit=await findGoukakuExcelInStudentFolder(studentDir);
+      const printPdf=pdfHit ? await readGoukakuPdfPrintSource(pdfHit) : null;
+      revokeGoukakuPdfUrls(goukakuDesignSheets[name]);
+
+      // 画面編集用は Excel 優先（アプリ編集済みExcel → 通常Excel → PDF）。印刷用は PDF があれば常にPDFを優先する。
+      if(excelHit){
+        const file=await excelHit.handle.getFile();
         const parsed=await readGoukakuExcelFile(file);
-        goukakuDesignSheets[name]={kind:'excel',fileName:hit.name,sheetName:parsed.sheetName,aoa:parsed.aoa,model:parsed.model,workbook:parsed.workbook,fileHandle:hit.handle,dirHandle:dirs[0].dir,path:dirs[0].label,dirty:false,editedCells:{}};
-        loaded.push(`${name}: ${dirs[0].label} / ${hit.name}（編集済みExcel）`);
+        goukakuDesignSheets[name]={kind:'excel',fileName:excelHit.name,sheetName:parsed.sheetName,aoa:parsed.aoa,model:parsed.model,workbook:parsed.workbook,fileHandle:excelHit.handle,dirHandle:studentDir,path:dirs[0].label,dirty:false,editedCells:{},printPdf};
+        const label=excelHit.isEdited ? '編集済みExcel' : 'Excel簡易表示';
+        loaded.push(`${name}: ${dirs[0].label} / ${excelHit.name}（${label}${printPdf ? '・印刷はPDF優先' : ''}）`);
         renderGoukakuPanel(name);
         continue;
       }
-      const pdfHit=await findGoukakuPdfInStudentFolder(dirs[0].dir);
-      if(pdfHit){
-        const file=await pdfHit.handle.getFile();
-        const pdfUrl=URL.createObjectURL(file);
-        const pdfBase64=arrayBufferToBase64(await readFileAsArrayBufferCompat(file));
-        if(goukakuDesignSheets[name]?.pdfUrl) URL.revokeObjectURL(goukakuDesignSheets[name].pdfUrl);
-        goukakuDesignSheets[name]={kind:'pdf',fileName:pdfHit.name,pdfUrl,pdfBase64,path:dirs[0].label,fileHandle:pdfHit.handle,dirHandle:dirs[0].dir,dirty:false};
-        loaded.push(`${name}: ${dirs[0].label} / ${pdfHit.name}（PDF）`);
+      if(printPdf){
+        goukakuDesignSheets[name]={kind:'pdf',fileName:printPdf.fileName,pdfUrl:printPdf.pdfUrl,pdfBase64:printPdf.pdfBase64,path:dirs[0].label,fileHandle:printPdf.fileHandle,dirHandle:studentDir,dirty:false};
+        loaded.push(`${name}: ${dirs[0].label} / ${printPdf.fileName}（PDF）`);
         renderGoukakuPanel(name);
         continue;
       }
-      if(!hit){missing.push(`${name}: 合格設計図PDF/Excelなし`);goukakuDesignSheets[name]={error:'生徒フォルダ直下に「合格設計図」を含むPDFまたはExcelがありません。'};renderGoukakuPanel(name);continue;}
-      const file=await hit.handle.getFile();
-      const parsed=await readGoukakuExcelFile(file);
-      goukakuDesignSheets[name]={kind:'excel',fileName:hit.name,sheetName:parsed.sheetName,aoa:parsed.aoa,model:parsed.model,workbook:parsed.workbook,fileHandle:hit.handle,dirHandle:dirs[0].dir,path:dirs[0].label,dirty:false,editedCells:{}};
-      loaded.push(`${name}: ${dirs[0].label} / ${hit.name}（Excel簡易表示）`);
+      missing.push(`${name}: 合格設計図PDF/Excelなし`);
+      goukakuDesignSheets[name]={error:'生徒フォルダ直下に「合格設計図」を含むPDFまたはExcelがありません。'};
       renderGoukakuPanel(name);
     }catch(e){
       failed.push(`${name}: ${e?.message||e}`);
@@ -1068,37 +1084,29 @@ async function loadGoukakuDesignsFromStudentParent(studentParentDir, names=stude
         renderGoukakuPanel(name);
         continue;
       }
-      const hit=await findGoukakuExcelInStudentFolder(found.dir);
-      // アプリ編集済みExcelがある場合は、PDFよりもそれを優先して読み込む。
-      if(hit?.isEdited){
-        const file=await hit.handle.getFile();
-        const parsed=await readGoukakuExcelFile(file);
-        goukakuDesignSheets[name]={kind:'excel',fileName:hit.name,sheetName:parsed.sheetName,aoa:parsed.aoa,model:parsed.model,workbook:parsed.workbook,fileHandle:hit.handle,dirHandle:found.dir,path:found.label,dirty:false,editedCells:{}};
-        loaded.push(`${name}: ${found.label} / ${hit.name}（編集済みExcel）`);
-        renderGoukakuPanel(name);
-        continue;
-      }
       const pdfHit=await findGoukakuPdfInStudentFolder(found.dir);
-      if(pdfHit){
-        const file=await pdfHit.handle.getFile();
-        const pdfUrl=URL.createObjectURL(file);
-        const pdfBase64=arrayBufferToBase64(await readFileAsArrayBufferCompat(file));
-        if(goukakuDesignSheets[name]?.pdfUrl) URL.revokeObjectURL(goukakuDesignSheets[name].pdfUrl);
-        goukakuDesignSheets[name]={kind:'pdf',fileName:pdfHit.name,pdfUrl,pdfBase64,path:found.label,fileHandle:pdfHit.handle,dirHandle:found.dir,dirty:false};
-        loaded.push(`${name}: ${found.label} / ${pdfHit.name}（PDF）`);
+      const excelHit=await findGoukakuExcelInStudentFolder(found.dir);
+      const printPdf=pdfHit ? await readGoukakuPdfPrintSource(pdfHit) : null;
+      revokeGoukakuPdfUrls(goukakuDesignSheets[name]);
+
+      // 画面編集用は Excel 優先（アプリ編集済みExcel → 通常Excel → PDF）。印刷用は PDF があれば常にPDFを優先する。
+      if(excelHit){
+        const file=await excelHit.handle.getFile();
+        const parsed=await readGoukakuExcelFile(file);
+        goukakuDesignSheets[name]={kind:'excel',fileName:excelHit.name,sheetName:parsed.sheetName,aoa:parsed.aoa,model:parsed.model,workbook:parsed.workbook,fileHandle:excelHit.handle,dirHandle:found.dir,path:found.label,dirty:false,editedCells:{},printPdf};
+        const label=excelHit.isEdited ? '編集済みExcel' : 'Excel簡易表示';
+        loaded.push(`${name}: ${found.label} / ${excelHit.name}（${label}${printPdf ? '・印刷はPDF優先' : ''}）`);
         renderGoukakuPanel(name);
         continue;
       }
-      if(!hit){
-        missing.push(`${name}: 合格設計図PDF/Excelなし`);
-        goukakuDesignSheets[name]={error:'生徒フォルダ直下に「合格設計図」を含むPDFまたはExcelがありません。'};
+      if(printPdf){
+        goukakuDesignSheets[name]={kind:'pdf',fileName:printPdf.fileName,pdfUrl:printPdf.pdfUrl,pdfBase64:printPdf.pdfBase64,path:found.label,fileHandle:printPdf.fileHandle,dirHandle:found.dir,dirty:false};
+        loaded.push(`${name}: ${found.label} / ${printPdf.fileName}（PDF）`);
         renderGoukakuPanel(name);
         continue;
       }
-      const file=await hit.handle.getFile();
-      const parsed=await readGoukakuExcelFile(file);
-      goukakuDesignSheets[name]={kind:'excel',fileName:hit.name,sheetName:parsed.sheetName,aoa:parsed.aoa,model:parsed.model,workbook:parsed.workbook,fileHandle:hit.handle,dirHandle:found.dir,path:found.label,dirty:false,editedCells:{}};
-      loaded.push(`${name}: ${found.label} / ${hit.name}（Excel簡易表示）`);
+      missing.push(`${name}: 合格設計図PDF/Excelなし`);
+      goukakuDesignSheets[name]={error:'生徒フォルダ直下に「合格設計図」を含むPDFまたはExcelがありません。'};
       renderGoukakuPanel(name);
     }catch(e){
       failed.push(`${name}: ${e?.message||e}`);
@@ -3298,16 +3306,17 @@ function meetingPrepGoukakuDesignHtml(name){
   if(item.error){
     return `<div class="box muted">合格設計図の読み込みに失敗しました。<br>${esc(item.error)}</div>`;
   }
-  if(item.kind === 'pdf'){
-    const pdfSrc = `${item.pdfUrl || ''}#toolbar=0&navpanes=0&scrollbar=0&view=Fit&page=1`;
-    const pdfBase64 = item.pdfBase64 || '';
-    return `<div class="goukakuPrintPdf goukakuPrintPdfAllPages" data-pdf-base64="${esc(pdfBase64)}" data-file-name="${esc(item.fileName || '合格設計図.pdf')}"><iframe class="goukakuFallbackPdf" src="${esc(pdfSrc)}"></iframe><div class="goukakuPdfRenderStatus">PDF全ページを1枚に縮小準備中...</div></div><div class="muted">合格設計図PDFは、PDF.jsが使える場合は全ページを1枚にまとめて縮小表示します。PDF.jsがない場合はPDFの1ページ目表示になります。</div>`;
+  const pdfForPrint = item.printPdf || (item.kind === 'pdf' ? item : null);
+  if(pdfForPrint){
+    const pdfSrc = `${pdfForPrint.pdfUrl || ''}#toolbar=0&navpanes=0&scrollbar=0&view=Fit&page=1`;
+    const pdfBase64 = pdfForPrint.pdfBase64 || '';
+    return `<div class="goukakuPrintPdf goukakuPrintPdfAllPages" data-pdf-base64="${esc(pdfBase64)}" data-file-name="${esc(pdfForPrint.fileName || '合格設計図.pdf')}"><iframe class="goukakuFallbackPdf" src="${esc(pdfSrc)}"></iframe><div class="goukakuPdfRenderStatus">PDF全ページを1枚に縮小準備中...</div></div><div class="muted">印刷用はPDFを優先します。PDF.jsが使える場合はPDF全ページを1枚にまとめて縮小表示します。</div>`;
   }
   if(item.model || item.aoa){
     let html = `<div class="muted">${esc(item.fileName || '合格設計図.xlsx')} ${item.sheetName ? '/ ' + esc(item.sheetName) : ''}</div>`;
     if(item.model){
-      html += '<div class="goukakuPrintExcelWrap">' + goukakuExcelModelToHtml(item.model,80,32,false,{showHeaders:false}) + '</div>';
-      html += '<div class="muted">Excel簡易再現：値・セル結合・列幅/行高・配置・太字・文字サイズ・色/罫線を、読み取れる範囲で反映しています。</div>';
+      html += '<div class="goukakuPrintExcelWrap">' + goukakuExcelModelToHtml(item.model,60,26,false,{showHeaders:false}) + '</div>';
+      html += '<div class="muted">PDFがないため、アプリ編集済みExcelまたは合格設計図Excelを1ページ内に縮小して簡易印刷します。</div>';
     }else{
       html += '<table class="prepTable goukakuPrintTable"><tbody>';
       const rows = (item.aoa || []).slice(0,55);
