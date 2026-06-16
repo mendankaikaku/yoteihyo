@@ -661,8 +661,8 @@ function buildGoukakuExcelModel(ws){
   // 以前は実データ範囲が B1 以降だと A列が表示されなかった。
   const startR=0;
   const startC=0;
-  // 最低でも A1:Z60 を表示。実データがそれより右/下にあれば最大 200行×60列まで広げる。
-  const maxR=Math.min(Math.max(usedRange.e.r, 59), 199);
+  // 最低でも A1:Z150 を表示。実データがそれより右/下にあれば最大 300行×60列まで広げる。
+  const maxR=Math.min(Math.max(usedRange.e.r, 149), 299);
   const maxC=Math.min(Math.max(usedRange.e.c, 25), 59);
   const merges=(ws['!merges'] || []).map(m=>({s:{r:m.s.r-startR,c:m.s.c-startC},e:{r:m.e.r-startR,c:m.e.c-startC}}))
     .filter(m=>m.e.r>=0 && m.e.c>=0 && m.s.r<=maxR-startR && m.s.c<=maxC-startC);
@@ -699,7 +699,7 @@ function normalizeGoukakuCellValueForWrite(value){
   if(/^[+-]?(?:\d+|\d+\.\d+|\.\d+)$/.test(text)) return {v:Number(text), t:'n'};
   return {v:text, t:'s'};
 }
-function goukakuExcelModelToHtml(model, maxRows=60, maxCols=20, editable=false, options={}){
+function goukakuExcelModelToHtml(model, maxRows=150, maxCols=20, editable=false, options={}){
   const rows=(model?.rows || []).slice(0,maxRows);
   if(!rows.length) return '<div class="empty" style="padding:10px">表示できるセルがありません。</div>';
   const colCount=Math.min(maxCols, Math.max(1, ...rows.map(r=>(r||[]).length)));
@@ -753,7 +753,7 @@ function goukakuExcelModelToHtml(model, maxRows=60, maxCols=20, editable=false, 
   if((model?.rows||[]).length>maxRows) html+=`<div class="hint" style="padding:8px">先頭${maxRows}行のみ表示しています。</div>`;
   return html;
 }
-function aoaToGoukakuTableHtml(aoaOrModel, maxRows=60, maxCols=20, editable=false, options={}){
+function aoaToGoukakuTableHtml(aoaOrModel, maxRows=150, maxCols=20, editable=false, options={}){
   if(aoaOrModel && Array.isArray(aoaOrModel.rows)) return goukakuExcelModelToHtml(aoaOrModel,maxRows,maxCols,editable,Object.assign({showHeaders:true}, options || {}));
   const data=(aoaOrModel||[]).slice(0,maxRows);
   if(!data.length) return '<div class="empty" style="padding:10px">表示できるセルがありません。</div>';
@@ -783,7 +783,7 @@ function goukakuPanelHtml(name){
     return `<div class="goukakuBox"><div class="goukakuHeader"><div><div>合格設計図PDF</div><div class="goukakuMeta">${escapeHtml(item.fileName||'')}</div></div><button type="button" class="goukakuExpand" data-open-goukaku="${escapeHtml(name)}" title="全画面で拡大">↗</button></div><div class="goukakuPdfWrap"><iframe class="goukakuPdfFrame" src="${escapeHtml(item.pdfUrl||'')}"></iframe></div></div>`;
   }
   const cnt=goukakuEditedCount(item);
-  return `<div class="goukakuBox"><div class="goukakuHeader"><div><div>合格設計図Excel（マス目編集）${cnt?`<span class="goukakuDirtyBadge">編集 ${cnt}セル</span>`:''}</div><div class="goukakuMeta">${escapeHtml(item.fileName||'')} / ${escapeHtml(item.sheetName||'')}</div></div><button type="button" class="goukakuExpand" data-open-goukaku="${escapeHtml(name)}" title="全画面で拡大・編集">↗</button></div><div class="goukakuEditNotice">マスをクリックして数字を入力できます。初回は「合格設計図_アプリ編集済.xlsx」を作成し、次回以降はその編集済みExcelを優先して読み込み、同じファイルへ上書き保存します。</div><div class="goukakuEditActions"><button type="button" class="secondary small" data-save-goukaku-excel="${escapeHtml(name)}">編集済みExcelを保存</button><button type="button" class="secondary small" data-clear-goukaku-edits="${escapeHtml(name)}">編集をクリア</button><span class="hint">初回だけ別名保存、次回以降は編集済みExcelに上書きします。</span></div><div class="goukakuTableWrap">${aoaToGoukakuTableHtml(item.model||item.aoa,50,22,true,{student:name,sheetName:item.sheetName,dirtyCells:item.editedCells||{}})}</div></div>`;
+  return `<div class="goukakuBox"><div class="goukakuHeader"><div><div>合格設計図Excel（マス目編集）${cnt?`<span class="goukakuDirtyBadge">編集 ${cnt}セル</span>`:''}</div><div class="goukakuMeta">${escapeHtml(item.fileName||'')} / ${escapeHtml(item.sheetName||'')}</div></div><button type="button" class="goukakuExpand" data-open-goukaku="${escapeHtml(name)}" title="全画面で拡大・編集">↗</button></div><div class="goukakuEditNotice">マスをクリックして数字を入力できます。初回は「合格設計図_アプリ編集済.xlsx」を作成し、次回以降はその編集済みExcelを優先して読み込み、同じファイルへ上書き保存します。</div><div class="goukakuEditActions"><button type="button" class="secondary small" data-save-goukaku-excel="${escapeHtml(name)}">編集済みExcelを保存</button><button type="button" class="secondary small" data-clear-goukaku-edits="${escapeHtml(name)}">編集をクリア</button><span class="hint">初回だけ別名保存、次回以降は編集済みExcelに上書きします。</span></div><div class="goukakuTableWrap">${aoaToGoukakuTableHtml(item.model||item.aoa,150,22,true,{student:name,sheetName:item.sheetName,dirtyCells:item.editedCells||{}})}</div></div>`;
 }
 function renderGoukakuPanel(name){
   const host=document.querySelector(`[data-goukaku-panel="${cssEscape(name)}"]`);
@@ -817,7 +817,7 @@ function openGoukakuModal(name){
   if(item.kind === 'pdf'){
     $('#goukakuModalBody').innerHTML=`<div class="hint" style="padding:8px 0">PDF表示です。元Excelをマス目編集したい場合は、PDFではなく合格設計図Excelを生徒フォルダに置いてください。</div><div class="goukakuPdfWrap"><iframe class="goukakuPdfFrame" src="${escapeHtml(item.pdfUrl||'')}"></iframe></div>`;
   }else{
-    $('#goukakuModalBody').innerHTML='<div class="goukakuEditNotice">セル番地ベースの簡易編集です。結合セルは左上セルに値を書き込みます。初回は編集済みExcelを作り、次回以降はそれを読み込んで上書きします。</div><div class="goukakuEditActions"><button type="button" class="secondary small" data-save-goukaku-excel="'+escapeHtml(name)+'">編集済みExcelを保存</button><button type="button" class="secondary small" data-clear-goukaku-edits="'+escapeHtml(name)+'">編集をクリア</button><span class="hint">④保存時にも自動保存します。</span></div>'+aoaToGoukakuTableHtml(item.model||item.aoa,200,60,true,{student:name,sheetName:item.sheetName,dirtyCells:item.editedCells||{}});
+    $('#goukakuModalBody').innerHTML='<div class="goukakuEditNotice">セル番地ベースの簡易編集です。結合セルは左上セルに値を書き込みます。初回は編集済みExcelを作り、次回以降はそれを読み込んで上書きします。</div><div class="goukakuEditActions"><button type="button" class="secondary small" data-save-goukaku-excel="'+escapeHtml(name)+'">編集済みExcelを保存</button><button type="button" class="secondary small" data-clear-goukaku-edits="'+escapeHtml(name)+'">編集をクリア</button><span class="hint">④保存時にも自動保存します。</span></div>'+aoaToGoukakuTableHtml(item.model||item.aoa,300,60,true,{student:name,sheetName:item.sheetName,dirtyCells:item.editedCells||{}});
     setTimeout(bindGoukakuButtons,0);
   }
   $('#goukakuModal').classList.add('open');
@@ -3315,7 +3315,7 @@ function meetingPrepGoukakuDesignHtml(name){
   if(item.model || item.aoa){
     let html = `<div class="muted">${esc(item.fileName || '合格設計図.xlsx')} ${item.sheetName ? '/ ' + esc(item.sheetName) : ''}</div>`;
     if(item.model){
-      html += '<div class="goukakuPrintExcelWrap">' + goukakuExcelModelToHtml(item.model,60,26,false,{showHeaders:false}) + '</div>';
+      html += '<div class="goukakuPrintExcelWrap">' + goukakuExcelModelToHtml(item.model,150,26,false,{showHeaders:false}) + '</div>';
       html += '<div class="muted">PDFがないため、アプリ編集済みExcelまたは合格設計図Excelを1ページ内に縮小して簡易印刷します。</div>';
     }else{
       html += '<table class="prepTable goukakuPrintTable"><tbody>';
