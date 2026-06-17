@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>面談予定入力・準備資料アプリ v34（合格設計図Excel A列固定・印刷PDF優先版）</title>
+<title>面談予定入力・準備資料アプリ v35（結果履歴JSON自動保存版）</title>
 <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
 <script src="./libs/xlsx.bundle.js"></script>
 <script>if(!window.XLSX){document.write('<script src="./libs/xlsx.full.min.js"><\/script>');}</script>
@@ -297,7 +297,7 @@ main.wrap{max-width:none!important;height:auto!important;min-height:0!important;
 <body>
 <header class="appHeader"><div class="wrap appHeaderInner">
   <div>
-    <h1>面談予定入力・準備資料アプリ <span class="versionBadge">v34 Excel A列固定・印刷PDF優先版</span></h1>
+    <h1>面談予定入力・準備資料アプリ <span class="versionBadge">v35 結果履歴JSON自動保存版</span></h1>
     <div class="sub">生徒カードは横スクロールで同時編集できます。印刷メニューは上部、確認ログは右上、マスタ設定は下にまとめて表示します。</div>
   </div>
   <div class="saveWarningBadge" id="uxHeaderSaveBadge">未保存</div>
@@ -2061,8 +2061,8 @@ async function loadGroup(){
       }
     }
     try{
-      const hist=await readPrepResultHistoryFromShared();
-      if(hist.debug && hist.debug.length) details.push(hist.debug.join(' / '));
+      const resultRecords=await readPrepResultRecords();
+      details.push(`結果履歴JSON/結果Excel: ${resultRecords.length}件確認（必要ならjson/result_history.jsonを自動作成・更新）`);
     }catch(e){
       details.push(`結果履歴JSON確認エラー: ${e?.message || e}`);
     }
@@ -2948,12 +2948,81 @@ function prepHistoryItemToResultRecord(item){
     timeLabel:hm(dt),
     summary:prepResultSummary(study,result),
     sourceFile:item.sourceFile || 'result_history.json',
-    sourceSheet:item.sourceSheet || '履歴JSON'
+    sourceSheet:item.sourceSheet || '履歴JSON',
+    sourceRow:item.sourceRow || '',
+    sourceFormat:item.sourceFormat || '履歴JSON'
   };
+}
+function prepResultRecordToHistoryItem(r){
+  if(!r) return null;
+  const dateKey=String(r.dateKey || (r.dateObj ? ymd(r.dateObj) : '') || '').trim();
+  if(!dateKey) return null;
+  const time=String(r.timeLabel || '').trim();
+  const datetime=time ? `${dateKey}T${time.length===5 ? time + ':00' : time}` : `${dateKey}T00:00:00`;
+  const study=norm(r.study || '');
+  const result=norm(r.result || '');
+  if(!study && !result) return null;
+  return {
+    student:norm(r.student || ''),
+    rawName:norm(r.rawName || r.student || ''),
+    studentNo:norm(r.studentNo || ''),
+    grade:norm(r.grade || ''),
+    type:norm(r.type || ''),
+    study,
+    result,
+    dateKey,
+    timeLabel:time,
+    datetime,
+    summary:prepResultSummary(study,result),
+    sourceFile:r.sourceFile || '',
+    sourceSheet:r.sourceSheet || '',
+    sourceRow:r.sourceRow || '',
+    sourceFormat:r.sourceFormat || '',
+    savedAt:new Date().toISOString()
+  };
+}
+function prepResultHistoryKey(item){
+  return [
+    prepNormalizeStudentNo(item.studentNo),
+    prepNormalizeName(item.rawName || item.student),
+    item.dateKey || '',
+    item.timeLabel || '',
+    norm(item.study),
+    norm(item.result),
+    item.sourceFile || '',
+    item.sourceSheet || '',
+    item.sourceRow || ''
+  ].join('||');
+}
+function mergePrepResultHistoryItems(existingItems, newRecords){
+  const map=new Map();
+  (existingItems || []).forEach(item=>{
+    const rec=prepHistoryItemToResultRecord(item);
+    const normalized=prepResultRecordToHistoryItem(rec);
+    if(!normalized) return;
+    map.set(prepResultHistoryKey(normalized), Object.assign({}, item, normalized, {savedAt:item.savedAt || normalized.savedAt}));
+  });
+  (newRecords || []).forEach(record=>{
+    const item=prepResultRecordToHistoryItem(record);
+    if(!item) return;
+    map.set(prepResultHistoryKey(item), item);
+  });
+  return Array.from(map.values()).sort((a,b)=>String(a.dateKey||'').localeCompare(String(b.dateKey||'')) || String(a.timeLabel||'').localeCompare(String(b.timeLabel||'')) || String(a.student||a.rawName||'').localeCompare(String(b.student||b.rawName||''),'ja'));
+}
+async function savePrepResultHistoryToShared(existingItems, newRecords){
+  const merged=mergePrepResultHistoryItems(existingItems, newRecords);
+  await writeJsonToShared('result_history.json', {
+    version:2,
+    type:'result_history',
+    savedAt:new Date().toISOString(),
+    records:merged
+  });
+  return merged;
 }
 async function readPrepResultHistoryFromShared(){
   const records=[];
   const debug=[];
+  let rawItems=[];
   try{
     // 復元/保存で保存用フォルダを選んでいれば、それを使う。
     // 未選択の場合は、印刷ボタン操作中なのでここで保存用フォルダを選べるようにする。
@@ -2962,16 +3031,16 @@ async function readPrepResultHistoryFromShared(){
       const dir = await pickSharedFolder();
       if(!dir){
         debug.push('結果履歴JSON: 保存用フォルダが選択されなかったため未読込');
-        return {records, debug};
+        return {records, debug, rawItems};
       }
     }
     const json=await readJsonFromShared('result_history.json');
     if(!json){
-      debug.push('結果履歴JSON: json/result_history.json なし');
-      return {records, debug};
+      debug.push('結果履歴JSON: json/result_history.json なし（結果Excelを読めたら自動作成します）');
+      return {records, debug, rawItems};
     }
-    const items=Array.isArray(json) ? json : (Array.isArray(json.records) ? json.records : []);
-    for(const item of items){
+    rawItems=Array.isArray(json) ? json : (Array.isArray(json.records) ? json.records : []);
+    for(const item of rawItems){
       const rec=prepHistoryItemToResultRecord(item);
       if(rec) records.push(rec);
     }
@@ -2979,7 +3048,7 @@ async function readPrepResultHistoryFromShared(){
   }catch(e){
     debug.push(`結果履歴JSON: 読込失敗 ${e?.message || e}`);
   }
-  return {records, debug};
+  return {records, debug, rawItems};
 }
 
 async function readWorkbookFromFileRobust(file){
@@ -3066,8 +3135,9 @@ function prepHeaderMapFromRow(headerRow){
   };
 }
 async function readPrepResultRecords(){
-  const files=getPrepResultFiles();
+  const selectedFiles=getPrepResultFiles();
   const records=[];
+  const excelRecords=[];
   const debug=[];
 
   // まず保存用フォルダ/json/result_history.json を読む。
@@ -3076,7 +3146,18 @@ async function readPrepResultRecords(){
   records.push(...hist.records);
   debug.push(...hist.debug);
 
-  // 必要なときだけ、画面で選んだ結果Excelも追加で読む。
+  // v35: 復元フォルダ配下の「学習結果」フォルダから結果Excelを自動読込する。
+  // 読み取れた結果は json/result_history.json に自動保存・追記する。
+  const shared=await getPrepResultFilesFromShared();
+  debug.push(...shared.debug);
+  const fileMap=new Map();
+  [...selectedFiles, ...shared.files].forEach(file=>{
+    if(!file) return;
+    const key=String(file._relativePath || file.webkitRelativePath || file.name || Math.random());
+    if(!fileMap.has(key)) fileMap.set(key,file);
+  });
+  const files=Array.from(fileMap.values());
+
   // 従来1行形式と、2行形式（上段=A〜D生徒情報/E-F空白、下段=E学習内容/F学習結果）に対応する。
   if(!files.length){
     if(debug.length) setMeetingPrepFolderInfo(`結果読取詳細:\n${debug.join('\n')}`);
@@ -3095,6 +3176,7 @@ async function readPrepResultRecords(){
         const twoRow=prepParseTwoRowResultSheet(aoa,file,sheetName);
         if(twoRow.records.length){
           records.push(...twoRow.records);
+          excelRecords.push(...twoRow.records);
           debug.push(...twoRow.debug);
           continue;
         }
@@ -3117,7 +3199,7 @@ async function readPrepResultRecords(){
           // 引き継ぎはしない。生徒番号・名前が両方空欄の行は除外する。
           if(!studentNo && !student){skippedNoId++; continue;}
           const dateOnly=new Date(dt.getFullYear(),dt.getMonth(),dt.getDate());
-          records.push({
+          const rec={
             student, rawName: student, studentNo,
             dateObj:dateOnly, dateKey:ymd(dateOnly), timeLabel:hm(dt),
             type:h.type>=0?norm(row[h.type]):'',
@@ -3127,7 +3209,9 @@ async function readPrepResultRecords(){
             sourceSheet:sheetName,
             sourceRow:r+1,
             sourceFormat:'1行形式'
-          });
+          };
+          records.push(rec);
+          excelRecords.push(rec);
           sheetCount++;
         }
         debug.push(`${file.name}/${sheetName}: ${sheetCount}件${hasHeader?`（見出し${headerRow+1}行目）`:'（A〜H固定）'}${skippedNoId?` / 生徒番号・名前空欄${skippedNoId}件除外`:''}${skippedDate?` / 日時読取不可${skippedDate}件`:''}`);
@@ -3136,6 +3220,16 @@ async function readPrepResultRecords(){
       console.warn('結果Excel読み取り失敗', file.name, e);
       debug.push(`${file.name}: 読み込み失敗 ${e?.message || e}`);
     }
+  }
+  if(excelRecords.length && sharedDirHandle){
+    try{
+      const mergedItems=await savePrepResultHistoryToShared(hist.rawItems || [], excelRecords);
+      debug.push(`結果履歴JSON: json/result_history.json に${mergedItems.length}件保存/更新（今回Excelから${excelRecords.length}件読込）`);
+    }catch(e){
+      debug.push(`結果履歴JSON: 保存失敗 ${e?.message || e}`);
+    }
+  }else if(excelRecords.length && !sharedDirHandle){
+    debug.push('結果履歴JSON: 保存用フォルダ未選択のため、Excel読取結果は今回表示だけに使用');
   }
   if(debug.length) setMeetingPrepFolderInfo(`結果Excel読取詳細:\n${debug.join('\n')}`);
   return records;
