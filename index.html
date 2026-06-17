@@ -3183,12 +3183,17 @@ function getMeetingPrepPreviousDates(){
   return datesFromStartDateObj(start);
 }
 function scheduleIndexForPrepDate(data, dateObj, fallbackIndex){
-  const base = parseYmdLocal(data?.weekStart || meetingPrepRestoredWeekStart || $('#weekStart')?.value);
+  // 面談準備印刷では、予定を必ず「その予定データが保存された週開始日」と日付で照合する。
+  // 復元週の範囲外の日付には、曜日順で無理に流用せず「予定なし」を返す。
+  // 例：復元データが6/1〜6/7で、印刷範囲が6/11〜6/17なら、6/1の予定を6/11へずらさない。
+  const weekStartValue = data?.weekStart || $('#weekStart')?.value || '';
+  const base = parseYmdLocal(weekStartValue);
   if(base){
     const idx = daysBetween(base, dateObj);
     if(idx >= 0 && idx < 7) return idx;
+    return -1;
   }
-  return fallbackIndex;
+  return Number.isInteger(fallbackIndex) ? fallbackIndex : -1;
 }
 function meetingPrepPeriodLabel(dates){
   if(!dates || !dates.length) return '';
@@ -3283,7 +3288,8 @@ function meetingPrepScheduleTableHtml(name, resultRecords){
   dates.forEach((d,di)=>{
     const dateKey=ymd(d);
     const si=scheduleIndexForPrepDate(data,d,di);
-    const plans=(data.schedule[si]||[]).map((v,i)=>String(v||'').trim()?`<li>${esc(LIMITS[i])} ${esc(v).replace(/\n/g,'<br>')}</li>`:'').filter(Boolean).join('');
+    const daySchedule = si >= 0 ? (data.schedule?.[si] || []) : [];
+    const plans=daySchedule.map((v,i)=>String(v||'').trim()?`<li>${esc(LIMITS[i])} ${esc(v).replace(/\n/g,'<br>')}</li>`:'').filter(Boolean).join('');
     const results=resultForStudentDate(resultRecords,name,dateKey).map(r=>`<li>${esc(r.timeLabel? r.timeLabel+' ' : '')}${esc(r.summary)}</li>`).join('');
     html+=`<tr><th>${jpDate(d)}<br>${DOW[d.getDay()]}曜</th><td>${plans?'<ul>'+plans+'</ul>':'<span class="muted">予定なし</span>'}</td><td>${results?'<ul>'+results+'</ul>':'<span class="muted">結果なし</span>'}</td></tr>`;
   });
@@ -3780,7 +3786,8 @@ function absentPlansResultsHtml(row, resultRecords){
   html+='<table class="detailTable"><thead><tr><th style="width:70px">日付</th><th>予定</th><th>結果</th></tr></thead><tbody>';
   dates.forEach((d,di)=>{
     const si=scheduleIndexForPrepDate(data,d,di);
-    const plans=(data.schedule?.[si]||[]).map((v,i)=>String(v||'').trim()?`<li>${esc(LIMITS[i])} ${esc(v).replace(/\n/g,'<br>')}</li>`:'').filter(Boolean).join('');
+    const daySchedule = si >= 0 ? (data.schedule?.[si] || []) : [];
+    const plans=daySchedule.map((v,i)=>String(v||'').trim()?`<li>${esc(LIMITS[i])} ${esc(v).replace(/\n/g,'<br>')}</li>`:'').filter(Boolean).join('');
     const results=resultForStudentDate(resultRecords||[],row.name,ymd(d)).map(r=>`<li>${esc(r.timeLabel? r.timeLabel+' ' : '')}${esc(r.summary)}</li>`).join('');
     html+=`<tr><th>${jpDate(d)}<br>${DOW[d.getDay()]}曜</th><td>${plans?'<ul>'+plans+'</ul>':'<span class="muted">予定なし</span>'}</td><td>${results?'<ul>'+results+'</ul>':'<span class="muted">結果なし</span>'}</td></tr>`;
   });
