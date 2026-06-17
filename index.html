@@ -481,9 +481,7 @@ function norm(s){
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g,'')
     .trim();
 }
-function setDefaultDate(){
-  if(!$('#weekStart').value) $('#weekStart').value=ymd(new Date())
-}
+function setDefaultDate(){if(!$('#weekStart').value) $('#weekStart').value=ymd(new Date())}
 function getDates(){const base=new Date($('#weekStart').value+'T00:00:00');return Array.from({length:7},(_,i)=>{const d=new Date(base);d.setDate(base.getDate()+i);return d})}
 function daysBetween(a,b){const aa=new Date(a.getFullYear(),a.getMonth(),a.getDate());const bb=new Date(b.getFullYear(),b.getMonth(),b.getDate());return Math.round((bb-aa)/86400000)}
 function showSaveInfo(text){$('#saveInfo').textContent=text||''}
@@ -491,6 +489,44 @@ function colName(n){let s='';while(n>0){let m=(n-1)%26;s=String.fromCharCode(65+
 function cellRef(r,c){return colName(c)+r}
 function splitNames(){return ($('#studentNames').value||'').split(/[、，,]/).map(x=>x.trim()).filter(Boolean)}
 function emptyStudentData(){return {studentNo:'',grade:'',weeklyMeetingAbsent:false,lessonCount:1,otherCount:1,schedule:Array.from({length:7},()=>Array(6).fill('')),materials:[{subject:'',book:'',content:''}],remarks:'',failureReason:'',exams:[],events:[],comments:[]}}
+function restoredDataBelongsToCurrentInputWeek(data){
+  const restoredWeek=String(data?.weekStart||'').trim();
+  const currentWeek=String($('#weekStart')?.value||'').trim();
+  return !restoredWeek || !currentWeek || restoredWeek===currentWeek;
+}
+function makeCurrentInputDataFromRestored(data){
+  const display=normalizeStudentData(data);
+  // 復元データの週開始が画面の開始日と違う場合でも、入力欄の日付は現在の開始日に固定する。
+  // 日付に紐づく予定本文だけは過去週と混ざるため入力欄に出さない。
+  // 一方で、週全体メモとして使う学習内容・備考・未達理由は復元して入力欄に表示する。
+  display.weekStart=$('#weekStart')?.value || display.weekStart || '';
+  display.schedule=Array.from({length:7},()=>Array(6).fill(''));
+  display.materials=(Array.isArray(display.materials) && display.materials.length) ? display.materials : [{subject:'',book:'',content:''}];
+  display.remarks=display.remarks||'';
+  display.failureReason=display.failureReason||'';
+  display.lessonCount=1;
+  display.otherCount=1;
+  return display;
+}
+function applyRestoredStudentForInput(name, rawData){
+  const restored=normalizeStudentData(rawData);
+  if(!meetingPrepRestoredStudentData) meetingPrepRestoredStudentData={};
+  if(restored.weekStart){
+    meetingPrepRestoredWeekStart = restored.weekStart;
+    meetingPrepRestoredStudentData[name]=restored;
+  }
+  return restoredDataBelongsToCurrentInputWeek(restored) ? restored : makeCurrentInputDataFromRestored(restored);
+}
+function applyRestoredStudentMapForInput(map){
+  const out={};
+  Object.entries(map||{}).forEach(([name,data])=>{
+    out[name]=applyRestoredStudentForInput(name,data);
+  });
+  return out;
+}
+function getMeetingPrepPrintData(name){
+  return normalizeStudentData((meetingPrepRestoredStudentData && meetingPrepRestoredStudentData[name]) || ensureStudent(name));
+}
 function normalizeStudentData(data){
   const d=Object.assign(emptyStudentData(),data||{});
   if(!Array.isArray(d.schedule)) d.schedule=Array.from({length:7},()=>Array(6).fill(''));
@@ -1753,8 +1789,7 @@ async function loadOne(name){
     place='ブラウザ内';
   }
   if(!mem)return alert(`${name}の保存内容はまだありません。`);
-  studentData[name]=normalizeStudentData(mem);
-  if(mem.weekStart) meetingPrepRestoredWeekStart = mem.weekStart;
+  studentData[name]=applyRestoredStudentForInput(name, mem);
   renderStudents();
   const savedAt=mem.savedAt?new Date(mem.savedAt).toLocaleString('ja-JP'):'保存日時不明';
   showSaveInfo(`${name}を復元しました（${savedAt} / ${place}）`);
@@ -1919,7 +1954,7 @@ async function loadGroup(){
         for(const name of names){
           const oneHit=await readStudentJsonFromSharedByName(name);
           if(oneHit.mem){
-            collected[name]=normalizeStudentData(oneHit.mem);
+            collected[name]=oneHit.mem;
             if(oneHit.mem && oneHit.mem.weekStart && !meetingPrepRestoredWeekStart) meetingPrepRestoredWeekStart = oneHit.mem.weekStart;
             details.push(`${name}: ${oneHit.source}`);
           }else{
@@ -1958,7 +1993,7 @@ async function loadGroup(){
     const missing=[];
     for(const name of names){
       const one=loadOneFromBrowser(name);
-      if(one) collected[name]=normalizeStudentData(one);
+      if(one) collected[name]=one;
       else missing.push(name);
     }
     if(Object.keys(collected).length){
@@ -1979,10 +2014,10 @@ async function loadGroup(){
   }
 
   if(!mem)return alert('保存用フォルダJSON・ブラウザ内保存のどちらにも、対象データが見つかりません。名前の表記、または選択した保存用フォルダを確認してください。');
-  $('#weekStart').value=mem.weekStart||$('#weekStart').value;
+  if(mem.weekStart) meetingPrepRestoredWeekStart = mem.weekStart;
   students=mem.names||names;
   $('#studentNames').value=students.join(', ');
-  studentData=Object.assign(studentData,mem.studentData||{});
+  Object.assign(studentData, applyRestoredStudentMapForInput(mem.studentData||{}));
   if(Array.isArray(mem.examMaster)) saveExamMasterData(mem.examMaster);
   if(Array.isArray(mem.eventMaster)) saveEventMasterData(mem.eventMaster); if(Array.isArray(mem.commentMaster)) saveCommentMasterData(mem.commentMaster);
   if(Array.isArray(mem.examTargetHistory)) saveExamTargetHistory(mem.examTargetHistory);
@@ -2503,9 +2538,8 @@ async function loadSharedGroup(){
     if(!mem)return alert('保存用フォルダに、この組み合わせのまとめて保存データが見つかりません。名前の順番・表記を確認してください。');
     students=mem.names||names;
     $('#studentNames').value=students.join(', ');
-    $('#weekStart').value=mem.weekStart||$('#weekStart').value;
-    meetingPrepRestoredWeekStart = mem.weekStart || $('#weekStart').value || meetingPrepRestoredWeekStart;
-    studentData=Object.assign(studentData,mem.studentData||{});
+    if(mem.weekStart) meetingPrepRestoredWeekStart = mem.weekStart;
+    Object.assign(studentData, applyRestoredStudentMapForInput(mem.studentData||{}));
     if(mem.lessonCount||mem.otherCount){students.forEach(n=>{const d=ensureStudent(n); if(mem.lessonCount)d.lessonCount=mem.lessonCount; if(mem.otherCount)d.otherCount=mem.otherCount;});}
     if(Array.isArray(mem.examMaster)) saveExamMasterData(mem.examMaster); if(Array.isArray(mem.eventMaster)) saveEventMasterData(mem.eventMaster); if(Array.isArray(mem.commentMaster)) saveCommentMasterData(mem.commentMaster); if(Array.isArray(mem.examTargetHistory)) saveExamTargetHistory(mem.examTargetHistory); if(Array.isArray(mem.eventTargetHistory)) saveEventTargetHistory(mem.eventTargetHistory); if(Array.isArray(mem.commentTargetHistory)) saveCommentTargetHistory(mem.commentTargetHistory);
     if(Array.isArray(mem.subjectTemplates)) saveSubjectTemplates(mem.subjectTemplates);
@@ -2527,7 +2561,7 @@ async function loadSharedIndividuals(){
     for(const name of names){
       const mem=await readJsonFromShared(sharedStudentFileName(name));
       if(mem){
-        studentData[name]=normalizeStudentData(mem);
+        studentData[name]=applyRestoredStudentForInput(name, mem);
       }else{
         missing.push(name);
       }
@@ -2587,9 +2621,8 @@ async function restoreInterviewDataFromShared(names){
   if(groupMem){
     students=groupMem.names||names;
     $('#studentNames').value=students.join(', ');
-    $('#weekStart').value=groupMem.weekStart||$('#weekStart').value;
-    meetingPrepRestoredWeekStart = groupMem.weekStart || $('#weekStart').value || meetingPrepRestoredWeekStart;
-    studentData=Object.assign(studentData,groupMem.studentData||{});
+    if(groupMem.weekStart) meetingPrepRestoredWeekStart = groupMem.weekStart;
+    Object.assign(studentData, applyRestoredStudentMapForInput(groupMem.studentData||{}));
     if(Array.isArray(groupMem.examMaster)) saveExamMasterData(groupMem.examMaster); if(Array.isArray(groupMem.examTargetHistory)) saveExamTargetHistory(groupMem.examTargetHistory);
     if(Array.isArray(groupMem.eventTargetHistory)) saveEventTargetHistory(groupMem.eventTargetHistory);
     if(Array.isArray(groupMem.commentTargetHistory)) saveCommentTargetHistory(groupMem.commentTargetHistory);
@@ -2604,13 +2637,13 @@ async function restoreInterviewDataFromShared(names){
   const missing=[];
   for(const name of names){
     const one=await readJsonFromShared(sharedStudentFileName(name));
-    if(one) collected[name]=normalizeStudentData(one);
+    if(one) collected[name]=one;
     else missing.push(name);
   }
   if(Object.keys(collected).length){
     students=names;
     $('#studentNames').value=students.join(', ');
-    Object.assign(studentData,collected);
+    Object.assign(studentData, applyRestoredStudentMapForInput(collected));
     renderStudents();
     return {restored:true, missing, mode:'individuals'};
   }
@@ -2728,6 +2761,7 @@ let meetingPrepWeeklyFileName = '';
 // 面談準備資料では、復元した週を「先週」として使う。
 // 画面の週開始日を今週用に変更しても、印刷時の先週日付がずれないように保持する。
 let meetingPrepRestoredWeekStart = '';
+let meetingPrepRestoredStudentData = {};
 
 function setMeetingPrepFolderInfo(message){
   const el = $('#meetingPrepFolderInfo');
@@ -3243,7 +3277,7 @@ function meetingPrepListenItemsHtml(name){
 }
 
 function meetingPrepScheduleTableHtml(name, resultRecords){
-  const data=ensureStudent(name), dates=getMeetingPrepPreviousDates();
+  const data=getMeetingPrepPrintData(name), dates=getMeetingPrepPreviousDates();
   let html='<h3>対象日までの一週間の予定・結果</h3>';
   html+='<table class="prepTable"><thead><tr><th style="width:90px">日付</th><th>予定</th><th>結果</th></tr></thead><tbody>';
   dates.forEach((d,di)=>{
