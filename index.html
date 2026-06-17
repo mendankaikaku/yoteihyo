@@ -481,7 +481,13 @@ function norm(s){
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g,'')
     .trim();
 }
-function setDefaultDate(){if(!$('#weekStart').value) $('#weekStart').value=ymd(new Date())}
+function setDefaultDate(){
+  if(!$('#weekStart').value){
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    $('#weekStart').value = ymd(d);
+  }
+}
 function getDates(){const base=new Date($('#weekStart').value+'T00:00:00');return Array.from({length:7},(_,i)=>{const d=new Date(base);d.setDate(base.getDate()+i);return d})}
 function daysBetween(a,b){const aa=new Date(a.getFullYear(),a.getMonth(),a.getDate());const bb=new Date(b.getFullYear(),b.getMonth(),b.getDate());return Math.round((bb-aa)/86400000)}
 function showSaveInfo(text){$('#saveInfo').textContent=text||''}
