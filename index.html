@@ -482,11 +482,7 @@ function norm(s){
     .trim();
 }
 function setDefaultDate(){
-  if(!$('#weekStart').value){
-    const d = new Date();
-    d.setDate(d.getDate() + 1);
-    $('#weekStart').value = ymd(d);
-  }
+  if(!$('#weekStart').value) $('#weekStart').value=ymd(new Date())
 }
 function getDates(){const base=new Date($('#weekStart').value+'T00:00:00');return Array.from({length:7},(_,i)=>{const d=new Date(base);d.setDate(base.getDate()+i);return d})}
 function daysBetween(a,b){const aa=new Date(a.getFullYear(),a.getMonth(),a.getDate());const bb=new Date(b.getFullYear(),b.getMonth(),b.getDate());return Math.round((bb-aa)/86400000)}
