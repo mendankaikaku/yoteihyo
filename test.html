@@ -409,91 +409,91 @@ const DEFAULT_SUBJECT_TEMPLATES=[
 const SUBJECT_POOL=[...new Set([...COMMON_TEST_SUBJECTS,...CROWN_TEST_SUBJECTS,'数学','英語','理科','社会','総合問題','面接','小論文'])];
 const EXAM_MASTER_KEY='yoteiExamMaster';
 const EXAM_MASTER_DEFAULT_VERSION_KEY='yoteiExamMasterDefaultVersion';
-const DEFAULT_TOSHIN_EXAM_VERSION='toshin_2026_schedule_20260620';
+const DEFAULT_TOSHIN_EXAM_VERSION='toshin_2026_schedule_20260620_fix_unicode';
 const DEFAULT_TOSHIN_EXAM_MASTER=[
-  ['全国統一高校生テスト','2026-06-21',['高1','高2','高3']],
-  ['京大本番レベル模試','2026-06-21',['高3']],
-  ['北大本番レベル模試','2026-06-21',['高3']],
-  ['高2京大本番レベル模試','2026-06-21',['高1','高2']],
-  ['高2北大本番レベル模試','2026-06-21',['高1','高2']],
-  ['九大本番レベル模試','2026-06-28',['高3']],
-  ['一橋大本番レベル模試','2026-06-28',['高3']],
-  ['東京科学大本番レベル模試','2026-06-28',['高3']],
-  ['高2九大本番レベル模試','2026-06-28',['高1','高2']],
-  ['高2東京科学大本番レベル模試','2026-06-28',['高1','高2']],
-  ['医学部82大学判定テスト','2026-07-05',['高3']],
-  ['東北大本番レベル模試','2026-07-05',['高3']],
-  ['名大本番レベル模試','2026-07-05',['高3']],
-  ['高2一橋大本番レベル模試','2026-07-05',['高1','高2']],
-  ['高2東北大本番レベル模試','2026-07-05',['高1','高2']],
-  ['高2名大本番レベル模試','2026-07-05',['高1','高2']],
-  ['阪大本番レベル模試','2026-07-12',['高3']],
-  ['千葉大本番レベル模試','2026-07-12',['高3']],
-  ['神戸大本番レベル模試','2026-07-12',['高3']],
-  ['広島大本番レベル模試','2026-07-19',['高3']],
-  ['高2阪大本番レベル模試','2026-07-19',['高1','高2']],
-  ['大学合格基礎力判定テスト','2026-07-20',['高1','高2','高3']],
-  ['早大・慶大レベル模試','2026-07-20',['高3']],
-  ['全国国公立大 記述模試','2026-07-20',['高3']],
-  ['上理・明青立法中レベル模試','2026-07-20',['高3']],
-  ['関関同立レベル模試','2026-07-26',['高3']],
-  ['高校レベル記述模試(高2)(高1)','2026-07-26',['高1','高2']],
-  ['九大本番レベル模試','2026-08-02',['高3']],
-  ['京大本番レベル模試','2026-08-02',['高3']],
-  ['一橋大本番レベル模試','2026-08-02',['高3']],
-  ['高2九大本番レベル模試','2026-08-02',['高1','高2']],
-  ['高2京大本番レベル模試','2026-08-02',['高1','高2']],
-  ['高2東京科学大本番レベル模試','2026-08-02',['高1','高2']],
-  ['東京科学大本番レベル模試','2026-08-23',['高3']],
-  ['高2一橋大本番レベル模試','2026-08-23',['高1','高2']],
-  ['共通テスト本番レベル模試','2026-08-30',['高2','高3']],
-  ['東大本番レベル模試','2026-09-06',['高3']],
-  ['名大本番レベル模試','2026-09-06',['高3']],
-  ['高2東大本番レベル模試','2026-09-06',['高1','高2']],
-  ['高2名大本番レベル模試','2026-09-06',['高1','高2']],
-  ['阪大本番レベル模試','2026-09-13',['高3']],
-  ['高2阪大本番レベル模試','2026-09-13',['高1','高2']],
-  ['大学合格基礎力判定テスト','2026-09-20',['高1','高2','高3']],
-  ['早大・慶大レベル模試','2026-09-20',['高3']],
-  ['全国国公立大 記述模試','2026-09-20',['高3']],
-  ['上理・明青立法中レベル模試','2026-09-20',['高3']],
-  ['関関同立レベル模試','2026-10-04',['高3']],
-  ['京大本番レベル模試','2026-10-04',['高3']],
-  ['東北大本番レベル模試','2026-10-04',['高3']],
-  ['高2大学合格基礎力判定テスト','2026-10-04',['高1','高2']],
-  ['高2京大本番レベル模試','2026-10-04',['高1','高2']],
-  ['高2東北大本番レベル模試','2026-10-04',['高1','高2']],
-  ['九大本番レベル模試','2026-10-11',['高3']],
-  ['高2九大本番レベル模試','2026-10-11',['高1','高2']],
-  ['東大本番レベル模試','2026-10-18',['高3']],
-  ['北大本番レベル模試','2026-10-18',['高3']],
-  ['名大本番レベル模試','2026-10-18',['高3']],
-  ['高2東大本番レベル模試','2026-10-18',['高1','高2']],
-  ['高2北大本番レベル模試','2026-10-18',['高1','高2']],
-  ['高2名大本番レベル模試','2026-10-18',['高1','高2']],
-  ['阪大本番レベル模試','2026-10-25',['高3']],
-  ['医学部82大学判定テスト','2026-11-01',['高3']],
-  ['高2阪大本番レベル模試','2026-11-01',['高1','高2']],
-  ['全国統一高校生テスト','2026-11-08',['高1','高2','高3']],
-  ['広島大本番レベル模試','2026-11-08',['高3']],
-  ['一橋大本番レベル模試','2026-11-08',['高3']],
-  ['高2東京科学大本番レベル模試','2026-11-08',['高1','高2']],
-  ['東京科学大本番レベル模試','2026-11-15',['高3']],
-  ['大学合格基礎力判定テスト','2026-11-15',['高1','高2','高3']],
-  ['千葉大本番レベル模試','2026-11-15',['高3']],
-  ['高2一橋大本番レベル模試','2026-11-15',['高1','高2']],
-  ['神戸大本番レベル模試','2026-11-22',['高3']],
-  ['早大・慶大レベル模試','2026-11-22',['高3']],
-  ['全国国公立大 記述模試','2026-11-22',['高3']],
-  ['上理・明青立法中レベル模試','2026-11-22',['高3']],
-  ['関関同立レベル模試','2026-12-20',['高3']],
-  ['高校レベル記述模試(高2)(高1)','2026-12-20',['高1','高2']],
-  ['共通テスト本番レベル模試','2027-01-23',['高2','高3']],
-  ['東大本番レベル模試','2027-01-23',['高3']],
-  ['高2東大本番レベル模試','2027-01-23',['高1','高2']],
-  ['京大本番レベル模試','2027-01-24',['高3']],
-  ['全国国公立大 記述模試','2027-02-07',['高3']],
-  ['高2京大本番レベル模試','2027-02-07',['高1','高2']]
+  ['\u5168\u56fd\u7d71\u4e00\u9ad8\u6821\u751f\u30c6\u30b9\u30c8','2026-06-21',['\u9ad81','\u9ad82','\u9ad83']],
+  ['\u4eac\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-06-21',['\u9ad83']],
+  ['\u5317\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-06-21',['\u9ad83']],
+  ['\u9ad82\u4eac\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-06-21',['\u9ad81','\u9ad82']],
+  ['\u9ad82\u5317\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-06-21',['\u9ad81','\u9ad82']],
+  ['\u4e5d\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-06-28',['\u9ad83']],
+  ['\u4e00\u6a4b\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-06-28',['\u9ad83']],
+  ['\u6771\u4eac\u79d1\u5b66\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-06-28',['\u9ad83']],
+  ['\u9ad82\u4e5d\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-06-28',['\u9ad81','\u9ad82']],
+  ['\u9ad82\u6771\u4eac\u79d1\u5b66\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-06-28',['\u9ad81','\u9ad82']],
+  ['\u533b\u5b66\u90e882\u5927\u5b66\u5224\u5b9a\u30c6\u30b9\u30c8','2026-07-05',['\u9ad83']],
+  ['\u6771\u5317\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-07-05',['\u9ad83']],
+  ['\u540d\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-07-05',['\u9ad83']],
+  ['\u9ad82\u4e00\u6a4b\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-07-05',['\u9ad81','\u9ad82']],
+  ['\u9ad82\u6771\u5317\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-07-05',['\u9ad81','\u9ad82']],
+  ['\u9ad82\u540d\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-07-05',['\u9ad81','\u9ad82']],
+  ['\u962a\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-07-12',['\u9ad83']],
+  ['\u5343\u8449\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-07-12',['\u9ad83']],
+  ['\u795e\u6238\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-07-12',['\u9ad83']],
+  ['\u5e83\u5cf6\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-07-19',['\u9ad83']],
+  ['\u9ad82\u962a\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-07-19',['\u9ad81','\u9ad82']],
+  ['\u5927\u5b66\u5408\u683c\u57fa\u790e\u529b\u5224\u5b9a\u30c6\u30b9\u30c8','2026-07-20',['\u9ad81','\u9ad82','\u9ad83']],
+  ['\u65e9\u5927\u30fb\u6176\u5927\u30ec\u30d9\u30eb\u6a21\u8a66','2026-07-20',['\u9ad83']],
+  ['\u5168\u56fd\u56fd\u516c\u7acb\u5927 \u8a18\u8ff0\u6a21\u8a66','2026-07-20',['\u9ad83']],
+  ['\u4e0a\u7406\u30fb\u660e\u9752\u7acb\u6cd5\u4e2d\u30ec\u30d9\u30eb\u6a21\u8a66','2026-07-20',['\u9ad83']],
+  ['\u95a2\u95a2\u540c\u7acb\u30ec\u30d9\u30eb\u6a21\u8a66','2026-07-26',['\u9ad83']],
+  ['\u9ad8\u6821\u30ec\u30d9\u30eb\u8a18\u8ff0\u6a21\u8a66(\u9ad82)(\u9ad81)','2026-07-26',['\u9ad81','\u9ad82']],
+  ['\u4e5d\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-08-02',['\u9ad83']],
+  ['\u4eac\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-08-02',['\u9ad83']],
+  ['\u4e00\u6a4b\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-08-02',['\u9ad83']],
+  ['\u9ad82\u4e5d\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-08-02',['\u9ad81','\u9ad82']],
+  ['\u9ad82\u4eac\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-08-02',['\u9ad81','\u9ad82']],
+  ['\u9ad82\u6771\u4eac\u79d1\u5b66\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-08-02',['\u9ad81','\u9ad82']],
+  ['\u6771\u4eac\u79d1\u5b66\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-08-23',['\u9ad83']],
+  ['\u9ad82\u4e00\u6a4b\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-08-23',['\u9ad81','\u9ad82']],
+  ['\u5171\u901a\u30c6\u30b9\u30c8\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-08-30',['\u9ad82','\u9ad83']],
+  ['\u6771\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-09-06',['\u9ad83']],
+  ['\u540d\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-09-06',['\u9ad83']],
+  ['\u9ad82\u6771\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-09-06',['\u9ad81','\u9ad82']],
+  ['\u9ad82\u540d\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-09-06',['\u9ad81','\u9ad82']],
+  ['\u962a\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-09-13',['\u9ad83']],
+  ['\u9ad82\u962a\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-09-13',['\u9ad81','\u9ad82']],
+  ['\u5927\u5b66\u5408\u683c\u57fa\u790e\u529b\u5224\u5b9a\u30c6\u30b9\u30c8','2026-09-20',['\u9ad81','\u9ad82','\u9ad83']],
+  ['\u65e9\u5927\u30fb\u6176\u5927\u30ec\u30d9\u30eb\u6a21\u8a66','2026-09-20',['\u9ad83']],
+  ['\u5168\u56fd\u56fd\u516c\u7acb\u5927 \u8a18\u8ff0\u6a21\u8a66','2026-09-20',['\u9ad83']],
+  ['\u4e0a\u7406\u30fb\u660e\u9752\u7acb\u6cd5\u4e2d\u30ec\u30d9\u30eb\u6a21\u8a66','2026-09-20',['\u9ad83']],
+  ['\u95a2\u95a2\u540c\u7acb\u30ec\u30d9\u30eb\u6a21\u8a66','2026-10-04',['\u9ad83']],
+  ['\u4eac\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-10-04',['\u9ad83']],
+  ['\u6771\u5317\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-10-04',['\u9ad83']],
+  ['\u9ad82\u5927\u5b66\u5408\u683c\u57fa\u790e\u529b\u5224\u5b9a\u30c6\u30b9\u30c8','2026-10-04',['\u9ad81','\u9ad82']],
+  ['\u9ad82\u4eac\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-10-04',['\u9ad81','\u9ad82']],
+  ['\u9ad82\u6771\u5317\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-10-04',['\u9ad81','\u9ad82']],
+  ['\u4e5d\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-10-11',['\u9ad83']],
+  ['\u9ad82\u4e5d\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-10-11',['\u9ad81','\u9ad82']],
+  ['\u6771\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-10-18',['\u9ad83']],
+  ['\u5317\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-10-18',['\u9ad83']],
+  ['\u540d\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-10-18',['\u9ad83']],
+  ['\u9ad82\u6771\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-10-18',['\u9ad81','\u9ad82']],
+  ['\u9ad82\u5317\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-10-18',['\u9ad81','\u9ad82']],
+  ['\u9ad82\u540d\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-10-18',['\u9ad81','\u9ad82']],
+  ['\u962a\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-10-25',['\u9ad83']],
+  ['\u533b\u5b66\u90e882\u5927\u5b66\u5224\u5b9a\u30c6\u30b9\u30c8','2026-11-01',['\u9ad83']],
+  ['\u9ad82\u962a\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-11-01',['\u9ad81','\u9ad82']],
+  ['\u5168\u56fd\u7d71\u4e00\u9ad8\u6821\u751f\u30c6\u30b9\u30c8','2026-11-08',['\u9ad81','\u9ad82','\u9ad83']],
+  ['\u5e83\u5cf6\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-11-08',['\u9ad83']],
+  ['\u4e00\u6a4b\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-11-08',['\u9ad83']],
+  ['\u9ad82\u6771\u4eac\u79d1\u5b66\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-11-08',['\u9ad81','\u9ad82']],
+  ['\u6771\u4eac\u79d1\u5b66\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-11-15',['\u9ad83']],
+  ['\u5927\u5b66\u5408\u683c\u57fa\u790e\u529b\u5224\u5b9a\u30c6\u30b9\u30c8','2026-11-15',['\u9ad81','\u9ad82','\u9ad83']],
+  ['\u5343\u8449\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-11-15',['\u9ad83']],
+  ['\u9ad82\u4e00\u6a4b\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-11-15',['\u9ad81','\u9ad82']],
+  ['\u795e\u6238\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-11-22',['\u9ad83']],
+  ['\u65e9\u5927\u30fb\u6176\u5927\u30ec\u30d9\u30eb\u6a21\u8a66','2026-11-22',['\u9ad83']],
+  ['\u5168\u56fd\u56fd\u516c\u7acb\u5927 \u8a18\u8ff0\u6a21\u8a66','2026-11-22',['\u9ad83']],
+  ['\u4e0a\u7406\u30fb\u660e\u9752\u7acb\u6cd5\u4e2d\u30ec\u30d9\u30eb\u6a21\u8a66','2026-11-22',['\u9ad83']],
+  ['\u95a2\u95a2\u540c\u7acb\u30ec\u30d9\u30eb\u6a21\u8a66','2026-12-20',['\u9ad83']],
+  ['\u9ad8\u6821\u30ec\u30d9\u30eb\u8a18\u8ff0\u6a21\u8a66(\u9ad82)(\u9ad81)','2026-12-20',['\u9ad81','\u9ad82']],
+  ['\u5171\u901a\u30c6\u30b9\u30c8\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2027-01-23',['\u9ad82','\u9ad83']],
+  ['\u6771\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2027-01-23',['\u9ad83']],
+  ['\u9ad82\u6771\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2027-01-23',['\u9ad81','\u9ad82']],
+  ['\u4eac\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2027-01-24',['\u9ad83']],
+  ['\u5168\u56fd\u56fd\u516c\u7acb\u5927 \u8a18\u8ff0\u6a21\u8a66','2027-02-07',['\u9ad83']],
+  ['\u9ad82\u4eac\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2027-02-07',['\u9ad81','\u9ad82']]
 ];
 const EXAM_TARGET_HISTORY_KEY='yoteiExamTargetHistory';
 const EVENT_TARGET_HISTORY_KEY='yoteiEventTargetHistory';
@@ -1339,11 +1339,20 @@ function defaultToshinExamRows(){return DEFAULT_TOSHIN_EXAM_MASTER.map(([name,da
 function mergeDefaultExamMaster(saved){
   const map=new Map();
   defaultToshinExamRows().forEach(row=>map.set(`${row.name}|${row.date}`,row));
-  (Array.isArray(saved)?saved:[]).forEach(row=>{if(row&&row.name)map.set(`${row.name}|${row.date||''}`,Object.assign({type:'common',subjectTemplate:'',grades:[],students:[]},row))});
+  (Array.isArray(saved)?saved:[]).forEach(row=>{if(row&&row.name&&!looksMojibakeExamRow(row))map.set(`${row.name}|${row.date||''}`,Object.assign({type:'common',subjectTemplate:'',grades:[],students:[]},row))});
   return Array.from(map.values());
 }
-function getExamMaster(){try{const saved=JSON.parse(localStorage.getItem(EXAM_MASTER_KEY)||'[]');const rows=Array.isArray(saved)?saved:[];if(localStorage.getItem(EXAM_MASTER_DEFAULT_VERSION_KEY)!==DEFAULT_TOSHIN_EXAM_VERSION){const merged=mergeDefaultExamMaster(rows);localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(merged));localStorage.setItem(EXAM_MASTER_DEFAULT_VERSION_KEY,DEFAULT_TOSHIN_EXAM_VERSION);return merged}return rows}catch(e){return defaultToshinExamRows()}}
-function saveExamMasterData(rows){localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(rows))}
+function looksMojibakeExamRow(row){
+  const s=[row?.name||'',...(Array.isArray(row?.grades)?row.grades:[])].join('');
+  return /[蜈鬮繝譛隧荳莠蛹譚]/.test(s);
+}
+function examMasterNeedsDefaultRows(rows){
+  if(!Array.isArray(rows) || !rows.length) return true;
+  const keys=new Set(rows.map(row=>`${row?.name||''}|${row?.date||''}`));
+  return defaultToshinExamRows().some(row=>!keys.has(`${row.name}|${row.date}`));
+}
+function getExamMaster(){try{const saved=JSON.parse(localStorage.getItem(EXAM_MASTER_KEY)||'[]');const rows=Array.isArray(saved)?saved:[];if(localStorage.getItem(EXAM_MASTER_DEFAULT_VERSION_KEY)!==DEFAULT_TOSHIN_EXAM_VERSION || examMasterNeedsDefaultRows(rows)){const merged=mergeDefaultExamMaster(rows);localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(merged));localStorage.setItem(EXAM_MASTER_DEFAULT_VERSION_KEY,DEFAULT_TOSHIN_EXAM_VERSION);return merged}return rows}catch(e){return defaultToshinExamRows()}}
+function saveExamMasterData(rows){const merged=mergeDefaultExamMaster(Array.isArray(rows)?rows:[]);localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(merged));localStorage.setItem(EXAM_MASTER_DEFAULT_VERSION_KEY,DEFAULT_TOSHIN_EXAM_VERSION)}
 function visibleExamMasters(){const start=new Date($('#weekStart').value+'T00:00:00');return getExamMaster().filter(ex=>{if(!ex.date)return false;const d=new Date(ex.date+'T00:00:00');const diff=daysBetween(start,d);return diff>=0&&diff<=21})}
 function getSubjectTemplates(){
   try{
@@ -1364,8 +1373,8 @@ function saveSubjectTemplates(list){localStorage.setItem(SUBJECT_TEMPLATE_KEY,JS
 function findSubjectTemplate(name){return getSubjectTemplates().find(t=>t.name===name)||null}
 function defaultTemplateNameForType(type){return type==='crown'?'冠模試型':'共テ型'}
 function examSubjectsForType(type,templateName){const t=findSubjectTemplate(templateName||defaultTemplateNameForType(type));return t?t.subjects:(type==='crown'?CROWN_TEST_SUBJECTS:COMMON_TEST_SUBJECTS)}
-function getExamMaster(){try{const saved=JSON.parse(localStorage.getItem(EXAM_MASTER_KEY)||'[]');const rows=Array.isArray(saved)?saved:[];if(localStorage.getItem(EXAM_MASTER_DEFAULT_VERSION_KEY)!==DEFAULT_TOSHIN_EXAM_VERSION){const merged=mergeDefaultExamMaster(rows);localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(merged));localStorage.setItem(EXAM_MASTER_DEFAULT_VERSION_KEY,DEFAULT_TOSHIN_EXAM_VERSION);return merged}return rows}catch(e){return defaultToshinExamRows()}}
-function saveExamMasterData(rows){localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(rows))}
+function getExamMaster(){try{const saved=JSON.parse(localStorage.getItem(EXAM_MASTER_KEY)||'[]');const rows=Array.isArray(saved)?saved:[];if(localStorage.getItem(EXAM_MASTER_DEFAULT_VERSION_KEY)!==DEFAULT_TOSHIN_EXAM_VERSION || examMasterNeedsDefaultRows(rows)){const merged=mergeDefaultExamMaster(rows);localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(merged));localStorage.setItem(EXAM_MASTER_DEFAULT_VERSION_KEY,DEFAULT_TOSHIN_EXAM_VERSION);return merged}return rows}catch(e){return defaultToshinExamRows()}}
+function saveExamMasterData(rows){const merged=mergeDefaultExamMaster(Array.isArray(rows)?rows:[]);localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(merged));localStorage.setItem(EXAM_MASTER_DEFAULT_VERSION_KEY,DEFAULT_TOSHIN_EXAM_VERSION)}
 function visibleExamMasters(){const start=new Date($('#weekStart').value+'T00:00:00');return getExamMaster().filter(ex=>{if(!ex.date)return false;const d=new Date(ex.date+'T00:00:00');const diff=daysBetween(start,d);return diff>=0&&diff<=21})}
 function examId(ex){return `${ex.name||''}|${ex.date||''}|${ex.type||'common'}|${ex.subjectTemplate||defaultTemplateNameForType(ex.type)}`}
 function splitTargetNames(s){return String(s||'').split(/[、，,\n]+/).map(x=>x.trim()).filter(Boolean)}
