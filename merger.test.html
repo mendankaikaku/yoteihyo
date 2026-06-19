@@ -921,7 +921,7 @@ function getExamHeaderMap(aoa){
     examDate: find(['実施日','日付']),
     status: find(['受験方法','当日','後日','不受験','参加']),
     comiru: find(['Comiru回答','コミル回答','Comiru','コミル']),
-    note: find(['コメント','模試コメント','模試備考','備考']),
+    subjectChanged: find(['科目変更あり','科目変更','科変']),
     savedAt: find(['保存日時','保存日'])
   };
 }
@@ -948,8 +948,8 @@ async function parseExamFile(file){
       const examName = norm(row[h.examName]);
       const status = h.status >= 0 ? norm(row[h.status]) : '';
       const comiruAnswered = h.comiru >= 0 ? !!norm(row[h.comiru]) : false;
-      const note = h.note >= 0 ? norm(row[h.note]) : '';
-      if(!examName && !status && !comiruAnswered && !note) continue;
+      const subjectChanged = h.subjectChanged >= 0 ? !!norm(row[h.subjectChanged]) : false;
+      if(!examName && !status && !comiruAnswered && !subjectChanged) continue;
       const rawStudent = h.student >= 0 ? norm(row[h.student]) : '';
       const student = canonicalStudentName(rawStudent || fallbackStudent);
       const examDateObj = h.examDate >= 0 ? parseDateLoose(row[h.examDate]) : null;
@@ -965,7 +965,7 @@ async function parseExamFile(file){
         examDateObj: examDateObj || new Date(2099,0,1),
         status,
         comiruAnswered,
-        note,
+        subjectChanged,
         sourceFile: file.name,
         sourcePath: file.webkitRelativePath || file.name,
         savedAt: h.savedAt >= 0 ? norm(row[h.savedAt]) : ''
@@ -3327,6 +3327,30 @@ function compactResultLine(r){
   const study = r.study ? `（${r.study}）` : '';
   return [time, `${title}${study}`].filter(Boolean).join(' ');
 }
+function shortExamNameForAllList(name){
+  return String(name || '模試')
+    .replace(/本番レベル模試/g,'本')
+    .replace(/レベル模試/g,'')
+    .replace(/全国統一高校生テスト/g,'統一')
+    .replace(/共通テスト/g,'共テ')
+    .replace(/大学合格基礎力判定テスト/g,'基礎')
+    .replace(/高校レベル記述模試/g,'記述')
+    .replace(/医学部82大学判定テスト/g,'医82')
+    .replace(/全国国公立大 記述模試/g,'国公記')
+    .replace(/早大・慶大/g,'早慶')
+    .replace(/上理・明青立法中/g,'上明')
+    .replace(/関関同立/g,'関同')
+    .replace(/東京科学大/g,'科大')
+    .replace(/\s+/g,'')
+    .slice(0,8);
+}
+function allListExamStillVisible(r){
+  const d = r?.examDateObj instanceof Date && !isNaN(r.examDateObj) ? r.examDateObj : parseDateLoose(r?.examDate || '');
+  if(!d) return true;
+  const limit = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  limit.setDate(limit.getDate() + 7);
+  return allListBaseDate() <= limit;
+}
 function buildAllListStudentMap(examRecords=[], eventRecords=[]){
   const studentMap = new Map();
 
@@ -3358,13 +3382,13 @@ function buildExamEventGroups(examRecords=[], eventRecords=[]){
   const examGroups = [];
   const examSeen = new Set();
   for(const r of examRecords || []){
+    if(!allListExamStillVisible(r)) continue;
     const baseKey = examKeyOf(r);
     if(!examSeen.has(baseKey)){
       examSeen.add(baseKey);
-      const baseLabel = `模試\n${r.examDate ? r.examDate + ' ' : ''}${r.examName || '模試名未入力'}`;
-      examGroups.push({key:`${baseKey}|status`, baseKey, field:'status', label:`${baseLabel}\n受験方法`});
-      examGroups.push({key:`${baseKey}|comiru`, baseKey, field:'comiru', label:`${baseLabel}\nComiru回答`});
-      examGroups.push({key:`${baseKey}|note`, baseKey, field:'note', label:`${baseLabel}\nコメント`});
+      const baseLabel = `${r.examDate ? r.examDate.slice(5).replace('-','/') + '\n' : ''}${shortExamNameForAllList(r.examName)}`;
+      examGroups.push({key:`${baseKey}|status`, baseKey, field:'status', label:`${baseLabel}\n受`});
+      examGroups.push({key:`${baseKey}|subject`, baseKey, field:'subject', label:`${baseLabel}\n科`});
     }
   }
   examGroups.sort((a,b)=>String(a.label).localeCompare(String(b.label),'ja'));
@@ -3376,8 +3400,7 @@ function buildExamEventGroups(examRecords=[], eventRecords=[]){
     if(!eventSeen.has(baseKey)){
       eventSeen.add(baseKey);
       const baseLabel = `イベント\n${r.datetime ? r.datetime + ' ' : ''}${r.eventName || 'イベント名未入力'}`;
-      eventGroups.push({key:`${baseKey}|status`, baseKey, field:'status', label:`${baseLabel}\n参加確認`});
-      eventGroups.push({key:`${baseKey}|comiru`, baseKey, field:'comiru', label:`${baseLabel}\nComiru回答`});
+      eventGroups.push({key:`${baseKey}|status`, baseKey, field:'status', label:`${baseLabel}\n参加`});
       eventGroups.push({key:`${baseKey}|note`, baseKey, field:'note', label:`${baseLabel}\n備考`});
     }
   }
@@ -3387,16 +3410,16 @@ function buildExamEventGroups(examRecords=[], eventRecords=[]){
 function buildExamEventMaps(examRecords=[], eventRecords=[]){
   const examByStudent = new Map();
   for(const r of examRecords || []){
+    if(!allListExamStillVisible(r)) continue;
     const meta = rosterMetaForStudent(r.student);
     const key = studentKeyForList(meta['生徒名'] || r.student, meta['生徒番号'] || r.studentNo || '');
     const g = examKeyOf(r);
     if(!examByStudent.has(key)) examByStudent.set(key, new Map());
     // 全員分リストでは模試の科目は出さず、受験方法・Comiru回答・コメントを表示する。
     const status = norm(r.status || '');
-    const statusCell = status.includes('不受験') ? '不受験' : (status.includes('後日') ? '後日' : (status.includes('当日') ? '当日' : status));
-    examByStudent.get(key).set(`${g}|status`, statusCell);
-    examByStudent.get(key).set(`${g}|comiru`, r.comiruAnswered ? '済' : '未');
-    examByStudent.get(key).set(`${g}|note`, r.note || '');
+    const statusCell = status.includes('不受験') ? '不' : (status.includes('後日') ? '後' : (status.includes('当日') ? '当' : status));
+    examByStudent.get(key).set(`${g}|status`, r.comiruAnswered ? statusCell : `!${statusCell || '不'}`);
+    examByStudent.get(key).set(`${g}|subject`, r.subjectChanged ? '○' : '');
   }
 
   const eventByStudent = new Map();
@@ -3405,8 +3428,7 @@ function buildExamEventMaps(examRecords=[], eventRecords=[]){
     const key = studentKeyForList(meta['生徒名'] || r.student, meta['生徒番号'] || r.studentNo || '');
     const g = eventKeyOf(r);
     if(!eventByStudent.has(key)) eventByStudent.set(key, new Map());
-    eventByStudent.get(key).set(`${g}|status`, r.status || '');
-    eventByStudent.get(key).set(`${g}|comiru`, r.comiruAnswered ? '済' : '未');
+    eventByStudent.get(key).set(`${g}|status`, r.comiruAnswered ? (r.status || '') : `!${r.status || '未'}`);
     eventByStudent.get(key).set(`${g}|note`, r.note || '');
   }
   return {examByStudent, eventByStudent};
@@ -3725,7 +3747,7 @@ function buildAllStudentListAoaByGrade(examRecords=[], eventRecords=[]){
     for(const s of students){
       const key = studentKeyForList(s.student, s.studentNo);
       const row = [s.grade, s.studentNo, s.student, s.kana, s.teacher, s.school, s.note];
-      for(const g of examGroups) row.push(examByStudent.get(key)?.get(g.key) || '');
+      for(const g of examGroups) row.push(examByStudent.get(key)?.get(g.key) || (g.field === 'status' ? '不' : ''));
       for(const g of eventGroups) row.push(eventByStudent.get(key)?.get(g.key) || '');
       for(const d of windowDates){
         const dk = ymd(d);
@@ -3752,7 +3774,12 @@ function styleAllStudentGradeSheet(ws, aoa){
     else if(c===2) widths.push(14);
     else if(c===3) widths.push(13);
     else if(c<=6) widths.push(14);
-    else widths.push(22);
+    else{
+      const h=String(aoa[1]?.[c]||'');
+      if(/\n(受|科|参加)$/.test(h)) widths.push(5);
+      else if(/\n備考$/.test(h)) widths.push(10);
+      else widths.push(22);
+    }
   }
   const range = applyNiceSheetSettings(ws, aoa, widths, {rows:{min:20,max:86,header:36,pxPerLine:14}});
   ws['!rows'][0] = {hpt:30};
@@ -3776,6 +3803,8 @@ function styleAllStudentGradeSheet(ws, aoa){
   const fontBase = {name:'Yu Gothic', sz:8, color:{rgb:'111827'}};
   const fontRed = {name:'Yu Gothic', sz:8, bold:true, color:{rgb:'991B1B'}};
   setRangeStyle(ws, range, (R,C,cell)=>{
+    const isComiruMissing = R>1 && cell && typeof cell.v === 'string' && cell.v.startsWith('!');
+    if(isComiruMissing) cell.v = cell.v.slice(1);
     const style = {font:R===0?fontTitle:(R===1?fontHeader:fontBase), alignment:{vertical:'top', horizontal:(R<=1 || C<=2)?'center':'left', wrapText:true}, border};
     if(R===0) style.fill = titleFill;
     else if(R===1) style.fill = headerFill;
@@ -3785,7 +3814,7 @@ function styleAllStudentGradeSheet(ws, aoa){
       if(headerText.includes('\n予定')) style.fill = planFill;
       else if(headerText.includes('\n結果')) style.fill = resultFill;
       else style.fill = baseFill;
-      if(/Comiru|コミル/.test(headerText) && /^(未|未回答|未済|No|NO|no)$/i.test(String(cell?.v ?? '').trim())){
+      if(isComiruMissing){
         style.fill = comiruMissingFill;
         style.font = fontRed;
       }
@@ -4136,4 +4165,3 @@ document.addEventListener('DOMContentLoaded', function(){
 
 </body>
 </html>
-
