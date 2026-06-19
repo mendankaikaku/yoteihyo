@@ -3379,7 +3379,7 @@ function groupAllListStudentsByGrade(studentMap){
   return byGrade;
 }
 function buildExamEventGroups(examRecords=[], eventRecords=[]){
-  const examGroups = [];
+  const examBases = [];
   const examSeen = new Set();
   for(const r of examRecords || []){
     if(!allListExamStillVisible(r)) continue;
@@ -3387,29 +3387,38 @@ function buildExamEventGroups(examRecords=[], eventRecords=[]){
     if(!examSeen.has(baseKey)){
       examSeen.add(baseKey);
       const baseLabel = `${r.examDate ? r.examDate.slice(5).replace('-','/') + '\n' : ''}${shortExamNameForAllList(r.examName)}`;
-      // 全員分リストの模試欄は、各模試ごとに「科目変更 / Comiru回答 / 当日後日不受験」の3列で出す。
-      // 既存の列幅設定は styleAllStudentGradeSheet 側で維持する。
-      examGroups.push({key:`${baseKey}|subject`, baseKey, field:'subject', label:`${baseLabel}\n科目変更`});
-      examGroups.push({key:`${baseKey}|comiru`, baseKey, field:'comiru', label:`${baseLabel}\nComiru回答`});
-      examGroups.push({key:`${baseKey}|status`, baseKey, field:'status', label:`${baseLabel}\n当日後日不受験`});
+      examBases.push({baseKey, baseLabel, sortKey:`${r.examDate || '9999-99-99'}|${r.examName || ''}`});
     }
   }
-  examGroups.sort((a,b)=>String(a.label).localeCompare(String(b.label),'ja'));
+  examBases.sort((a,b)=>String(a.sortKey).localeCompare(String(b.sortKey),'ja'));
+  const examGroups = [];
+  for(const b of examBases){
+    // 全員分リストの模試欄は、各模試ごとに必ず「科目変更 / Comiru回答 / 当日後日不受験」の3列で出す。
+    // ここで3列をまとめて追加し、後から列全体をソートしないことで、指定順を崩さない。
+    examGroups.push({key:`${b.baseKey}|subject`, baseKey:b.baseKey, field:'subject', label:`${b.baseLabel}\n科目変更`});
+    examGroups.push({key:`${b.baseKey}|comiru`, baseKey:b.baseKey, field:'comiru', label:`${b.baseLabel}\nComiru回答`});
+    examGroups.push({key:`${b.baseKey}|status`, baseKey:b.baseKey, field:'status', label:`${b.baseLabel}\n当日後日不受験`});
+  }
 
-  const eventGroups = [];
+  const eventBases = [];
   const eventSeen = new Set();
   for(const r of eventRecords || []){
     const baseKey = eventKeyOf(r);
     if(!eventSeen.has(baseKey)){
       eventSeen.add(baseKey);
       const baseLabel = `イベント\n${r.datetime ? r.datetime + ' ' : ''}${r.eventName || 'イベント名未入力'}`;
-      // 全員分リストのイベント欄も、各イベントごとに「参加 / Comiru回答 / 備考」の3列で出す。
-      eventGroups.push({key:`${baseKey}|status`, baseKey, field:'status', label:`${baseLabel}\n参加`});
-      eventGroups.push({key:`${baseKey}|comiru`, baseKey, field:'comiru', label:`${baseLabel}\nComiru回答`});
-      eventGroups.push({key:`${baseKey}|note`, baseKey, field:'note', label:`${baseLabel}\n備考`});
+      eventBases.push({baseKey, baseLabel, sortKey:`${r.datetime || '9999-99-99'}|${r.eventName || ''}`});
     }
   }
-  eventGroups.sort((a,b)=>String(a.label).localeCompare(String(b.label),'ja'));
+  eventBases.sort((a,b)=>String(a.sortKey).localeCompare(String(b.sortKey),'ja'));
+  const eventGroups = [];
+  for(const b of eventBases){
+    // 全員分リストのイベント欄は、各イベントごとに必ず「参加 / Comiru回答 / 備考」の3列で出す。
+    // 前版は列追加後に見出し文字でソートしていたため、環境によって並びが崩れてComiru列が見つけにくかった。
+    eventGroups.push({key:`${b.baseKey}|status`, baseKey:b.baseKey, field:'status', label:`${b.baseLabel}\n参加`});
+    eventGroups.push({key:`${b.baseKey}|comiru`, baseKey:b.baseKey, field:'comiru', label:`${b.baseLabel}\nComiru回答`});
+    eventGroups.push({key:`${b.baseKey}|note`, baseKey:b.baseKey, field:'note', label:`${b.baseLabel}\n備考`});
+  }
   return {examGroups, eventGroups};
 }
 function buildExamEventMaps(examRecords=[], eventRecords=[]){
