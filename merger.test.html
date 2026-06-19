@@ -437,8 +437,8 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
         <div class="manualBox important">
           <h3>毎日更新</h3>
           <ol>
-            <li>結果Excelに前日の結果を貼り付ける。(手作業、ファイルから直接エクセル編集)</li>
-            <li>結果Excelを更新して上書き保存して閉じる。</li>
+            <li>結果Excelに前日の結果を貼り付ける。</li>
+            <li>結果Excelを上書き保存して閉じる。</li>
             <li>このアプリで①フォルダー読取 → ②統合 → ③結果履歴を保存。</li>
             <li>④毎日更新を押して、出たExcelを開いて印刷。</li>
           </ol>
@@ -469,7 +469,7 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
           <ul>
             <li>統合後は必ず③結果履歴を保存する。</li>
             <li>手修正したExcelは対応フォルダーへ戻す。</li>
-            <li>Comiru のアンケートのCSVは「Comiru」フォルダーへ入れる。</li>
+            <li>Comiru CSVは「Comiru」フォルダーへ入れる。</li>
             <li>見出し行は消さない。列の追加・並び替えはOK。</li>
           </ul>
         </div>
@@ -2821,7 +2821,7 @@ async function downloadWithRange(mode){
   const exams = state.examRecords.filter(r => (!from || r.examDateObj >= from) && (!to || r.examDateObj <= to));
   const events = state.eventRecords.filter(r => (!from || r.dateObj >= from) && (!to || r.dateObj <= to));
   const out = buildOutputs(records, [], results);
-  downloadWorkbookFromAoa(out.calendarAoa, out.listAoa, out.resultAoa, state.rosterAoa, out.logAoa, label, exams, events);
+  await downloadWorkbookFromAoa(out.calendarAoa, out.listAoa, out.resultAoa, state.rosterAoa, out.logAoa, label, exams, events);
 }
 
 function safeSheetName(name){
@@ -3542,9 +3542,9 @@ async function downloadMonthlyPosterResultWorkbook(){
     const rankingWs = aoaToSheet(mergedRankingAoa);
     styleHighSpeedRankingSheet(rankingWs, mergedRankingAoa);
     XLSX.utils.book_append_sheet(wb, rankingWs, uniqueSheetName('高速基礎ランキング', used));
-    XLSX.writeFile(wb, `校舎掲示用_毎日更新_${ymd(from)}-${ymd(to)}.xlsx`);
+    const saveRes = await saveWorkbookDirectOrDownload(wb, `校舎掲示用_毎日更新_${ymd(from)}-${ymd(to)}.xlsx`, "毎日更新", state.dailyPosterFiles, "毎日更新");
     const counts = MONTHLY_POSTER_RESULT_RULES.map(rule => `${rule.keyword}: ${results.filter(r => norm(r.result).includes(rule.keyword)).length}件`).join('\n');
-    log(`毎日更新を作成しました\n対象期間: ${ymd(from)}〜${ymd(to)}\n${counts}`);
+    log(`毎日更新を作成しました\n対象期間: ${ymd(from)}〜${ymd(to)}\n${counts}\n${saveRes.message}`);
   }catch(e){
     alert(e.message || String(e));
     log('毎日更新の作成に失敗しました。');
@@ -4152,14 +4152,14 @@ async function downloadAllStudentList(){
   }
 
   const base = allListBaseDate();
-  XLSX.writeFile(wb, `全員分リスト_学年別_B4横_${ymd(base)}基準.xlsx`);
+  const saveRes = await saveWorkbookDirectOrDownload(wb, `全員分リスト_学年別_B4横_${ymd(base)}基準.xlsx`, "全員分リスト", state.allListFiles, "全員分リスト");
   if(typeof log === 'function'){
     const count = Math.max(0, (state.allListUpdateLog?.length || 1) - 1);
-    log(`全員分リストを出力しました。\n手修正・自動データの衝突ログ: ${count}件${count ? '\nExcel内の「更新ログ」シートを確認してください。' : ''}`);
+    log(`全員分リストを出力しました。\n${saveRes.message}\n手修正・自動データの衝突ログ: ${count}件${count ? '\nExcel内の「更新ログ」シートを確認してください。' : ''}`);
   }
 }
 
-function downloadWorkbookFromAoa(calendarAoa, listAoa, resultAoa, rosterAoa, logAoa, label, examRecords=[], eventRecords=[]){
+async function downloadWorkbookFromAoa(calendarAoa, listAoa, resultAoa, rosterAoa, logAoa, label, examRecords=[], eventRecords=[]){
   // 「全体予定表」フォルダー内に前回手修正したExcelがあれば、
   // カレンダー/掲示用カレンダーの手修正を優先して復元する。
   calendarAoa = mergeRestoredWholeScheduleAoa("カレンダー", calendarAoa);
@@ -4304,7 +4304,8 @@ function downloadWorkbookFromAoa(calendarAoa, listAoa, resultAoa, rosterAoa, log
   examSheetObjects.forEach(s => XLSX.utils.book_append_sheet(wb, s.ws, s.sheetName));
   eventSheetObjects.forEach(s => XLSX.utils.book_append_sheet(wb, s.ws, s.sheetName));
   XLSX.utils.book_append_sheet(wb, wsLog, "ログ");
-  XLSX.writeFile(wb, `全体予定表_${label}.xlsx`);
+  const saveRes = await saveWorkbookDirectOrDownload(wb, `全体予定表_${label}.xlsx`, "全体予定表", state.wholeScheduleFiles, "全体予定表");
+  if(typeof log === "function") log(saveRes.message);
 }
 
 // ============================================================
@@ -4317,6 +4318,115 @@ function pathPartsOfFile(file){
 function filePathIncludes(file, keyword){
   return pathPartsOfFile(file).some(p => p.includes(keyword));
 }
+
+// ============================================================
+// 8.9 フォルダー直接上書き保存
+// ============================================================
+async function collectFilesFromDirectoryHandle(dirHandle, basePath){
+  const out = [];
+  const root = basePath || dirHandle.name || "";
+  for await (const [name, handle] of dirHandle.entries()){
+    if(name.startsWith(".")) continue;
+    const rel = root ? `${root}/${name}` : name;
+    if(handle.kind === "file"){
+      try{
+        const file = await handle.getFile();
+        try{ Object.defineProperty(file, "webkitRelativePath", {value:rel, configurable:true}); }
+        catch(e){ file.webkitRelativePath = rel; }
+        try{ Object.defineProperty(file, "__fileHandle", {value:handle, configurable:true}); }
+        catch(e){ file.__fileHandle = handle; }
+        out.push(file);
+      }catch(e){
+        console.warn("ファイル読み取り失敗", rel, e);
+      }
+    }else if(handle.kind === "directory"){
+      out.push(...await collectFilesFromDirectoryHandle(handle, rel));
+    }
+  }
+  return out;
+}
+
+async function chooseBundleFolderWithWriteAccess(){
+  if(!("showDirectoryPicker" in window)) return null;
+  const rootHandle = await window.showDirectoryPicker({mode:"readwrite"});
+  let perm = await rootHandle.queryPermission({mode:"readwrite"});
+  if(perm !== "granted") perm = await rootHandle.requestPermission({mode:"readwrite"});
+  if(perm !== "granted") throw new Error("フォルダーへの書き込み権限がありません。");
+  state.bundleRootHandle = rootHandle;
+  const files = await collectFilesFromDirectoryHandle(rootHandle, rootHandle.name || "");
+  return files;
+}
+
+async function getOrCreateSubDirectory(rootHandle, folderName){
+  if(!rootHandle) return null;
+  return await rootHandle.getDirectoryHandle(folderName, {create:true});
+}
+
+function workbookToXlsxBlob(wb){
+  const out = XLSX.write(wb, {bookType:"xlsx", type:"array", cellStyles:true});
+  return new Blob([out], {type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+}
+
+function pickExistingOutputHandle(existingFiles, filename){
+  const files = Array.isArray(existingFiles) ? existingFiles : [];
+  const exact = files.find(f => f && f.__fileHandle && f.name === filename);
+  if(exact) return {handle: exact.__fileHandle, name: exact.name, mode: "同名ファイルを上書き"};
+  const first = files.find(f => f && f.__fileHandle && !/^~\\$/.test(f.name || ""));
+  if(first) return {handle: first.__fileHandle, name: first.name, mode: "既存ファイルを上書き"};
+  return null;
+}
+
+async function saveWorkbookDirectOrDownload(wb, filename, folderName, existingFiles, labelText){
+  const label = labelText || filename;
+  const root = state.bundleRootHandle;
+
+  if(root && window.FileSystemFileHandle && FileSystemFileHandle.prototype.createWritable){
+    try{
+      const blob = workbookToXlsxBlob(wb);
+      const picked = pickExistingOutputHandle(existingFiles, filename);
+      let fileHandle = picked ? picked.handle : null;
+      let savedName = picked ? picked.name : filename;
+      let saveMode = picked ? picked.mode : "";
+
+      if(!fileHandle){
+        const dirHandle = await getOrCreateSubDirectory(root, folderName);
+        fileHandle = await dirHandle.getFileHandle(filename, {create:true});
+        saveMode = `${folderName}フォルダーに新規保存`;
+      }
+
+      const writable = await fileHandle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+
+      return {direct:true, name:savedName, mode:saveMode, message:`${label}を直接保存しました：${folderName}/${savedName}（${saveMode}）`};
+    }catch(e){
+      console.warn("直接保存に失敗したためダウンロードへ切替", e);
+      XLSX.writeFile(wb, filename);
+      return {direct:false, name:filename, mode:"ダウンロード", message:`${label}は直接保存に失敗したため、従来どおりダウンロードしました。理由: ${e.message || e}`};
+    }
+  }
+
+  XLSX.writeFile(wb, filename);
+  return {direct:false, name:filename, mode:"ダウンロード", message:`${label}をダウンロードしました。直接上書きには対応ブラウザで①フォルダー読取を使ってください。`};
+}
+
+async function readBundleFolderSmart(){
+  if("showDirectoryPicker" in window){
+    try{
+      log("保存復元フォルダーを読み取り中...\n対応ブラウザのため、出力Excelは同じフォルダーへ直接上書きできます。");
+      const files = await chooseBundleFolderWithWriteAccess();
+      if(files) await setBundleFolderFiles(files);
+      return;
+    }catch(e){
+      if(e && (e.name === "AbortError" || e.code === 20)) return;
+      alert(e.message || String(e));
+      log("フォルダー読み取りに失敗しました。");
+      return;
+    }
+  }
+  $("bundleFolderInput").click();
+}
+
 async function setBundleFolderFiles(fileList){
   const files = [...fileList].filter(f => !shouldSkipBundleFile(f));
   const planned = [];
@@ -4397,7 +4507,7 @@ function setResultHistoryFiles(fileList){
   log(`結果履歴JSON選択完了\nJSONファイル: ${state.resultHistoryFiles.length}件\n結果Excelを更新した日は「③ 結果履歴を保存」を押してから出力してください。`);
 }
 
-$("readBundleBtn").addEventListener("click", () => $("bundleFolderInput").click());
+$("readBundleBtn").addEventListener("click", readBundleFolderSmart);
 $("bundleFolderInput").addEventListener("change", e => setBundleFolderFiles(e.target.files));
 $("folderInput").addEventListener("change", e => setFiles(e.target.files));
 $("resultInput").addEventListener("change", e => setResultFiles(e.target.files));
