@@ -481,6 +481,171 @@ main.wrap{max-width:none!important;height:auto!important;min-height:0!important;
   }
 }
 
+
+/* =========================================================
+   予定入力用：必要フォルダ構造パネル
+   JS不要。右下の「フォルダ構造」で開閉。
+========================================================= */
+.folderStructureToggle{
+  position:fixed;
+  width:1px;
+  height:1px;
+  opacity:0;
+  pointer-events:none;
+}
+.folderStructureBtn{
+  position:fixed;
+  right:112px;
+  bottom:14px;
+  z-index:2147482999;
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  min-height:36px;
+  padding:8px 12px;
+  border-radius:999px;
+  background:#334155;
+  color:#fff;
+  border:1px solid rgba(255,255,255,.35);
+  box-shadow:0 8px 22px rgba(51,65,85,.22);
+  font-size:13px;
+  line-height:1;
+  font-weight:900;
+  cursor:pointer;
+  user-select:none;
+}
+.folderStructureBtn::before{
+  content:"📁";
+  font-size:14px;
+  line-height:1;
+}
+.folderStructureBackdrop{
+  position:fixed;
+  inset:0;
+  z-index:2147483003;
+  display:none;
+  background:rgba(15,23,42,.16);
+  cursor:pointer;
+}
+.folderStructurePanel{
+  position:fixed;
+  right:12px;
+  bottom:58px;
+  z-index:2147483004;
+  display:none;
+  width:min(520px,calc(100vw - 24px));
+  max-height:min(760px,calc(100vh - 76px));
+  overflow:auto;
+  background:#fff;
+  color:#172033;
+  border:1px solid #dbe4ef;
+  border-radius:16px;
+  box-shadow:0 18px 46px rgba(15,23,42,.22);
+}
+.folderStructureToggle:checked ~ .folderStructureBackdrop,
+.folderStructureToggle:checked ~ .folderStructurePanel{
+  display:block;
+}
+.folderStructureHead{
+  position:sticky;
+  top:0;
+  z-index:1;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:11px 13px;
+  background:#f8fafc;
+  border-bottom:1px solid #e5e7eb;
+}
+.folderStructureHead b{
+  font-size:15px;
+}
+.folderStructureClose{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:28px;
+  padding:5px 9px;
+  border-radius:999px;
+  background:#e5e7eb;
+  color:#111827;
+  font-size:12px;
+  font-weight:900;
+  cursor:pointer;
+  user-select:none;
+}
+.folderStructureBody{
+  padding:12px 13px 14px;
+  font-size:12.5px;
+  line-height:1.58;
+}
+.folderTree{
+  margin:8px 0 0;
+  padding:10px 11px;
+  background:#0f172a;
+  color:#e5e7eb;
+  border-radius:12px;
+  overflow:auto;
+  white-space:pre;
+  font-family:"Consolas","Menlo","Monaco",monospace;
+  font-size:12px;
+  line-height:1.55;
+}
+.folderStructureBox{
+  border:1px solid #e5e7eb;
+  background:#f8fafc;
+  border-radius:10px;
+  padding:9px 10px;
+  margin-top:8px;
+}
+.folderStructureBox.warn{
+  background:#fff7ed;
+  border-color:#fed7aa;
+}
+.folderStructureBox.save{
+  background:#fef2f2;
+  border-color:#fecaca;
+}
+.folderStructureBox h3{
+  margin:0 0 5px;
+  font-size:13px;
+}
+.folderStructureBox ul{
+  margin:0;
+  padding-left:18px;
+}
+.folderStructureBox li{
+  margin:1px 0;
+}
+.folderStructureSmall{
+  margin-top:8px;
+  color:#667085;
+  font-size:11.5px;
+}
+@media(max-width:700px){
+  .folderStructureBtn{
+    right:94px;
+    bottom:10px;
+    min-height:34px;
+    padding:7px 10px;
+    font-size:12px;
+  }
+  .folderStructurePanel{
+    right:8px;
+    bottom:52px;
+    width:calc(100vw - 16px);
+  }
+}
+@media print{
+  .folderStructureToggle,
+  .folderStructureBtn,
+  .folderStructureBackdrop,
+  .folderStructurePanel{
+    display:none!important;
+  }
+}
+
 </style>
 </head>
 <body>
@@ -545,6 +710,90 @@ main.wrap{max-width:none!important;height:auto!important;min-height:0!important;
   </div>
 </aside>
 
+
+
+
+<input id="folderStructureToggle" class="folderStructureToggle" type="checkbox" aria-hidden="true" />
+<label for="folderStructureToggle" class="folderStructureBtn">フォルダ構造</label>
+<label for="folderStructureToggle" class="folderStructureBackdrop" aria-hidden="true"></label>
+<aside class="folderStructurePanel" aria-label="必要なフォルダ構造">
+  <div class="folderStructureHead">
+    <b>必要なフォルダ構造</b>
+    <label for="folderStructureToggle" class="folderStructureClose">閉じる</label>
+  </div>
+  <div class="folderStructureBody">
+    <div class="folderStructureBox warn">
+      <h3>最初に作るフォルダー</h3>
+      <ul>
+        <li>アプリ本体を置くフォルダー</li>
+        <li>保存復元フォルダー</li>
+        <li>担任助手フォルダー</li>
+      </ul>
+    </div>
+
+    <div class="folderStructureBox">
+      <h3>アプリ本体フォルダー</h3>
+      <div class="folderTree">アプリ本体フォルダー
+├─ 面談予定入力アプリ.html
+├─ 予定統合アプリ.html
+└─ libs
+   ├─ xlsx.bundle.js
+   ├─ xlsx.full.min.js
+   └─ pdf.min.js  ※あれば</div>
+      <div class="folderStructureSmall">外部通信なしで使うため、Excel読み書き用の libs は同じ場所に置きます。</div>
+    </div>
+
+    <div class="folderStructureBox">
+      <h3>保存復元フォルダー</h3>
+      <div class="folderTree">保存復元フォルダー
+├─ 打ち込み結果
+├─ 学習結果
+├─ 対応表
+├─ 全員分リスト
+├─ 毎日更新
+├─ 全体予定表
+├─ json
+├─ Comiru
+└─ マスタ</div>
+      <ul>
+        <li>入力用の保存・復元では、この保存復元フォルダーを選びます。</li>
+        <li>統合用も、この保存復元フォルダーを選ぶだけで自動振り分けします。</li>
+        <li>Comiru CSVは「Comiru」フォルダーに入れます。</li>
+        <li>手修正した全員分リストは「全員分リスト」フォルダーへ戻します。</li>
+      </ul>
+    </div>
+
+    <div class="folderStructureBox">
+      <h3>担任助手フォルダー</h3>
+      <div class="folderTree">担任助手フォルダー
+├─ 週面シート.xlsx
+├─ 山田太郎
+│  ├─ 合格設計図.pdf
+│  ├─ 合格設計図.xlsx
+│  └─ 過去の予定Excel
+├─ 佐藤花子
+│  ├─ 合格設計図.pdf
+│  └─ 合格設計図.xlsx
+└─ 鈴木一郎
+   └─ 合格設計図.xlsx</div>
+      <ul>
+        <li>生徒フォルダー名は、アプリに入力する生徒名と合わせます。</li>
+        <li>合格設計図は PDF優先、なければExcelを使います。</li>
+        <li>週面シートExcelは担任助手フォルダー直下に置きます。</li>
+      </ul>
+    </div>
+
+    <div class="folderStructureBox save">
+      <h3>迷ったら守ること</h3>
+      <ul>
+        <li>保存・復元では「保存復元フォルダー」を選びます。</li>
+        <li>印刷では「担任助手フォルダー」内の週面シート・生徒フォルダーを使います。</li>
+        <li>Excelを手修正したら、対応するフォルダーへ戻します。</li>
+        <li>フォルダー名はなるべく上の名前のまま使います。</li>
+      </ul>
+    </div>
+  </div>
+</aside>
 
 <header class="appHeader"><div class="wrap appHeaderInner">
   <div>
