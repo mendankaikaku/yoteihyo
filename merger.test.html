@@ -397,7 +397,7 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
   <section class="controlGrid">
     <div class="card">
       <p class="cardTitle"><span class="step">①</span>フォルダーを読み取る</p>
-      <div class="hint" style="margin-bottom:10px;">「まとめて復元」フォルダーを選ぶだけで、json / 毎日更新エクセル / 打ち込み結果 / 対応表 / 全員分リスト / 毎日更新 / 全体予定表 を自動で振り分けます。</div>
+      <div class="hint" style="margin-bottom:10px;">「まとめて復元」フォルダーを選ぶだけで、json / 毎日更新 / 打ち込み結果 / 対応表 / 全員分リスト / 毎日更新 / 全体予定表 を自動で振り分けます。</div>
       <div class="bundleActionGrid">
         <button id="readBundleBtn" class="ok primaryAction" type="button">① フォルダーを読み取る</button>
       </div>
@@ -415,7 +415,7 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
       <details>
         <summary>読み取るフォルダーの中身</summary>
         <div class="hint" style="margin-top:8px;">
-          予定Excelは「打ち込み結果」、毎日更新.xlsxは「毎日更新エクセル」、履歴JSONは「json」、対応表は「対応表」、全員分リストは「全員分リスト」、掲示用Excelの手修正版は「毎日更新」、全体予定表の手修正版は「全体予定表」フォルダーから自動で読みます。
+          予定Excelは「打ち込み結果」、毎日更新.xlsxは「毎日更新」、履歴JSONは「json」、対応表は「対応表」、全員分リストは「全員分リスト」、掲示用Excelの手修正版は「毎日更新」、全体予定表の手修正版は「全体予定表」フォルダーから自動で読みます。
         </div>
       </details>
     </div>
@@ -427,7 +427,7 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
       </p>
 
       <div class="manualFlow">
-        <div class="manualStep"><b>① 復元</b>保存復元フォルダーを選ぶだけ。打ち込み結果・毎日更新エクセル・対応表・全員分リスト・全体予定表・Comiruを自動で読み取る。</div>
+        <div class="manualStep"><b>① 復元</b>保存復元フォルダーを選ぶだけ。打ち込み結果・毎日更新・対応表・全員分リスト・全体予定表・Comiruを自動で読み取る。</div>
         <div class="manualStep"><b>② 統合</b>予定、結果、模試、イベント、Comiru回答をまとめる。ログに未照合や衝突が出たら確認する。</div>
         <div class="manualStep"><b>③ 保存</b>結果履歴をJSONに保存。前日の毎日更新.xlsxは上書きしても、履歴から復元できるようにする。</div>
         <div class="manualStep"><b>④ 出力</b>2週間出力、1か月出力、全員分リスト、毎日更新を必要に応じてダウンロードする。</div>
@@ -440,7 +440,8 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
             <li>毎日更新.xlsxに前日の結果を貼り付ける。</li>
             <li>毎日更新.xlsxを上書き保存して閉じる。</li>
             <li>このアプリで①フォルダー読取 → ②統合 → ③結果履歴を保存。</li>
-            <li>④毎日更新を押して、出たExcelを開いて印刷。</li>
+            <li>④毎日掲示を押して、出たExcelを開いて印刷。</li>
+            <li>毎日掲示.xlsxは毎日掲示フォルダに保存</li>
           </ol>
         </div>
 
@@ -450,7 +451,7 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
             <li>①フォルダー読取 → ②統合 → ③保存。</li>
             <li>④2週間出力を押す。</li>
             <li>模試科目リストはComiru CSV、前回手修正、入力用の模試情報を合流して作る。</li>
-            <li>手修正したExcelは「全体予定表」フォルダーへ戻す。</li>
+            <li>手修正したExcelは「全体予定表」フォルダーへ戻す。(上書き保存でok)</li>
           </ol>
         </div>
 
@@ -470,7 +471,7 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
             <li>統合後は必ず③結果履歴を保存する。</li>
             <li>手修正したExcelは対応フォルダーへ戻す。</li>
             <li>Comiru CSVは「Comiru」フォルダーへ入れる。</li>
-            <li>見出し行は消さない。列の追加・並び替えはOK。</li>
+            <li>見出し行(1行目)は消さない。列の追加・並び替えはOK。</li>
           </ul>
         </div>
       </div>
@@ -1395,7 +1396,7 @@ function getResultHeaderMap(aoa){
     grade: find(["学年"]),
     type: find(["区分"]),
     study: find(["学習内容","講座","コンテンツ"]),
-    result: find(["毎日更新エクセル","結果","内容"]),
+    result: find(["毎日更新","結果","内容"]),
     like: find(["いいね"]),
     datetime: find(["日時","日付","時刻","実施日時"])
   };
@@ -1450,19 +1451,19 @@ function summarizeResult(study, result){
 
 function looksLikeResultHeader(row){
   const joined = (row || []).map(v => norm(v)).join("|");
-  return /生徒番号|名前|生徒名|学習内容|毎日更新エクセル|日時|区分/.test(joined);
+  return /生徒番号|名前|生徒名|学習内容|毎日更新|日時|区分/.test(joined);
 }
 
 function fixedResultHeaderMap(){
   // 列名なし毎日更新.xlsx用の固定レイアウト
-  // A:生徒番号 B:フルネーム C:学年 D:区分 E:学習内容 F:毎日更新エクセル G:いいね H:日時
+  // A:生徒番号 B:フルネーム C:学年 D:区分 E:学習内容 F:毎日更新 G:いいね H:日時
   return {studentNo:0, student:1, grade:2, type:3, study:4, result:5, like:6, datetime:7};
 }
 
 function fixedTwoRowResultMap(){
   // 2行1セット形式も、列配置は従来形式と同じ A〜H 固定。
   // 上の行: A:生徒番号 B:名前 C:学年 D:区分 E/F:空白 G:いいね H:日時
-  // 下の行: A〜D:空白 E:学習内容 F:毎日更新エクセル G:いいねなど H:空白
+  // 下の行: A〜D:空白 E:学習内容 F:毎日更新 G:いいねなど H:空白
   return {studentNo:0, student:1, grade:2, type:3, study:4, result:5, like:6, datetime:7};
 }
 
@@ -1481,7 +1482,7 @@ function looksLikeTwoRowMetaRow(row){
   const map = fixedTwoRowResultMap();
 
   // 従来1行形式との誤結合を防ぐ最重要条件。
-  // 上の行に E/F（学習内容・毎日更新エクセル）が入っているなら、これは2行形式ではなく従来1行形式。
+  // 上の行に E/F（学習内容・毎日更新）が入っているなら、これは2行形式ではなく従来1行形式。
   if(fixedCell(row, map.study) || fixedCell(row, map.result)) return false;
 
   // 2行形式の上段は、日時がある場合もあれば、日時欄が空のまま
@@ -1509,7 +1510,7 @@ function looksLikeTwoRowDetailRow(row){
 
 function looksLikeTwoRowHeaderPair(top, bottom){
   const joined = `${(top || []).map(v=>norm(v)).join('|')}|${(bottom || []).map(v=>norm(v)).join('|')}`;
-  return /生徒番号/.test(joined) && /学習内容/.test(joined) && /毎日更新エクセル/.test(joined);
+  return /生徒番号/.test(joined) && /学習内容/.test(joined) && /毎日更新/.test(joined);
 }
 
 function parseTwoRowResultSheet(aoa, file, sheetName){
@@ -1552,7 +1553,7 @@ function parseTwoRowResultSheet(aoa, file, sheetName){
     r++;
   }
   if(records.length){
-    logRows.push([file.name, "成功", `結果 ${records.length}件読み込み（2行形式：1行目=A〜D生徒情報、日時は上下どちらのH列でも可、2行目=E学習内容/F毎日更新エクセル）`, sheetName]);
+    logRows.push([file.name, "成功", `結果 ${records.length}件読み込み（2行形式：1行目=A〜D生徒情報、日時は上下どちらのH列でも可、2行目=E学習内容/F毎日更新）`, sheetName]);
     if(skippedHeaders) logRows.push([file.name, "情報", `2行形式の見出し行を${skippedHeaders}行スキップしました`, sheetName]);
   }
   return {records, logRows};
@@ -1566,7 +1567,7 @@ function parseOneRowResultSheet(aoa, file, sheetName){
   const startRow = hasHeader ? 1 : 0;
 
   if(h.study < 0 || h.result < 0 || h.datetime < 0){
-    logRows.push([file.name, "注意", `毎日更新.xlsxの列不足のためスキップ: ${sheetName}`, "1行形式は A:生徒番号 B:名前 C:学年 D:区分 E:学習内容 F:毎日更新エクセル G:いいね H:日時。2行形式は1行目=A〜D生徒情報/E-F空白、2行目=A〜D空白/E学習内容/F毎日更新エクセル、日時は上下どちらかのH列が必要です"]);
+    logRows.push([file.name, "注意", `毎日更新.xlsxの列不足のためスキップ: ${sheetName}`, "1行形式は A:生徒番号 B:名前 C:学年 D:区分 E:学習内容 F:毎日更新 G:いいね H:日時。2行形式は1行目=A〜D生徒情報/E-F空白、2行目=A〜D空白/E学習内容/F毎日更新、日時は上下どちらかのH列が必要です"]);
     return {records, logRows};
   }
   let count = 0;
@@ -2121,7 +2122,7 @@ function buildOutputs(records, logRows, resultRecords=[]){
     ]);
   }
 
-  const resultAoa = [["学年","生徒名","生徒番号","日付","時刻","区分","分類","学習内容","毎日更新エクセル","カレンダー表示","元ファイル","元シート"]];
+  const resultAoa = [["学年","生徒名","生徒番号","日付","時刻","区分","分類","学習内容","毎日更新","カレンダー表示","元ファイル","元シート"]];
   const resultSorted = [...resultRecords].sort((a,b)=> a.dateKey.localeCompare(b.dateKey) || studentSortKey(a.student).localeCompare(studentSortKey(b.student),"ja") || a.timeLabel.localeCompare(b.timeLabel));
   for(const r of resultSorted){
     const meta = rosterMetaForStudent(r.student);
@@ -4164,7 +4165,7 @@ function downloadWorkbookFromAoa(calendarAoa, listAoa, resultAoa, rosterAoa, log
   // カレンダー/掲示用カレンダーの手修正を優先して復元する。
   calendarAoa = mergeRestoredWholeScheduleAoa("カレンダー", calendarAoa);
   const wb = XLSX.utils.book_new();
-  const resultHeader = [["学年","生徒名","生徒番号","日付","時刻","区分","分類","学習内容","毎日更新エクセル","カレンダー表示","元ファイル","元シート"]];
+  const resultHeader = [["学年","生徒名","生徒番号","日付","時刻","区分","分類","学習内容","毎日更新","カレンダー表示","元ファイル","元シート"]];
   const rosterHeader = [ROSTER_COLUMNS];
   const wsCal = aoaToSheet(calendarAoa);
   const wsList = aoaToSheet(listAoa);
@@ -4338,7 +4339,7 @@ async function setBundleFolderFiles(fileList){
     else if(isExcel && (filePathIncludes(f, '毎日掲示') || filePathIncludes(f, '毎日更新'))) dailyPosters.push(f);
     else if(isExcel && (filePathIncludes(f, '全員分リスト') || filePathIncludes(f, '全員リスト'))) allLists.push(f);
     else if(isExcel && filePathIncludes(f, '全体予定表')) wholeSchedules.push(f);
-    else if(isExcel && (filePathIncludes(f, '毎日更新エクセル') || filePathIncludes(f, '毎日更新エクセル') || name === '毎日更新.xlsx')) results.push(f);
+    else if(isExcel && (filePathIncludes(f, '毎日更新') || filePathIncludes(f, '毎日更新') || name === '毎日更新.xlsx')) results.push(f);
     else if(isExcel && filePathIncludes(f, '打ち込み結果')) planned.push(f);
     else if((isExcel || isCsv) && filePathIncludes(f, '対応表')) rosters.push(f);
   }
@@ -4366,7 +4367,7 @@ async function setBundleFolderFiles(fileList){
   updateStats(state.files, [], [], [], state.resultRecords);
   const summary = `読み取り完了
 予定Excel（打ち込み結果）: ${planned.length}件
-毎日更新.xlsx（毎日更新エクセル）: ${results.length}件
+毎日更新.xlsx（毎日更新）: ${results.length}件
 結果履歴JSON（json）: ${histories.length}件
 全員分リスト復元Excel（全員分リスト）: ${allLists.length}件${allListRestoreLogs.length ? '（' + allListRestoreLogs.join(' / ') + '）' : ''}
 掲示用手修正Excel（毎日更新）: ${dailyPosters.length}件${dailyPosterRestoreLogs.length ? '（' + dailyPosterRestoreLogs.join(' / ') + '）' : ''}
