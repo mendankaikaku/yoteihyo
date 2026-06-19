@@ -3713,15 +3713,46 @@ function allListSmallStatusText(status){
 function allListSmallComiruText(answered){
   return answered ? '済' : '未聞き取り';
 }
+function allListCompactStatusText(status, kind){
+  const st = allListCellText ? allListCellText(status) : String(status || '').trim();
+  if(kind === 'exam'){
+    if(st.includes('当日')) return '当';
+    if(st.includes('後日')) return '後';
+    if(st.includes('不受験')) return '不';
+    if(st.includes('未')) return '未';
+  }else{
+    if(st.includes('不参加')) return '不参';
+    if(st.includes('参加')) return '参';
+    if(st.includes('未')) return '未';
+  }
+  return st || '未';
+}
+function allListCompactComiruText(comiru){
+  const s = String(comiru || '').trim();
+  if(s === '済' || s.includes('済')) return 'C済';
+  if(s.includes('未')) return 'C未';
+  return s ? 'C' + s : 'C未';
+}
+function allListCompactName(name, maxLen=13){
+  const n = String(name || '').replace(/大学入学共通テスト/g,'共テ').replace(/共通テスト/g,'共テ').replace(/本番レベル模試/g,'本レ').replace(/全国統一高校生テスト/g,'全統高').replace(/模試/g,'').replace(/イベント/g,'').replace(/\s+/g,'').trim();
+  return n.length > maxLen ? n.slice(0, maxLen) + '…' : (n || '名称未');
+}
 function allListSmallRowKey(kind, machineKey, studentKey){
   return `${kind || ''}|${machineKey || ''}|${studentKey || ''}`;
 }
 function allListSmallRowObjectToLine(obj){
   if(!obj) return '';
+  const date = obj.date ? allListSmallDateLabel(obj.date) + ' ' : '';
+  const name = allListCompactName(obj.name, 13);
+  const c = allListCompactComiruText(obj.comiru || '未');
   if(obj.kind === '模試'){
-    return `${obj.date ? allListSmallDateLabel(obj.date) + ' ' : ''}${obj.name || '模試名未入力'}｜${obj.status || '未聞き取り'}｜科目変更:${obj.subject || ''}｜Comiru回答:${obj.comiru || '未聞き取り'}`;
+    const st = allListCompactStatusText(obj.status, 'exam');
+    const subj = obj.subject ? ' 科○' : '';
+    return `${date}${name} ${st} ${c}${subj}`;
   }
-  return `${obj.date ? allListSmallDateLabel(obj.date) + ' ' : ''}${obj.name || 'イベント名未入力'}｜${obj.status || '未聞き取り'}｜Comiru回答:${obj.comiru || '未聞き取り'}${obj.note ? '｜備考:' + obj.note : ''}`;
+  const st = allListCompactStatusText(obj.status, 'event');
+  const note = obj.note ? ` 備:${String(obj.note).slice(0,12)}${String(obj.note).length>12?'…':''}` : '';
+  return `${date}${name} ${st} ${c}${note}`;
 }
 function allListSmallRowObjectPending(obj){
   return !obj || !norm(obj.status || '') || String(obj.status || '').includes('未') || !norm(obj.comiru || '') || String(obj.comiru || '').includes('未');
@@ -3898,7 +3929,7 @@ function appendSmallNotesToBaseNote(baseNote, extraLines){
   const base = norm(baseNote || '');
   const lines = (extraLines || []).filter(Boolean);
   if(!lines.length) return base;
-  const block = "【小規模模試・イベント】\n" + lines.map(x => "・" + x).join("\n");
+  const block = "【小規模】\n" + lines.map(x => "・" + x).join("\n");
   return base ? `${base}\n${block}` : block;
 }
 
@@ -3928,7 +3959,7 @@ function buildExamEventGroups(examRecords=[], eventRecords=[]){
     if(allListIsSmallTargetCount(eventCounts.get(baseKey) || 0)) continue;
     if(!eventSeen.has(baseKey)){
       eventSeen.add(baseKey);
-      const baseLabel = `イベント\n${r.datetime ? r.datetime + ' ' : ''}${r.eventName || 'イベント名未入力'}`;
+      const baseLabel = `${r.datetime ? String(r.datetime).slice(5,10).replace('-','/') + '\n' : ''}${shortExamNameForAllList ? shortExamNameForAllList(r.eventName || 'イベント') : (r.eventName || 'イベント')}`;
       eventGroups.push({key:`${baseKey}|status`, baseKey, field:'status', label:`${baseLabel}\n参加`});
       eventGroups.push({key:`${baseKey}|note`, baseKey, field:'note', label:`${baseLabel}\n備考`});
     }
@@ -4354,7 +4385,7 @@ function styleAllStudentGradeSheet(ws, aoa){
     if(R===0) style.fill = titleFill;
     else if(R===1) style.fill = headerFill;
     else if(C<=2) style.fill = nameFill;
-    if(R>1 && C===6 && text.includes('【小規模模試・イベント】') && text.includes('未聞き取り')){
+    if(R>1 && C===6 && text.includes('【小規模】') && text.includes('未')){
       style.fill = comiruMissingFill;
       style.font = fontRed;
     }
@@ -4417,7 +4448,7 @@ async function downloadAllStudentList(){
   XLSX.writeFile(wb, `全員分リスト_学年別_B4横_${ymd(base)}基準.xlsx`);
   if(typeof log === 'function'){
     const count = Math.max(0, (state.allListUpdateLog?.length || 1) - 1);
-    log(`全員分リストを出力しました。\n対象15人以下の模試・イベントは備考欄に反映し、Excel内の「小規模模試イベント_復元用」シートにも保存しました。手修正はそのシートを更新してください。\n手修正・自動データの衝突ログ: ${count}件${count ? '\nExcel内の「更新ログ」シートを確認してください。' : ''}`);
+    log(`全員分リストを出力しました。\n対象15人以下の模試・イベントは備考欄に短縮表示し、Excel内の「小規模模試イベント_復元用」シートにも保存しました。手修正はそのシートを更新してください。\n手修正・自動データの衝突ログ: ${count}件${count ? '\nExcel内の「更新ログ」シートを確認してください。' : ''}`);
   }
 }
 
