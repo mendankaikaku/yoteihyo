@@ -682,8 +682,8 @@ main.wrap{max-width:none!important;height:auto!important;min-height:0!important;
         <li>原本は生徒に返却します。</li>
         <li>コピーを打ち込みボックスに集めます。</li>
         <li>アプリで ①生徒名 → ②生徒欄を作る → ③復元 → 手打ち → ④保存。</li>
-        <li>必要なら「面談内容コピー」を押してPOSへCtrl+Vします。</li>
-        <li>入力後は生徒ファイルに入れます。</li>
+        <li>「面談内容コピー」を押してPOSへCtrl+Vします。(2画面にしたほうが楽かも)</li>
+        <li>入力後はコピーした紙は生徒ファイルに入れます。</li>
       </ol>
     </div>
 
@@ -722,7 +722,7 @@ main.wrap{max-width:none!important;height:auto!important;min-height:0!important;
       <div class="folderStructureSmall">太字のフォルダー名は、アプリが自動で探す名前なので基本的に変更しないでください。</div>
       <div class="folderTree"><strong>保存復元フォルダー</strong>
 ├─ <strong>打ち込み結果</strong>
-├─ <strong>毎日更新エクセル</strong>
+├─ <strong>毎日更新</strong>
 ├─ <strong>対応表</strong>
 ├─ <strong>全員分リスト</strong>
 ├─ <strong>毎日掲示</strong>
@@ -733,7 +733,7 @@ main.wrap{max-width:none!important;height:auto!important;min-height:0!important;
         <li>入力用の保存・復元では、この保存復元フォルダーを選びます。</li>
         <li>統合用も、この保存復元フォルダーを選ぶだけで自動振り分けします。</li>
         <li>Comiru CSVは「Comiru」フォルダーに入れます。</li>
-        <li>毎日更新用のExcelは「毎日更新エクセル」フォルダーに入れ、ファイル名は「毎日更新.xlsx」にします。</li>
+        <li>毎日更新用のExcelは「毎日更新」フォルダーに入れ、ファイル名は「毎日更新.xlsx」にします。</li>
         <li>手修正した全員分リストは「全員分リスト」フォルダーへ戻します。</li>
         <li>「マスタ」フォルダーは今の運用では不要です。</li>
       </ul>
@@ -807,13 +807,13 @@ main.wrap{max-width:none!important;height:auto!important;min-height:0!important;
     <details id="meetingPrepDetails" class="prepDetails">
       <summary>印刷メニューを開く</summary>
       <div class="printActions prepInside" style="grid-template-columns:minmax(260px,1fr) 170px auto auto;">
-        <div class="compactHint" style="margin-top:0">復元ボタンで読み込んだ「まとめて復元」フォルダから、結果履歴JSON・毎日更新エクセルExcel・週面シート・合格設計図を自動で使います。週面欠席チェックを付けた生徒だけの電話確認リストも印刷できます。</div>
+        <div class="compactHint" style="margin-top:0">復元ボタンで読み込んだ「まとめて復元」フォルダから、結果履歴JSON・毎日更新Excel・週面シート・合格設計図を自動で使います。週面欠席チェックを付けた生徒だけの電話確認リストも印刷できます。</div>
         <div class="field"><label>週面欠席リスト対象日</label><input id="weeklyAbsentTargetDate" type="date"></div>
         <button class="secondary primaryBig" id="printMeetingPrep" type="button">面談準備を印刷</button>
         <button class="secondary primaryBig" id="printWeeklyAbsentList" type="button">週面欠席者リスト印刷</button>
       </div>
       <div class="printDialogNote"><b>印刷設定：</b>印刷時は「システムダイアログを使用して印刷」を利用して、<b>用紙サイズ：A4／向き：縦／両面印刷：オン／長辺とじ</b>に設定してください。各生徒はA4両面2枚（1枚目：前週確認→今週記入、2枚目：週面シート→合格設計図）で印刷されます。</div>
-      <div id="meetingPrepFolderInfo" class="compactHint">復元した内容を先週分として使い、今週欄は印刷時だけ白紙にします。復元時に「まとめて復元」フォルダを選ぶと、json/result_history.json、毎日更新エクセルフォルダ内の毎日更新.xlsx、打ち込み結果/担任助手フォルダ内の週面シート、担任助手フォルダ/生徒名フォルダ内の合格設計図PDFまたはExcelを自動で読みます。</div>
+      <div id="meetingPrepFolderInfo" class="compactHint">復元した内容を先週分として使い、今週欄は印刷時だけ白紙にします。復元時に「まとめて復元」フォルダを選ぶと、json/result_history.json、毎日更新フォルダ内の毎日更新.xlsx、打ち込み結果/担任助手フォルダ内の週面シート、担任助手フォルダ/生徒名フォルダ内の合格設計図PDFまたはExcelを自動で読みます。</div>
     </details>
   </section>
 
@@ -3539,7 +3539,7 @@ function setMeetingPrepFolderInfo(message){
 
 function getPrepResultFiles(){
   // v14: 面談準備では個別の毎日更新.xlsx選択欄を廃止。
-  // 毎日更新.xlsxは「まとめて復元/毎日更新エクセル」フォルダから自動読込する。
+  // 毎日更新.xlsxは「まとめて復元/毎日更新」フォルダから自動読込する。
   return [];
 }
 async function listExcelFilesFromDirectoryRecursive(dir, maxDepth=5, depth=0, pathParts=[]){
@@ -3572,15 +3572,15 @@ async function getPrepResultFilesFromShared(){
       return {files, debug};
     }
     let resultDir=null;
-    if(String(sharedDirHandle.name || '') === '毎日更新エクセル') resultDir=sharedDirHandle;
-    if(!resultDir) resultDir=await findDirectoryByNameRecursive(sharedDirHandle, '毎日更新エクセル', 5);
+    if(String(sharedDirHandle.name || '') === '毎日更新') resultDir=sharedDirHandle;
+    if(!resultDir) resultDir=await findDirectoryByNameRecursive(sharedDirHandle, '毎日更新', 5);
     if(!resultDir){
-      debug.push('毎日更新.xlsx: 毎日更新エクセルフォルダなし');
+      debug.push('毎日更新.xlsx: 毎日更新フォルダなし');
       return {files, debug};
     }
-    const found=await listExcelFilesFromDirectoryRecursive(resultDir, 5, 0, ['毎日更新エクセル']);
+    const found=await listExcelFilesFromDirectoryRecursive(resultDir, 5, 0, ['毎日更新']);
     files.push(...found);
-    debug.push(`毎日更新.xlsx: 毎日更新エクセルフォルダから${files.length}件自動読込`);
+    debug.push(`毎日更新.xlsx: 毎日更新フォルダから${files.length}件自動読込`);
   }catch(e){
     debug.push(`毎日更新.xlsx: 自動読込失敗 ${e?.message || e}`);
   }
@@ -3612,11 +3612,11 @@ function prepHeaderMap(aoa){
     grade:find(['学年']),
     type:find(['区分']),
     study:find(['学習内容','講座','コンテンツ']),
-    result:find(['毎日更新エクセル','結果','内容']),
+    result:find(['毎日更新','結果','内容']),
     datetime:find(['日時','日付','時刻','実施日時'])
   };
 }
-function prepLooksLikeHeader(row){return /生徒番号|名前|生徒名|学習内容|毎日更新エクセル|日時|区分/.test((row||[]).map(v=>norm(v)).join('|'));}
+function prepLooksLikeHeader(row){return /生徒番号|名前|生徒名|学習内容|毎日更新|日時|区分/.test((row||[]).map(v=>norm(v)).join('|'));}
 function prepFixedResultMap(){return {studentNo:0,student:1,grade:2,type:3,study:4,result:5,datetime:7};}
 
 function prepFixedResultCell(row, idx){return norm((row || [])[idx]);}
@@ -3626,7 +3626,7 @@ function prepHasAnyFixedCells(row, indexes){return indexes.some(idx => !!prepFix
 function prepDateTimeAt(row, idx){return parseDateTimeLoose((row || [])[idx]);}
 function prepLooksLikeTwoRowHeaderPair(top, bottom){
   const joined=`${(top || []).map(v=>norm(v)).join('|')}|${(bottom || []).map(v=>norm(v)).join('|')}`;
-  return /生徒番号/.test(joined) && /学習内容/.test(joined) && /毎日更新エクセル/.test(joined);
+  return /生徒番号/.test(joined) && /学習内容/.test(joined) && /毎日更新/.test(joined);
 }
 function prepLooksLikeTwoRowMetaRow(row){
   const h=prepFixedResultMap();
@@ -3641,7 +3641,7 @@ function prepLooksLikeTwoRowMetaRow(row){
 }
 function prepLooksLikeTwoRowDetailRow(row){
   const h=prepFixedResultMap();
-  // 下段はA〜Dが空白で、E/Fに学習内容・毎日更新エクセルが入る。
+  // 下段はA〜Dが空白で、E/Fに学習内容・毎日更新が入る。
   // H列に日時が入る場合もあるため、日時の有無では除外しない。
   if(!prepIsBlankFixedCells(row,[h.studentNo,h.student,h.grade,h.type])) return false;
   return !!(prepFixedResultCell(row,h.study) || prepFixedResultCell(row,h.result));
@@ -3698,7 +3698,7 @@ function prepHistoryItemToResultRecord(item){
   if(!dt) return null;
   const dateOnly=new Date(dt.getFullYear(),dt.getMonth(),dt.getDate());
   const study=norm(item.study || item['学習内容'] || '');
-  const result=norm(item.result || item['毎日更新エクセル'] || '');
+  const result=norm(item.result || item['毎日更新'] || '');
   if(!study && !result) return null;
   return {
     student:norm(item.student || item.name || item['生徒名'] || ''),
@@ -3807,7 +3807,7 @@ function findPrepResultHeaderRow(aoa){
     if(/学年/.test(joined)) score+=1;
     if(/区分/.test(joined)) score+=1;
     if(/学習内容|講座|コンテンツ/.test(joined)) score+=2;
-    if(/毎日更新エクセル|結果/.test(joined)) score+=2;
+    if(/毎日更新|結果/.test(joined)) score+=2;
     if(/日時|日付|時刻|実施日時/.test(joined)) score+=2;
     if(score>best.score) best={row:r, score};
   }
@@ -3826,7 +3826,7 @@ function prepHeaderMapFromRow(headerRow){
     grade:find(['学年']),
     type:find(['区分']),
     study:find(['学習内容','講座','コンテンツ']),
-    result:find(['毎日更新エクセル','結果','内容']),
+    result:find(['毎日更新','結果','内容']),
     datetime:find(['日時','日付','時刻','実施日時'])
   };
 }
@@ -3842,7 +3842,7 @@ async function readPrepResultRecords(){
   debug.push(...hist.debug);
 
   // 必要なときだけ、画面で選んだ毎日更新.xlsxも追加で読む。
-  // 従来1行形式と、2行形式（上段=A〜D生徒情報/E-F空白、下段=E学習内容/F毎日更新エクセル）に対応する。
+  // 従来1行形式と、2行形式（上段=A〜D生徒情報/E-F空白、下段=E学習内容/F毎日更新）に対応する。
   if(!files.length){
     if(debug.length) setMeetingPrepFolderInfo(`結果読取詳細:\n${debug.join('\n')}`);
     return records;
