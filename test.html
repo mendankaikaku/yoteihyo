@@ -2728,7 +2728,11 @@ function allListIsChecked(v){
 }
 function allListStatusFromValue(v, allowed){
   const s=allListCellText(v).replace(/\s/g,'');
-  return (allowed||[]).find(x=>s===x || s.includes(x)) || '';
+  const list=allowed||[];
+  if(list.includes('当日') && s==='当') return '当日';
+  if(list.includes('後日') && s==='後') return '後日';
+  if(list.includes('不受験') && s==='不') return '不受験';
+  return list.find(x=>s===x || s.includes(x)) || '';
 }
 function allListSplitSubjects(v){
   return allListCellText(v).split(/[、,，\n／\/・･]/).map(x=>x.trim()).filter(Boolean);
