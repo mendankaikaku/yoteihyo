@@ -408,6 +408,93 @@ const DEFAULT_SUBJECT_TEMPLATES=[
 ];
 const SUBJECT_POOL=[...new Set([...COMMON_TEST_SUBJECTS,...CROWN_TEST_SUBJECTS,'数学','英語','理科','社会','総合問題','面接','小論文'])];
 const EXAM_MASTER_KEY='yoteiExamMaster';
+const EXAM_MASTER_DEFAULT_VERSION_KEY='yoteiExamMasterDefaultVersion';
+const DEFAULT_TOSHIN_EXAM_VERSION='toshin_2026_schedule_20260620';
+const DEFAULT_TOSHIN_EXAM_MASTER=[
+  ['全国統一高校生テスト','2026-06-21',['高1','高2','高3']],
+  ['京大本番レベル模試','2026-06-21',['高3']],
+  ['北大本番レベル模試','2026-06-21',['高3']],
+  ['高2京大本番レベル模試','2026-06-21',['高1','高2']],
+  ['高2北大本番レベル模試','2026-06-21',['高1','高2']],
+  ['九大本番レベル模試','2026-06-28',['高3']],
+  ['一橋大本番レベル模試','2026-06-28',['高3']],
+  ['東京科学大本番レベル模試','2026-06-28',['高3']],
+  ['高2九大本番レベル模試','2026-06-28',['高1','高2']],
+  ['高2東京科学大本番レベル模試','2026-06-28',['高1','高2']],
+  ['医学部82大学判定テスト','2026-07-05',['高3']],
+  ['東北大本番レベル模試','2026-07-05',['高3']],
+  ['名大本番レベル模試','2026-07-05',['高3']],
+  ['高2一橋大本番レベル模試','2026-07-05',['高1','高2']],
+  ['高2東北大本番レベル模試','2026-07-05',['高1','高2']],
+  ['高2名大本番レベル模試','2026-07-05',['高1','高2']],
+  ['阪大本番レベル模試','2026-07-12',['高3']],
+  ['千葉大本番レベル模試','2026-07-12',['高3']],
+  ['神戸大本番レベル模試','2026-07-12',['高3']],
+  ['広島大本番レベル模試','2026-07-19',['高3']],
+  ['高2阪大本番レベル模試','2026-07-19',['高1','高2']],
+  ['大学合格基礎力判定テスト','2026-07-20',['高1','高2','高3']],
+  ['早大・慶大レベル模試','2026-07-20',['高3']],
+  ['全国国公立大 記述模試','2026-07-20',['高3']],
+  ['上理・明青立法中レベル模試','2026-07-20',['高3']],
+  ['関関同立レベル模試','2026-07-26',['高3']],
+  ['高校レベル記述模試(高2)(高1)','2026-07-26',['高1','高2']],
+  ['九大本番レベル模試','2026-08-02',['高3']],
+  ['京大本番レベル模試','2026-08-02',['高3']],
+  ['一橋大本番レベル模試','2026-08-02',['高3']],
+  ['高2九大本番レベル模試','2026-08-02',['高1','高2']],
+  ['高2京大本番レベル模試','2026-08-02',['高1','高2']],
+  ['高2東京科学大本番レベル模試','2026-08-02',['高1','高2']],
+  ['東京科学大本番レベル模試','2026-08-23',['高3']],
+  ['高2一橋大本番レベル模試','2026-08-23',['高1','高2']],
+  ['共通テスト本番レベル模試','2026-08-30',['高2','高3']],
+  ['東大本番レベル模試','2026-09-06',['高3']],
+  ['名大本番レベル模試','2026-09-06',['高3']],
+  ['高2東大本番レベル模試','2026-09-06',['高1','高2']],
+  ['高2名大本番レベル模試','2026-09-06',['高1','高2']],
+  ['阪大本番レベル模試','2026-09-13',['高3']],
+  ['高2阪大本番レベル模試','2026-09-13',['高1','高2']],
+  ['大学合格基礎力判定テスト','2026-09-20',['高1','高2','高3']],
+  ['早大・慶大レベル模試','2026-09-20',['高3']],
+  ['全国国公立大 記述模試','2026-09-20',['高3']],
+  ['上理・明青立法中レベル模試','2026-09-20',['高3']],
+  ['関関同立レベル模試','2026-10-04',['高3']],
+  ['京大本番レベル模試','2026-10-04',['高3']],
+  ['東北大本番レベル模試','2026-10-04',['高3']],
+  ['高2大学合格基礎力判定テスト','2026-10-04',['高1','高2']],
+  ['高2京大本番レベル模試','2026-10-04',['高1','高2']],
+  ['高2東北大本番レベル模試','2026-10-04',['高1','高2']],
+  ['九大本番レベル模試','2026-10-11',['高3']],
+  ['高2九大本番レベル模試','2026-10-11',['高1','高2']],
+  ['東大本番レベル模試','2026-10-18',['高3']],
+  ['北大本番レベル模試','2026-10-18',['高3']],
+  ['名大本番レベル模試','2026-10-18',['高3']],
+  ['高2東大本番レベル模試','2026-10-18',['高1','高2']],
+  ['高2北大本番レベル模試','2026-10-18',['高1','高2']],
+  ['高2名大本番レベル模試','2026-10-18',['高1','高2']],
+  ['阪大本番レベル模試','2026-10-25',['高3']],
+  ['医学部82大学判定テスト','2026-11-01',['高3']],
+  ['高2阪大本番レベル模試','2026-11-01',['高1','高2']],
+  ['全国統一高校生テスト','2026-11-08',['高1','高2','高3']],
+  ['広島大本番レベル模試','2026-11-08',['高3']],
+  ['一橋大本番レベル模試','2026-11-08',['高3']],
+  ['高2東京科学大本番レベル模試','2026-11-08',['高1','高2']],
+  ['東京科学大本番レベル模試','2026-11-15',['高3']],
+  ['大学合格基礎力判定テスト','2026-11-15',['高1','高2','高3']],
+  ['千葉大本番レベル模試','2026-11-15',['高3']],
+  ['高2一橋大本番レベル模試','2026-11-15',['高1','高2']],
+  ['神戸大本番レベル模試','2026-11-22',['高3']],
+  ['早大・慶大レベル模試','2026-11-22',['高3']],
+  ['全国国公立大 記述模試','2026-11-22',['高3']],
+  ['上理・明青立法中レベル模試','2026-11-22',['高3']],
+  ['関関同立レベル模試','2026-12-20',['高3']],
+  ['高校レベル記述模試(高2)(高1)','2026-12-20',['高1','高2']],
+  ['共通テスト本番レベル模試','2027-01-23',['高2','高3']],
+  ['東大本番レベル模試','2027-01-23',['高3']],
+  ['高2東大本番レベル模試','2027-01-23',['高1','高2']],
+  ['京大本番レベル模試','2027-01-24',['高3']],
+  ['全国国公立大 記述模試','2027-02-07',['高3']],
+  ['高2京大本番レベル模試','2027-02-07',['高1','高2']]
+];
 const EXAM_TARGET_HISTORY_KEY='yoteiExamTargetHistory';
 const EVENT_TARGET_HISTORY_KEY='yoteiEventTargetHistory';
 const EVENT_MASTER_KEY='yoteiEventMaster';
@@ -1248,7 +1335,14 @@ function deleteStudentFromGroup(name){
 /* =========================================================
    4. 模試・イベント
 ========================================================= */
-function getExamMaster(){try{const saved=JSON.parse(localStorage.getItem(EXAM_MASTER_KEY)||'[]');return Array.isArray(saved)?saved:[]}catch(e){return []}}
+function defaultToshinExamRows(){return DEFAULT_TOSHIN_EXAM_MASTER.map(([name,date,grades])=>({name,date,type:'common',subjectTemplate:'',grades:[...grades],students:[]}))}
+function mergeDefaultExamMaster(saved){
+  const map=new Map();
+  defaultToshinExamRows().forEach(row=>map.set(`${row.name}|${row.date}`,row));
+  (Array.isArray(saved)?saved:[]).forEach(row=>{if(row&&row.name)map.set(`${row.name}|${row.date||''}`,Object.assign({type:'common',subjectTemplate:'',grades:[],students:[]},row))});
+  return Array.from(map.values());
+}
+function getExamMaster(){try{const saved=JSON.parse(localStorage.getItem(EXAM_MASTER_KEY)||'[]');const rows=Array.isArray(saved)?saved:[];if(localStorage.getItem(EXAM_MASTER_DEFAULT_VERSION_KEY)!==DEFAULT_TOSHIN_EXAM_VERSION){const merged=mergeDefaultExamMaster(rows);localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(merged));localStorage.setItem(EXAM_MASTER_DEFAULT_VERSION_KEY,DEFAULT_TOSHIN_EXAM_VERSION);return merged}return rows}catch(e){return defaultToshinExamRows()}}
 function saveExamMasterData(rows){localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(rows))}
 function visibleExamMasters(){const start=new Date($('#weekStart').value+'T00:00:00');return getExamMaster().filter(ex=>{if(!ex.date)return false;const d=new Date(ex.date+'T00:00:00');const diff=daysBetween(start,d);return diff>=0&&diff<=21})}
 function getSubjectTemplates(){
@@ -1270,7 +1364,7 @@ function saveSubjectTemplates(list){localStorage.setItem(SUBJECT_TEMPLATE_KEY,JS
 function findSubjectTemplate(name){return getSubjectTemplates().find(t=>t.name===name)||null}
 function defaultTemplateNameForType(type){return type==='crown'?'冠模試型':'共テ型'}
 function examSubjectsForType(type,templateName){const t=findSubjectTemplate(templateName||defaultTemplateNameForType(type));return t?t.subjects:(type==='crown'?CROWN_TEST_SUBJECTS:COMMON_TEST_SUBJECTS)}
-function getExamMaster(){try{const saved=JSON.parse(localStorage.getItem(EXAM_MASTER_KEY)||'[]');return Array.isArray(saved)?saved:[]}catch(e){return []}}
+function getExamMaster(){try{const saved=JSON.parse(localStorage.getItem(EXAM_MASTER_KEY)||'[]');const rows=Array.isArray(saved)?saved:[];if(localStorage.getItem(EXAM_MASTER_DEFAULT_VERSION_KEY)!==DEFAULT_TOSHIN_EXAM_VERSION){const merged=mergeDefaultExamMaster(rows);localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(merged));localStorage.setItem(EXAM_MASTER_DEFAULT_VERSION_KEY,DEFAULT_TOSHIN_EXAM_VERSION);return merged}return rows}catch(e){return defaultToshinExamRows()}}
 function saveExamMasterData(rows){localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(rows))}
 function visibleExamMasters(){const start=new Date($('#weekStart').value+'T00:00:00');return getExamMaster().filter(ex=>{if(!ex.date)return false;const d=new Date(ex.date+'T00:00:00');const diff=daysBetween(start,d);return diff>=0&&diff<=21})}
 function examId(ex){return `${ex.name||''}|${ex.date||''}|${ex.type||'common'}|${ex.subjectTemplate||defaultTemplateNameForType(ex.type)}`}
