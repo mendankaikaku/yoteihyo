@@ -722,10 +722,10 @@ main.wrap{max-width:none!important;height:auto!important;min-height:0!important;
       <div class="folderStructureSmall">太字のフォルダー名は、アプリが自動で探す名前なので基本的に変更しないでください。</div>
       <div class="folderTree"><strong>保存復元フォルダー</strong>
 ├─ <strong>打ち込み結果</strong>
-├─ <strong>学習結果</strong>
+├─ <strong>毎日更新エクセル</strong>
 ├─ <strong>対応表</strong>
 ├─ <strong>全員分リスト</strong>
-├─ <strong>毎日更新</strong>
+├─ <strong>毎日掲示</strong>
 ├─ <strong>全体予定表</strong>
 ├─ <strong>json</strong>
 └─ <strong>Comiru</strong></div>
@@ -733,6 +733,7 @@ main.wrap{max-width:none!important;height:auto!important;min-height:0!important;
         <li>入力用の保存・復元では、この保存復元フォルダーを選びます。</li>
         <li>統合用も、この保存復元フォルダーを選ぶだけで自動振り分けします。</li>
         <li>Comiru CSVは「Comiru」フォルダーに入れます。</li>
+        <li>毎日更新用のExcelは「毎日更新エクセル」フォルダーに入れ、ファイル名は「毎日更新.xlsx」にします。</li>
         <li>手修正した全員分リストは「全員分リスト」フォルダーへ戻します。</li>
         <li>「マスタ」フォルダーは今の運用では不要です。</li>
       </ul>
@@ -806,13 +807,13 @@ main.wrap{max-width:none!important;height:auto!important;min-height:0!important;
     <details id="meetingPrepDetails" class="prepDetails">
       <summary>印刷メニューを開く</summary>
       <div class="printActions prepInside" style="grid-template-columns:minmax(260px,1fr) 170px auto auto;">
-        <div class="compactHint" style="margin-top:0">復元ボタンで読み込んだ「まとめて復元」フォルダから、結果履歴JSON・学習結果Excel・週面シート・合格設計図を自動で使います。週面欠席チェックを付けた生徒だけの電話確認リストも印刷できます。</div>
+        <div class="compactHint" style="margin-top:0">復元ボタンで読み込んだ「まとめて復元」フォルダから、結果履歴JSON・毎日更新エクセルExcel・週面シート・合格設計図を自動で使います。週面欠席チェックを付けた生徒だけの電話確認リストも印刷できます。</div>
         <div class="field"><label>週面欠席リスト対象日</label><input id="weeklyAbsentTargetDate" type="date"></div>
         <button class="secondary primaryBig" id="printMeetingPrep" type="button">面談準備を印刷</button>
         <button class="secondary primaryBig" id="printWeeklyAbsentList" type="button">週面欠席者リスト印刷</button>
       </div>
       <div class="printDialogNote"><b>印刷設定：</b>印刷時は「システムダイアログを使用して印刷」を利用して、<b>用紙サイズ：A4／向き：縦／両面印刷：オン／長辺とじ</b>に設定してください。各生徒はA4両面2枚（1枚目：前週確認→今週記入、2枚目：週面シート→合格設計図）で印刷されます。</div>
-      <div id="meetingPrepFolderInfo" class="compactHint">復元した内容を先週分として使い、今週欄は印刷時だけ白紙にします。復元時に「まとめて復元」フォルダを選ぶと、json/result_history.json、学習結果フォルダ内の結果Excel、打ち込み結果/担任助手フォルダ内の週面シート、担任助手フォルダ/生徒名フォルダ内の合格設計図PDFまたはExcelを自動で読みます。</div>
+      <div id="meetingPrepFolderInfo" class="compactHint">復元した内容を先週分として使い、今週欄は印刷時だけ白紙にします。復元時に「まとめて復元」フォルダを選ぶと、json/result_history.json、毎日更新エクセルフォルダ内の毎日更新.xlsx、打ち込み結果/担任助手フォルダ内の週面シート、担任助手フォルダ/生徒名フォルダ内の合格設計図PDFまたはExcelを自動で読みます。</div>
     </details>
   </section>
 
@@ -2717,7 +2718,7 @@ function isGeneratedPlanExcelFileName(fileName){
   if(/^~\$/.test(name)) return false;
   if(!/\.xlsx$/i.test(name)) return false;
   // 予定入力HTMLが作る「生徒名.6月1日-6月7日.xlsx」のような予定Excelだけを対象にする。
-  // 合格設計図.xlsx・週面シート.xlsx・結果Excelなどを誤削除しないため、日付範囲入りの名前に限定する。
+  // 合格設計図.xlsx・週面シート.xlsx・毎日更新.xlsxなどを誤削除しないため、日付範囲入りの名前に限定する。
   return /\d{1,2}月\d{1,2}日\s*[-〜~ー]\s*\d{1,2}月\d{1,2}日/i.test(name);
 }
 function isCleanupTargetJsonFileName(fileName){
@@ -3537,8 +3538,8 @@ function setMeetingPrepFolderInfo(message){
 }
 
 function getPrepResultFiles(){
-  // v14: 面談準備では個別の結果Excel選択欄を廃止。
-  // 結果Excelは「まとめて復元/学習結果」フォルダから自動読込する。
+  // v14: 面談準備では個別の毎日更新.xlsx選択欄を廃止。
+  // 毎日更新.xlsxは「まとめて復元/毎日更新エクセル」フォルダから自動読込する。
   return [];
 }
 async function listExcelFilesFromDirectoryRecursive(dir, maxDepth=5, depth=0, pathParts=[]){
@@ -3567,21 +3568,21 @@ async function getPrepResultFilesFromShared(){
   const debug=[];
   try{
     if(!sharedDirHandle){
-      debug.push('結果Excel: 復元フォルダ未選択');
+      debug.push('毎日更新.xlsx: 復元フォルダ未選択');
       return {files, debug};
     }
     let resultDir=null;
-    if(String(sharedDirHandle.name || '') === '学習結果') resultDir=sharedDirHandle;
-    if(!resultDir) resultDir=await findDirectoryByNameRecursive(sharedDirHandle, '学習結果', 5);
+    if(String(sharedDirHandle.name || '') === '毎日更新エクセル') resultDir=sharedDirHandle;
+    if(!resultDir) resultDir=await findDirectoryByNameRecursive(sharedDirHandle, '毎日更新エクセル', 5);
     if(!resultDir){
-      debug.push('結果Excel: 学習結果フォルダなし');
+      debug.push('毎日更新.xlsx: 毎日更新エクセルフォルダなし');
       return {files, debug};
     }
-    const found=await listExcelFilesFromDirectoryRecursive(resultDir, 5, 0, ['学習結果']);
+    const found=await listExcelFilesFromDirectoryRecursive(resultDir, 5, 0, ['毎日更新エクセル']);
     files.push(...found);
-    debug.push(`結果Excel: 学習結果フォルダから${files.length}件自動読込`);
+    debug.push(`毎日更新.xlsx: 毎日更新エクセルフォルダから${files.length}件自動読込`);
   }catch(e){
-    debug.push(`結果Excel: 自動読込失敗 ${e?.message || e}`);
+    debug.push(`毎日更新.xlsx: 自動読込失敗 ${e?.message || e}`);
   }
   return {files, debug};
 }
@@ -3611,11 +3612,11 @@ function prepHeaderMap(aoa){
     grade:find(['学年']),
     type:find(['区分']),
     study:find(['学習内容','講座','コンテンツ']),
-    result:find(['学習結果','結果','内容']),
+    result:find(['毎日更新エクセル','結果','内容']),
     datetime:find(['日時','日付','時刻','実施日時'])
   };
 }
-function prepLooksLikeHeader(row){return /生徒番号|名前|生徒名|学習内容|学習結果|日時|区分/.test((row||[]).map(v=>norm(v)).join('|'));}
+function prepLooksLikeHeader(row){return /生徒番号|名前|生徒名|学習内容|毎日更新エクセル|日時|区分/.test((row||[]).map(v=>norm(v)).join('|'));}
 function prepFixedResultMap(){return {studentNo:0,student:1,grade:2,type:3,study:4,result:5,datetime:7};}
 
 function prepFixedResultCell(row, idx){return norm((row || [])[idx]);}
@@ -3625,7 +3626,7 @@ function prepHasAnyFixedCells(row, indexes){return indexes.some(idx => !!prepFix
 function prepDateTimeAt(row, idx){return parseDateTimeLoose((row || [])[idx]);}
 function prepLooksLikeTwoRowHeaderPair(top, bottom){
   const joined=`${(top || []).map(v=>norm(v)).join('|')}|${(bottom || []).map(v=>norm(v)).join('|')}`;
-  return /生徒番号/.test(joined) && /学習内容/.test(joined) && /学習結果/.test(joined);
+  return /生徒番号/.test(joined) && /学習内容/.test(joined) && /毎日更新エクセル/.test(joined);
 }
 function prepLooksLikeTwoRowMetaRow(row){
   const h=prepFixedResultMap();
@@ -3640,7 +3641,7 @@ function prepLooksLikeTwoRowMetaRow(row){
 }
 function prepLooksLikeTwoRowDetailRow(row){
   const h=prepFixedResultMap();
-  // 下段はA〜Dが空白で、E/Fに学習内容・学習結果が入る。
+  // 下段はA〜Dが空白で、E/Fに学習内容・毎日更新エクセルが入る。
   // H列に日時が入る場合もあるため、日時の有無では除外しない。
   if(!prepIsBlankFixedCells(row,[h.studentNo,h.student,h.grade,h.type])) return false;
   return !!(prepFixedResultCell(row,h.study) || prepFixedResultCell(row,h.result));
@@ -3697,7 +3698,7 @@ function prepHistoryItemToResultRecord(item){
   if(!dt) return null;
   const dateOnly=new Date(dt.getFullYear(),dt.getMonth(),dt.getDate());
   const study=norm(item.study || item['学習内容'] || '');
-  const result=norm(item.result || item['学習結果'] || '');
+  const result=norm(item.result || item['毎日更新エクセル'] || '');
   if(!study && !result) return null;
   return {
     student:norm(item.student || item.name || item['生徒名'] || ''),
@@ -3806,7 +3807,7 @@ function findPrepResultHeaderRow(aoa){
     if(/学年/.test(joined)) score+=1;
     if(/区分/.test(joined)) score+=1;
     if(/学習内容|講座|コンテンツ/.test(joined)) score+=2;
-    if(/学習結果|結果/.test(joined)) score+=2;
+    if(/毎日更新エクセル|結果/.test(joined)) score+=2;
     if(/日時|日付|時刻|実施日時/.test(joined)) score+=2;
     if(score>best.score) best={row:r, score};
   }
@@ -3825,7 +3826,7 @@ function prepHeaderMapFromRow(headerRow){
     grade:find(['学年']),
     type:find(['区分']),
     study:find(['学習内容','講座','コンテンツ']),
-    result:find(['学習結果','結果','内容']),
+    result:find(['毎日更新エクセル','結果','内容']),
     datetime:find(['日時','日付','時刻','実施日時'])
   };
 }
@@ -3835,13 +3836,13 @@ async function readPrepResultRecords(){
   const debug=[];
 
   // まず保存用フォルダ/json/result_history.json を読む。
-  // 結果Excelを毎回選ばなくても、保存済み履歴から先週結果を出すため。
+  // 毎日更新.xlsxを毎回選ばなくても、保存済み履歴から先週結果を出すため。
   const hist=await readPrepResultHistoryFromShared();
   records.push(...hist.records);
   debug.push(...hist.debug);
 
-  // 必要なときだけ、画面で選んだ結果Excelも追加で読む。
-  // 従来1行形式と、2行形式（上段=A〜D生徒情報/E-F空白、下段=E学習内容/F学習結果）に対応する。
+  // 必要なときだけ、画面で選んだ毎日更新.xlsxも追加で読む。
+  // 従来1行形式と、2行形式（上段=A〜D生徒情報/E-F空白、下段=E学習内容/F毎日更新エクセル）に対応する。
   if(!files.length){
     if(debug.length) setMeetingPrepFolderInfo(`結果読取詳細:\n${debug.join('\n')}`);
     return records;
@@ -3897,11 +3898,11 @@ async function readPrepResultRecords(){
         debug.push(`${file.name}/${sheetName}: ${sheetCount}件${hasHeader?`（見出し${headerRow+1}行目）`:'（A〜H固定）'}${skippedNoId?` / 生徒番号・名前空欄${skippedNoId}件除外`:''}${skippedDate?` / 日時読取不可${skippedDate}件`:''}`);
       }
     }catch(e){
-      console.warn('結果Excel読み取り失敗', file.name, e);
+      console.warn('毎日更新.xlsx読み取り失敗', file.name, e);
       debug.push(`${file.name}: 読み込み失敗 ${e?.message || e}`);
     }
   }
-  if(debug.length) setMeetingPrepFolderInfo(`結果Excel読取詳細:\n${debug.join('\n')}`);
+  if(debug.length) setMeetingPrepFolderInfo(`毎日更新.xlsx読取詳細:\n${debug.join('\n')}`);
   return records;
 }
 function prepResultMatchesStudent(r, name){
@@ -3912,7 +3913,7 @@ function prepResultMatchesStudent(r, name){
   // 番号が両方あるのに一致しない結果は、名前が似ていても別人として扱う。
   if(savedNo){
     if(resultNo) return savedNo===resultNo;
-    // 結果Excel側に番号がない場合だけ名前照合にフォールバックする。
+    // 毎日更新.xlsx側に番号がない場合だけ名前照合にフォールバックする。
   }
   if(prepMatchesStudent(r.student, name)) return true;
   if(prepMatchesStudent(r.rawName, name)) return true;
@@ -3920,7 +3921,7 @@ function prepResultMatchesStudent(r, name){
   return false;
 }
 function resultForStudentDate(resultRecords, name, dateKey){
-  // 結果Excelから読んだ「日付」と「名前」が、先週の日付・表示中の生徒名に合うものだけ表示する。
+  // 毎日更新.xlsxから読んだ「日付」と「名前」が、先週の日付・表示中の生徒名に合うものだけ表示する。
   // 名前は空白・全角空白・苗字だけ/フルネームの差を吸収する。
   return resultRecords.filter(r=>String(r.dateKey||'')===String(dateKey||'') && prepResultMatchesStudent(r, name));
 }
@@ -4600,7 +4601,7 @@ async function printWeeklyAbsentList(){
 async function printMeetingPrep(){
   syncFromDom();
   if(!students.length) return alert('先に生徒名を入力して「② 生徒欄を作る」を押してください。');
-  if(!window.XLSX) return alert('Excel読み取りライブラリの読み込みに失敗しました。\nこの機能は結果Excel・週面シートを読むために xlsx ライブラリが必要です。\nインターネット接続がある状態で開くか、職場PCのセキュリティで CDN がブロックされていないか確認してください。');
+  if(!window.XLSX) return alert('Excel読み取りライブラリの読み込みに失敗しました。\nこの機能は毎日更新.xlsx・週面シートを読むために xlsx ライブラリが必要です。\nインターネット接続がある状態で開くか、職場PCのセキュリティで CDN がブロックされていないか確認してください。');
   const empty=students.filter(n=>!studentHasMeaningfulInputData(n));
   if(empty.length && !confirm(`入力内容が空の生徒がいます：${empty.join('、')}\nこのまま印刷しますか？`)) return;
   const resultRecords=await readPrepResultRecords();
