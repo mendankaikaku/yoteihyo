@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>予定統合アプリ</title>
+  <title>予定統合アプリ（Comiru模試CSV対応版）</title>
   <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
   <script src="./libs/xlsx.bundle.js"></script>
   <script>
@@ -170,10 +170,21 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
       </div>
       <div class="safetyNote">出力前に③を押して、結果Excelを result_history.json に退避します。</div>
       <div id="bundleReadSummary" class="hint" style="margin-top:10px;white-space:pre-wrap;">まだ読み込んでいません</div>
-      
+
+      <details>
+        <summary>ComiruアンケートCSVを貼り付ける（模試科目リスト用）</summary>
+        <div class="hint" style="margin-top:8px;">Comiruから出したCSVを貼り付けて「Comiru CSVを反映」を押すと、模試の科目・当日/後日/不受験・Comiru回答を読み取り、2週間/1か月/期間指定出力の模試科目リストに合流します。</div>
+        <textarea id="comiruCsvText" rows="6" placeholder="ここにComiruアンケートCSVを貼り付け"></textarea>
+        <div class="btnRow">
+          <button id="applyComiruCsvBtn" class="ghost" type="button">Comiru CSVを反映</button>
+          <button id="loadComiruCsvBtn" class="secondary" type="button">CSVファイルを選ぶ</button>
+        </div>
+        <div id="comiruCsvSummary" class="hint" style="margin-top:8px;white-space:pre-wrap;">未反映</div>
+      </details>
 
       <!-- 下のinputは処理用に非表示で保持。 -->
       <input id="bundleFolderInput" class="hidden" type="file" webkitdirectory directory multiple accept=".xlsx,.xls,.xlsm,.csv,.json" />
+      <input id="comiruCsvInput" class="hidden" type="file" accept=".csv,.txt" />
       <input id="folderInput" class="hidden" type="file" webkitdirectory directory multiple accept=".xlsx,.xls,.xlsm" />
       <input id="rosterInput" class="hidden" type="file" accept=".xlsx,.xls,.xlsm,.csv" />
       <input id="resultInput" class="hidden" type="file" multiple accept=".xlsx,.xls,.xlsm" />
@@ -286,6 +297,7 @@ const state = {
   logAoa: [],
   resultAoa: [],
   examRecords: [],
+  comiruExamRecords: [],
   eventRecords: [],
   rosterAoa: [],
   rosterMap: new Map(),
@@ -963,6 +975,8 @@ async function parseExamFile(file){
         examName,
         examDate: examDateKey,
         examDateObj: examDateObj || new Date(2099,0,1),
+        type: String(examName).includes('冠') ? 'crown' : 'common',
+        subjects: [],
         status,
         comiruAnswered,
         subjectChanged,
@@ -977,6 +991,187 @@ async function parseExamFile(file){
     logRows.push([file.webkitRelativePath || file.name, '失敗', e.message || String(e), '模試確認']);
   }
   return {records, logRows};
+}
+
+// ============================================================
+// 2.5.5 ComiruアンケートCSVの貼り付け読み取り（模試科目リスト用）
+// ============================================================
+const COMIRU_SUBJECT_ALIASES = new Map([
+  ['英語r','英語R'],['英語リーディング','英語R'],['リーディング','英語R'],
+  ['英語l','英語L'],['英語リスニング','英語L'],['リスニング','英語L'],
+  ['数ia','数学ⅠA'],['数学ia','数学ⅠA'],['数学1a','数学ⅠA'],['数学Ⅰa','数学ⅠA'],['数学i a','数学ⅠA'],['数学１a','数学ⅠA'],
+  ['数iibc','数学ⅡBC'],['数Ⅱbc','数学ⅡBC'],['数学iibc','数学ⅡBC'],['数学2bc','数学ⅡBC'],['数学Ⅱbc','数学ⅡBC'],['数学２bc','数学ⅡBC'],
+  ['政経','公共政経'],['公共政治経済','公共政経'],['公共・政経','公共政経'],
+  ['情報i','情報'],['情報Ⅰ','情報']
+]);
+function compactKey(s){
+  return String(s ?? '')
+    .replace(/[０-９Ａ-Ｚａ-ｚ]/g, ch => String.fromCharCode(ch.charCodeAt(0)-0xFEE0))
+    .toLowerCase()
+    .replace(/[\s\u3000・･（）()\"'\-_/／]/g,'');
+}
+function canonicalSubjectName(s){
+  const raw = norm(s);
+  if(!raw) return '';
+  const key = compactKey(raw);
+  if(COMIRU_SUBJECT_ALIASES.has(key)) return COMIRU_SUBJECT_ALIASES.get(key);
+  const all = [...COMMON_TEST_SUBJECTS_FOR_EXAM, ...CROWN_TEST_SUBJECTS_FOR_EXAM];
+  for(const sub of all){ if(key === compactKey(sub)) return sub; }
+  for(const sub of all){ if(key.includes(compactKey(sub))) return sub; }
+  return '';
+}
+function answerLooksSelected(v){
+  const s = norm(v);
+  if(!s) return false;
+  if(/^(0|false|no|なし|無し|不要|未選択|選択なし|受験しない|不受験)$/i.test(s)) return false;
+  return true;
+}
+function normalizeExamStatusText(s){
+  const t = norm(s);
+  if(!t) return '';
+  if(/不受験|受験しない|受けない|欠席|不参加/.test(t)) return '不受験';
+  if(/後日|別日|後受|後受験/.test(t)) return '後日';
+  if(/当日|当受|会場|受験する|参加/.test(t)) return '当日';
+  return '';
+}
+function parseCsvTextRows(text){
+  const rows = [];
+  let row = [], cur = '', q = false;
+  const src = String(text || '').replace(/^\uFEFF/, '');
+  for(let i=0;i<src.length;i++){
+    const ch = src[i];
+    if(q){
+      if(ch === '"' && src[i+1] === '"'){ cur += '"'; i++; }
+      else if(ch === '"') q = false;
+      else cur += ch;
+    }else{
+      if(ch === '"') q = true;
+      else if(ch === ','){ row.push(cur); cur = ''; }
+      else if(ch === '\n'){ row.push(cur); rows.push(row); row = []; cur = ''; }
+      else if(ch !== '\r') cur += ch;
+    }
+  }
+  row.push(cur);
+  if(row.some(x => norm(x))) rows.push(row);
+  return rows.filter(r => r.some(x => norm(x)));
+}
+function findCsvHeaderRow(rows){
+  for(let i=0;i<Math.min(rows.length, 12);i++){
+    const joined = (rows[i] || []).map(norm).join(' ');
+    if(/生徒|氏名|名前|回答者/.test(joined) && /模試|科目|受験|当日|後日|不受験|アンケート|フォーム/.test(joined)) return i;
+  }
+  return 0;
+}
+function getComiruCsvHeaderMap(header){
+  const hs = header.map(x => norm(x));
+  const find = (names) => {
+    for(const name of names){ const idx = hs.findIndex(h => h === name); if(idx >= 0) return idx; }
+    for(let i=0;i<hs.length;i++){ if(names.some(n => hs[i].includes(n))) return i; }
+    return -1;
+  };
+  return {
+    student: find(['生徒名','氏名','名前','回答者名','回答者','お子さま名','生徒']),
+    studentNo: find(['生徒番号','番号','ID','id']),
+    grade: find(['学年']),
+    examName: find(['模試名','模試','アンケート名','フォーム名','タイトル','件名']),
+    examDate: find(['実施日','模試日','受験日','日付']),
+    status: find(['受験方法','受験区分','当日後日不受験','当日/後日/不受験','参加区分','出欠']),
+    subjects: find(['受験科目','科目','選択科目','受験教科','教科']),
+    answeredAt: find(['回答日時','回答日','送信日時','登録日時'])
+  };
+}
+function extractComiruSubjects(row, header, h){
+  const set = new Set();
+  const addFromText = (text) => {
+    const t = norm(text);
+    if(!t) return;
+    for(const part of splitSubjectList(t)){
+      const sub = canonicalSubjectName(part);
+      if(sub) set.add(sub);
+    }
+    const ck = compactKey(t);
+    for(const sub of [...COMMON_TEST_SUBJECTS_FOR_EXAM, ...CROWN_TEST_SUBJECTS_FOR_EXAM]){
+      if(ck.includes(compactKey(sub))) set.add(sub);
+    }
+  };
+  if(h.subjects >= 0) addFromText(row[h.subjects]);
+  for(let c=0;c<header.length;c++){
+    const head = norm(header[c]);
+    const val = norm(row[c]);
+    const headSub = canonicalSubjectName(head);
+    if(headSub && answerLooksSelected(val)) set.add(headSub);
+    if(/科目|教科|受験/.test(head) && !/受験方法|受験区分|受験日|当日|後日|不受験/.test(head)) addFromText(val);
+  }
+  return [...set];
+}
+function inferExamNameFromCsvRow(row, header, h, sourceName){
+  if(h.examName >= 0 && norm(row[h.examName])) return norm(row[h.examName]);
+  for(let c=0;c<header.length;c++){
+    const head = norm(header[c]);
+    const val = norm(row[c]);
+    if(/模試|共通テスト|共テ|プレ|実戦|オープン/.test(val)) return val;
+    if(/模試|アンケート|フォーム|タイトル|件名/.test(head) && val) return val;
+  }
+  return sourceName && sourceName !== '貼り付けCSV' ? sourceName.replace(/\.csv$/i,'') : 'Comiru模試';
+}
+function parseComiruExamCsvText(text, sourceName='貼り付けCSV'){
+  const rows = parseCsvTextRows(text);
+  if(rows.length < 2) return {records:[], logRows:[['Comiru CSV','注意','CSVの行が不足しています','']]};
+  const headerRow = findCsvHeaderRow(rows);
+  const header = rows[headerRow].map(norm);
+  const h = getComiruCsvHeaderMap(header);
+  const records = [];
+  const logs = [];
+  for(let i=headerRow+1;i<rows.length;i++){
+    const row = rows[i] || [];
+    const student = canonicalStudentName(h.student >= 0 ? row[h.student] : '');
+    if(!student) continue;
+    const examName = inferExamNameFromCsvRow(row, header, h, sourceName);
+    let status = h.status >= 0 ? normalizeExamStatusText(row[h.status]) : '';
+    if(!status){
+      for(const v of row){ status = normalizeExamStatusText(v); if(status) break; }
+    }
+    const subjects = extractComiruSubjects(row, header, h);
+    const rawDate = h.examDate >= 0 ? row[h.examDate] : examName;
+    const examDateObj = parseDateLoose(rawDate);
+    const examDate = examDateObj ? ymd(examDateObj) : '';
+    const meta = rosterMetaForStudent(student);
+    const grade = meta['学年'] || (h.grade >= 0 ? norm(row[h.grade]) : '');
+    const studentNo = meta['生徒番号'] || (h.studentNo >= 0 ? norm(row[h.studentNo]) : '');
+    if(!examName && !status && !subjects.length) continue;
+    records.push({
+      student,
+      grade,
+      studentNo,
+      kana: meta['読み仮名'] || '',
+      examName,
+      examDate,
+      examDateObj: examDateObj || new Date(2099,0,1),
+      type: String(examName).includes('冠') ? 'crown' : 'common',
+      subjects,
+      status,
+      comiruAnswered: true,
+      subjectChanged: subjects.length > 0,
+      sourceFile: sourceName,
+      sourcePath: sourceName,
+      savedAt: h.answeredAt >= 0 ? norm(row[h.answeredAt]) : '',
+      fromComiruCsv: true
+    });
+  }
+  logs.push(['Comiru CSV', records.length ? '成功' : '注意', `${records.length}件読み込み`, sourceName]);
+  return {records, logRows:logs};
+}
+function refreshExamRecordsWithComiruCsv(){
+  const base = (state.examRecords || []).filter(r => !r.fromComiruCsv);
+  state.examRecords = [...base, ...(state.comiruExamRecords || [])];
+}
+function applyComiruExamCsvText(text, sourceName='貼り付けCSV'){
+  const parsed = parseComiruExamCsvText(text, sourceName);
+  state.comiruExamRecords = parsed.records;
+  refreshExamRecordsWithComiruCsv();
+  if(state.logAoa && state.logAoa.length) state.logAoa.push(...parsed.logRows);
+  if($('comiruCsvSummary')) $('comiruCsvSummary').textContent = `Comiru CSV: ${parsed.records.length}件反映\n` + (parsed.records[0] ? `例: ${parsed.records[0].student} / ${parsed.records[0].examName} / ${parsed.records[0].status || '受験方法空欄'} / ${parsed.records[0].subjects.join('、') || '科目空欄'}` : '読み取れる行がありません');
+  log(`Comiru CSVを反映しました。\n模試CSV件数: ${parsed.records.length}件\n次に「② 統合する」またはそのまま④出力を押すと科目リストに反映されます。`);
 }
 
 
@@ -1943,7 +2138,7 @@ async function merge(){
   const out = buildOutputs(allRecords, allLogs, allResults);
   state.records = allRecords;
   state.resultRecords = allResults;
-  state.examRecords = allExamRecords;
+  state.examRecords = [...allExamRecords, ...(state.comiruExamRecords || [])];
   state.eventRecords = allEventRecords;
   state.calendarAoa = out.calendarAoa;
   state.listAoa = out.listAoa;
@@ -1963,7 +2158,7 @@ async function merge(){
   const success = allLogs.filter(x => x[1] === "成功").length;
   const fail = allLogs.filter(x => x[1] === "失敗").length;
   log(`統合プレビュー作成完了\n成功ファイル: ${success}\n失敗ファイル: ${fail}\n予定件数: ${allRecords.length}\n結果件数: ${allResults.length}\n生徒数: ${out.students.length}\n日付数: ${out.dateKeys.length}
-模試確認件数: ${allExamRecords.length}
+模試確認件数: ${state.examRecords.length}（Comiru CSV ${state.comiruExamRecords.length}件含む）
 イベント確認件数: ${allEventRecords.length}`);
 }
 
@@ -2525,7 +2720,7 @@ async function downloadWithRange(mode){
   const {from,to,label} = dateRangeForOutput(mode);
   const records = state.records.filter(r => inDateRange(r, from, to));
   const results = state.resultRecords.filter(r => inDateRange(r, from, to));
-  const exams = state.examRecords.filter(r => (!from || r.examDateObj >= from) && (!to || r.examDateObj <= to));
+  const exams = state.examRecords.filter(r => (!r.examDate || ((!from || r.examDateObj >= from) && (!to || r.examDateObj <= to))));
   const events = state.eventRecords.filter(r => (!from || r.dateObj >= from) && (!to || r.dateObj <= to));
   const out = buildOutputs(records, [], results);
   downloadWorkbookFromAoa(out.calendarAoa, out.listAoa, out.resultAoa, state.rosterAoa, out.logAoa, label, exams, events);
@@ -2581,7 +2776,21 @@ function buildExamSubjectSheetAoa(records, grade, examKey){
   return {aoa, exam:first};
 }
 function buildExamSubjectSheets(examRecords){
-  return [];
+  const used = new Set();
+  const groups = new Map();
+  for(const r of examRecords || []){
+    if(!r) continue;
+    const grade = r.grade || '未設定';
+    const key = `${grade}	${examKeyOf(r)}`;
+    if(!groups.has(key)) groups.set(key, {grade, examKey:examKeyOf(r), sample:r});
+  }
+  return [...groups.values()]
+    .sort((a,b)=>String(a.sample.examDate || '').localeCompare(String(b.sample.examDate || '')) || String(a.sample.examName || '').localeCompare(String(b.sample.examName || ''),'ja') || String(a.grade).localeCompare(String(b.grade),'ja'))
+    .map(g => {
+      const built = buildExamSubjectSheetAoa(examRecords, g.grade, g.examKey);
+      const sheetName = uniqueSheetName(`模試_${shortSheetPart(g.sample.examName)}_${g.grade}`, used);
+      return {grade:g.grade, sheetName, ...built};
+    });
 }
 function addExamSheetMerges(ws, aoa){
   ws['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:Math.max(3,(aoa[1] || []).length-1)}}];
@@ -3859,7 +4068,7 @@ async function downloadAllStudentList(){
   // 模試・イベントは期間指定がある場合だけ絞り込み、予定/結果カレンダーは既存仕様に従う。
   const from = $('fromDate').value ? new Date($('fromDate').value + 'T00:00:00') : null;
   const to = $('toDate').value ? new Date($('toDate').value + 'T23:59:59') : null;
-  const exams = (state.examRecords || []).filter(r => (!from || r.examDateObj >= from) && (!to || r.examDateObj <= to));
+  const exams = (state.examRecords || []).filter(r => (!r.examDate || ((!from || r.examDateObj >= from) && (!to || r.examDateObj <= to))));
   const events = (state.eventRecords || []).filter(r => (!from || r.dateObj >= from) && (!to || r.dateObj <= to));
   const gradeAoas = buildAllStudentListAoaByGrade(exams, events);
   if(!gradeAoas.length){ alert('出力する生徒が見つかりません'); return; }
@@ -4125,6 +4334,15 @@ function setResultHistoryFiles(fileList){
 
 $("readBundleBtn").addEventListener("click", () => $("bundleFolderInput").click());
 $("bundleFolderInput").addEventListener("change", e => setBundleFolderFiles(e.target.files));
+if($("applyComiruCsvBtn")) $("applyComiruCsvBtn").addEventListener("click", () => applyComiruExamCsvText($("comiruCsvText").value || '', '貼り付けCSV'));
+if($("loadComiruCsvBtn")) $("loadComiruCsvBtn").addEventListener("click", () => $("comiruCsvInput").click());
+if($("comiruCsvInput")) $("comiruCsvInput").addEventListener("change", async e => {
+  const file = e.target.files && e.target.files[0];
+  if(!file) return;
+  const text = await file.text();
+  if($("comiruCsvText")) $("comiruCsvText").value = text;
+  applyComiruExamCsvText(text, file.name || 'Comiru CSV');
+});
 $("folderInput").addEventListener("change", e => setFiles(e.target.files));
 $("resultInput").addEventListener("change", e => setResultFiles(e.target.files));
 $("resultHistoryInput").addEventListener("change", e => setResultHistoryFiles(e.target.files));
@@ -4145,7 +4363,7 @@ $("downloadBtn").addEventListener("click", () => downloadWithRange("custom"));
 $("downloadAllListBtn").addEventListener("click", downloadAllStudentList);
 $("downloadMonthlyPosterBtn").addEventListener("click", downloadMonthlyPosterResultWorkbook);
 $("clearBtn").addEventListener("click", () => {
-  state.files=[]; state.resultFiles=[]; state.resultHistoryFiles=[]; state.posterSettingsFiles=[]; state.allListFiles=[]; state.allListRestores=new Map(); state.dailyPosterFiles=[]; state.dailyPosterRestores=new Map(); state.wholeScheduleFiles=[]; state.wholeScheduleRestores=new Map(); state.resultHistoryRecords=[]; state.records=[]; state.resultRecords=[]; state.examRecords=[]; state.eventRecords=[]; state.calendarAoa=[]; state.listAoa=[]; state.resultAoa=[]; state.logAoa=[]; state.rosterAoa=[]; state.rosterMap=new Map(); state.rosterNoMap=new Map(); state.workbookReady=false;
+  state.files=[]; state.resultFiles=[]; state.resultHistoryFiles=[]; state.posterSettingsFiles=[]; state.allListFiles=[]; state.allListRestores=new Map(); state.dailyPosterFiles=[]; state.dailyPosterRestores=new Map(); state.wholeScheduleFiles=[]; state.wholeScheduleRestores=new Map(); state.resultHistoryRecords=[]; state.records=[]; state.resultRecords=[]; state.examRecords=[]; state.comiruExamRecords=[]; state.eventRecords=[]; state.calendarAoa=[]; state.listAoa=[]; state.resultAoa=[]; state.logAoa=[]; state.rosterAoa=[]; state.rosterMap=new Map(); state.rosterNoMap=new Map(); state.workbookReady=false;
   $("bundleFolderInput").value="";
   $("folderInput").value="";
   $("rosterInput").value="";
