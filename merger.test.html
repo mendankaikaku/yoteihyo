@@ -3387,8 +3387,11 @@ function buildExamEventGroups(examRecords=[], eventRecords=[]){
     if(!examSeen.has(baseKey)){
       examSeen.add(baseKey);
       const baseLabel = `${r.examDate ? r.examDate.slice(5).replace('-','/') + '\n' : ''}${shortExamNameForAllList(r.examName)}`;
-      examGroups.push({key:`${baseKey}|status`, baseKey, field:'status', label:`${baseLabel}\n受`});
-      examGroups.push({key:`${baseKey}|subject`, baseKey, field:'subject', label:`${baseLabel}\n科`});
+      // 全員分リストの模試欄は、各模試ごとに「科目変更 / Comiru回答 / 当日後日不受験」の3列で出す。
+      // 既存の列幅設定は styleAllStudentGradeSheet 側で維持する。
+      examGroups.push({key:`${baseKey}|subject`, baseKey, field:'subject', label:`${baseLabel}\n科目変更`});
+      examGroups.push({key:`${baseKey}|comiru`, baseKey, field:'comiru', label:`${baseLabel}\nComiru回答`});
+      examGroups.push({key:`${baseKey}|status`, baseKey, field:'status', label:`${baseLabel}\n当日後日不受験`});
     }
   }
   examGroups.sort((a,b)=>String(a.label).localeCompare(String(b.label),'ja'));
@@ -3415,11 +3418,12 @@ function buildExamEventMaps(examRecords=[], eventRecords=[]){
     const key = studentKeyForList(meta['生徒名'] || r.student, meta['生徒番号'] || r.studentNo || '');
     const g = examKeyOf(r);
     if(!examByStudent.has(key)) examByStudent.set(key, new Map());
-    // 全員分リストでは模試の科目は出さず、受験方法・Comiru回答・コメントを表示する。
+    // 全員分リストでは、受験方法・Comiru回答・科目変更を各模試3列で表示する。
     const status = norm(r.status || '');
-    const statusCell = status.includes('不受験') ? '不' : (status.includes('後日') ? '後' : (status.includes('当日') ? '当' : status));
-    examByStudent.get(key).set(`${g}|status`, r.comiruAnswered ? statusCell : `!${statusCell || '不'}`);
+    const statusCell = status.includes('不受験') ? '不受験' : (status.includes('後日') ? '後日' : (status.includes('当日') ? '当日' : status));
     examByStudent.get(key).set(`${g}|subject`, r.subjectChanged ? '○' : '');
+    examByStudent.get(key).set(`${g}|comiru`, r.comiruAnswered ? '済' : '!未');
+    examByStudent.get(key).set(`${g}|status`, statusCell || '不受験');
   }
 
   const eventByStudent = new Map();
@@ -3465,11 +3469,16 @@ function isAllListDateDynamicHeader(h){
   return /\d{1,2}\/\d{1,2}.*\n(予定|結果)$/.test(t) || /\n(予定|結果)$/.test(t);
 }
 function allListCanonicalHeader(h){
-  const t = normalizeAllListHeaderText(h).replace(/\s+/g,'');
+  const raw = normalizeAllListHeaderText(h);
+  const t = raw.replace(/\s+/g,'');
   if(['氏名','名前'].includes(t)) return '生徒名';
   if(['生徒No','生徒Ｎｏ','番号','生徒番号'].includes(t)) return '生徒番号';
   if(['よみがな','ふりがな','フリガナ','読み'].includes(t)) return '読み仮名';
-  return normalizeAllListHeaderText(h);
+  // 旧版の全員分リストを読み込んだ場合も、新しい3列見出しへ対応づけて手修正を引き継ぐ。
+  if(/\n受$/.test(raw)) return raw.replace(/\n受$/, '\n当日後日不受験');
+  if(/\nComiru$/.test(raw)) return raw.replace(/\nComiru$/, '\nComiru回答');
+  if(/\n変更$/.test(raw)) return raw.replace(/\n変更$/, '\n科目変更');
+  return raw;
 }
 function allListRowKeyFromCells(row, header){
   const headerCanon = header.map(allListCanonicalHeader);
@@ -3747,7 +3756,7 @@ function buildAllStudentListAoaByGrade(examRecords=[], eventRecords=[]){
     for(const s of students){
       const key = studentKeyForList(s.student, s.studentNo);
       const row = [s.grade, s.studentNo, s.student, s.kana, s.teacher, s.school, s.note];
-      for(const g of examGroups) row.push(examByStudent.get(key)?.get(g.key) || (g.field === 'status' ? '不' : ''));
+      for(const g of examGroups) row.push(examByStudent.get(key)?.get(g.key) || (g.field === 'status' ? '不受験' : ''));
       for(const g of eventGroups) row.push(eventByStudent.get(key)?.get(g.key) || '');
       for(const d of windowDates){
         const dk = ymd(d);
@@ -3776,7 +3785,9 @@ function styleAllStudentGradeSheet(ws, aoa){
     else if(c<=6) widths.push(14);
     else{
       const h=String(aoa[1]?.[c]||'');
-      if(/\n(受|科|参加)$/.test(h)) widths.push(5);
+      if(/\n(受|当日後日不受験|参加)$/.test(h)) widths.push(5);
+      else if(/\n(Comiru|Comiru回答)$/.test(h)) widths.push(8);
+      else if(/\n(変更|科目変更)$/.test(h)) widths.push(6);
       else if(/\n備考$/.test(h)) widths.push(10);
       else widths.push(22);
     }
