@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ja">　
+<html lang="ja">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -3403,7 +3403,9 @@ function buildExamEventGroups(examRecords=[], eventRecords=[]){
     if(!eventSeen.has(baseKey)){
       eventSeen.add(baseKey);
       const baseLabel = `イベント\n${r.datetime ? r.datetime + ' ' : ''}${r.eventName || 'イベント名未入力'}`;
+      // 全員分リストのイベント欄も、各イベントごとに「参加 / Comiru回答 / 備考」の3列で出す。
       eventGroups.push({key:`${baseKey}|status`, baseKey, field:'status', label:`${baseLabel}\n参加`});
+      eventGroups.push({key:`${baseKey}|comiru`, baseKey, field:'comiru', label:`${baseLabel}\nComiru回答`});
       eventGroups.push({key:`${baseKey}|note`, baseKey, field:'note', label:`${baseLabel}\n備考`});
     }
   }
@@ -3432,7 +3434,8 @@ function buildExamEventMaps(examRecords=[], eventRecords=[]){
     const key = studentKeyForList(meta['生徒名'] || r.student, meta['生徒番号'] || r.studentNo || '');
     const g = eventKeyOf(r);
     if(!eventByStudent.has(key)) eventByStudent.set(key, new Map());
-    eventByStudent.get(key).set(`${g}|status`, r.comiruAnswered ? (r.status || '') : `!${r.status || '未'}`);
+    eventByStudent.get(key).set(`${g}|status`, r.status || '');
+    eventByStudent.get(key).set(`${g}|comiru`, r.comiruAnswered ? '済' : '!未');
     eventByStudent.get(key).set(`${g}|note`, r.note || '');
   }
   return {examByStudent, eventByStudent};
