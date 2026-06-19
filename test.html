@@ -722,7 +722,7 @@ main.wrap{max-width:none!important;height:auto!important;min-height:0!important;
       <div class="folderStructureSmall">太字のフォルダー名は、アプリが自動で探す名前なので基本的に変更しないでください。</div>
       <div class="folderTree"><strong>保存復元フォルダー</strong>
 ├─ <strong>打ち込み結果</strong>
-├─ <strong>毎日更新</strong>
+├─ <strong>毎日更新エクセル</strong>
 ├─ <strong>対応表</strong>
 ├─ <strong>全員分リスト</strong>
 ├─ <strong>毎日掲示</strong>
@@ -733,7 +733,7 @@ main.wrap{max-width:none!important;height:auto!important;min-height:0!important;
         <li>入力用の保存・復元では、この保存復元フォルダーを選びます。</li>
         <li>統合用も、この保存復元フォルダーを選ぶだけで自動振り分けします。</li>
         <li>Comiru CSVは「Comiru」フォルダーに入れます。</li>
-        <li>毎日更新用のExcelは「毎日更新」フォルダーに入れ、ファイル名は「毎日更新.xlsx」にします。</li>
+        <li>毎日更新用のExcelは「毎日更新エクセル」フォルダーに入れ、ファイル名は「毎日更新.xlsx」にします。</li>
         <li>手修正した全員分リストは「全員分リスト」フォルダーへ戻します。</li>
         <li>「マスタ」フォルダーは今の運用では不要です。</li>
       </ul>
@@ -3256,8 +3256,13 @@ function allListMergeExamPatch(data, patch){
   if(!ex){ ex={id:patch.id||'',name:patch.name||'',date:patch.date||'',type:patch.type||'common',subjectTemplate:patch.subjectTemplate||'',status:'',comiruAnswered:false,subjects:[],subjectChanged:false,note:''}; data.exams.push(ex); }
   let changed=false;
   if(['当日','後日','不受験'].includes(patch.status) && ex.status!==patch.status){ex.status=patch.status; changed=true;}
-  if(typeof patch.comiruAnswered==='boolean' && ex.comiruAnswered!==patch.comiruAnswered){ex.comiruAnswered=patch.comiruAnswered; changed=true;}
-  if(typeof patch.subjectChanged==='boolean' && ex.subjectChanged!==patch.subjectChanged){ex.subjectChanged=patch.subjectChanged; changed=true;}
+  // Comiruは「未」より「済」を優先。済みを未に戻さない。
+  if(patch.comiruAnswered===true && ex.comiruAnswered!==true){ex.comiruAnswered=true; changed=true;}
+  else if(patch.comiruAnswered===false && ex.comiruAnswered!==true && ex.comiruAnswered!==false){ex.comiruAnswered=false; changed=true;}
+  // 科目変更も、ありを優先。ありを空/なしで消さない。
+  if(patch.subjectChanged===true && ex.subjectChanged!==true){ex.subjectChanged=true; changed=true;}
+  else if(patch.subjectChanged===false && ex.subjectChanged!==true && ex.subjectChanged!==false){ex.subjectChanged=false; changed=true;}
+  if(allListCellText(patch.note)){ex.note=allListCellText(patch.note); changed=true;}
   return changed;
 }
 function allListMergeEventPatch(data, patch){
@@ -3269,7 +3274,10 @@ function allListMergeEventPatch(data, patch){
   if(!ev){ ev={id:patch.id||'',name:patch.name||'',datetime:patch.datetime||'',status:'',comiruAnswered:false,note:''}; data.events.push(ev); }
   let changed=false;
   if(['参加','不参加'].includes(patch.status) && ev.status!==patch.status){ev.status=patch.status; changed=true;}
-  if(typeof patch.comiruAnswered==='boolean' && ev.comiruAnswered!==patch.comiruAnswered){ev.comiruAnswered=patch.comiruAnswered; changed=true;}
+  // Comiruは「未」より「済」を優先。済みを未に戻さない。
+  if(patch.comiruAnswered===true && ev.comiruAnswered!==true){ev.comiruAnswered=true; changed=true;}
+  else if(patch.comiruAnswered===false && ev.comiruAnswered!==true && ev.comiruAnswered!==false){ev.comiruAnswered=false; changed=true;}
+  // イベントは備考も重要なので、復元用シート/全員分リストの備考を反映する。
   if(allListCellText(patch.note)){ev.note=allListCellText(patch.note); changed=true;}
   return changed;
 }
@@ -3301,7 +3309,7 @@ function parseAllListOverridesFromRows(aoa, targetNames){
       const bucket=ensure(matched);
       // 行形式：模試名/イベント名の列がある場合
       if(examNameIdx>=0 && allListCellText(row[examNameIdx])){
-        bucket.exams.push({
+        allListAddPatchWithPriority(bucket,'exam',{
           name:allListCellText(row[examNameIdx]),
           date:examDateIdx>=0?allListCellText(row[examDateIdx]):'',
           status:examStatusIdx>=0?allListStatusFromValue(row[examStatusIdx],['当日','後日','不受験']):'',
@@ -3310,7 +3318,7 @@ function parseAllListOverridesFromRows(aoa, targetNames){
         });
       }
       if(eventNameIdx>=0 && allListCellText(row[eventNameIdx])){
-        bucket.events.push({
+        allListAddPatchWithPriority(bucket,'event',{
           name:allListCellText(row[eventNameIdx]),
           datetime:eventDateIdx>=0?allListCellText(row[eventDateIdx]):'',
           status:eventStatusIdx>=0?allListStatusFromValue(row[eventStatusIdx],['参加','不参加']):'',
@@ -3331,7 +3339,7 @@ function parseAllListOverridesFromRows(aoa, targetNames){
           if(/Comiru|コミル/.test(h)) p.comiruAnswered=allListIsChecked(v);
           if(/科目変更|科変/.test(h)) p.subjectChanged=allListIsChecked(v);
         });
-        if(p.status || p.comiruAnswered!==undefined || p.subjectChanged!==undefined) bucket.exams.push(p);
+        if(p.status || p.comiruAnswered!==undefined || p.subjectChanged!==undefined) allListAddPatchWithPriority(bucket,'exam',p);
       });
       getEventMaster().forEach(master=>{
         const evName=master.name||''; if(!evName) return;
@@ -3345,13 +3353,117 @@ function parseAllListOverridesFromRows(aoa, targetNames){
           if(/Comiru|コミル/.test(h)) p.comiruAnswered=allListIsChecked(v);
           if(/備考|メモ/.test(h)) p.note=allListCellText(v);
         });
-        if(p.status || p.comiruAnswered!==undefined || p.note) bucket.events.push(p);
+        if(p.status || p.comiruAnswered!==undefined || p.note) allListAddPatchWithPriority(bucket,'event',p);
       });
     }
     break;
   }
   return patches;
 }
+
+function allListParseComiruValue(v){
+  const s=allListCellText(v).replace(/\s/g,'');
+  if(!s) return undefined;
+  if(/済|回答済|○|〇|◯|true|yes|y|1/i.test(s)) return true;
+  if(/未|未回答|なし|無|false|no|n|0/i.test(s)) return false;
+  return allListIsChecked(s);
+}
+function allListPatchStatusRank(status, kind){
+  const s=allListCellText(status);
+  if(kind==='exam' && ['当日','後日','不受験'].includes(s)) return 3;
+  if(kind==='event' && ['参加','不参加'].includes(s)) return 3;
+  if(s.includes('未')) return 1;
+  return s ? 2 : 0;
+}
+function allListPatchKey(patch, kind){
+  if(kind==='exam') return allListNormKey([patch.id||'', patch.name||'', patch.date||''].join('|'));
+  return allListNormKey([patch.id||'', patch.name||'', patch.datetime||''].join('|'));
+}
+function allListPreferPatch(oldPatch, newPatch, kind){
+  if(!oldPatch) return newPatch;
+  const out=Object.assign({}, oldPatch);
+  const oldRank=allListPatchStatusRank(oldPatch.status, kind);
+  const newRank=allListPatchStatusRank(newPatch.status, kind);
+  if(newRank > oldRank || (newRank === oldRank && allListCellText(newPatch.status))) out.status = newPatch.status;
+  if(newPatch.comiruAnswered === true || (oldPatch.comiruAnswered !== true && typeof newPatch.comiruAnswered === 'boolean')) out.comiruAnswered = newPatch.comiruAnswered;
+  if(kind==='exam'){
+    if(newPatch.subjectChanged === true || (oldPatch.subjectChanged !== true && typeof newPatch.subjectChanged === 'boolean')) out.subjectChanged = newPatch.subjectChanged;
+    ['id','name','date','type','subjectTemplate'].forEach(k=>{ if(allListCellText(newPatch[k]) && !allListCellText(out[k])) out[k]=newPatch[k]; });
+  }else{
+    if(allListCellText(newPatch.note)) out.note = newPatch.note;
+    ['id','name','datetime'].forEach(k=>{ if(allListCellText(newPatch[k]) && !allListCellText(out[k])) out[k]=newPatch[k]; });
+  }
+  return out;
+}
+function allListAddPatchWithPriority(bucket, kind, patch){
+  if(!patch || !patch.name) return;
+  const arr = kind === 'exam' ? bucket.exams : bucket.events;
+  const key = allListPatchKey(patch, kind);
+  const idx = arr.findIndex(x => allListPatchKey(x, kind) === key);
+  if(idx >= 0) arr[idx] = allListPreferPatch(arr[idx], patch, kind);
+  else arr.push(patch);
+}
+function allListSmallHeaderIndex(headers, patterns){
+  return headers.findIndex(h=>patterns.some(p=>allListNormKey(h).includes(allListNormKey(p))));
+}
+function parseSmallAllListOverridesFromRows(aoa, targetNames){
+  const patches={};
+  const ensure=(name)=>patches[name]||(patches[name]={exams:[],events:[]});
+  for(let hr=0; hr<Math.min(12,aoa.length); hr++){
+    const headers=(aoa[hr]||[]).map(allListCellText);
+    const rowText=headers.join('|');
+    if(!/区分/.test(rowText) || !/生徒名/.test(rowText) || !/機械キー/.test(rowText)) continue;
+    const kindIdx=allListSmallHeaderIndex(headers,['区分']);
+    const dateIdx=allListSmallHeaderIndex(headers,['日付/日時','日付','日時']);
+    const nameIdx=allListSmallHeaderIndex(headers,['名称','名前']);
+    const targetCountIdx=allListSmallHeaderIndex(headers,['対象人数']);
+    const gradeIdx=allListSmallHeaderIndex(headers,['学年']);
+    const noIdx=allListSmallHeaderIndex(headers,['生徒番号']);
+    const studentIdx=allListSmallHeaderIndex(headers,['生徒名']);
+    const statusIdx=allListSmallHeaderIndex(headers,['受験方法/参加','受験方法','参加']);
+    const subjectIdx=allListSmallHeaderIndex(headers,['科目変更']);
+    const comiruIdx=allListSmallHeaderIndex(headers,['Comiru回答','コミル回答','Comiru','コミル']);
+    const noteIdx=allListSmallHeaderIndex(headers,['備考']);
+    const machineKeyIdx=allListSmallHeaderIndex(headers,['機械キー']);
+    for(let r=hr+1;r<aoa.length;r++){
+      const row=aoa[r]||[];
+      if(!row.some(v=>allListCellText(v))) continue;
+      const matched=matchAllListStudentName(studentIdx>=0?row[studentIdx]:'',targetNames) || matchAllListStudentName(noIdx>=0?row[noIdx]:'',targetNames);
+      if(!matched) continue;
+      const kind=allListCellText(row[kindIdx]);
+      const bucket=ensure(matched);
+      const itemName=nameIdx>=0?allListCellText(row[nameIdx]):'';
+      const dateText=dateIdx>=0?allListCellText(row[dateIdx]):'';
+      const statusText=statusIdx>=0?allListCellText(row[statusIdx]):'';
+      const comiruValue=comiruIdx>=0?allListParseComiruValue(row[comiruIdx]):undefined;
+      const noteText=noteIdx>=0?allListCellText(row[noteIdx]):'';
+      const machineKey=machineKeyIdx>=0?allListCellText(row[machineKeyIdx]):'';
+      if(kind.includes('模試')){
+        allListAddPatchWithPriority(bucket,'exam',{
+          id:machineKey,
+          name:itemName,
+          date:dateText,
+          status:allListStatusFromValue(statusText,['当日','後日','不受験']) || (statusText.includes('未') ? '未聞き取り' : ''),
+          comiruAnswered:comiruValue,
+          subjectChanged:subjectIdx>=0 ? allListIsChecked(row[subjectIdx]) : undefined,
+          note:noteText
+        });
+      }else if(kind.includes('イベント')){
+        allListAddPatchWithPriority(bucket,'event',{
+          id:machineKey,
+          name:itemName,
+          datetime:dateText,
+          status:allListStatusFromValue(statusText,['参加','不参加']) || (statusText.includes('未') ? '未聞き取り' : ''),
+          comiruAnswered:comiruValue,
+          note:noteText
+        });
+      }
+    }
+    break;
+  }
+  return patches;
+}
+
 async function applyAllStudentListOverridesToInput(names){
   try{
     const hit=await readAllStudentListWorkbookFromShared();
@@ -3362,11 +3474,12 @@ async function applyAllStudentListOverridesToInput(names){
     (wb.SheetNames||[]).forEach(sheetName=>{
       const ws=wb.Sheets[sheetName];
       const aoa=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false,blankrows:false});
-      const patches=parseAllListOverridesFromRows(aoa,names);
+      const isSmallSheet=String(sheetName||'').includes('小規模模試イベント');
+      const patches=isSmallSheet ? parseSmallAllListOverridesFromRows(aoa,names) : parseAllListOverridesFromRows(aoa,names);
       Object.entries(patches).forEach(([name,p])=>{
         const b=allPatches[name]||(allPatches[name]={exams:[],events:[]});
-        b.exams.push(...(p.exams||[]));
-        b.events.push(...(p.events||[]));
+        (p.exams||[]).forEach(ex=>allListAddPatchWithPriority(b,'exam',ex));
+        (p.events||[]).forEach(ev=>allListAddPatchWithPriority(b,'event',ev));
       });
     });
     Object.entries(allPatches).forEach(([name,p])=>{
