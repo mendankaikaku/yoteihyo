@@ -3672,12 +3672,245 @@ function groupAllListStudentsByGrade(studentMap){
   }
   return byGrade;
 }
+
+const ALL_LIST_SMALL_TARGET_LIMIT = 15;
+
+function allListGroupTargetCountByBase(records, keyFn, visibleFn){
+  const map = new Map();
+  for(const r of records || []){
+    if(visibleFn && !visibleFn(r)) continue;
+    const baseKey = keyFn(r);
+    if(!baseKey) continue;
+    if(!map.has(baseKey)) map.set(baseKey, new Set());
+    const meta = rosterMetaForStudent(r.student);
+    const stuKey = studentKeyForList(meta['生徒名'] || r.student, meta['生徒番号'] || r.studentNo || '');
+    if(stuKey) map.get(baseKey).add(stuKey);
+  }
+  const out = new Map();
+  for(const [k,set] of map.entries()) out.set(k, set.size);
+  return out;
+}
+function allListIsSmallTargetCount(count){
+  return Number(count || 0) > 0 && Number(count || 0) <= ALL_LIST_SMALL_TARGET_LIMIT;
+}
+function allListSmallDateLabel(dateText){
+  const d = String(dateText || '').trim();
+  if(!d) return '';
+  const m = d.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m) return `${Number(m[2])}/${Number(m[3])}`;
+  const m2 = d.match(/(\d{1,2})[\/月](\d{1,2})/);
+  if(m2) return `${Number(m2[1])}/${Number(m2[2])}`;
+  return d;
+}
+function allListSmallStatusText(status){
+  const s = norm(status || '');
+  if(!s) return '未聞き取り';
+  if(s.includes('不受験')) return '不受験';
+  if(s.includes('後日')) return '後日';
+  if(s.includes('当日')) return '当日';
+  return s;
+}
+function allListSmallComiruText(answered){
+  return answered ? '済' : '未聞き取り';
+}
+function allListSmallRowKey(kind, machineKey, studentKey){
+  return `${kind || ''}|${machineKey || ''}|${studentKey || ''}`;
+}
+function allListSmallRowObjectToLine(obj){
+  if(!obj) return '';
+  if(obj.kind === '模試'){
+    return `${obj.date ? allListSmallDateLabel(obj.date) + ' ' : ''}${obj.name || '模試名未入力'}｜${obj.status || '未聞き取り'}｜科目変更:${obj.subject || ''}｜Comiru回答:${obj.comiru || '未聞き取り'}`;
+  }
+  return `${obj.date ? allListSmallDateLabel(obj.date) + ' ' : ''}${obj.name || 'イベント名未入力'}｜${obj.status || '未聞き取り'}｜Comiru回答:${obj.comiru || '未聞き取り'}${obj.note ? '｜備考:' + obj.note : ''}`;
+}
+function allListSmallRowObjectPending(obj){
+  return !obj || !norm(obj.status || '') || String(obj.status || '').includes('未') || !norm(obj.comiru || '') || String(obj.comiru || '').includes('未');
+}
+function allListSmallRowObjectToArray(obj){
+  return [
+    obj.kind || '',
+    obj.date || '',
+    obj.name || '',
+    obj.count || '',
+    obj.grade || '',
+    obj.studentNo || '',
+    obj.student || '',
+    obj.status || '',
+    obj.subject || '',
+    obj.comiru || '',
+    obj.note || '',
+    obj.machineKey || ''
+  ];
+}
+function allListSmallHeaderIndex(header, names){
+  const h = (header || []).map(x => String(x || '').replace(/\s/g,''));
+  for(const name of names){
+    const n = String(name).replace(/\s/g,'');
+    const idx = h.findIndex(x => x === n || x.includes(n));
+    if(idx >= 0) return idx;
+  }
+  return -1;
+}
+async function parseSmallAllListRestoreFile(file){
+  const out = {rowObjects:[]};
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, {type:'array', cellDates:true});
+  for(const sheetName of wb.SheetNames){
+    if(!String(sheetName || '').includes('小規模模試イベント')) continue;
+    const ws = wb.Sheets[sheetName];
+    const aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:'', raw:false});
+    if(!aoa.length) continue;
+    let headerRow = -1;
+    for(let r=0; r<Math.min(12, aoa.length); r++){
+      const rowText = (aoa[r] || []).map(norm).join('|');
+      if(/区分/.test(rowText) && /生徒名/.test(rowText) && /機械キー/.test(rowText)){ headerRow = r; break; }
+    }
+    if(headerRow < 0) continue;
+    const header = (aoa[headerRow] || []).map(x => String(x || '').trim());
+    const idx = {
+      kind: allListSmallHeaderIndex(header, ['区分']),
+      date: allListSmallHeaderIndex(header, ['日付/日時','日付','日時']),
+      name: allListSmallHeaderIndex(header, ['名称','名前']),
+      count: allListSmallHeaderIndex(header, ['対象人数']),
+      grade: allListSmallHeaderIndex(header, ['学年']),
+      studentNo: allListSmallHeaderIndex(header, ['生徒番号']),
+      student: allListSmallHeaderIndex(header, ['生徒名']),
+      status: allListSmallHeaderIndex(header, ['受験方法/参加','受験方法','参加']),
+      subject: allListSmallHeaderIndex(header, ['科目変更']),
+      comiru: allListSmallHeaderIndex(header, ['Comiru回答','Comiru']),
+      note: allListSmallHeaderIndex(header, ['備考']),
+      machineKey: allListSmallHeaderIndex(header, ['機械キー'])
+    };
+    for(let r=headerRow+1; r<aoa.length; r++){
+      const row = aoa[r] || [];
+      if(!row.some(v => norm(v))) continue;
+      const obj = {
+        kind: idx.kind >= 0 ? norm(row[idx.kind]) : '',
+        date: idx.date >= 0 ? norm(row[idx.date]) : '',
+        name: idx.name >= 0 ? norm(row[idx.name]) : '',
+        count: idx.count >= 0 ? norm(row[idx.count]) : '',
+        grade: idx.grade >= 0 ? norm(row[idx.grade]) : '',
+        studentNo: idx.studentNo >= 0 ? norm(row[idx.studentNo]) : '',
+        student: idx.student >= 0 ? norm(row[idx.student]) : '',
+        status: idx.status >= 0 ? norm(row[idx.status]) : '',
+        subject: idx.subject >= 0 ? norm(row[idx.subject]) : '',
+        comiru: idx.comiru >= 0 ? norm(row[idx.comiru]) : '',
+        note: idx.note >= 0 ? norm(row[idx.note]) : '',
+        machineKey: idx.machineKey >= 0 ? norm(row[idx.machineKey]) : ''
+      };
+      obj.studentKey = studentKeyForList(obj.student, obj.studentNo);
+      if(!obj.kind || !obj.studentKey || !obj.machineKey) continue;
+      out.rowObjects.push(obj);
+    }
+  }
+  return out;
+}
+function buildSmallExamEventNoteMaps(examRecords=[], eventRecords=[]){
+  const examCounts = allListGroupTargetCountByBase(examRecords, examKeyOf, allListExamStillVisible);
+  const eventCounts = allListGroupTargetCountByBase(eventRecords, eventKeyOf, null);
+  const rowObjects = new Map();
+
+  function putRowObject(obj){
+    if(!obj || !obj.studentKey) return;
+    const rk = allListSmallRowKey(obj.kind, obj.machineKey, obj.studentKey);
+    rowObjects.set(rk, obj);
+  }
+
+  for(const r of examRecords || []){
+    if(!allListExamStillVisible(r)) continue;
+    const baseKey = examKeyOf(r);
+    const count = examCounts.get(baseKey) || 0;
+    if(!allListIsSmallTargetCount(count)) continue;
+    const meta = rosterMetaForStudent(r.student);
+    const stuKey = studentKeyForList(meta['生徒名'] || r.student, meta['生徒番号'] || r.studentNo || '');
+    putRowObject({
+      kind:'模試',
+      date:r.examDate || '',
+      name:r.examName || '',
+      count,
+      grade:meta["学年"] || r.grade || '',
+      studentNo:meta["生徒番号"] || r.studentNo || '',
+      student:meta["生徒名"] || r.student || '',
+      status:allListSmallStatusText(r.status),
+      subject:r.subjectChanged ? 'あり' : '',
+      comiru:allListSmallComiruText(r.comiruAnswered),
+      note:r.note || '',
+      machineKey:baseKey,
+      studentKey:stuKey
+    });
+  }
+
+  for(const r of eventRecords || []){
+    const baseKey = eventKeyOf(r);
+    const count = eventCounts.get(baseKey) || 0;
+    if(!allListIsSmallTargetCount(count)) continue;
+    const meta = rosterMetaForStudent(r.student);
+    const stuKey = studentKeyForList(meta['生徒名'] || r.student, meta['生徒番号'] || r.studentNo || '');
+    putRowObject({
+      kind:'イベント',
+      date:r.datetime || '',
+      name:r.eventName || '',
+      count,
+      grade:meta["学年"] || r.grade || '',
+      studentNo:meta["生徒番号"] || r.studentNo || '',
+      student:meta["生徒名"] || r.student || '',
+      status:norm(r.status || '') || '未聞き取り',
+      subject:'',
+      comiru:allListSmallComiruText(r.comiruAnswered),
+      note:r.note || '',
+      machineKey:baseKey,
+      studentKey:stuKey
+    });
+  }
+
+  const manual = state.allListSmallRestores;
+  if(manual && manual.rowObjects && manual.rowObjects.length){
+    for(const obj of manual.rowObjects){
+      putRowObject(obj);
+    }
+  }
+
+  const noteMap = new Map();
+  const pendingMap = new Map();
+  const restoreRows = [["区分","日付/日時","名称","対象人数","学年","生徒番号","生徒名","受験方法/参加","科目変更","Comiru回答","備考","機械キー"]];
+  const rows = [...rowObjects.values()].sort((a,b)=>
+    String(a.date || '').localeCompare(String(b.date || '')) ||
+    String(a.kind || '').localeCompare(String(b.kind || ''),'ja') ||
+    String(a.name || '').localeCompare(String(b.name || ''),'ja') ||
+    String(a.grade || '').localeCompare(String(b.grade || ''),'ja') ||
+    String(a.student || '').localeCompare(String(b.student || ''),'ja')
+  );
+
+  for(const obj of rows){
+    const line = allListSmallRowObjectToLine(obj);
+    if(line){
+      if(!noteMap.has(obj.studentKey)) noteMap.set(obj.studentKey, []);
+      const arr = noteMap.get(obj.studentKey);
+      if(!arr.includes(line)) arr.push(line);
+    }
+    if(allListSmallRowObjectPending(obj)) pendingMap.set(obj.studentKey, true);
+    restoreRows.push(allListSmallRowObjectToArray(obj));
+  }
+
+  return {noteMap, pendingMap, restoreRows};
+}
+function appendSmallNotesToBaseNote(baseNote, extraLines){
+  const base = norm(baseNote || '');
+  const lines = (extraLines || []).filter(Boolean);
+  if(!lines.length) return base;
+  const block = "【小規模模試・イベント】\n" + lines.map(x => "・" + x).join("\n");
+  return base ? `${base}\n${block}` : block;
+}
+
 function buildExamEventGroups(examRecords=[], eventRecords=[]){
+  const examCounts = allListGroupTargetCountByBase(examRecords, examKeyOf, allListExamStillVisible);
+  const eventCounts = allListGroupTargetCountByBase(eventRecords, eventKeyOf, null);
   const examGroups = [];
   const examSeen = new Set();
   for(const r of examRecords || []){
     if(!allListExamStillVisible(r)) continue;
     const baseKey = examKeyOf(r);
+    if(allListIsSmallTargetCount(examCounts.get(baseKey) || 0)) continue;
     if(!examSeen.has(baseKey)){
       examSeen.add(baseKey);
       const baseLabel = `${r.examDate ? r.examDate.slice(5).replace('-','/') + '\n' : ''}${shortExamNameForAllList(r.examName)}`;
@@ -3692,6 +3925,7 @@ function buildExamEventGroups(examRecords=[], eventRecords=[]){
   const eventSeen = new Set();
   for(const r of eventRecords || []){
     const baseKey = eventKeyOf(r);
+    if(allListIsSmallTargetCount(eventCounts.get(baseKey) || 0)) continue;
     if(!eventSeen.has(baseKey)){
       eventSeen.add(baseKey);
       const baseLabel = `イベント\n${r.datetime ? r.datetime + ' ' : ''}${r.eventName || 'イベント名未入力'}`;
@@ -3703,14 +3937,16 @@ function buildExamEventGroups(examRecords=[], eventRecords=[]){
   return {examGroups, eventGroups};
 }
 function buildExamEventMaps(examRecords=[], eventRecords=[]){
+  const examCounts = allListGroupTargetCountByBase(examRecords, examKeyOf, allListExamStillVisible);
+  const eventCounts = allListGroupTargetCountByBase(eventRecords, eventKeyOf, null);
   const examByStudent = new Map();
   for(const r of examRecords || []){
     if(!allListExamStillVisible(r)) continue;
+    const g = examKeyOf(r);
+    if(allListIsSmallTargetCount(examCounts.get(g) || 0)) continue;
     const meta = rosterMetaForStudent(r.student);
     const key = studentKeyForList(meta['生徒名'] || r.student, meta['生徒番号'] || r.studentNo || '');
-    const g = examKeyOf(r);
     if(!examByStudent.has(key)) examByStudent.set(key, new Map());
-    // 全員分リストでは模試の科目は出さず、受験方法・Comiru回答・コメントを表示する。
     const status = norm(r.status || '');
     const statusCell = status.includes('不受験') ? '不' : (status.includes('後日') ? '後' : (status.includes('当日') ? '当' : status));
     examByStudent.get(key).set(`${g}|status`, statusCell || '不');
@@ -3720,9 +3956,10 @@ function buildExamEventMaps(examRecords=[], eventRecords=[]){
 
   const eventByStudent = new Map();
   for(const r of eventRecords || []){
+    const g = eventKeyOf(r);
+    if(allListIsSmallTargetCount(eventCounts.get(g) || 0)) continue;
     const meta = rosterMetaForStudent(r.student);
     const key = studentKeyForList(meta['生徒名'] || r.student, meta['生徒番号'] || r.studentNo || '');
-    const g = eventKeyOf(r);
     if(!eventByStudent.has(key)) eventByStudent.set(key, new Map());
     eventByStudent.get(key).set(`${g}|status`, r.comiruAnswered ? (r.status || '') : `!${r.status || '未'}`);
     eventByStudent.get(key).set(`${g}|note`, r.note || '');
@@ -3855,6 +4092,7 @@ async function parseAllListRestoreFile(file){
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, {type:'array', cellDates:true});
   for(const sheetName of wb.SheetNames){
+    if(String(sheetName || '').includes('小規模模試イベント')) continue;
     const ws = wb.Sheets[sheetName];
     const aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:'', raw:false});
     if(!aoa.length) continue;
@@ -3898,16 +4136,21 @@ async function parseAllListRestoreFile(file){
 async function loadAllListRestoreFiles(files){
   const merged = new Map();
   const logs = [];
+  const small = {rowObjects:[]};
   for(const file of files || []){
     try{
       const parsed = await parseAllListRestoreFile(file);
       for(const [grade, data] of parsed.entries()) merged.set(grade, data);
-      logs.push(`${file.name}: ${parsed.size}シート`);
+      const smallParsed = await parseSmallAllListRestoreFile(file);
+      if(smallParsed && smallParsed.rowObjects) small.rowObjects.push(...smallParsed.rowObjects);
+      const smallMsg = smallParsed && smallParsed.rowObjects && smallParsed.rowObjects.length ? ` / 小規模${smallParsed.rowObjects.length}件` : '';
+      logs.push(`${file.name}: ${parsed.size}シート${smallMsg}`);
     }catch(e){
       logs.push(`${file.name}: 読み込み失敗 ${e.message || e}`);
     }
   }
   state.allListRestores = merged;
+  state.allListSmallRestores = small;
   return logs;
 }
 function findAllListRestoreForGrade(grade){
@@ -4028,6 +4271,7 @@ function buildAllStudentListAoaByGrade(examRecords=[], eventRecords=[]){
   const byGrade = groupAllListStudentsByGrade(studentMap);
   const {examGroups, eventGroups} = buildExamEventGroups(examRecords, eventRecords);
   const {examByStudent, eventByStudent} = buildExamEventMaps(examRecords, eventRecords);
+  const smallInfo = buildSmallExamEventNoteMaps(examRecords, eventRecords);
   const windowDates = allListWindowDates();
   const {planByStudentDate, resultByStudentDate} = buildPlanResultMapsForAllList(windowDates);
 
@@ -4042,7 +4286,8 @@ function buildAllStudentListAoaByGrade(examRecords=[], eventRecords=[]){
     const aoa = [[title], header];
     for(const s of students){
       const key = studentKeyForList(s.student, s.studentNo);
-      const row = [s.grade, s.studentNo, s.student, s.kana, s.teacher, s.school, s.note];
+      const smallLines = smallInfo.noteMap.get(key) || [];
+      const row = [s.grade, s.studentNo, s.student, s.kana, s.teacher, s.school, appendSmallNotesToBaseNote(s.note, smallLines)];
       for(const g of examGroups) row.push(examByStudent.get(key)?.get(g.key) || (g.field === 'status' ? '不' : ''));
       for(const g of eventGroups) row.push(eventByStudent.get(key)?.get(g.key) || '');
       for(const d of windowDates){
@@ -4053,7 +4298,7 @@ function buildAllStudentListAoaByGrade(examRecords=[], eventRecords=[]){
       aoa.push(row);
     }
     const mergedAoa = mergeRestoredAllListAoa(grade, aoa);
-    gradeAoas.push({grade, title, aoa:mergedAoa, windowDates, examCount:examGroups.length, eventCount:eventGroups.length, restored: !!findAllListRestoreForGrade(grade)});
+    gradeAoas.push({grade, title, aoa:mergedAoa, windowDates, examCount:examGroups.length, eventCount:eventGroups.length, smallRestoreRows: smallInfo.restoreRows, smallPendingMap: smallInfo.pendingMap, restored: !!findAllListRestoreForGrade(grade)});
   }
   return gradeAoas;
 }
@@ -4107,6 +4352,10 @@ function styleAllStudentGradeSheet(ws, aoa){
     if(R===0) style.fill = titleFill;
     else if(R===1) style.fill = headerFill;
     else if(C<=2) style.fill = nameFill;
+    if(R>1 && C===6 && text.includes('【小規模模試・イベント】') && text.includes('未聞き取り')){
+      style.fill = comiruMissingFill;
+      style.font = fontRed;
+    }
     else if(R>1 && C>=7){
       const headerText = String(aoa[1]?.[C] || '');
       if(headerText.includes('\n予定')) style.fill = planFill;
@@ -4140,10 +4389,19 @@ async function downloadAllStudentList(){
   if(!gradeAoas.length){ alert('出力する生徒が見つかりません'); return; }
 
   const wb = XLSX.utils.book_new();
+  let smallRestoreAoa = [["区分","日付/日時","名称","対象人数","学年","生徒番号","生徒名","受験方法/参加","科目変更","Comiru回答","備考","機械キー"]];
   for(const item of gradeAoas){
     const ws = aoaToSheet(item.aoa);
     styleAllStudentGradeSheet(ws, item.aoa);
     XLSX.utils.book_append_sheet(wb, ws, safeSheetName(item.grade));
+    if(item.smallRestoreRows && item.smallRestoreRows.length > 1){
+      smallRestoreAoa.push(...item.smallRestoreRows.slice(1));
+    }
+  }
+  if(smallRestoreAoa.length > 1){
+    const wsSmall = aoaToSheet(smallRestoreAoa);
+    applyNiceSheetSettings(wsSmall, smallRestoreAoa, [10,16,28,10,10,12,18,16,14,14,34,44], {rows:{min:22,max:90,header:32,pxPerLine:16}});
+    XLSX.utils.book_append_sheet(wb, wsSmall, safeSheetName('小規模模試イベント_復元用'));
   }
 
   if(state.allListUpdateLog && state.allListUpdateLog.length > 1){
@@ -4156,7 +4414,7 @@ async function downloadAllStudentList(){
   XLSX.writeFile(wb, `全員分リスト_学年別_B4横_${ymd(base)}基準.xlsx`);
   if(typeof log === 'function'){
     const count = Math.max(0, (state.allListUpdateLog?.length || 1) - 1);
-    log(`全員分リストを出力しました。\n手修正・自動データの衝突ログ: ${count}件${count ? '\nExcel内の「更新ログ」シートを確認してください。' : ''}`);
+    log(`全員分リストを出力しました。\n対象15人以下の模試・イベントは備考欄に反映し、Excel内の「小規模模試イベント_復元用」シートにも保存しました。手修正はそのシートを更新してください。\n手修正・自動データの衝突ログ: ${count}件${count ? '\nExcel内の「更新ログ」シートを確認してください。' : ''}`);
   }
 }
 
