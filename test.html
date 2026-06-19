@@ -1410,10 +1410,10 @@ function examPanelHtml(name){
   return exams.map(ex=>{
     const id=examId(ex);
     const targetInfo=[(ex.grades||[]).join('・'), (ex.students||[]).join('・')].filter(Boolean).join(' / ');
-    return `<div class="examItem" data-exam-id="${escapeHtml(id)}" data-exam-name="${escapeHtml(ex.name)}" data-exam-date="${escapeHtml(ex.date)}"><div class="examHead"><span>${escapeHtml(ex.name)}</span><span class="examDate">${escapeHtml(ex.date)}${targetInfo?' / 対象:'+escapeHtml(targetInfo):''}</span></div><div class="checkRow">${['当日','後日','不受験'].map(st=>`<label><input type="radio" name="exam_${escapeHtml(name)}_${escapeHtml(id)}" data-exam-status value="${st}">${st}</label>`).join('')}<label><input type="checkbox" data-exam-comiru>Comiru回答</label></div><div class="field" style="margin-top:8px"><label>コメント</label><textarea data-exam-note placeholder="Comiru回答状況や個別コメント"></textarea></div></div>`;
+    return `<div class="examItem" data-exam-id="${escapeHtml(id)}" data-exam-name="${escapeHtml(ex.name)}" data-exam-date="${escapeHtml(ex.date)}"><div class="examHead"><span>${escapeHtml(ex.name)}</span><span class="examDate">${escapeHtml(ex.date)}${targetInfo?' / 対象:'+escapeHtml(targetInfo):''}</span></div><div class="checkRow">${['当日','後日','不受験'].map(st=>`<label><input type="radio" name="exam_${escapeHtml(name)}_${escapeHtml(id)}" data-exam-status value="${st}">${st}</label>`).join('')}<label><input type="checkbox" data-exam-comiru>Comiru回答</label><label><input type="checkbox" data-exam-subject-changed>科目変更あり</label></div></div>`;
   }).join('')
 }
-function getExamInputsForCard(card){return Array.from(card.querySelectorAll('.examItem')).map(item=>({id:item.dataset.examId||'',name:item.dataset.examName||'',date:item.dataset.examDate||'',type:item.dataset.examType||'common',subjectTemplate:item.dataset.examTemplate||'',status:(item.querySelector('input[data-exam-status]:checked')||{}).value||'',comiruAnswered:!!item.querySelector('input[data-exam-comiru]:checked'),subjects:[],subjectChanged:false,note:item.querySelector('[data-exam-note]')?.value||''}))}
+function getExamInputsForCard(card){return Array.from(card.querySelectorAll('.examItem')).map(item=>({id:item.dataset.examId||'',name:item.dataset.examName||'',date:item.dataset.examDate||'',type:item.dataset.examType||'common',subjectTemplate:item.dataset.examTemplate||'',status:(item.querySelector('input[data-exam-status]:checked')||{}).value||'',comiruAnswered:!!item.querySelector('input[data-exam-comiru]:checked'),subjects:[],subjectChanged:!!item.querySelector('input[data-exam-subject-changed]:checked'),note:''}))}
 function applyExamValuesToCard(card,values=[]){
   const list=Array.isArray(values)?values:[];
   const map=new Map(list.map(v=>[v.id||`${v.name}|${v.date}|${v.type||'common'}|${v.subjectTemplate||defaultTemplateNameForType(v.type||'common')}`,v]));
@@ -1423,7 +1423,7 @@ function applyExamValuesToCard(card,values=[]){
     if(!v)return;
     if(exact&&v.status){const st=item.querySelector(`input[data-exam-status][value="${v.status}"]`);if(st)st.checked=true}
     const comiru=item.querySelector('input[data-exam-comiru]'); if(comiru) comiru.checked=!!v.comiruAnswered;
-    const note=item.querySelector('[data-exam-note]'); if(note) note.value=v.note||'';
+    const subjectChanged=item.querySelector('input[data-exam-subject-changed]'); if(subjectChanged) subjectChanged.checked=!!v.subjectChanged;
   })
 }
 function getEventInputsForCard(card){return Array.from(card.querySelectorAll('.eventItem')).map(row=>({id:row.dataset.eventId||'',name:row.querySelector('[data-event-name]')?.value||'',datetime:row.querySelector('[data-event-datetime]')?.value||'',status:(row.querySelector('input[data-event-status]:checked')||{}).value||'',comiruAnswered:!!row.querySelector('input[data-event-comiru]:checked'),note:row.querySelector('[data-event-note]')?.value||''})).filter(x=>x.name||x.datetime||x.status||x.comiruAnswered||x.note)}
@@ -2172,7 +2172,7 @@ function maxUsedOther(data){let m=1;(data.schedule||[]).forEach(day=>[3,4,5].for
 /* =========================================================
    6. コピー・POS
 ========================================================= */
-function buildCopyText(name){syncFromDom(); const data=ensureStudent(name),dates=getDates(),lines=[]; lines.push(`${name} 面談内容`); if(data.studentNo)lines.push(`生徒番号 ${data.studentNo}`); dates.forEach((d,di)=>{const items=data.schedule[di].map((v,i)=>String(v||'').trim()?`${LIMITS[i]} ${String(v||'').trim().replace(/\s*\n\s*/g,' / ')}`:'').filter(Boolean).join(' / '); lines.push(`${jpDate(d)}（${DOW[d.getDay()]}） ${items}`.trim())}); data.materials.forEach(m=>{const subject=String(m.subject||'').trim().replace(/\s*\n\s*/g,' / '),book=String(m.book||'').trim().replace(/\s*\n\s*/g,' / '),content=String(m.content||'').trim().replace(/\s*\n\s*/g,' / '); if(subject||book||content)lines.push([subject,book,content].filter(Boolean).join('　'))}); const remarks=String(data.remarks||'').trim().replace(/\s*\n\s*/g,' / '); if(remarks)lines.push(`備考 ${remarks}`); const failureReason=String(data.failureReason||'').trim().replace(/\s*\n\s*/g,' / '); if(failureReason)lines.push(`達成できなかった理由 ${failureReason}`); if(data.weeklyMeetingAbsent)lines.push('週面欠席'); (data.exams||[]).forEach(ex=>{if(ex.name||ex.status||ex.comiruAnswered||ex.note)lines.push(`模試 ${ex.name} ${ex.status} Comiru回答:${ex.comiruAnswered?'済':'未'} ${ex.note||''}`.trim())}); (data.events||[]).forEach(ev=>{if(ev.name||ev.status||ev.comiruAnswered||ev.note)lines.push(`イベント ${ev.name} ${ev.datetime||''} ${ev.status} Comiru回答:${ev.comiruAnswered?'済':'未'} ${ev.note||''}`.trim())}); (data.comments||[]).forEach(cm=>{if(cm.title||cm.text||cm.note)lines.push(`今週の方針/コメント ${cm.title||''} ${cm.text||''} ${cm.note||''}`.trim())}); return lines.join('\n')}
+function buildCopyText(name){syncFromDom(); const data=ensureStudent(name),dates=getDates(),lines=[]; lines.push(`${name} 面談内容`); if(data.studentNo)lines.push(`生徒番号 ${data.studentNo}`); dates.forEach((d,di)=>{const items=data.schedule[di].map((v,i)=>String(v||'').trim()?`${LIMITS[i]} ${String(v||'').trim().replace(/\s*\n\s*/g,' / ')}`:'').filter(Boolean).join(' / '); lines.push(`${jpDate(d)}（${DOW[d.getDay()]}） ${items}`.trim())}); data.materials.forEach(m=>{const subject=String(m.subject||'').trim().replace(/\s*\n\s*/g,' / '),book=String(m.book||'').trim().replace(/\s*\n\s*/g,' / '),content=String(m.content||'').trim().replace(/\s*\n\s*/g,' / '); if(subject||book||content)lines.push([subject,book,content].filter(Boolean).join('　'))}); const remarks=String(data.remarks||'').trim().replace(/\s*\n\s*/g,' / '); if(remarks)lines.push(`備考 ${remarks}`); const failureReason=String(data.failureReason||'').trim().replace(/\s*\n\s*/g,' / '); if(failureReason)lines.push(`達成できなかった理由 ${failureReason}`); if(data.weeklyMeetingAbsent)lines.push('週面欠席'); (data.exams||[]).forEach(ex=>{if(ex.name||ex.status||ex.comiruAnswered||ex.subjectChanged)lines.push(`模試 ${ex.name} ${ex.status} Comiru回答:${ex.comiruAnswered?'済':'未'} 科目変更:${ex.subjectChanged?'あり':'なし'}`.trim())}); (data.events||[]).forEach(ev=>{if(ev.name||ev.status||ev.comiruAnswered||ev.note)lines.push(`イベント ${ev.name} ${ev.datetime||''} ${ev.status} Comiru回答:${ev.comiruAnswered?'済':'未'} ${ev.note||''}`.trim())}); (data.comments||[]).forEach(cm=>{if(cm.title||cm.text||cm.note)lines.push(`今週の方針/コメント ${cm.title||''} ${cm.text||''} ${cm.note||''}`.trim())}); return lines.join('\n')}
 async function copyOne(name){const text=buildCopyText(name); try{if(navigator.clipboard&&window.isSecureContext)await navigator.clipboard.writeText(text); else{const ta=document.createElement('textarea');ta.value=text;ta.setAttribute('readonly','');ta.style.position='fixed';ta.style.left='-9999px';document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta)} alert(`${name}の面談内容をコピーしました。POSを開きます。`); const opened=window.open(POS_URL,'_blank','noopener'); if(!opened)alert('POSを開けませんでした。ポップアップブロック設定を確認してください。')}catch(e){alert('自動コピーに失敗しました。')}}
 async function copyOnly(name){const text=buildCopyText(name); try{if(navigator.clipboard&&window.isSecureContext)await navigator.clipboard.writeText(text); else{const ta=document.createElement('textarea');ta.value=text;ta.setAttribute('readonly','');ta.style.position='fixed';ta.style.left='-9999px';document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta)} alert(`${name}の面談内容をコピーしました。`);}catch(e){alert('自動コピーに失敗しました。')}}
 
@@ -2183,7 +2183,7 @@ function cellXml(r,c,v,style=0){if(v===undefined||v===null||v==='')return '';ret
 function rowXml(r,cells){return `<row r="${r}">${cells.join('')}</row>`}
 function buildPlanSheetXml(name){const data=ensureStudent(name),dates=getDates();let rows=[],r=1;rows.push(rowXml(r,[cellXml(r,1,'予定入力表',1)]));r++;rows.push(rowXml(r,[cellXml(r,1,'生徒名',2),cellXml(r,2,name,0),cellXml(r,4,'週開始',2),cellXml(r,5,$('#weekStart').value,0)]));r+=2;rows.push(rowXml(r,[cellXml(r,1,'予定/日付',2),...dates.map((d,i)=>cellXml(r,2+i,`${jpDate(d)}（${DOW[d.getDay()]}）`,2))]));r++;LIMITS.forEach((lim,li)=>{rows.push(rowXml(r,[cellXml(r,1,lim,2),...data.schedule.map((day,di)=>cellXml(r,2+di,day[li]||'',0))]));r++});r++;const headerRow=r;rows.push(rowXml(r,[cellXml(r,1,'教科',2),cellXml(r,2,'問題集/高速マスター',2),cellXml(r,5,'内容',2)]));r++;data.materials.forEach(m=>{if(m.subject||m.book||m.content){rows.push(rowXml(r,[cellXml(r,1,m.subject,0),cellXml(r,2,m.book,0),cellXml(r,5,m.content,0)]));r++}});const remarksRow=r;rows.push(rowXml(r,[cellXml(r,1,'備考',2),cellXml(r,2,data.remarks,0)]));r++;const failureRow=r;rows.push(rowXml(r,[cellXml(r,1,'達成できなかった理由',2),cellXml(r,2,data.failureReason||'',0)]));r++;const absentRow=r;rows.push(rowXml(r,[cellXml(r,1,'週面欠席',2),cellXml(r,2,data.weeklyMeetingAbsent?'欠席':'',0)]));const merges=[`<mergeCell ref="A1:H1"/>`,`<mergeCell ref="B${headerRow}:D${headerRow}"/>`,`<mergeCell ref="E${headerRow}:H${headerRow}"/>`];for(let rr=headerRow+1;rr<remarksRow;rr++)merges.push(`<mergeCell ref="B${rr}:D${rr}"/>`,`<mergeCell ref="E${rr}:H${rr}"/>`);merges.push(`<mergeCell ref="B${remarksRow}:H${remarksRow}"/>`,`<mergeCell ref="B${failureRow}:H${failureRow}"/>`,`<mergeCell ref="B${absentRow}:H${absentRow}"/>`);return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="4" topLeftCell="A5" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols><col min="1" max="1" width="15" customWidth="1"/><col min="2" max="8" width="20" customWidth="1"/></cols><sheetData>${rows.join('')}</sheetData><mergeCells count="${merges.length}">${merges.join('')}</mergeCells><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`}
 function simpleSheetXml(aoa){const rows=[];aoa.forEach((row,idx)=>{const r=idx+1;rows.push(rowXml(r,row.map((v,c)=>cellXml(r,c+1,v,idx===0?2:0))))});return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols><col min="1" max="12" width="22" customWidth="1"/></cols><sheetData>${rows.join('')}</sheetData><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`}
-function buildExamSheetXml(name){const data=ensureStudent(name);const aoa=[['生徒名','生徒番号','週開始','模試名','実施日','受験方法','Comiru回答','コメント','保存日時']];(data.exams||[]).forEach(ex=>{if(ex.name||ex.status||ex.comiruAnswered||ex.note)aoa.push([name,data.studentNo||'',$('#weekStart').value,ex.name,ex.date,ex.status,ex.comiruAnswered?'済':'',ex.note||'',new Date().toLocaleString('ja-JP')])});return simpleSheetXml(aoa)}
+function buildExamSheetXml(name){const data=ensureStudent(name);const aoa=[['生徒名','生徒番号','週開始','模試名','実施日','受験方法','Comiru回答','科目変更あり','保存日時']];(data.exams||[]).forEach(ex=>{if(ex.name||ex.status||ex.comiruAnswered||ex.subjectChanged)aoa.push([name,data.studentNo||'',$('#weekStart').value,ex.name,ex.date,ex.status,ex.comiruAnswered?'済':'',ex.subjectChanged?'○':'',new Date().toLocaleString('ja-JP')])});return simpleSheetXml(aoa)}
 function buildEventSheetXml(name){const data=ensureStudent(name);const aoa=[['生徒名','生徒番号','学年','週開始','イベント名','日時','参加/不参加','Comiru回答','備考','保存日時']];(data.events||[]).forEach(ev=>{if(ev.name||ev.datetime||ev.status||ev.comiruAnswered||ev.note)aoa.push([name,data.studentNo||'',data.grade||'',$('#weekStart').value,ev.name,ev.datetime||'',ev.status,ev.comiruAnswered?'済':'',ev.note,new Date().toLocaleString('ja-JP')])});return simpleSheetXml(aoa)}
 function buildCommentSheetXml(name){const data=ensureStudent(name);const aoa=[['生徒名','生徒番号','学年','週開始','タイトル','今週の方針/コメント','個別メモ','保存日時']];(data.comments||[]).forEach(cm=>{if(cm.title||cm.text||cm.note)aoa.push([name,data.studentNo||'',data.grade||'',$('#weekStart').value,cm.title||'',cm.text||'',cm.note||'',new Date().toLocaleString('ja-JP')])});return simpleSheetXml(aoa)}
 const enc=new TextEncoder();function bytes(s){return enc.encode(s)}function crcTable(){let t=[];for(let i=0;i<256;i++){let c=i;for(let k=0;k<8;k++)c=(c&1)?(0xedb88320^(c>>>1)):(c>>>1);t[i]=c>>>0}return t}const CRC_TABLE=crcTable();function crc32Bytes(arr){let crc=0xffffffff;for(let i=0;i<arr.length;i++)crc=(crc>>>8)^CRC_TABLE[(crc^arr[i])&0xff];return (crc^0xffffffff)>>>0}function put16(a,o,v){a[o]=v&255;a[o+1]=(v>>>8)&255}function put32(a,o,v){a[o]=v&255;a[o+1]=(v>>>8)&255;a[o+2]=(v>>>16)&255;a[o+3]=(v>>>24)&255}function concat(parts){let len=parts.reduce((s,p)=>s+p.length,0),out=new Uint8Array(len),pos=0;parts.forEach(p=>{out.set(p,pos);pos+=p.length});return out}
@@ -2682,7 +2682,7 @@ function studentHasMeaningfulData(data){
   if(!!data.weeklyMeetingAbsent) return true;
   if((data.schedule||[]).some(day => (day||[]).some(v => String(v||'').trim()))) return true;
   if((data.materials||[]).some(m => String(m.subject||m.book||m.content||'').trim())) return true;
-  if((data.exams||[]).some(ex => String(ex.status||ex.note||'').trim() || ex.comiruAnswered)) return true;
+  if((data.exams||[]).some(ex => String(ex.status||'').trim() || ex.comiruAnswered || ex.subjectChanged)) return true;
   if((data.events||[]).some(ev => String(ev.status||ev.note||'').trim() || ev.comiruAnswered)) return true;
   if((data.comments||[]).some(cm => String(cm.title||cm.text||cm.note||'').trim())) return true;
   return false;
@@ -2780,7 +2780,7 @@ function allListMergeExamPatch(data, patch){
   let changed=false;
   if(['当日','後日','不受験'].includes(patch.status) && ex.status!==patch.status){ex.status=patch.status; changed=true;}
   if(typeof patch.comiruAnswered==='boolean' && ex.comiruAnswered!==patch.comiruAnswered){ex.comiruAnswered=patch.comiruAnswered; changed=true;}
-  if(allListCellText(patch.note)){ex.note=allListCellText(patch.note); changed=true;}
+  if(typeof patch.subjectChanged==='boolean' && ex.subjectChanged!==patch.subjectChanged){ex.subjectChanged=patch.subjectChanged; changed=true;}
   return changed;
 }
 function allListMergeEventPatch(data, patch){
@@ -2810,7 +2810,7 @@ function parseAllListOverridesFromRows(aoa, targetNames){
     const examDateIdx=allListFindHeaderIndex(headers,['実施日','模試日','日付']);
     const examStatusIdx=allListFindHeaderIndex(headers,['受験方法','受験区分','当日後日','当日/後日','受験']);
     const examComiruIdx=allListFindHeaderIndex(headers,['Comiru回答','コミル回答','Comiru','コミル']);
-    const examNoteIdx=allListFindHeaderIndex(headers,['コメント','模試コメント','模試備考']);
+    const examSubjectChangedIdx=allListFindHeaderIndex(headers,['科目変更あり','科目変更','科変']);
     const genericNoteIdx=allListFindHeaderIndex(headers,['備考']);
     const eventNameIdx=allListFindHeaderIndex(headers,['イベント名']);
     const eventDateIdx=allListFindHeaderIndex(headers,['日時','イベント日']);
@@ -2829,7 +2829,7 @@ function parseAllListOverridesFromRows(aoa, targetNames){
           date:examDateIdx>=0?allListCellText(row[examDateIdx]):'',
           status:examStatusIdx>=0?allListStatusFromValue(row[examStatusIdx],['当日','後日','不受験']):'',
           comiruAnswered:examComiruIdx>=0?allListIsChecked(row[examComiruIdx]):undefined,
-          note:examNoteIdx>=0?allListCellText(row[examNoteIdx]):''
+          subjectChanged:examSubjectChangedIdx>=0?allListIsChecked(row[examSubjectChangedIdx]):undefined
         });
       }
       if(eventNameIdx>=0 && allListCellText(row[eventNameIdx])){
@@ -2852,9 +2852,9 @@ function parseAllListOverridesFromRows(aoa, targetNames){
           if(/当日|後日|不受験/.test(h) && allListIsChecked(v)) p.status=(h.match(/当日|後日|不受験/)||[''])[0];
           const st=allListStatusFromValue(v,['当日','後日','不受験']); if(st) p.status=st;
           if(/Comiru|コミル/.test(h)) p.comiruAnswered=allListIsChecked(v);
-          if(/コメント|備考|メモ/.test(h)) p.note=allListCellText(v);
+          if(/科目変更|科変/.test(h)) p.subjectChanged=allListIsChecked(v);
         });
-        if(p.status || p.comiruAnswered!==undefined || p.note) bucket.exams.push(p);
+        if(p.status || p.comiruAnswered!==undefined || p.subjectChanged!==undefined) bucket.exams.push(p);
       });
       getEventMaster().forEach(master=>{
         const evName=master.name||''; if(!evName) return;
@@ -3499,7 +3499,7 @@ function studentHasMeaningfulInputData(name){
   if(String(d.remarks||'').trim()) return true;
   if(String(d.failureReason||'').trim()) return true;
   if(!!d.weeklyMeetingAbsent) return true;
-  if((d.exams||[]).some(ex=>ex.name||ex.status||ex.comiruAnswered||ex.note)) return true;
+  if((d.exams||[]).some(ex=>ex.name||ex.status||ex.comiruAnswered||ex.subjectChanged)) return true;
   if((d.events||[]).some(ev=>ev.name||ev.status||ev.comiruAnswered||ev.note||ev.datetime)) return true;
   return false;
 }
@@ -3516,7 +3516,7 @@ function examPrintDetailHtml(ex){
   const parts=[];
   parts.push(`受験方法：${examStatusChecksForPrint(ex)}`);
   parts.push(`Comiru回答：${checkboxMark('回答済み',!!ex?.comiruAnswered)}`);
-  if(ex?.note) parts.push(`コメント：${esc(ex.note)}`);
+  parts.push(`科目変更：${checkboxMark('あり',!!ex?.subjectChanged)}`);
   return parts.join(' / ');
 }
 function eventStatusChecksForPrint(ev){
@@ -3550,7 +3550,7 @@ function meetingPrepListenItemsHtml(name){
   const data=ensureStudent(name);
   const items=[];
   (data.exams||[]).forEach(ex=>{
-    if(!(ex.name||ex.status||ex.comiruAnswered||ex.note)) return;
+    if(!(ex.name||ex.status||ex.comiruAnswered||ex.subjectChanged)) return;
     const pending=examPendingListenDetailHtml(ex);
     if(pending) items.push(`模試：${esc(ex.name||'名称未入力')}（${pending}）`);
   });
@@ -3598,7 +3598,7 @@ function meetingPrepCurrentPlanHtml(name){
   // 画面上の復元内容は消さず、印刷時だけ予定・下段・備考を空欄表示にする。
   // 模試・イベントは確認用なので、現在表示されている対象があればそのまま載せる。
   const data=ensureStudent(name), dates=getMeetingPrepCurrentDates();
-  const exams=(data.exams||[]).filter(ex=>ex.name||ex.status||ex.comiruAnswered||ex.note);
+  const exams=(data.exams||[]).filter(ex=>ex.name||ex.status||ex.comiruAnswered||ex.subjectChanged);
   const events=(data.events||[]).filter(ev=>ev.name||ev.status||ev.comiruAnswered||ev.note||ev.datetime);
   let html='<div class="twoCols">';
   html+='<section><h3>今週の予定（記入用）</h3><table class="prepTable blankTable"><tbody>';
@@ -4048,7 +4048,7 @@ async function collectWeeklyAbsentRowsForPrint(){
 function listenItemsHtmlFromData(data){
   const items=[];
   (data?.exams||[]).forEach(ex=>{
-    if(!(ex.name||ex.status||ex.comiruAnswered||ex.note)) return;
+    if(!(ex.name||ex.status||ex.comiruAnswered||ex.subjectChanged)) return;
     const pending=examPendingListenDetailHtml(ex);
     if(pending) items.push(`模試：${esc(ex.name||'名称未入力')}（${pending}）`);
   });
