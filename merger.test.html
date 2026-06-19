@@ -4346,8 +4346,10 @@ function styleAllStudentGradeSheet(ws, aoa){
   const fontBase = {name:'Yu Gothic', sz:8, color:{rgb:'111827'}};
   const fontRed = {name:'Yu Gothic', sz:8, bold:true, color:{rgb:'991B1B'}};
   setRangeStyle(ws, range, (R,C,cell)=>{
+    const cellText = cell && cell.v != null ? String(cell.v) : '';
     const isComiruMissing = R>1 && cell && typeof cell.v === 'string' && cell.v.startsWith('!');
     if(isComiruMissing) cell.v = cell.v.slice(1);
+    const text = cell && cell.v != null ? String(cell.v) : cellText;
     const style = {font:R===0?fontTitle:(R===1?fontHeader:fontBase), alignment:{vertical:'top', horizontal:(R<=1 || C<=2)?'center':'left', wrapText:true}, border};
     if(R===0) style.fill = titleFill;
     else if(R===1) style.fill = headerFill;
@@ -4371,6 +4373,7 @@ function styleAllStudentGradeSheet(ws, aoa){
   return ws;
 }
 async function downloadAllStudentList(){
+  if(!window.XLSX){ alert('Excel出力ライブラリが読み込めていません。libs/xlsx.bundle.js を確認してください。'); return; }
   if(typeof ensureWorkbookReadyForOutput === 'function'){
     if(!(await ensureWorkbookReadyForOutput())) return;
   }else if(!state.workbookReady){
@@ -4675,7 +4678,15 @@ $("mergeBtn").addEventListener("click", merge);
 $("download2wBtn").addEventListener("click", () => downloadWithRange("2w"));
 $("download1mBtn").addEventListener("click", () => downloadWithRange("1m"));
 $("downloadBtn").addEventListener("click", () => downloadWithRange("custom"));
-$("downloadAllListBtn").addEventListener("click", downloadAllStudentList);
+$("downloadAllListBtn").addEventListener("click", async () => {
+  try{
+    await downloadAllStudentList();
+  }catch(e){
+    console.error(e);
+    alert('全員分リストの出力でエラーが出ました：' + (e?.message || e));
+    log('全員分リストの出力でエラーが出ました：' + (e?.message || e));
+  }
+});
 $("downloadMonthlyPosterBtn").addEventListener("click", downloadMonthlyPosterResultWorkbook);
 $("clearBtn").addEventListener("click", () => {
   state.files=[]; state.resultFiles=[]; state.resultHistoryFiles=[]; state.posterSettingsFiles=[]; state.allListFiles=[]; state.allListRestores=new Map(); state.dailyPosterFiles=[]; state.dailyPosterRestores=new Map(); state.wholeScheduleFiles=[]; state.wholeScheduleRestores=new Map(); state.resultHistoryRecords=[]; state.records=[]; state.resultRecords=[]; state.examRecords=[]; state.eventRecords=[]; state.calendarAoa=[]; state.listAoa=[]; state.resultAoa=[]; state.logAoa=[]; state.rosterAoa=[]; state.rosterMap=new Map(); state.rosterNoMap=new Map(); state.workbookReady=false;
