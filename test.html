@@ -472,7 +472,7 @@ main.wrap{max-width:none!important;height:auto!important;min-height:0!important;
     width:calc(100vw - 16px);
   }
 }
-@media print{
+.meetingFlowFallback{font-size:12px;line-height:1.45}.flowTable th:nth-child(1),.flowTable td:nth-child(1){width:9%;text-align:center}.flowTable th:nth-child(3),.flowTable td:nth-child(3){width:14%;text-align:center;white-space:nowrap}.flowMemo{margin-top:8px;border:1px solid #cbd5e1;background:#f8fafc;border-radius:8px;padding:8px}.flowMemo ul{margin:4px 0 0 18px;padding:0}.flowMemo li{margin:2px 0}.flowTimeTable{width:55%;margin-top:4px}@media print{
   .usageHelpToggle,
   .usageHelpBtn,
   .usageHelpBackdrop,
@@ -768,7 +768,7 @@ main.wrap{max-width:none!important;height:auto!important;min-height:0!important;
       </ul>
     </div>
   </div>
-</aside>　
+</aside>
 
 
 <header class="appHeader"><div class="wrap appHeaderInner">
@@ -4224,8 +4224,45 @@ async function handleMeetingPrepWeeklyFileChange(){
   }
 }
 
+function meetingFlowFallbackHtml(reason){
+  const msg = reason ? `<div class="muted">週面シートExcelを読み取れなかったため、代わりに面談フローを印刷しています。<br>${esc(reason)}</div>` : '<div class="muted">週面シートExcelを読み取れなかったため、代わりに面談フローを印刷しています。</div>';
+  return `
+    <div class="meetingFlowFallback">
+      ${msg}
+      <h2>3. 面談フロー</h2>
+      <table class="prepTable flowTable">
+        <tr><th>順番</th><th>内容</th><th>目安</th><th>やること</th></tr>
+        <tr><td>①</td><td>模試・イベント・方針告知</td><td>3分</td><td>Comiru回答をその場でさせる。助手は模試・イベントのチェックを埋める。</td></tr>
+        <tr><td>②</td><td>振り返り</td><td>1人4分</td><td>先週の予定・結果を見て、できたこと・できなかったことを確認する。</td></tr>
+        <tr><td>③</td><td>次週計画</td><td>1人5分</td><td>受講、高マス、演習会、模試、問題集、今週の方針を決める。</td></tr>
+        <tr><td>④</td><td>その他相談</td><td>3分</td><td>困っていること、相談、合格設計図の変更を確認する。</td></tr>
+      </table>
+
+      <h3>人数別の面談時間目安</h3>
+      <table class="prepTable flowTimeTable">
+        <tr><th>人数</th><th>目安時間</th></tr>
+        <tr><td>1人</td><td>15分</td></tr>
+        <tr><td>2人</td><td>21分</td></tr>
+        <tr><td>3人</td><td>30分</td></tr>
+        <tr><td>4人</td><td>39分</td></tr>
+      </table>
+
+      <div class="flowMemo">
+        <b>面談中に忘れないこと</b>
+        <ul>
+          <li>模試Comiru・イベントComiruはその場で回答させる。</li>
+          <li>生徒は面談準備シートに書き込む。</li>
+          <li>助手はチェックボックスを埋める。</li>
+          <li>合格設計図に変更があれば、助手が持っている面談準備シートにも書く。</li>
+        </ul>
+      </div>
+    </div>`;
+}
 function loadWeeklySheetHtml(){
-  return meetingPrepWeeklyHtmlCache || '<p class="muted">復元フォルダから週面シートを自動読込できませんでした。</p>';
+  const html = meetingPrepWeeklyHtmlCache || '';
+  const text = String(html).replace(/<[^>]*>/g, '').trim();
+  const failed = !text || text.includes('週面シートをまだ自動読込できていません') || text.includes('週面シートを自動読込できませんでした') || text.includes('週面シートの読み込みに失敗しました');
+  return failed ? meetingFlowFallbackHtml(text) : html;
 }
 function buildMeetingPrepPrintHtml(resultRecords, weeklyHtml){
   const now=new Date();
