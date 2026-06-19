@@ -150,7 +150,7 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
     <div class="headerActions">
       <button id="mergeBtn" class="ok primaryAction">② 統合する</button>
       <button id="saveResultHistoryBtn" class="saveImportant primaryAction" type="button">③ 結果履歴を保存</button>
-      <button id="download2wBtn" class="outputAction" disabled>④ 2週間出力＋科目リスト</button>
+      <button id="download2wBtn" class="outputAction" disabled>④ 2週間出力</button>
       <button id="download1mBtn" class="outputAction" disabled>④ 1か月出力</button>
       <button id="downloadBtn" class="outputAction" disabled>④ 期間指定出力</button>
       <button id="downloadAllListBtn" class="outputAction" disabled>④ 全員分リスト</button>
@@ -919,9 +919,9 @@ function getExamHeaderMap(aoa){
     weekStart: find(['週開始','週開始日']),
     examName: find(['模試名','模試']),
     examDate: find(['実施日','日付']),
-    type: find(['種別']),
     status: find(['受験方法','当日','後日','不受験','参加']),
-    subjects: find(['科目']),
+    comiru: find(['Comiru回答','コミル回答','Comiru','コミル']),
+    note: find(['コメント','模試コメント','模試備考','備考']),
     savedAt: find(['保存日時','保存日'])
   };
 }
@@ -937,7 +937,7 @@ async function parseExamFile(file){
     const aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:'', raw:false});
     if(aoa.length < 2) return {records, logRows};
     const h = getExamHeaderMap(aoa);
-    if(h.examName < 0 || h.status < 0 || h.subjects < 0){
+    if(h.examName < 0){
       logRows.push([file.webkitRelativePath || file.name, '注意', '模試確認シートの列不足のためスキップ', sheetName]);
       return {records, logRows};
     }
@@ -946,14 +946,14 @@ async function parseExamFile(file){
     for(let r=1;r<aoa.length;r++){
       const row = aoa[r] || [];
       const examName = norm(row[h.examName]);
-      const status = norm(row[h.status]);
-      const subjects = splitSubjectList(h.subjects >= 0 ? row[h.subjects] : '');
-      if(!examName && !status && !subjects.length) continue;
+      const status = h.status >= 0 ? norm(row[h.status]) : '';
+      const comiruAnswered = h.comiru >= 0 ? !!norm(row[h.comiru]) : false;
+      const note = h.note >= 0 ? norm(row[h.note]) : '';
+      if(!examName && !status && !comiruAnswered && !note) continue;
       const rawStudent = h.student >= 0 ? norm(row[h.student]) : '';
       const student = canonicalStudentName(rawStudent || fallbackStudent);
       const examDateObj = h.examDate >= 0 ? parseDateLoose(row[h.examDate]) : null;
       const examDateKey = examDateObj ? ymd(examDateObj) : '';
-      const type = h.type >= 0 ? norm(row[h.type]) : '共通テスト系';
       const meta = rosterMetaForStudent(student);
       records.push({
         student,
@@ -963,9 +963,9 @@ async function parseExamFile(file){
         examName,
         examDate: examDateKey,
         examDateObj: examDateObj || new Date(2099,0,1),
-        type,
         status,
-        subjects,
+        comiruAnswered,
+        note,
         sourceFile: file.name,
         sourcePath: file.webkitRelativePath || file.name,
         savedAt: h.savedAt >= 0 ? norm(row[h.savedAt]) : ''
@@ -2578,20 +2578,7 @@ function buildExamSubjectSheetAoa(records, grade, examKey){
   return {aoa, exam:first};
 }
 function buildExamSubjectSheets(examRecords){
-  const used = new Set();
-  const groups = new Map();
-  for(const r of examRecords || []){
-    const grade = r.grade || '未設定';
-    const key = `${grade}\t${examKeyOf(r)}`;
-    if(!groups.has(key)) groups.set(key, {grade, examKey: examKeyOf(r), sample:r});
-  }
-  return [...groups.values()]
-    .sort((a,b)=>String(a.sample.examDate || '').localeCompare(String(b.sample.examDate || '')) || String(a.sample.examName || '').localeCompare(String(b.sample.examName || ''),'ja') || String(a.grade).localeCompare(String(b.grade),'ja'))
-    .map(g => {
-      const built = buildExamSubjectSheetAoa(examRecords, g.grade, g.examKey);
-      const sheetName = uniqueSheetName(`模試_${shortSheetPart(g.sample.examName)}_${g.grade}`, used);
-      return {grade:g.grade, sheetName, ...built};
-    });
+  return [];
 }
 function addExamSheetMerges(ws, aoa){
   ws['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:Math.max(3,(aoa[1] || []).length-1)}}];
@@ -3368,10 +3355,13 @@ function buildExamEventGroups(examRecords=[], eventRecords=[]){
   const examGroups = [];
   const examSeen = new Set();
   for(const r of examRecords || []){
-    const key = examKeyOf(r);
-    if(!examSeen.has(key)){
-      examSeen.add(key);
-      examGroups.push({key, label:`模試\n${r.examDate ? r.examDate + ' ' : ''}${r.examName || '模試名未入力'}`});
+    const baseKey = examKeyOf(r);
+    if(!examSeen.has(baseKey)){
+      examSeen.add(baseKey);
+      const baseLabel = `模試\n${r.examDate ? r.examDate + ' ' : ''}${r.examName || '模試名未入力'}`;
+      examGroups.push({key:`${baseKey}|status`, baseKey, field:'status', label:`${baseLabel}\n受験方法`});
+      examGroups.push({key:`${baseKey}|comiru`, baseKey, field:'comiru', label:`${baseLabel}\nComiru回答`});
+      examGroups.push({key:`${baseKey}|note`, baseKey, field:'note', label:`${baseLabel}\nコメント`});
     }
   }
   examGroups.sort((a,b)=>String(a.label).localeCompare(String(b.label),'ja'));
@@ -3395,11 +3385,12 @@ function buildExamEventMaps(examRecords=[], eventRecords=[]){
     const key = studentKeyForList(meta['生徒名'] || r.student, meta['生徒番号'] || r.studentNo || '');
     const g = examKeyOf(r);
     if(!examByStudent.has(key)) examByStudent.set(key, new Map());
-    // 全員分リストでは模試の科目は出さず、受験方法だけを表示する。
-    // 表示は「当日」「後日」「不受験」のいずれかを基本にする。
+    // 全員分リストでは模試の科目は出さず、受験方法・Comiru回答・コメントを表示する。
     const status = norm(r.status || '');
-    const cell = status.includes('不受験') ? '不受験' : (status.includes('後日') ? '後日' : (status.includes('当日') ? '当日' : status));
-    examByStudent.get(key).set(g, cell);
+    const statusCell = status.includes('不受験') ? '不受験' : (status.includes('後日') ? '後日' : (status.includes('当日') ? '当日' : status));
+    examByStudent.get(key).set(`${g}|status`, statusCell);
+    examByStudent.get(key).set(`${g}|comiru`, r.comiruAnswered ? '済' : '');
+    examByStudent.get(key).set(`${g}|note`, r.note || '');
   }
 
   const eventByStudent = new Map();
@@ -3499,7 +3490,7 @@ function allListIsManualPriorityHeader(headerText, canonText){
   // 基本情報は復元するが、衝突ログは原則出さない
   if(allListIsIdentityCanon(c)) return false;
   // 模試・イベント・確認欄・メモ欄は手修正優先
-  if(/模試|受験|当日|後日|不受験|科目|イベント|参加|不参加|備考|メモ|確認|電話|共有|手動|担当者|最終確認/.test(h+c)) return true;
+  if(/模試|受験|当日|後日|不受験|Comiru|コミル|コメント|科目|イベント|参加|不参加|備考|メモ|確認|電話|共有|手動|担当者|最終確認/.test(h+c)) return true;
   // 既存リストにだけある独自列も手修正優先
   return true;
 }
