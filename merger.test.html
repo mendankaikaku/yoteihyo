@@ -2389,6 +2389,49 @@ function applyNiceSheetSettings(ws, aoa, widths, options={}){
   }
   return range;
 }
+function setSheetPrintDefaults(ws, {paperSize=9, orientation='portrait', fitToWidth=1, fitToHeight=0, margins=null}={}){
+  ws['!pageSetup'] = Object.assign({}, ws['!pageSetup'] || {}, {
+    paperSize,
+    orientation,
+    fitToWidth,
+    fitToHeight
+  });
+  if(margins) ws['!margins'] = Object.assign({}, ws['!margins'] || {}, margins);
+}
+function setA4PortraitPrint(ws, fitToHeight=0){
+  setSheetPrintDefaults(ws, {
+    paperSize:9,
+    orientation:'portrait',
+    fitToWidth:1,
+    fitToHeight,
+    margins:{left:0.25, right:0.25, top:0.35, bottom:0.35, header:0.15, footer:0.15}
+  });
+}
+function setB4LandscapeOnePagePrint(ws){
+  setSheetPrintDefaults(ws, {
+    paperSize:12,
+    orientation:'landscape',
+    fitToWidth:1,
+    fitToHeight:1,
+    margins:{left:0.18, right:0.18, top:0.25, bottom:0.25, header:0.1, footer:0.1}
+  });
+}
+function escapeSheetNameForFormula(name){
+  return String(name ?? '').replace(/'/g, "''");
+}
+function setWorkbookPrintArea(wb, sheetName, rangeRef){
+  if(!wb || !sheetName || !rangeRef) return;
+  if(!wb.Workbook) wb.Workbook = {};
+  if(!Array.isArray(wb.Workbook.Names)) wb.Workbook.Names = [];
+  const sheetIndex = Array.isArray(wb.SheetNames) ? wb.SheetNames.indexOf(sheetName) : -1;
+  if(sheetIndex < 0) return;
+  wb.Workbook.Names = wb.Workbook.Names.filter(n => !(n && n.Name === '_xlnm.Print_Area' && n.Sheet === sheetIndex));
+  wb.Workbook.Names.push({
+    Name:'_xlnm.Print_Area',
+    Sheet:sheetIndex,
+    Ref:`'${escapeSheetNameForFormula(sheetName)}'!${rangeRef}`
+  });
+}
 
 
 function stripPosterPrefixLine(s){
@@ -3020,7 +3063,7 @@ const DEFAULT_POSTER_SETTINGS = {
   rankingTitle: '高速基礎マスターランキング',
   showRankingDate: true,
   rankingDateSuffix: '',
-  limitTop10: false,
+  limitTop10: true,
   shortNameRulesText: [
     '高速基礎マスター英語センター1800 => 英単語1800',
     '高速基礎マスター英単語センター1800 => 英単語1800',
@@ -3436,8 +3479,8 @@ function styleMonthlyPosterSheet(ws, aoa){
   const range = applyNiceSheetSettings(ws, aoa, widths, {rows:{min:30,max:160,header:34,pxPerLine:20}});
   ws['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:2}}];
   ws['!freeze'] = {xSplit:0, ySplit:2};
-  ws['!pageSetup'] = {orientation:'portrait', fitToWidth:1, fitToHeight:0};
-  ws['!margins'] = {left:0.28, right:0.28, top:0.35, bottom:0.35, header:0.15, footer:0.15};
+  setA4PortraitPrint(ws, 0);
+  ws['!margins'] = Object.assign({}, ws['!margins'], {left:0.28, right:0.28});
   const border = {top:{style:'thin',color:{rgb:'94A3B8'}},bottom:{style:'thin',color:{rgb:'94A3B8'}},left:{style:'thin',color:{rgb:'94A3B8'}},right:{style:'thin',color:{rgb:'94A3B8'}}};
   const titleFill = {fgColor:{rgb:'DBEAFE'}};
   const headerFill = {fgColor:{rgb:'E5E7EB'}};
@@ -3577,8 +3620,8 @@ function buildHighSpeedRankingAoa(rows, label){
     const item = map.get(key);
     item.correct += r.correct;
   }
-  let ranked = [...map.values()].sort((a,b)=> b.correct - a.correct || String(a.grade).localeCompare(String(b.grade),'ja') || String(a.kana || a.student).localeCompare(String(b.kana || b.student),'ja'));
-  if(settings.limitTop10) ranked = ranked.slice(0,10);
+  const ranked = [...map.values()].sort((a,b)=> b.correct - a.correct || String(a.grade).localeCompare(String(b.grade),'ja') || String(a.kana || a.student).localeCompare(String(b.kana || b.student),'ja'));
+  // ランキングデータ自体は切らない。Excel上では11位以降も残し、印刷範囲だけ10位までにする。
   const aoa = [[title], ['順位','学年','氏名','正解数']];
   ranked.forEach((r,i)=> aoa.push([i+1, r.grade, r.student, r.correct]));
   if(!ranked.length) aoa.push(['','','','該当結果なし']);
@@ -3589,8 +3632,7 @@ function styleHighSpeedRankingSheet(ws, aoa){
   const range = applyNiceSheetSettings(ws, aoa, widths, {rows:{min:28,max:88,header:34,pxPerLine:18}});
   ws['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:3}}];
   ws['!freeze'] = {ySplit:2};
-  ws['!pageSetup'] = {orientation:'portrait', fitToWidth:1, fitToHeight:0};
-  ws['!margins'] = {left:0.25, right:0.25, top:0.35, bottom:0.35, header:0.15, footer:0.15};
+  setA4PortraitPrint(ws, 1);
   const border = {top:{style:'thin',color:{rgb:'94A3B8'}},bottom:{style:'thin',color:{rgb:'94A3B8'}},left:{style:'thin',color:{rgb:'94A3B8'}},right:{style:'thin',color:{rgb:'94A3B8'}}};
   const titleFill = {fgColor:{rgb:'DBEAFE'}};
   const headerFill = {fgColor:{rgb:'E5E7EB'}};
@@ -3631,9 +3673,12 @@ async function downloadMonthlyPosterResultWorkbook(){
     const highSpeedRows = extractHighSpeedRowsFromSheets(rawSheets.sheets, yesterday.from, yesterday.to);
     const rankingAoa = buildHighSpeedRankingAoa(highSpeedRows, yesterday.label);
     const mergedRankingAoa = mergeRestoredDailyPosterAoa('高速基礎ランキング', rankingAoa);
+    // データ自体は11位以降も残す。印刷範囲だけタイトル＋見出し＋10位まで（A1:D12）に固定する。
     const rankingWs = aoaToSheet(mergedRankingAoa);
     styleHighSpeedRankingSheet(rankingWs, mergedRankingAoa);
-    XLSX.utils.book_append_sheet(wb, rankingWs, uniqueSheetName('高速基礎ランキング', used));
+    const rankingSheetName = uniqueSheetName('高速基礎ランキング', used);
+    XLSX.utils.book_append_sheet(wb, rankingWs, rankingSheetName);
+    setWorkbookPrintArea(wb, rankingSheetName, '$A$1:$D$12');
     XLSX.writeFile(wb, `校舎掲示用_毎日更新_${ymd(from)}-${ymd(to)}.xlsx`);
     const counts = MONTHLY_POSTER_RESULT_RULES.map(rule => `${rule.keyword}: ${results.filter(r => norm(r.result).includes(rule.keyword)).length}件`).join('\n');
     log(`毎日更新を作成しました\n対象期間: ${ymd(from)}〜${ymd(to)}\n${counts}`);
@@ -4192,8 +4237,7 @@ function styleAllStudentGradeSheet(ws, aoa){
   const range = applyNiceSheetSettings(ws, aoa, widths, {rows:{min:20,max:86,header:36,pxPerLine:14}});
   ws['!rows'][0] = {hpt:30};
   ws['!freeze'] = {xSplit:3, ySplit:2};
-  ws['!pageSetup'] = {orientation:'landscape', paperSize:12, fitToWidth:1, fitToHeight:1};
-  ws['!margins'] = {left:0.18, right:0.18, top:0.25, bottom:0.25, header:0.1, footer:0.1};
+  setB4LandscapeOnePagePrint(ws);
   if(colCount > 1){
     ws['!merges'] = ws['!merges'] || [];
     ws['!merges'].push({s:{r:0,c:0}, e:{r:0,c:colCount-1}});
