@@ -292,9 +292,208 @@ main.wrap{max-width:none!important;height:auto!important;min-height:0!important;
 /* 印刷設定メモ：既存の .compactHint 非表示指定に巻き込まれない専用表示 */
 .printDialogNote{display:block!important;margin-top:8px;color:#7c2d12;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:8px 10px;font-weight:900;font-size:12px;line-height:1.55;}
 .printDialogNote b{color:#9a3412;}
+
+/* =========================================================
+   右下ヘルプ：予定入力用の使い方パネル
+========================================================= */
+.helpFloatingBtn{
+  position:fixed;
+  right:18px;
+  bottom:18px;
+  z-index:10000;
+  min-height:42px;
+  padding:10px 14px;
+  border-radius:999px;
+  background:#2563eb;
+  color:#fff;
+  font-weight:900;
+  box-shadow:0 16px 40px rgba(37,99,235,.32);
+  border:1px solid rgba(255,255,255,.3);
+}
+.helpFloatingBtn:hover{filter:brightness(.98)}
+.helpOverlay{
+  position:fixed;
+  inset:0;
+  background:rgba(15,23,42,.42);
+  z-index:10001;
+  display:none;
+}
+.helpOverlay.open{display:block}
+.helpDrawer{
+  position:fixed;
+  right:0;
+  top:0;
+  height:100%;
+  width:min(430px,calc(100vw - 24px));
+  background:#fff;
+  border-left:1px solid #dbe4ef;
+  box-shadow:-24px 0 70px rgba(15,23,42,.28);
+  transform:translateX(100%);
+  transition:transform .18s ease;
+  z-index:10002;
+  display:flex;
+  flex-direction:column;
+}
+.helpOverlay.open .helpDrawer{transform:translateX(0)}
+.helpDrawerHead{
+  padding:14px 16px;
+  border-bottom:1px solid #e5e7eb;
+  background:#f8fafc;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+}
+.helpDrawerTitle{
+  font-size:18px;
+  font-weight:900;
+}
+.helpCloseBtn{
+  background:#e5e7eb!important;
+  color:#111827!important;
+  min-height:34px!important;
+  padding:7px 10px!important;
+  box-shadow:none!important;
+}
+.helpDrawerBody{
+  padding:14px 16px 24px;
+  overflow:auto;
+  line-height:1.65;
+}
+.helpMiniFlow{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:8px;
+  margin:0 0 14px;
+}
+.helpStep{
+  border:1px solid #bfdbfe;
+  background:#eff6ff;
+  color:#1e3a8a;
+  border-radius:12px;
+  padding:9px 10px;
+  font-size:13px;
+}
+.helpStep b{
+  display:block;
+  color:#172033;
+  font-size:14px;
+  margin-bottom:2px;
+}
+.helpBox{
+  border:1px solid #dbe4ef;
+  background:#f8fafc;
+  border-radius:12px;
+  padding:10px 12px;
+  margin:10px 0;
+}
+.helpBox.warn{
+  background:#fff7ed;
+  border-color:#fed7aa;
+}
+.helpBox.save{
+  background:#fef2f2;
+  border-color:#fecaca;
+}
+.helpBox h3{
+  margin:0 0 6px;
+  font-size:14px;
+}
+.helpBox ol,.helpBox ul{
+  margin:0;
+  padding-left:20px;
+  font-size:13px;
+}
+.helpBox li{margin:1px 0;}
+.helpSmall{
+  font-size:12px;
+  color:#64748b;
+  margin-top:8px;
+}
+@media(max-width:700px){
+  .helpFloatingBtn{
+    right:12px;
+    bottom:12px;
+    min-height:38px;
+    padding:8px 12px;
+    font-size:12px;
+  }
+}
+@media print{
+  .helpFloatingBtn,.helpOverlay{display:none!important;}
+}
+
 </style>
 </head>
 <body>
+
+<button id="helpFloatingBtn" class="helpFloatingBtn" type="button">？ 使い方</button>
+<div id="helpOverlay" class="helpOverlay" aria-hidden="true">
+  <aside class="helpDrawer" role="dialog" aria-modal="true" aria-labelledby="helpDrawerTitle">
+    <div class="helpDrawerHead">
+      <div id="helpDrawerTitle" class="helpDrawerTitle">予定入力用アプリの使い方</div>
+      <button id="helpCloseBtn" class="helpCloseBtn" type="button">閉じる</button>
+    </div>
+    <div class="helpDrawerBody">
+      <div class="helpMiniFlow">
+        <div class="helpStep"><b>① 生徒名を入力</b>複数人の面談ならカンマ区切りで入力します。苗字が同じ生徒は「平井瑛」のように区別できるところまで入力します。</div>
+        <div class="helpStep"><b>② 前回復元</b>保存復元フォルダーを選んで、前回の予定・備考・模試・イベント・コメントを戻します。</div>
+        <div class="helpStep"><b>③ 入力</b>受講、高マス、問題集、模試、イベント、今週の方針、達成できなかった理由を入力します。</div>
+        <div class="helpStep"><b>④ 保存</b>席を外す前に必ず保存します。グループ保存をすると個人分にも反映します。</div>
+      </div>
+
+      <div class="helpBox warn">
+        <h3>面談準備印刷</h3>
+        <ol>
+          <li>今日面談する生徒名を入力します。</li>
+          <li>前回復元を押します。</li>
+          <li>週面シートExcelを選択します。</li>
+          <li>面談準備印刷を押します。</li>
+          <li>印刷設定は A4縦・両面・長辺とじ です。</li>
+        </ol>
+        <div class="helpSmall">印刷は各生徒A4 2枚想定です。1枚目に面談準備、2枚目表に週面シート、2枚目裏に合格設計図を入れます。</div>
+      </div>
+
+      <div class="helpBox">
+        <h3>面談中にやること</h3>
+        <ul>
+          <li>模試ComiruとイベントComiruをその場で回答させます。</li>
+          <li>生徒は面談準備シートに書き込みます。</li>
+          <li>助手はチェックボックスを埋めます。</li>
+          <li>合格設計図に変更があれば、配布した面談準備シートにも書きます。</li>
+        </ul>
+      </div>
+
+      <div class="helpBox">
+        <h3>面談後の打ち込み</h3>
+        <ol>
+          <li>面談シートを回収してコピーします。</li>
+          <li>原本は生徒に返却します。</li>
+          <li>コピーを打ち込みボックスに集めます。</li>
+          <li>アプリで 生徒名 → 復元 → 手打ち → 保存。</li>
+          <li>必要なら「面談内容コピー」を押してPOSへCtrl+Vします。</li>
+          <li>入力後は生徒ファイルに入れます。</li>
+        </ol>
+      </div>
+
+      <div class="helpBox save">
+        <h3>絶対に忘れないこと</h3>
+        <ul>
+          <li>入力したら必ず保存します。</li>
+          <li>保存復元フォルダーを選んで保存します。</li>
+          <li>面談準備印刷は、週面シートExcelを選んでから行います。</li>
+          <li>Comiru回答は面談中に済ませます。</li>
+        </ul>
+      </div>
+
+      <div class="helpSmall">
+        このパネルは右下の「？使い方」からいつでも開けます。普段は閉じたままでOKです。
+      </div>
+    </div>
+  </aside>
+</div>
+
+
 <header class="appHeader"><div class="wrap appHeaderInner">
   <div>
     <h1>面談予定入力・準備資料アプリ <span class="versionBadge">v34 Excel A列固定・印刷PDF優先版</span></h1>
@@ -306,7 +505,7 @@ main.wrap{max-width:none!important;height:auto!important;min-height:0!important;
   <section class="card workflowCard" id="uxWorkflowCard">
     <p class="sectionTitle">今日の操作</p>
     <div class="topActions">
-      <div class="field wide"><label>① 生徒名（複数はカンマ区切り）</label><input id="studentNames" placeholder="例：佐藤, 鈴木, 高橋" /></div>
+      <div class="field wide"><label>① 生徒名（複数はカンマ区切り）</label><input id="studentNames" placeholder="例：佐藤, 鈴木, 高橋,×横田→〇横田朋" /></div>
       <div class="field"><label>開始日</label><input id="weekStart" type="date" /></div>
       <button id="applyStudents" class="primaryBig">② 生徒欄を作る</button>
       <button class="secondary primaryBig" id="loadGroupMemory">③ 前回を復元</button>
@@ -3923,7 +4122,43 @@ main.wrap{grid-template-rows:auto minmax(0,1fr) auto!important;gap:8px!important
       await new Promise(function(resolve){ setTimeout(resolve, 80); });
     }
     window.addEventListener('load', function(){ setTimeout(function(){ prepareMeetingPrepPrint(); }, 60); });
-  <\/script></body></html>`;
+  <\/script><script>
+
+(function(){
+  function setupInputHelpDrawer(){
+    const btn = document.getElementById('helpFloatingBtn');
+    const overlay = document.getElementById('helpOverlay');
+    const close = document.getElementById('helpCloseBtn');
+    if(!btn || !overlay || !close) return;
+
+    function openHelp(){
+      overlay.classList.add('open');
+      overlay.setAttribute('aria-hidden','false');
+    }
+    function closeHelp(){
+      overlay.classList.remove('open');
+      overlay.setAttribute('aria-hidden','true');
+    }
+
+    btn.addEventListener('click', openHelp);
+    close.addEventListener('click', closeHelp);
+    overlay.addEventListener('click', function(e){
+      if(e.target === overlay) closeHelp();
+    });
+    document.addEventListener('keydown', function(e){
+      if(e.key === 'Escape' && overlay.classList.contains('open')) closeHelp();
+    });
+  }
+
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', setupInputHelpDrawer);
+  }else{
+    setupInputHelpDrawer();
+  }
+})();
+
+</script>
+</body></html>`;
 }
 let __meetingPrepPrintBusy=false;
 function printHtmlInHiddenIframe(html){
