@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>予定統合アプリ</title>　
+  <title>予定統合アプリああ</title>　
   <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
   <script src="./libs/xlsx.bundle.js"></script>
   <script>
@@ -4586,7 +4586,7 @@ function allListSlotDateDisplay(value){
   const base = `${d.getMonth()+1}/${d.getDate()}(${WEEK_JA[d.getDay()]})`;
   const hasTime = /(?:T|\s)\d{1,2}:\d{2}|午前|午後/.test(raw);
   if(!hasTime && d.getHours()===0 && d.getMinutes()===0) return base;
-  return `${base}${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${base}${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 }
 
 function allListSlotDisplayName(item){
@@ -4747,18 +4747,21 @@ function allListApplyDropdowns(ws, aoa){
   for(let c=0;c<header.length;c++){
     const h=String(header[c] || '');
     let formula=null;
-    if(/小規模\\d+\\n種別$/.test(h)) formula='"模試,イベント"';
-    else if(/小規模\\d+\\n回答$/.test(h)) formula='"〇,×,当日,後日,不受験,未"';
-    else if(/小規模\\d+\\nComiru$/.test(h)) formula='"〇,×"';
-    else if(/\\n受験$/.test(h)) formula='"当日,後日,不受験,未"';
-    else if(/\\n(参加)$/.test(h)) formula='"〇,×,未"';
-    else if(/\\n(Comiru|科目変更)$/.test(h)) formula='"〇,×"';
+    if(/(?:小規模\s*)?\d+\n回答$/.test(h)) formula='"〇,×,当日,後日,不受験,未"';
+    else if(/(?:小規模\s*)?\d+\nComiru$/.test(h)) formula='"〇,×"';
+    else if(/\n受験$/.test(h)) formula='"当日,後日,不受験,未"';
+    else if(/\n(参加)$/.test(h)) formula='"〇,×,未"';
+    else if(/\n(Comiru|科目変更)$/.test(h)) formula='"〇,×"';
     if(!formula) continue;
     const col=XLSX.utils.encode_col(c);
     validations.push({sqref:`${col}3:${col}${lastRow}`, type:'list', allowBlank:true, formulae:[formula], showErrorMessage:true, errorTitle:'入力候補', error:'プルダウンから選んでください。'});
   }
   if(validations.length){
-    ws['!dataValidations'] = (ws['!dataValidations'] || []).concat(validations);
+    try{
+      ws['!dataValidations'] = (ws['!dataValidations'] || []).concat(validations);
+    }catch(e){
+      console.warn('全員分リストのプルダウン設定をスキップしました', e);
+    }
   }
 }
 
@@ -4896,42 +4899,47 @@ function styleAllStudentGradeSheet(ws, aoa){
   return ws;
 }
 async function downloadAllStudentList(){
-  if(!window.XLSX){ alert('Excel出力ライブラリが読み込めていません。libs/xlsx.bundle.js を確認してください。'); return; }
-  if(typeof ensureWorkbookReadyForOutput === 'function'){
-    if(!(await ensureWorkbookReadyForOutput())) return;
-  }else if(!state.workbookReady){
-    alert('先に統合プレビューを作成してください');
-    return;
-  }
+  try{
+    if(!window.XLSX){ alert('Excel出力ライブラリが読み込めていません。libs/xlsx.bundle.js を確認してください。'); return; }
+    if(typeof ensureWorkbookReadyForOutput === 'function'){
+      if(!(await ensureWorkbookReadyForOutput())) return;
+    }else if(!state.workbookReady){
+      alert('先に統合プレビューを作成してください');
+      return;
+    }
 
-  state.allListUpdateLog = [["日時","区分","学年","生徒キー","生徒名","対象","列名","全員分リストの値","自動データの値","採用値","理由"]];
+    state.allListUpdateLog = [["日時","区分","学年","生徒キー","生徒名","対象","列名","全員分リストの値","自動データの値","採用値","理由"]];
 
-  // 模試・イベントは期間指定がある場合だけ絞り込み、予定/結果カレンダーは既存仕様に従う。
-  const from = $('fromDate').value ? new Date($('fromDate').value + 'T00:00:00') : null;
-  const to = $('toDate').value ? new Date($('toDate').value + 'T23:59:59') : null;
-  const exams = (state.examRecords || []).filter(r => (!from || r.examDateObj >= from) && (!to || r.examDateObj <= to));
-  const events = (state.eventRecords || []).filter(r => (!from || r.dateObj >= from) && (!to || r.dateObj <= to));
-  const gradeAoas = buildAllStudentListAoaByGrade(exams, events);
-  if(!gradeAoas.length){ alert('出力する生徒が見つかりません'); return; }
+    const from = $('fromDate').value ? new Date($('fromDate').value + 'T00:00:00') : null;
+    const to = $('toDate').value ? new Date($('toDate').value + 'T23:59:59') : null;
+    const exams = (state.examRecords || []).filter(r => (!from || r.examDateObj >= from) && (!to || r.examDateObj <= to));
+    const events = (state.eventRecords || []).filter(r => (!from || r.dateObj >= from) && (!to || r.dateObj <= to));
+    const gradeAoas = buildAllStudentListAoaByGrade(exams, events);
+    if(!gradeAoas.length){ alert('出力する生徒が見つかりません'); return; }
 
-  const wb = XLSX.utils.book_new();
-  for(const item of gradeAoas){
-    const ws = aoaToSheet(item.aoa);
-    styleAllStudentGradeSheet(ws, item.aoa);
-    XLSX.utils.book_append_sheet(wb, ws, safeSheetName(item.grade));
-  }
+    const wb = XLSX.utils.book_new();
+    for(const item of gradeAoas){
+      const ws = aoaToSheet(item.aoa);
+      styleAllStudentGradeSheet(ws, item.aoa);
+      XLSX.utils.book_append_sheet(wb, ws, safeSheetName(item.grade));
+    }
 
-  if(state.allListUpdateLog && state.allListUpdateLog.length > 1){
-    const wsLog = aoaToSheet(state.allListUpdateLog);
-    styleAllListUpdateLogSheet(wsLog, state.allListUpdateLog);
-    XLSX.utils.book_append_sheet(wb, wsLog, safeSheetName('更新ログ'));
-  }
+    if(state.allListUpdateLog && state.allListUpdateLog.length > 1){
+      const wsLog = aoaToSheet(state.allListUpdateLog);
+      styleAllListUpdateLogSheet(wsLog, state.allListUpdateLog);
+      XLSX.utils.book_append_sheet(wb, wsLog, safeSheetName('更新ログ'));
+    }
 
-  const base = allListBaseDate();
-  XLSX.writeFile(wb, `全員分リスト_学年別_B4横_${ymd(base)}基準.xlsx`);
-  if(typeof log === 'function'){
-    const count = Math.max(0, (state.allListUpdateLog?.length || 1) - 1);
-    log(`全員分リストを出力しました。\n対象人数が少ない模試・イベントは、各生徒ごとの追加スロット列にまとめました。列数は学年内の最大対象数に合わせて自動で増えます。回答・Comiruはプルダウンで更新できます。\n手修正・自動データの衝突ログ: ${count}件${count ? '\nExcel内の「更新ログ」シートを確認してください。' : ''}`);
+    const base = allListBaseDate();
+    XLSX.writeFile(wb, `全員分リスト_学年別_B4横_${ymd(base)}基準.xlsx`);
+    if(typeof log === 'function'){
+      const count = Math.max(0, (state.allListUpdateLog?.length || 1) - 1);
+      log(`全員分リストを出力しました。\n対象人数が少ない模試・イベントは、各生徒ごとの追加スロット列にまとめました。列数は学年内の最大対象数に合わせて自動で増えます。回答・Comiruはプルダウンで更新できます。\n手修正・自動データの衝突ログ: ${count}件${count ? '\nExcel内の「更新ログ」シートを確認してください。' : ''}`);
+    }
+  }catch(e){
+    console.error('全員分リスト出力エラー', e);
+    alert('全員分リストの出力でエラーが出ました。\n' + (e && e.message ? e.message : e));
+    if(typeof log === 'function') log('全員分リストの出力でエラー: ' + (e && e.stack ? e.stack : e));
   }
 }
 
