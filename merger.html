@@ -4928,8 +4928,8 @@ function styleAllStudentGradeSheet(ws, aoa){
     else if(/\nComiru$/.test(h)) widths.push(7);
     else if(/\n科目変更$/.test(h)) widths.push(7);
     else if(/\n備考$/.test(h)) widths.push(12);
-    else if(/\n予定$/.test(h)) widths.push(18);
-    else if(/\n結果$/.test(h)) widths.push(18);
+    else if(/\n予定$/.test(h)) widths.push(12);
+    else if(/\n結果$/.test(h)) widths.push(12);
     else widths.push(16);
   }
   const range = applyNiceSheetSettings(ws, aoa, widths, {rows:{min:18,max:78,header:38,pxPerLine:13}});
