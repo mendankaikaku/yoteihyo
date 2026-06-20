@@ -3308,23 +3308,14 @@ function monthlyPosterAchievementContent(rec){
   return [dateText, course].filter(Boolean).join('　');
 }
 function buildMonthlyPosterContinuousAoa(records, rule, label){
-  const map = new Map();
-  for(const rec of records || []){
-    if(!norm(rec.result).includes(rule.keyword)) continue;
-    const meta = resultPosterStudentMeta(rec);
-    const key = normalizeStudentNoKey(meta.studentNo) || normalizeNameKey(meta.student);
-    if(!key) continue;
-    if(!map.has(key)) map.set(key, {grade:meta.grade, student:meta.student, kana:meta.kana, days:new Set()});
-    const item = map.get(key);
-    if(rec.dateKey) item.days.add(rec.dateKey);
-    else if(rec.dateObj) item.days.add(ymd(rec.dateObj));
-  }
-  const rows = [...map.values()]
-    .map(r => ({...r, dayCount:r.days.size}))
-    .filter(r => r.dayCount > 0)
-    .sort((a,b)=> b.dayCount - a.dayCount || String(a.grade||'').localeCompare(String(b.grade||''),'ja') || String(a.kana || a.student).localeCompare(String(b.kana || b.student),'ja'));
-  const aoa = [[`${label}　${rule.keyword}`], ['学年','氏名','日数']];
-  for(const r of rows) aoa.push([r.grade, r.student, r.dayCount]);
+  // 連続実施は「掲示を作る日の前日1日分」だけを表示する。
+  // 月間日数カウントにはしない。
+  const rows = (records || [])
+    .filter(r => norm(r.result).includes(rule.keyword))
+    .map(r => ({...resultPosterStudentMeta(r), content:monthlyPosterAchievementContent(r), dateKey:r.dateKey || '', timeLabel:r.timeLabel || ''}))
+    .sort((a,b)=> String(a.grade||'').localeCompare(String(b.grade||''),'ja') || String(a.kana || a.student).localeCompare(String(b.kana || b.student),'ja') || String(a.timeLabel).localeCompare(String(b.timeLabel)));
+  const aoa = [[`${label}　${rule.keyword}`], ['学年','氏名','内容']];
+  for(const r of rows) aoa.push([r.grade, r.student, r.content]);
   if(rows.length === 0) aoa.push(['', '', '該当結果なし']);
   return aoa;
 }
@@ -3444,7 +3435,8 @@ function extractHighSpeedRowsFromSheets(sheets, from, to){
       const total = correct + incorrect;
       if(!total) continue;
       const dt = idx.date >= 0 ? parseDateLoose(row[idx.date]) : null;
-      if(dt && (dt < from || dt > to)) continue;
+      // 高速基礎ランキングは前日1日分だけ。日付が読めない行は混入防止のため除外。
+      if(!dt || dt < from || dt > to) continue;
       const rawName = idx.student >= 0 ? norm(row[idx.student]) : '';
       const studentNo = idx.studentNo >= 0 ? norm(row[idx.studentNo]) : '';
       const metaByNo = lookupRosterByStudentNo(studentNo);
@@ -3522,30 +3514,37 @@ async function downloadMonthlyPosterResultWorkbook(){
   }
   $('downloadMonthlyPosterBtn').disabled = true;
   try{
-    log('毎日更新を作成中...\n毎日更新.xlsxと結果履歴JSONから、今月分の結果を抽出しています。');
-    let results = state.resultRecords && state.resultRecords.length ? state.resultRecords : (await loadMonthlyPosterResultsDirectly()).records;
-    const {from,to,label} = monthRangeForOpenedPage(new Date());
-    results = mergeResultRecordsUnique(results).filter(r => inDateRange(r, from, to));
+    log('毎日更新を作成中...\n連続実施と高速基礎ランキングは前日1日分、修得系は今月分から抽出しています。');
+    let allResults = state.resultRecords && state.resultRecords.length ? state.resultRecords : (await loadMonthlyPosterResultsDirectly()).records;
+    allResults = mergeResultRecordsUnique(allResults);
+    const month = monthRangeForOpenedPage(new Date());
+    const yesterday = previousDayRangeForOpenedPage(new Date());
+    const monthResults = allResults.filter(r => inDateRange(r, month.from, month.to));
+    const yesterdayResults = allResults.filter(r => inDateRange(r, yesterday.from, yesterday.to));
     const wb = XLSX.utils.book_new();
     const used = new Set();
     for(const rule of MONTHLY_POSTER_RESULT_RULES){
-      const aoa = buildMonthlyPosterResultAoa(results, rule, label);
+      const sourceRecords = rule.keyword === '連続で実施' ? yesterdayResults : monthResults;
+      const label = rule.keyword === '連続で実施' ? yesterday.label : month.label;
+      const aoa = buildMonthlyPosterResultAoa(sourceRecords, rule, label);
       const mergedAoa = mergeRestoredDailyPosterAoa(rule.sheetName, aoa);
       const ws = aoaToSheet(mergedAoa);
       styleMonthlyPosterSheet(ws, mergedAoa);
       XLSX.utils.book_append_sheet(wb, ws, uniqueSheetName(rule.sheetName, used));
     }
     const rawSheets = await loadRawResultSheetsDirectly();
-    const yesterday = previousDayRangeForOpenedPage(new Date());
     const highSpeedRows = extractHighSpeedRowsFromSheets(rawSheets.sheets, yesterday.from, yesterday.to);
     const rankingAoa = buildHighSpeedRankingAoa(highSpeedRows, yesterday.label);
     const mergedRankingAoa = mergeRestoredDailyPosterAoa('高速基礎ランキング', rankingAoa);
     const rankingWs = aoaToSheet(mergedRankingAoa);
     styleHighSpeedRankingSheet(rankingWs, mergedRankingAoa);
     XLSX.utils.book_append_sheet(wb, rankingWs, uniqueSheetName('高速基礎ランキング', used));
-    XLSX.writeFile(wb, `校舎掲示用_毎日更新_${ymd(from)}-${ymd(to)}.xlsx`);
-    const counts = MONTHLY_POSTER_RESULT_RULES.map(rule => `${rule.keyword}: ${results.filter(r => norm(r.result).includes(rule.keyword)).length}件`).join('\n');
-    log(`毎日更新を作成しました\n対象期間: ${ymd(from)}〜${ymd(to)}\n${counts}`);
+    XLSX.writeFile(wb, `校舎掲示用_毎日更新_${ymd(month.from)}-${ymd(month.to)}.xlsx`);
+    const counts = MONTHLY_POSTER_RESULT_RULES.map(rule => {
+      const src = rule.keyword === '連続で実施' ? yesterdayResults : monthResults;
+      return `${rule.keyword}: ${src.filter(r => norm(r.result).includes(rule.keyword)).length}件`;
+    }).join('\n');
+    log(`毎日更新を作成しました\n連続実施・高速基礎ランキング対象日: ${ymd(yesterday.from)}\n修得系対象期間: ${ymd(month.from)}〜${ymd(month.to)}\n${counts}\n高速基礎ランキング: ${highSpeedRows.length}件`);
   }catch(e){
     alert(e.message || String(e));
     log('毎日更新の作成に失敗しました。');
