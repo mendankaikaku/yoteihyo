@@ -4720,8 +4720,19 @@ function allListParseSmallSlotRowsFromRestoreMap(gradeMap){
         const name=allListSlotCleanName(nameRaw);
         const comiruBool=allListMarkToBool(comiru);
         const subjectBool=allListMarkToBool(subject);
-        const status=allListSmallSlotStatusFromAnswer(kind, answer);
-        const obj={kind,date,name,count:'',grade,studentNo,student,status,subject:subjectBool===true?'あり':'',comiru:comiruBool===true?'済':'未聞き取り',comiruAnswered:comiruBool,subjectChanged:subjectBool===true,note,machineKey:allListSmallSlotMachineKey(kind,name,date),studentKey,_source:'restore'};
+        // 空欄は「未/×」として確定させず、入力用や自動生成データを残す。
+        const status=answer ? allListSmallSlotStatusFromAnswer(kind, answer) : '';
+        const obj={
+          kind,date,name,count:'',grade,studentNo,student,status,
+          subject:subjectBool===true?'あり':(subjectBool===false?'なし':''),
+          comiru:comiruBool===true?'済':(comiruBool===false?'未聞き取り':''),
+          comiruAnswered:comiruBool,
+          subjectChanged:subjectBool,
+          note,
+          machineKey:allListSmallSlotMachineKey(kind,name,date),
+          studentKey,
+          _source:'restore'
+        };
         out.rowObjects.push(obj);
       }
     }
@@ -4754,21 +4765,45 @@ function allListSmallDedupeKey(obj){
 function allListSmallMergeRestoredOverAuto(oldObj, newObj){
   if(!oldObj) return newObj;
   if(!newObj) return oldObj;
-  const merged = Object.assign({}, oldObj, newObj);
-  // 読み込んだ全員分リスト側の手修正を最優先する。
-  ['status','subject','comiru','note'].forEach(k=>{
-    if(newObj && newObj._source === 'restore'){
-      if(newObj[k] !== undefined && newObj[k] !== null && String(newObj[k]) !== '') merged[k] = newObj[k];
-    }else if(oldObj && oldObj._source === 'restore'){
-      if(oldObj[k] !== undefined && oldObj[k] !== null && String(oldObj[k]) !== '') merged[k] = oldObj[k];
-    }
-  });
-  ['comiruAnswered','subjectChanged'].forEach(k=>{
-    if(newObj && newObj._source === 'restore' && newObj[k] !== undefined && newObj[k] !== null) merged[k] = newObj[k];
-    else if(oldObj && oldObj._source === 'restore' && oldObj[k] !== undefined && oldObj[k] !== null) merged[k] = oldObj[k];
-  });
-  merged._source = (oldObj._source === 'restore' || newObj._source === 'restore') ? 'restore' : 'auto';
-  return merged;
+
+  const isOldRestore = oldObj._source === 'restore';
+  const isNewRestore = newObj._source === 'restore';
+  const hasText = v => v !== undefined && v !== null && String(v) !== '';
+
+  // 読み込んだExcel側を優先。ただし空欄は自動データを消さない。
+  // これにより、全員分リストの回答/Comiru/科目変更が空欄でも、
+  // 入力用Excelや自動生成側の値を勝手に「未」「×」へ戻さない。
+  if(isNewRestore){
+    const merged = Object.assign({}, oldObj);
+    ['kind','date','name','count','grade','studentNo','student','machineKey','studentKey'].forEach(k=>{
+      if(hasText(newObj[k])) merged[k] = newObj[k];
+    });
+    ['status','subject','comiru','note'].forEach(k=>{
+      if(hasText(newObj[k])) merged[k] = newObj[k];
+    });
+    ['comiruAnswered','subjectChanged'].forEach(k=>{
+      if(newObj[k] !== undefined && newObj[k] !== null) merged[k] = newObj[k];
+    });
+    merged._source = 'restore';
+    return merged;
+  }
+
+  if(isOldRestore){
+    const merged = Object.assign({}, newObj);
+    ['kind','date','name','count','grade','studentNo','student','machineKey','studentKey'].forEach(k=>{
+      if(hasText(oldObj[k])) merged[k] = oldObj[k];
+    });
+    ['status','subject','comiru','note'].forEach(k=>{
+      if(hasText(oldObj[k])) merged[k] = oldObj[k];
+    });
+    ['comiruAnswered','subjectChanged'].forEach(k=>{
+      if(oldObj[k] !== undefined && oldObj[k] !== null) merged[k] = oldObj[k];
+    });
+    merged._source = 'restore';
+    return merged;
+  }
+
+  return Object.assign({}, oldObj, newObj);
 }
 
 function buildSmallSlotObjectsByStudent(examRecords=[], eventRecords=[]){
