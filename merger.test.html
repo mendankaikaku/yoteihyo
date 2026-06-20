@@ -6242,8 +6242,10 @@ function styleAllStudentPrintSheet(ws, aoa){
   const planCount = Math.max(0, Number(aoa?._printPlanColumnCount || 0));
   // 模試イベントを大きく、右側に3日間の予定欄を追加しても読めるように列幅を広げる。
   const widths = [10, 10, 6, 6, 22, 22, ...Array(manualCount).fill(16), 155, ...Array(planCount).fill(28)];
-  const range = applyNiceSheetSettings(ws, aoa, widths, {rows:{min:28,max:190,header:36,pxPerLine:18}});
-  ws['!rows'][0] = {hpt:28};
+  // 印刷用は上下の余白をできるだけ詰める。
+  // 横幅はこのファイルの設定を維持し、行高だけを文字量ぎりぎりまで小さくする。
+  const range = applyNiceSheetSettings(ws, aoa, widths, {rows:{min:13,max:130,header:24,pxPerLine:11}});
+  ws['!rows'][0] = {hpt:22};
   ws['!freeze'] = {xSplit:2, ySplit:2};
   ws['!pageSetup'] = {orientation:'landscape', paperSize:12, fitToWidth:1, fitToHeight:0};
   ws['!margins'] = {left:0.08, right:0.08, top:0.18, bottom:0.18, header:0.04, footer:0.04};
@@ -6275,7 +6277,7 @@ function styleAllStudentPrintSheet(ws, aoa){
       /Comiru[:：]\s*×/.test(text) ||
       /科目変更[:：]\s*〇/.test(text)
     );
-    const style = {font:R===0?fontTitle:(R===1?fontHeader:(hasNeedsHearing?fontMissing:fontBase)), alignment:{vertical:'center', horizontal:'center', wrapText:true, shrinkToFit:!hasNeedsHearing}, border};
+    const style = {font:R===0?fontTitle:(R===1?fontHeader:(hasNeedsHearing?fontMissing:fontBase)), alignment:{vertical:R<=1?'center':'top', horizontal:'center', wrapText:true, shrinkToFit:!hasNeedsHearing}, border};
     if(R===0) style.fill = titleFill;
     else if(R===1) style.fill = headerFill;
     else if(C<=1) style.fill = nameFill;
@@ -6283,7 +6285,7 @@ function styleAllStudentPrintSheet(ws, aoa){
     else if(C===eventCol) style.fill = hasNeedsHearing ? missingFill : eventFill;
     else if(C>eventCol) style.fill = planFill;
     if(hasNeedsHearing){
-      style.alignment = {vertical:'center', horizontal:'center', wrapText:true, shrinkToFit:false};
+      style.alignment = {vertical:'top', horizontal:'center', wrapText:true, shrinkToFit:false};
     }
     return style;
   });
