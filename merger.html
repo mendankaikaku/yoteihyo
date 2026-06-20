@@ -3460,32 +3460,63 @@ function rankingRowKey(row, header){
   const student = idxStudent >= 0 ? norm(row[idxStudent]) : '';
   return [grade, normalizeNameKey(student)].join('|');
 }
+
+function dailyPosterDateKeyFromCell(v){
+  const d = parseDateLoose(v);
+  if(d) return ymd(d);
+  const s = norm(v);
+  const m = s.match(/(\d{1,2})\s*\/\s*(\d{1,2})/);
+  if(m){
+    const y = new Date().getFullYear();
+    return `${y}-${pad2(Number(m[1]))}-${pad2(Number(m[2]))}`;
+  }
+  return '9999-12-31';
+}
+function sortDailyPosterAoaIfDateColumn(aoa){
+  const rows = (aoa || []).map(row => Array.isArray(row) ? row : [row]);
+  if(rows.length <= 3) return posterMoveNoHitRowsToBottom(rows);
+  const title = rows[0];
+  const header = rows[1] || [];
+  const dateCol = header.findIndex(h => /日付/.test(norm(h)));
+  const body = rows.slice(2);
+  const real = body.filter(row => !posterIsNoHitRow(row));
+  const nohit = body.filter(row => posterIsNoHitRow(row));
+  if(!real.length) return [...rows.slice(0,2), ...nohit];
+  if(dateCol < 0) return posterMoveNoHitRowsToBottom(rows);
+  real.sort((a,b)=>
+    dailyPosterDateKeyFromCell(a[dateCol]).localeCompare(dailyPosterDateKeyFromCell(b[dateCol])) ||
+    String(a[0] || '').localeCompare(String(b[0] || ''), 'ja') ||
+    String(a[1] || '').localeCompare(String(b[1] || ''), 'ja') ||
+    String(a[2] || '').localeCompare(String(b[2] || ''), 'ja')
+  );
+  return [title, header, ...real, ...nohit];
+}
+
 function mergeRestoredDailyPosterAoa(sheetName, generatedAoa){
   const restore = findDailyPosterRestore(sheetName);
-  if(!restore || !generatedAoa || generatedAoa.length < 2) return generatedAoa;
+  if(!restore || !generatedAoa || generatedAoa.length < 2) return sortDailyPosterAoaIfDateColumn(generatedAoa);
   const restoredAoa = (restore.aoa || []).map(row => (row || []).map(v => norm(v)));
-  if(restoredAoa.length < 2) return generatedAoa;
+  if(restoredAoa.length < 2) return sortDailyPosterAoaIfDateColumn(generatedAoa);
 
   const isRanking = normalizeDailyPosterSheetKey(sheetName).includes('ランキング') || normalizeDailyPosterSheetKey(sheetName).includes('高速');
   const genHeader = (generatedAoa[1] || []).map(v => norm(v));
   const restoreHeader = (restoredAoa[1] || []).map(v => norm(v));
   const keyFn = isRanking ? rankingRowKey : posterRowKey;
 
-  // 生成側に実データがあるなら、前回掲示Excel由来の「該当なし」は復元しない。
-  // 生成側も該当なししかない場合だけ、該当なしを残す。
+  // 生成側または前回掲示Excel側に実データが1件でもあるなら、「該当なし」は復元しない。
+  // どちらにも実データがない場合だけ「該当なし」を残す。
   const generatedBody = generatedAoa.slice(2).filter(row => (row || []).some(v => norm(v)));
   const generatedRealRows = generatedBody.filter(row => !posterIsNoHitRow(row));
-  const hasGeneratedRealRows = generatedRealRows.length > 0;
+  const restoredBodyAll = restoredAoa.slice(2).filter(row => (row || []).some(v => norm(v)));
+  const restoredRealRows = restoredBodyAll.filter(row => !posterIsNoHitRow(row));
+  const hasAnyRealRows = generatedRealRows.length > 0 || restoredRealRows.length > 0;
 
   // タイトルは手修正版Excelの1行目を優先。これにより「分」などの細かい表記もExcel側の手修正を正とする。
   const titleRow = (restoredAoa[0] || []).some(v => norm(v)) ? restoredAoa[0] : generatedAoa[0];
   const header = restoreHeader.length >= genHeader.length ? restoreHeader : genHeader;
   const out = [titleRow, header];
   const used = new Set();
-  const restoredRows = restoredAoa
-    .slice(2)
-    .filter(row => row.some(v => norm(v)))
-    .filter(row => !(hasGeneratedRealRows && posterIsNoHitRow(row)));
+  const restoredRows = restoredBodyAll.filter(row => !(hasAnyRealRows && posterIsNoHitRow(row)));
   const restoreMap = new Map();
   for(const row of restoredRows){
     const key = keyFn(row, restoreHeader);
@@ -3494,7 +3525,7 @@ function mergeRestoredDailyPosterAoa(sheetName, generatedAoa){
 
   // 生成側に存在する行は、同じ生徒・内容が手修正版にあれば手修正版を採用。
   for(const grow of generatedAoa.slice(2)){
-    if(hasGeneratedRealRows && posterIsNoHitRow(grow)) continue;
+    if(hasAnyRealRows && posterIsNoHitRow(grow)) continue;
     const key = keyFn(grow, genHeader);
     const restored = restoreMap.get(key);
     if(restored){
@@ -3510,7 +3541,7 @@ function mergeRestoredDailyPosterAoa(sheetName, generatedAoa){
     if(key && used.has(key)) continue;
     out.push([...row, ...Array(Math.max(0, header.length - row.length)).fill('')]);
   }
-  return posterMoveNoHitRowsToBottom(out);
+  return sortDailyPosterAoaIfDateColumn(out);
 }
 
 
