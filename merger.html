@@ -4191,7 +4191,9 @@ function allListApplyDropdowns(ws, aoa){
   for(let c=0;c<header.length;c++){
     const h=String(header[c] || '');
     let formula=null;
-    if(/\n受験$/.test(h)) formula='"当日,後日,不受験,未"';
+    if(/(?:小規模\s*)?\d+\n回答$/.test(h)) formula='"〇,×,当日,後日,不受験,未"';
+    else if(/(?:小規模\s*)?\d+\nComiru$/.test(h)) formula='"〇,×"';
+    else if(/\n受験$/.test(h)) formula='"当日,後日,不受験,未"';
     else if(/\n(参加)$/.test(h)) formula='"〇,×,未"';
     else if(/\n(Comiru|科目変更)$/.test(h)) formula='"〇,×"';
     if(!formula) continue;
@@ -4574,6 +4576,38 @@ function mergeRestoredAllListAoa(grade, generatedAoa){
 }
 
 
+
+
+function allListSlotDateDisplay(value){
+  const raw = allListCellText(value);
+  if(!raw) return '';
+  const d = parseDateTimeLoose(raw);
+  if(!d) return raw;
+  const base = `${d.getMonth()+1}/${d.getDate()}(${WEEK_JA[d.getDay()]})`;
+  const hasTime = /(?:T|\s)\d{1,2}:\d{2}|午前|午後/.test(raw);
+  if(!hasTime && d.getHours()===0 && d.getMinutes()===0) return base;
+  return `${base}${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function allListSlotDisplayName(item){
+  const kind = item?.kind === '模試' ? '模試' : 'イベント';
+  const name = allListCellText(item?.name || '');
+  if(!name) return '';
+  if(/^【(模試|イベント)】/.test(name)) return name;
+  return `【${kind}】${name}`;
+}
+function allListSlotKindFromName(name, answer=''){
+  const n=allListCellText(name);
+  const a=allListCellText(answer).replace(/\s/g,'');
+  if(/【模試】/.test(n)) return '模試';
+  if(/【イベント】/.test(n)) return 'イベント';
+  if(/当日|後日|不受験|^(当|後|不)$/.test(a)) return '模試';
+  return 'イベント';
+}
+function allListSlotCleanName(name){
+  return allListCellText(name).replace(/^【(?:模試|イベント)】/,'').trim();
+}
+
 function allListSmallSlotStatusFromAnswer(kind, answer){
   const a=allListCellText(answer).replace(/\s/g,'');
   if(kind === '模試'){
@@ -4622,11 +4656,10 @@ function allListParseSmallSlotRowsFromRestoreMap(gradeMap){
     const slots=new Map();
     header.forEach((h,i)=>{
       const t=String(h || '').replace(/\r\n/g,'\n').replace(/\r/g,'\n');
-      const m=t.match(/小規模\s*([0-9０-９]+)[\s\S]*(種別|日付|日時|名称|回答|Comiru|コミル|備考)/);
+      const m=t.match(/(?:小規模\s*)?([0-9０-９]+)[\s\S]*(日付|日時|名称|回答|Comiru|コミル|備考)/);
       if(!m) return;
       const no=String(m[1]).replace(/[０-９]/g,ch=>String.fromCharCode(ch.charCodeAt(0)-0xFEE0));
       const field=m[2].includes('日') || m[2].includes('時') ? 'date' :
-        m[2].includes('種別') ? 'kind' :
         m[2].includes('名称') ? 'name' :
         m[2].includes('回答') ? 'answer' :
         /Comiru|コミル/i.test(m[2]) ? 'comiru' :
@@ -4643,17 +4676,14 @@ function allListParseSmallSlotRowsFromRestoreMap(gradeMap){
       const studentKey=studentKeyForList(student, studentNo);
       if(!studentKey) continue;
       for(const slot of slots.values()){
-        const kindRaw=slot.kind!=null ? allListCellText(row[slot.kind]) : '';
-        const name=slot.name!=null ? allListCellText(row[slot.name]) : '';
+        const nameRaw=slot.name!=null ? allListCellText(row[slot.name]) : '';
         const date=slot.date!=null ? allListCellText(row[slot.date]) : '';
         const answer=slot.answer!=null ? allListCellText(row[slot.answer]) : '';
         const comiru=slot.comiru!=null ? allListCellText(row[slot.comiru]) : '';
         const note=slot.note!=null ? allListCellText(row[slot.note]) : '';
-        if(!name && !kindRaw && !answer && !comiru && !note) continue;
-        let kind=kindRaw.includes('模試') ? '模試' : (kindRaw.includes('イベント') ? 'イベント' : '');
-        if(!kind){
-          kind=/当日|後日|不受験|^(当|後|不)$/.test(answer) ? '模試' : 'イベント';
-        }
+        if(!nameRaw && !answer && !comiru && !note) continue;
+        const kind=allListSlotKindFromName(nameRaw, answer);
+        const name=allListSlotCleanName(nameRaw);
         const comiruBool=allListMarkToBool(comiru);
         const status=allListSmallSlotStatusFromAnswer(kind, answer);
         const obj={kind,date,name,count:'',grade,studentNo,student,status,subject:'',comiru:comiruBool===true?'済':'未聞き取り',comiruAnswered:comiruBool,subjectChanged:false,note,machineKey:allListSmallSlotMachineKey(kind,name,date),studentKey};
@@ -4749,11 +4779,11 @@ function buildAllStudentListAoaByGrade(examRecords=[], eventRecords=[]){
       const key = studentKeyForList(st.student, st.studentNo);
       maxSmallSlots = Math.max(maxSmallSlots, (smallByStudent.get(key) || []).length);
     }
-    const smallHeaders = [];
+    const extraHeaders = [];
     for(let i=1;i<=maxSmallSlots;i++){
-      smallHeaders.push(`小規模${i}\n種別`, `小規模${i}\n日付`, `小規模${i}\n名称`, `小規模${i}\n回答`, `小規模${i}\nComiru`, `小規模${i}\n備考`);
+      extraHeaders.push(`${i}\n日付`, `${i}\n名称`, `${i}\n回答`, `${i}\nComiru`, `${i}\n備考`);
     }
-    const header = ['学年','生徒番号','生徒名','読み仮名','担当','高校','備考', ...smallHeaders, ...examGroups.map(g=>g.label), ...eventGroups.map(g=>g.label)];
+    const header = ['学年','生徒番号','生徒名','読み仮名','担当','高校','備考', ...extraHeaders, ...examGroups.map(g=>g.label), ...eventGroups.map(g=>g.label)];
     for(const d of windowDates){
       header.push(`${mmdd(d)}(${WEEK_JA[d.getDay()]})\n予定`);
       header.push(`${mmdd(d)}(${WEEK_JA[d.getDay()]})\n結果`);
@@ -4766,9 +4796,9 @@ function buildAllStudentListAoaByGrade(examRecords=[], eventRecords=[]){
       for(let i=0;i<maxSmallSlots;i++){
         const item = smallItems[i];
         if(item){
-          row.push(item.kind || '', item.date || '', item.name || '', allListSmallSlotAnswer(item), allListSmallSlotComiru(item), item.note || '');
+          row.push(allListSlotDateDisplay(item.date || ''), allListSlotDisplayName(item), allListSmallSlotAnswer(item), allListSmallSlotComiru(item), item.note || '');
         }else{
-          row.push('', '', '', '', '', '');
+          row.push('', '', '', '', '');
         }
       }
       for(const g of examGroups) row.push(examByStudent.get(key)?.get(g.key) || '');
@@ -4800,12 +4830,11 @@ function styleAllStudentGradeSheet(ws, aoa){
     else if(c<=6) widths.push(14);
     else{
       const h=String(aoa[1]?.[c]||'');
-      if(/小規模\d+\n種別$/.test(h)) widths.push(8);
-      else if(/小規模\d+\n日付$/.test(h)) widths.push(10);
-      else if(/小規模\d+\n名称$/.test(h)) widths.push(18);
-      else if(/小規模\d+\n回答$/.test(h)) widths.push(9);
-      else if(/小規模\d+\nComiru$/.test(h)) widths.push(8);
-      else if(/小規模\d+\n備考$/.test(h)) widths.push(18);
+      if(/(?:小規模\s*)?\d+\n日付$/.test(h)) widths.push(10);
+      else if(/(?:小規模\s*)?\d+\n名称$/.test(h)) widths.push(20);
+      else if(/(?:小規模\s*)?\d+\n回答$/.test(h)) widths.push(9);
+      else if(/(?:小規模\s*)?\d+\nComiru$/.test(h)) widths.push(8);
+      else if(/(?:小規模\s*)?\d+\n備考$/.test(h)) widths.push(18);
       else if(/\n(受験|参加)$/.test(h)) widths.push(7);
       else if(/\nComiru$/.test(h)) widths.push(8);
       else if(/\n科目変更$/.test(h)) widths.push(8);
@@ -4828,7 +4857,7 @@ function styleAllStudentGradeSheet(ws, aoa){
   const headerFill = {fgColor:{rgb:'E0F2FE'}};
   const baseFill = {fgColor:{rgb:'FFFFFF'}};
   const nameFill = {fgColor:{rgb:'F1F5F9'}};
-  const smallFill = {fgColor:{rgb:'F5F3FF'}};
+  const extraFill = {fgColor:{rgb:'F5F3FF'}};
   const planFill = {fgColor:{rgb:'FFF7ED'}};
   const resultFill = {fgColor:{rgb:'ECFDF5'}};
   const missingFill = {fgColor:{rgb:'FECACA'}};
@@ -4842,20 +4871,20 @@ function styleAllStudentGradeSheet(ws, aoa){
     if(isBangMissing) cell.v = cell.v.slice(1);
     const text = cell && cell.v != null ? String(cell.v) : cellText;
     const headerText = String(aoa[1]?.[C] || '');
-    const isSmall = /小規模\d+\n/.test(headerText);
+    const isExtra = /(?:小規模\s*)?\d+\n/.test(headerText);
     const isMissing = R>1 && (
       isBangMissing ||
       (/\nComiru$/.test(headerText) && text === '×') ||
       (/\n(受験|参加|回答)$/.test(headerText) && text === '未')
     );
-    const style = {font:R===0?fontTitle:(R===1?fontHeader:fontBase), alignment:{vertical:'top', horizontal:(R<=1 || C<=2 || /\n(種別|回答|Comiru)$/.test(headerText))?'center':'left', wrapText:true}, border};
+    const style = {font:R===0?fontTitle:(R===1?fontHeader:fontBase), alignment:{vertical:'top', horizontal:(R<=1 || C<=2 || /\n(回答|Comiru)$/.test(headerText))?'center':'left', wrapText:true}, border};
     if(R===0) style.fill = titleFill;
     else if(R===1) style.fill = headerFill;
     else if(C<=2) style.fill = nameFill;
     else if(R>1 && C>=7){
       if(headerText.includes('\n予定')) style.fill = planFill;
       else if(headerText.includes('\n結果')) style.fill = resultFill;
-      else if(isSmall) style.fill = smallFill;
+      else if(isExtra) style.fill = extraFill;
       else style.fill = baseFill;
     }
     if(isMissing){
@@ -4902,7 +4931,7 @@ async function downloadAllStudentList(){
   XLSX.writeFile(wb, `全員分リスト_学年別_B4横_${ymd(base)}基準.xlsx`);
   if(typeof log === 'function'){
     const count = Math.max(0, (state.allListUpdateLog?.length || 1) - 1);
-    log(`全員分リストを出力しました。\n対象15人以下の模試・イベントは、各生徒ごとの小規模スロット列にまとめました。スロット数は学年内の最大対象数に合わせて自動で増えます。回答・Comiruはプルダウンで更新できます。\n手修正・自動データの衝突ログ: ${count}件${count ? '\nExcel内の「更新ログ」シートを確認してください。' : ''}`);
+    log(`全員分リストを出力しました。\n対象人数が少ない模試・イベントは、各生徒ごとの追加スロット列にまとめました。列数は学年内の最大対象数に合わせて自動で増えます。回答・Comiruはプルダウンで更新できます。\n手修正・自動データの衝突ログ: ${count}件${count ? '\nExcel内の「更新ログ」シートを確認してください。' : ''}`);
   }
 }
 
