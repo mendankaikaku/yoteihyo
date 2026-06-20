@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>面談予定入力・準備資料アプリ 18:04（合格設計図Excel A列固定・印刷PDF優先版）</title>
+<title>面談予定入力・準備資料アプリ v34（合格設計図Excel A列固定・印刷PDF優先版）</title>
 <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
 <script src="./libs/xlsx.bundle.js"></script>
 <script>if(!window.XLSX){document.write('<script src="./libs/xlsx.full.min.js"><\/script>');}</script>
@@ -3386,6 +3386,45 @@ function allListMergeEventPatch(data, patch){
   if(allListCellText(patch.note)){ev.note=allListCellText(patch.note); changed=true;}
   return changed;
 }
+
+function allListParseSmallSlotsFromHeaderRow(headers, row, matched){
+  const slots=new Map();
+  headers.forEach((h,i)=>{
+    const t=String(h || '').replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+    const m=t.match(/小規模\s*([0-9０-９]+)[\s\S]*(種別|日付|日時|名称|回答|Comiru|コミル|備考)/);
+    if(!m) return;
+    const no=String(m[1]).replace(/[０-９]/g,ch=>String.fromCharCode(ch.charCodeAt(0)-0xFEE0));
+    const field=m[2].includes('日') || m[2].includes('時') ? 'date' :
+      m[2].includes('種別') ? 'kind' :
+      m[2].includes('名称') ? 'name' :
+      m[2].includes('回答') ? 'answer' :
+      /Comiru|コミル/i.test(m[2]) ? 'comiru' :
+      m[2].includes('備考') ? 'note' : '';
+    if(!field) return;
+    if(!slots.has(no)) slots.set(no,{});
+    slots.get(no)[field]=i;
+  });
+  const out=[];
+  for(const slot of slots.values()){
+    const kindRaw=slot.kind!=null ? allListCellText(row[slot.kind]) : '';
+    const name=slot.name!=null ? allListCellText(row[slot.name]) : '';
+    const date=slot.date!=null ? allListCellText(row[slot.date]) : '';
+    const answer=slot.answer!=null ? allListCellText(row[slot.answer]) : '';
+    const comiru=slot.comiru!=null ? allListCellText(row[slot.comiru]) : '';
+    const note=slot.note!=null ? allListCellText(row[slot.note]) : '';
+    if(!name && !kindRaw && !answer && !comiru && !note) continue;
+    let kind=kindRaw.includes('模試') ? '模試' : (kindRaw.includes('イベント') ? 'イベント' : '');
+    if(!kind) kind=/当日|後日|不受験|^(当|後|不)$/.test(answer) ? '模試' : 'イベント';
+    const comiruBool=allListMarkToBool(comiru);
+    if(kind==='模試'){
+      out.push({kind:'模試', patch:{id:['模試',name,date].join('|'), name, date, status:allListStatusFromValue(answer,['当日','後日','不受験']), comiruAnswered:comiruBool, subjectChanged:undefined, note}});
+    }else{
+      out.push({kind:'イベント', patch:{id:['イベント',name,date].join('|'), name, datetime:date, status:allListStatusFromValue(answer,['参加','不参加']), comiruAnswered:comiruBool, note}});
+    }
+  }
+  return out;
+}
+
 function parseAllListOverridesFromRows(aoa, targetNames){
   const patches={};
   const ensure=(name)=>patches[name]||(patches[name]={exams:[],events:[]});
@@ -3412,6 +3451,12 @@ function parseAllListOverridesFromRows(aoa, targetNames){
       const matched=matchAllListStudentName(row[nameIdx],targetNames) || matchAllListStudentName(row[noIdx],targetNames);
       if(!matched) continue;
       const bucket=ensure(matched);
+      // 全員分リスト本体の「小規模① 種別/日付/名称/回答/Comiru/備考」列を読む。
+      const smallSlotItems=allListParseSmallSlotsFromHeaderRow(headers,row,matched);
+      smallSlotItems.forEach(item=>{
+        if(item.kind==='模試') allListAddPatchWithPriority(bucket,'exam',item.patch);
+        else if(item.kind==='イベント') allListAddPatchWithPriority(bucket,'event',item.patch);
+      });
       // 全員分リスト本体の備考欄にある【小規模】ブロックを読む。
       // 例: 6/20 保護者会　参:〇　C:×　備:電話済
       if(genericNoteIdx>=0 && allListCellText(row[genericNoteIdx]).includes('【小規模】')){
