@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>面談予定入力・準備資料アプリ 18:21（合格設計図Excel A列固定・印刷PDF優先版）</title>
+<title>面談予定入力・準備資料アプリ v34（合格設計図Excel A列固定・印刷PDF優先版）</title>
 <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
 <script src="./libs/xlsx.bundle.js"></script>
 <script>if(!window.XLSX){document.write('<script src="./libs/xlsx.full.min.js"><\/script>');}</script>
@@ -3409,13 +3409,14 @@ function allListParseSmallSlotsFromHeaderRow(headers, row, matched){
   const slots=new Map();
   headers.forEach((h,i)=>{
     const t=String(h || '').replace(/\r\n/g,'\n').replace(/\r/g,'\n');
-    const m=t.match(/(?:小規模\s*)?([0-9０-９]+)[\s\S]*(種別|日付|日時|名称|回答|Comiru|コミル|備考)/);
+    const m=t.match(/(?:小規模\s*)?([0-9０-９]+)[\s\S]*(種別|日付|日時|名称|回答|科目変更|科変|Comiru|コミル|備考)/);
     if(!m) return;
     const no=String(m[1]).replace(/[０-９]/g,ch=>String.fromCharCode(ch.charCodeAt(0)-0xFEE0));
     const field=m[2].includes('日') || m[2].includes('時') ? 'date' :
       m[2].includes('種別') ? 'kind' :
       m[2].includes('名称') ? 'name' :
       m[2].includes('回答') ? 'answer' :
+      /科目変更|科変/.test(m[2]) ? 'subject' :
       /Comiru|コミル/i.test(m[2]) ? 'comiru' :
       m[2].includes('備考') ? 'note' : '';
     if(!field) return;
@@ -3428,15 +3429,17 @@ function allListParseSmallSlotsFromHeaderRow(headers, row, matched){
     const nameRaw=slot.name!=null ? allListCellText(row[slot.name]) : '';
     const date=slot.date!=null ? allListSlotDateClean(row[slot.date]) : '';
     const answer=slot.answer!=null ? allListCellText(row[slot.answer]) : '';
+    const subject=slot.subject!=null ? allListCellText(row[slot.subject]) : '';
     const comiru=slot.comiru!=null ? allListCellText(row[slot.comiru]) : '';
     const note=slot.note!=null ? allListCellText(row[slot.note]) : '';
-    if(!nameRaw && !kindRaw && !answer && !comiru && !note) continue;
+    if(!nameRaw && !kindRaw && !answer && !subject && !comiru && !note) continue;
     let kind=kindRaw.includes('模試') ? '模試' : (kindRaw.includes('イベント') ? 'イベント' : '');
     if(!kind) kind=allListSlotKindFromName(nameRaw, answer);
     const name=allListSlotCleanName(nameRaw);
     const comiruBool=allListMarkToBool(comiru);
+    const subjectBool=allListMarkToBool(subject);
     if(kind==='模試'){
-      out.push({kind:'模試', patch:{id:['模試',name,date].join('|'), name, date, status:allListStatusFromValue(answer,['当日','後日','不受験']), comiruAnswered:comiruBool, subjectChanged:undefined, note}});
+      out.push({kind:'模試', patch:{id:['模試',name,date].join('|'), name, date, status:allListStatusFromValue(answer,['当日','後日','不受験']), comiruAnswered:comiruBool, subjectChanged:subjectBool, note}});
     }else{
       out.push({kind:'イベント', patch:{id:['イベント',name,date].join('|'), name, datetime:date, status:allListStatusFromValue(answer,['参加','不参加']), comiruAnswered:comiruBool, note}});
     }
@@ -3470,7 +3473,7 @@ function parseAllListOverridesFromRows(aoa, targetNames){
       const matched=matchAllListStudentName(row[nameIdx],targetNames) || matchAllListStudentName(row[noIdx],targetNames);
       if(!matched) continue;
       const bucket=ensure(matched);
-      // 全員分リスト本体の「① 日付/名称/回答/Comiru/備考」列を読む。
+      // 全員分リスト本体の「① 日付/名称/回答/科目変更/Comiru/備考」列を読む。
       const smallSlotItems=allListParseSmallSlotsFromHeaderRow(headers,row,matched);
       smallSlotItems.forEach(item=>{
         if(item.kind==='模試') allListAddPatchWithPriority(bucket,'exam',item.patch);
