@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>予定統合アプリあ</title>　
+  <title>予定統合アプリ</title>　
   <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
   <script src="./libs/xlsx.bundle.js"></script>
   <script>
@@ -4551,6 +4551,7 @@ function mergeRestoredAllListAoa(grade, generatedAoa){
   const headerCanon = slots.map(x=>x.canon);
   const out = [title, header];
   const used = new Set();
+  const conflictCells = [];
 
   const generatedRows = generatedAoa.slice(2);
   const generatedByKey = new Map();
@@ -4577,6 +4578,7 @@ function mergeRestoredAllListAoa(grade, generatedAoa){
     const gen = generatedByKey.get(key);
     if(gen) used.add(key);
 
+    const outRowIndex = out.length;
     const newRow = Array(header.length).fill('');
     const studentName = allListStudentNameFromRow(restored, restoreCanon) || (gen ? allListStudentNameFromRow(gen, genCanon) : '');
 
@@ -4599,6 +4601,7 @@ function mergeRestoredAllListAoa(grade, generatedAoa){
         if(restoredVal && restoredVal !== autoVal){
           const kind = /結果/.test(col) ? '結果上書き' : '予定上書き';
           allListAddUpdateLog(kind, grade, key, studentName, col, col, restoredVal, autoVal, autoVal, '予定・結果は入力用Excel/毎日更新.xlsx/JSONを正本として採用');
+          conflictCells.push(`${outRowIndex}:${c}`);
         }
         continue;
       }
@@ -4607,6 +4610,7 @@ function mergeRestoredAllListAoa(grade, generatedAoa){
         newRow[c] = restoredVal !== '' ? restoredVal : autoVal;
         if(restoredVal && gen && restoredVal !== autoVal){
           allListAddUpdateLog('手修正優先', grade, key, studentName, col, col, restoredVal, autoVal, restoredVal, '模試・イベント・確認メモ系は全員分リストの手修正を採用');
+          conflictCells.push(`${outRowIndex}:${c}`);
         }
         continue;
       }
@@ -4631,6 +4635,7 @@ function mergeRestoredAllListAoa(grade, generatedAoa){
     allListAddUpdateLog('自動行追加', grade, key, studentName, '生徒行', '行', '', '入力用/対応表に存在', '末尾へ追加', '全員分リストにない自動データ生徒を追加。不要なら全員分リスト側で確認');
   }
 
+  out._allListConflictCells = conflictCells;
   return out;
 }
 
@@ -5013,10 +5018,13 @@ function styleAllStudentGradeSheet(ws, aoa){
   const planFill = {fgColor:{rgb:'FFF7ED'}};
   const resultFill = {fgColor:{rgb:'ECFDF5'}};
   const missingFill = {fgColor:{rgb:'FECACA'}};
+  const conflictFill = {fgColor:{rgb:'FDE68A'}};
   const fontTitle = {name:'Yu Gothic', sz:14, bold:true, color:{rgb:'111827'}};
   const fontHeader = {name:'Yu Gothic', sz:8, bold:true, color:{rgb:'111827'}};
   const fontBase = {name:'Yu Gothic', sz:7, color:{rgb:'111827'}};
   const fontRed = {name:'Yu Gothic', sz:7, bold:true, color:{rgb:'991B1B'}};
+  const fontConflict = {name:'Yu Gothic', sz:7, bold:true, color:{rgb:'92400E'}};
+  const conflictCells = new Set(Array.isArray(aoa._allListConflictCells) ? aoa._allListConflictCells : []);
   setRangeStyle(ws, range, (R,C,cell)=>{
     const cellText = cell && cell.v != null ? String(cell.v) : '';
     const isBangMissing = R>1 && cell && typeof cell.v === 'string' && cell.v.startsWith('!');
@@ -5042,6 +5050,10 @@ function styleAllStudentGradeSheet(ws, aoa){
     if(isMissing){
       style.fill = missingFill;
       style.font = fontRed;
+    }
+    if(conflictCells.has(`${R}:${C}`)){
+      style.fill = conflictFill;
+      style.font = fontConflict;
     }
     return style;
   });
