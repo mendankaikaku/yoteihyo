@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>予定統合アプリああ</title>　
+  <title>予定統合アプリ</title>　
   <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
   <script src="./libs/xlsx.bundle.js"></script>
   <script>
@@ -3619,7 +3619,9 @@ function allListBaseDate(){
 }
 function allListWindowDates(){
   const base = allListBaseDate();
-  return [-2,-1,0,1].map(offset => {
+  // 全員分リストは「基準日の2日前・1日前・当日」の3日間だけ表示する。
+  // 例：基準日が6/20なら、6/18〜6/20。
+  return [-2,-1,0].map(offset => {
     const d = new Date(base);
     d.setDate(base.getDate() + offset);
     return d;
@@ -4826,30 +4828,32 @@ function styleAllStudentGradeSheet(ws, aoa){
   const colCount = Math.max(...aoa.map(r => r.length));
   const widths = [];
   for(let c=0;c<colCount;c++){
-    if(c===0) widths.push(8);
-    else if(c===1) widths.push(12);
-    else if(c===2) widths.push(14);
-    else if(c===3) widths.push(13);
-    else if(c<=6) widths.push(14);
-    else{
-      const h=String(aoa[1]?.[c]||'');
-      if(/(?:小規模\s*)?\d+\n日付$/.test(h)) widths.push(10);
-      else if(/(?:小規模\s*)?\d+\n名称$/.test(h)) widths.push(20);
-      else if(/(?:小規模\s*)?\d+\n回答$/.test(h)) widths.push(9);
-      else if(/(?:小規模\s*)?\d+\nComiru$/.test(h)) widths.push(8);
-      else if(/(?:小規模\s*)?\d+\n備考$/.test(h)) widths.push(18);
-      else if(/\n(受験|参加)$/.test(h)) widths.push(7);
-      else if(/\nComiru$/.test(h)) widths.push(8);
-      else if(/\n科目変更$/.test(h)) widths.push(8);
-      else if(/\n備考$/.test(h)) widths.push(14);
-      else widths.push(22);
-    }
+    const h=String(aoa[1]?.[c]||'');
+    if(c===0) widths.push(5);          // 学年
+    else if(c===1) widths.push(9);     // 生徒番号
+    else if(c===2) widths.push(11);    // 生徒名
+    else if(c===3) widths.push(8);     // 読み仮名
+    else if(c===4) widths.push(9);     // 担当
+    else if(c===5) widths.push(10);    // 高校
+    else if(c===6) widths.push(12);    // 備考
+    else if(/(?:小規模\s*)?\d+\n日付$/.test(h)) widths.push(9);
+    else if(/(?:小規模\s*)?\d+\n名称$/.test(h)) widths.push(16);
+    else if(/(?:小規模\s*)?\d+\n回答$/.test(h)) widths.push(7);
+    else if(/(?:小規模\s*)?\d+\nComiru$/.test(h)) widths.push(7);
+    else if(/(?:小規模\s*)?\d+\n備考$/.test(h)) widths.push(13);
+    else if(/\n(受験|参加)$/.test(h)) widths.push(6);
+    else if(/\nComiru$/.test(h)) widths.push(7);
+    else if(/\n科目変更$/.test(h)) widths.push(7);
+    else if(/\n備考$/.test(h)) widths.push(12);
+    else if(/\n予定$/.test(h)) widths.push(18);
+    else if(/\n結果$/.test(h)) widths.push(18);
+    else widths.push(16);
   }
-  const range = applyNiceSheetSettings(ws, aoa, widths, {rows:{min:20,max:86,header:42,pxPerLine:14}});
-  ws['!rows'][0] = {hpt:30};
+  const range = applyNiceSheetSettings(ws, aoa, widths, {rows:{min:18,max:78,header:38,pxPerLine:13}});
+  ws['!rows'][0] = {hpt:28};
   ws['!freeze'] = {xSplit:3, ySplit:2};
   ws['!pageSetup'] = {orientation:'landscape', paperSize:12, fitToWidth:1, fitToHeight:1};
-  ws['!margins'] = {left:0.18, right:0.18, top:0.25, bottom:0.25, header:0.1, footer:0.1};
+  ws['!margins'] = {left:0.12, right:0.12, top:0.20, bottom:0.20, header:0.05, footer:0.05};
   if(colCount > 1){
     ws['!merges'] = ws['!merges'] || [];
     ws['!merges'].push({s:{r:0,c:0}, e:{r:0,c:colCount-1}});
@@ -4864,10 +4868,10 @@ function styleAllStudentGradeSheet(ws, aoa){
   const planFill = {fgColor:{rgb:'FFF7ED'}};
   const resultFill = {fgColor:{rgb:'ECFDF5'}};
   const missingFill = {fgColor:{rgb:'FECACA'}};
-  const fontTitle = {name:'Yu Gothic', sz:15, bold:true, color:{rgb:'111827'}};
-  const fontHeader = {name:'Yu Gothic', sz:9, bold:true, color:{rgb:'111827'}};
-  const fontBase = {name:'Yu Gothic', sz:8, color:{rgb:'111827'}};
-  const fontRed = {name:'Yu Gothic', sz:8, bold:true, color:{rgb:'991B1B'}};
+  const fontTitle = {name:'Yu Gothic', sz:14, bold:true, color:{rgb:'111827'}};
+  const fontHeader = {name:'Yu Gothic', sz:8, bold:true, color:{rgb:'111827'}};
+  const fontBase = {name:'Yu Gothic', sz:7, color:{rgb:'111827'}};
+  const fontRed = {name:'Yu Gothic', sz:7, bold:true, color:{rgb:'991B1B'}};
   setRangeStyle(ws, range, (R,C,cell)=>{
     const cellText = cell && cell.v != null ? String(cell.v) : '';
     const isBangMissing = R>1 && cell && typeof cell.v === 'string' && cell.v.startsWith('!');
@@ -4880,7 +4884,7 @@ function styleAllStudentGradeSheet(ws, aoa){
       (/\nComiru$/.test(headerText) && text === '×') ||
       (/\n(受験|参加|回答)$/.test(headerText) && text === '未')
     );
-    const style = {font:R===0?fontTitle:(R===1?fontHeader:fontBase), alignment:{vertical:'top', horizontal:(R<=1 || C<=2 || /\n(回答|Comiru)$/.test(headerText))?'center':'left', wrapText:true}, border};
+    const style = {font:R===0?fontTitle:(R===1?fontHeader:fontBase), alignment:{vertical:'top', horizontal:(R<=1 || C<=2 || /\n(回答|Comiru)$/.test(headerText))?'center':'left', wrapText:true, shrinkToFit:true}, border};
     if(R===0) style.fill = titleFill;
     else if(R===1) style.fill = headerFill;
     else if(C<=2) style.fill = nameFill;
