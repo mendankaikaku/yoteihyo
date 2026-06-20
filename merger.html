@@ -461,7 +461,7 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
             <li>①フォルダー読取 → ②統合 → ④全員分リスト。</li>
             <li>フロントで聞いた内容は、全員分リストに手入力してよい。</li>
             <li>編集後は「全員分リスト」フォルダーに上書き保存。</li>
-            <li>次回読み取り時に、値・列幅・色・書式をできるだけ維持する。</li>
+            <li>次回読み取り時に、該当生徒の該当セルの手修正をできるだけ維持する。</li>
           </ol>
         </div>
 
@@ -4399,19 +4399,41 @@ async function parseAllListRestoreFile(file){
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, {type:'array', cellDates:true});
   for(const sheetName of wb.SheetNames){
-    if(String(sheetName || '').includes('小規模模試イベント')) continue;
+    const sn = String(sheetName || '');
+    // 「更新ログ」は衝突確認専用シートなので、全員分リスト本体としては絶対に読まない。
+    // ここを読んでしまうと、次回出力時にログ列（日時/区分/採用値/理由など）が本体表に混ざる。
+    if(sn.includes('更新ログ') || sn.includes('衝突ログ') || sn.includes('差分ログ') || sn.includes('小規模模試イベント')) continue;
+
     const ws = wb.Sheets[sheetName];
     const aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:'', raw:false});
     if(!aoa.length) continue;
+
     let headerRow = -1;
     for(let r=0; r<Math.min(12, aoa.length); r++){
       const rowText = (aoa[r] || []).map(norm).join('|');
       if(/生徒名|氏名|名前/.test(rowText) && /学年/.test(rowText)){ headerRow = r; break; }
     }
     if(headerRow < 0) continue;
-    const titleRows = aoa.slice(0, headerRow).map(row => (row || []).map(v => norm(v)));
+
     const header = (aoa[headerRow] || []).map(normalizeAllListHeaderText);
     const headerCanon = header.map(allListCanonicalHeader);
+    const headerText = header.join('|');
+
+    // 更新ログや別用途の表を誤って全員分リストとして扱わないための判定。
+    // 全員分リスト本体には、生徒番号/読み仮名/担当/高校/備考/予定/結果/小規模列のいずれかが入る。
+    // 更新ログは「日時・区分・対象・列名・採用値・理由」なのでここで除外する。
+    const looksLikeUpdateLog =
+      /日時/.test(headerText) && /区分/.test(headerText) && /採用値/.test(headerText) && /理由/.test(headerText);
+    const looksLikeAllStudentList =
+      headerCanon.includes('生徒番号') ||
+      headerCanon.includes('読み仮名') ||
+      headerCanon.includes('担当') ||
+      headerCanon.includes('高校') ||
+      headerCanon.includes('備考') ||
+      header.some(h => /\n予定$|\n結果$|(?:小規模\s*)?\d+\n(日付|名称|回答|Comiru|備考|科目変更)$/.test(h));
+    if(looksLikeUpdateLog || !looksLikeAllStudentList) continue;
+
+    const titleRows = aoa.slice(0, headerRow).map(row => (row || []).map(v => norm(v)));
     const idxGrade = headerCanon.findIndex(h => h === '学年');
     const rawRows = [];
     const rows = new Map();
@@ -4436,7 +4458,12 @@ async function parseAllListRestoreFile(file){
       return safeSheetName(sheetName);
     })();
     const grade = gradeFromFirstRow || safeSheetName(sheetName);
-    gradeMap.set(grade, {sourceFile:file.name, sheetName, titleRows, headerRow, header, headerCanon, rows, order, rawRows});
+
+    // 同じ学年のシートが複数見つかった場合は、先に見つかった本体シートを優先。
+    // これで更新ログ系やコピーシートが後から同じ学年として上書きする事故を防ぐ。
+    if(!gradeMap.has(grade)){
+      gradeMap.set(grade, {sourceFile:file.name, sheetName, titleRows, headerRow, header, headerCanon, rows, order, rawRows});
+    }
   }
   return gradeMap;
 }
