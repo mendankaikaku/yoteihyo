@@ -3307,6 +3307,21 @@ function monthlyPosterAchievementContent(rec){
   const course = posterShortCourseName(rec.study) || posterShortCourseName(rec.result) || norm(rec.study) || norm(rec.result);
   return [dateText, course].filter(Boolean).join('　');
 }
+
+function posterIsNoHitRow(row){
+  return (row || []).some(v => /該当なし|該当結果なし/.test(String(v || '')));
+}
+function posterMoveNoHitRowsToBottom(aoa){
+  const rows = (aoa || []).map(row => Array.isArray(row) ? row : [row]);
+  if(rows.length <= 3) return rows;
+  const head = rows.slice(0,2);
+  const body = rows.slice(2);
+  const real = body.filter(row => !posterIsNoHitRow(row));
+  const nohit = body.filter(row => posterIsNoHitRow(row));
+  if(!real.length) return rows; // 該当なししかないならそのまま
+  return [...head, ...real, ...nohit];
+}
+
 function buildMonthlyPosterContinuousAoa(records, rule, label){
   // 連続実施は「掲示を作る日の前日1日分」だけを表示する。
   // 月間日数カウントにはしない。
@@ -3316,8 +3331,8 @@ function buildMonthlyPosterContinuousAoa(records, rule, label){
     .sort((a,b)=> String(a.grade||'').localeCompare(String(b.grade||''),'ja') || String(a.kana || a.student).localeCompare(String(b.kana || b.student),'ja') || String(a.timeLabel).localeCompare(String(b.timeLabel)));
   const aoa = [[`${label}　${rule.keyword}`], ['学年','氏名','内容']];
   for(const r of rows) aoa.push([r.grade, r.student, r.content]);
-  if(rows.length === 0) aoa.push(['', '', '該当結果なし']);
-  return aoa;
+  if(rows.length === 0) aoa.push(['', '', '該当なし']);
+  return posterMoveNoHitRowsToBottom(aoa);
 }
 function buildMonthlyPosterResultAoa(records, rule, label){
   if(rule.keyword === '連続で実施') return buildMonthlyPosterContinuousAoa(records, rule, label);
@@ -3328,8 +3343,8 @@ function buildMonthlyPosterResultAoa(records, rule, label){
   const title = `${label}　${rule.keyword}`;
   const aoa = [[title], ['学年','氏名','内容']];
   for(const r of rows) aoa.push([r.grade, r.student, r.content]);
-  if(rows.length === 0) aoa.push(['', '', '該当結果なし']);
-  return aoa;
+  if(rows.length === 0) aoa.push(['', '', '該当なし']);
+  return posterMoveNoHitRowsToBottom(aoa);
 }
 function styleMonthlyPosterSheet(ws, aoa){
   const widths = [10, 22, 82];
@@ -3413,7 +3428,8 @@ function extractHighSpeedRowsFromSheets(sheets, from, to){
   for(const sh of sheets || []){
     const aoa = sheetObjectToAoa(sh).filter(row => (row || []).some(v => norm(v)));
     if(!aoa.length) continue;
-    const hr = findHeaderRowIndexByKeywords(aoa, ['正解数','不正解数']);
+    let hr = findHeaderRowIndexByKeywords(aoa, ['正解数','不正解数']);
+    if(hr < 0) hr = findHeaderRowIndexByKeywords(aoa, ['合格数']);
     if(hr < 0) continue;
     const header = aoa[hr] || [];
     const idx = {
@@ -3424,16 +3440,16 @@ function extractHighSpeedRowsFromSheets(sheets, from, to){
       course: headerIndexIncludes(header, ['講座名','コンテンツ','学習内容']),
       stage: headerIndexIncludes(header, ['ステージ','ユニット']),
       test: headerIndexIncludes(header, ['テスト']),
-      correct: headerIndexIncludes(header, ['正解数']),
+      correct: headerIndexIncludes(header, ['合格数','正解数']),
       incorrect: headerIndexIncludes(header, ['不正解数'])
     };
-    if(idx.correct < 0 || idx.incorrect < 0) continue;
+    if(idx.correct < 0) continue;
     for(let r=hr+1;r<aoa.length;r++){
       const row = aoa[r] || [];
       const correct = numberLoose(row[idx.correct]);
-      const incorrect = numberLoose(row[idx.incorrect]);
+      const incorrect = idx.incorrect >= 0 ? numberLoose(row[idx.incorrect]) : 0;
       const total = correct + incorrect;
-      if(!total) continue;
+      if(!correct && !total) continue;
       const dt = idx.date >= 0 ? parseDateLoose(row[idx.date]) : null;
       // 高速基礎ランキングは前日1日分だけ。日付が読めない行は混入防止のため除外。
       if(!dt || dt < from || dt > to) continue;
@@ -3445,7 +3461,7 @@ function extractHighSpeedRowsFromSheets(sheets, from, to){
       const course = idx.course >= 0 ? norm(row[idx.course]) : '';
       const stage = idx.stage >= 0 ? norm(row[idx.stage]) : '';
       const test = idx.test >= 0 ? norm(row[idx.test]) : '';
-      const key = [ymd(dt || from), normalizeStudentNoKey(studentNo) || normalizeNameKey(resolvedName), course, stage, test, correct, incorrect, sh.sourceFile, sh.sheetName, r].join('|');
+      const key = [ymd(dt), normalizeStudentNoKey(studentNo) || normalizeNameKey(resolvedName), course, stage, test, correct, incorrect, sh.sourceFile, sh.sheetName, r].join('|');
       if(seen.has(key)) continue;
       seen.add(key);
       rows.push({dateObj:dt, studentNo, student:resolvedName, rawName, grade, correct, incorrect, total, course, stage, test, sourceFile:sh.sourceFile, sourceSheet:sh.sheetName});
@@ -3461,41 +3477,43 @@ function previousDayRangeForOpenedPage(base = new Date()){
 }
 function buildHighSpeedRankingAoa(rows, label){
   const settings = currentPosterSettings();
-  const titleParts = [];
-  if(settings.showRankingDate !== false){
-    titleParts.push(`${label}${settings.rankingDateSuffix || ''}`);
-  }
-  titleParts.push(settings.rankingTitle || DEFAULT_POSTER_SETTINGS.rankingTitle);
-  const title = titleParts.filter(Boolean).join('　');
+  const titleBase = settings.rankingTitle || DEFAULT_POSTER_SETTINGS.rankingTitle || '高速基礎ランキング';
+  const title = settings.showRankingDate !== false ? `${label}${settings.rankingDateSuffix || ''}　${titleBase}` : titleBase;
   const map = new Map();
   for(const r of rows || []){
     const key = normalizeStudentNoKey(r.studentNo) || normalizeNameKey(r.student);
     if(!key) continue;
     if(!map.has(key)){
       const meta = lookupRosterByStudentNo(r.studentNo) || rosterMetaForStudent(r.student);
-      map.set(key, {grade:meta?.['学年'] || r.grade || '', student:meta?.['生徒名'] || r.student, kana:meta?.['読み仮名'] || '', studentNo:meta?.['生徒番号'] || r.studentNo || '', correct:0});
+      map.set(key, {grade:meta?.['学年'] || r.grade || '', student:meta?.['生徒名'] || r.student, kana:meta?.['読み仮名'] || '', studentNo:meta?.['生徒番号'] || r.studentNo || '', passCount:0});
     }
     const item = map.get(key);
-    item.correct += r.correct;
+    item.passCount += Number(r.correct || r.passCount || 0);
   }
-  let ranked = [...map.values()].sort((a,b)=> b.correct - a.correct || String(a.grade).localeCompare(String(b.grade),'ja') || String(a.kana || a.student).localeCompare(String(b.kana || b.student),'ja'));
+  let ranked = [...map.values()]
+    .filter(r=>r.passCount>0)
+    .sort((a,b)=> b.passCount - a.passCount || String(a.grade).localeCompare(String(b.grade),'ja') || String(a.kana || a.student).localeCompare(String(b.kana || b.student),'ja'));
   if(settings.limitTop10) ranked = ranked.slice(0,10);
-  const aoa = [[title], ['順位','学年','氏名','正解数']];
-  ranked.forEach((r,i)=> aoa.push([i+1, r.grade, r.student, r.correct]));
-  if(!ranked.length) aoa.push(['','','','該当結果なし']);
-  return aoa;
+  const aoa = [[title], ['順位','学年','氏名','合格数']];
+  ranked.forEach((r,i)=> aoa.push([i+1, r.grade, r.student, r.passCount]));
+  if(!ranked.length) aoa.push(['','','','該当なし']);
+  return posterMoveNoHitRowsToBottom(aoa);
 }
 function styleHighSpeedRankingSheet(ws, aoa){
+  // 高速基礎ランキングは必ず「タイトル + 順位/学年/氏名/合格数」の4列だけに整える。
+  const cleanAoa = posterMoveNoHitRowsToBottom(aoa || []).map(row => [row?.[0] ?? '', row?.[1] ?? '', row?.[2] ?? '', row?.[3] ?? '']);
+  Object.keys(ws).forEach(k=>{ if(k[0] !== '!') delete ws[k]; });
+  XLSX.utils.sheet_add_aoa(ws, cleanAoa, {origin:'A1'});
   const widths = [8,10,24,14];
-  const range = applyNiceSheetSettings(ws, aoa, widths, {rows:{min:28,max:88,header:34,pxPerLine:18}});
+  const range = applyNiceSheetSettings(ws, cleanAoa, widths, {rows:{min:28,max:72,header:34,pxPerLine:18}});
   ws['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:3}}];
-  ws['!freeze'] = {ySplit:2};
-  ws['!pageSetup'] = {orientation:'portrait', fitToWidth:1, fitToHeight:0};
-  ws['!margins'] = {left:0.25, right:0.25, top:0.35, bottom:0.35, header:0.15, footer:0.15};
+  ws['!freeze'] = {xSplit:0, ySplit:2};
+  ws['!pageSetup'] = {orientation:'portrait', fitToWidth:1, fitToHeight:1};
+  ws['!margins'] = {left:0.35, right:0.35, top:0.4, bottom:0.35, header:0.15, footer:0.15};
   const border = {top:{style:'thin',color:{rgb:'94A3B8'}},bottom:{style:'thin',color:{rgb:'94A3B8'}},left:{style:'thin',color:{rgb:'94A3B8'}},right:{style:'thin',color:{rgb:'94A3B8'}}};
-  const titleFill = {fgColor:{rgb:'DBEAFE'}};
+  const titleFill = {fgColor:{rgb:'FEF3C7'}};
   const headerFill = {fgColor:{rgb:'E5E7EB'}};
-  const rankFill = {fgColor:{rgb:'FEF3C7'}};
+  const rankFill = {fgColor:{rgb:'FEF9C3'}};
   const fontTitle = {name:'Yu Gothic', sz:18, bold:true, color:{rgb:'111827'}};
   const fontHeader = {name:'Yu Gothic', sz:12, bold:true, color:{rgb:'111827'}};
   const fontBase = {name:'Yu Gothic', sz:12, color:{rgb:'111827'}};
@@ -3535,9 +3553,9 @@ async function downloadMonthlyPosterResultWorkbook(){
     const rawSheets = await loadRawResultSheetsDirectly();
     const highSpeedRows = extractHighSpeedRowsFromSheets(rawSheets.sheets, yesterday.from, yesterday.to);
     const rankingAoa = buildHighSpeedRankingAoa(highSpeedRows, yesterday.label);
-    const mergedRankingAoa = mergeRestoredDailyPosterAoa('高速基礎ランキング', rankingAoa);
-    const rankingWs = aoaToSheet(mergedRankingAoa);
-    styleHighSpeedRankingSheet(rankingWs, mergedRankingAoa);
+    // 高速基礎ランキングは毎回きれいな順位表にするため、過去Excelの手修正復元は使わない。
+    const rankingWs = aoaToSheet(rankingAoa);
+    styleHighSpeedRankingSheet(rankingWs, rankingAoa);
     XLSX.utils.book_append_sheet(wb, rankingWs, uniqueSheetName('高速基礎ランキング', used));
     XLSX.writeFile(wb, `校舎掲示用_毎日更新_${ymd(month.from)}-${ymd(month.to)}.xlsx`);
     const counts = MONTHLY_POSTER_RESULT_RULES.map(rule => {
