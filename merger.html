@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>予定統合アプリ完成</title>　
+  <title>予定統合アプリ</title>　
   <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
   <script src="./libs/xlsx.bundle.js"></script>
   <script>
@@ -3471,12 +3471,21 @@ function mergeRestoredDailyPosterAoa(sheetName, generatedAoa){
   const restoreHeader = (restoredAoa[1] || []).map(v => norm(v));
   const keyFn = isRanking ? rankingRowKey : posterRowKey;
 
+  // 生成側に実データがあるなら、前回掲示Excel由来の「該当なし」は復元しない。
+  // 生成側も該当なししかない場合だけ、該当なしを残す。
+  const generatedBody = generatedAoa.slice(2).filter(row => (row || []).some(v => norm(v)));
+  const generatedRealRows = generatedBody.filter(row => !posterIsNoHitRow(row));
+  const hasGeneratedRealRows = generatedRealRows.length > 0;
+
   // タイトルは手修正版Excelの1行目を優先。これにより「分」などの細かい表記もExcel側の手修正を正とする。
   const titleRow = (restoredAoa[0] || []).some(v => norm(v)) ? restoredAoa[0] : generatedAoa[0];
   const header = restoreHeader.length >= genHeader.length ? restoreHeader : genHeader;
   const out = [titleRow, header];
   const used = new Set();
-  const restoredRows = restoredAoa.slice(2).filter(row => row.some(v => norm(v)));
+  const restoredRows = restoredAoa
+    .slice(2)
+    .filter(row => row.some(v => norm(v)))
+    .filter(row => !(hasGeneratedRealRows && posterIsNoHitRow(row)));
   const restoreMap = new Map();
   for(const row of restoredRows){
     const key = keyFn(row, restoreHeader);
@@ -3485,6 +3494,7 @@ function mergeRestoredDailyPosterAoa(sheetName, generatedAoa){
 
   // 生成側に存在する行は、同じ生徒・内容が手修正版にあれば手修正版を採用。
   for(const grow of generatedAoa.slice(2)){
+    if(hasGeneratedRealRows && posterIsNoHitRow(grow)) continue;
     const key = keyFn(grow, genHeader);
     const restored = restoreMap.get(key);
     if(restored){
@@ -3494,13 +3504,13 @@ function mergeRestoredDailyPosterAoa(sheetName, generatedAoa){
       out.push([...grow, ...Array(Math.max(0, header.length - grow.length)).fill('')]);
     }
   }
-  // 手修正版にだけある行も消さずに残す。
+  // 手修正版にだけある行も消さずに残す。ただし該当なしは実データがある場合だけ除外済み。
   for(const row of restoredRows){
     const key = keyFn(row, restoreHeader);
     if(key && used.has(key)) continue;
     out.push([...row, ...Array(Math.max(0, header.length - row.length)).fill('')]);
   }
-  return out;
+  return posterMoveNoHitRowsToBottom(out);
 }
 
 
