@@ -3633,15 +3633,33 @@ function posterShortCourseName(text){
   s = s.replace(/[：:：、，,。]/g, ' ');
   s = s.replace(/\s+/g, ' ').trim();
 
+  const source = norm(text);
+  const sourceHalf = toHalfWidth(source).replace(/\s+/g, '');
+
+  // 数学計算演習は「数学計算演習」だけで潰さず、数Ⅰ/数A/数IA/数Ⅱ... まで判定する。
+  // 例: 数学計算演習 数Ⅰ、数学計算演習 数A、数学計算演習 数IA、数学計算演習ⅠA、数学計算演習ⅡB など
+  if(/数学計算演習|計算演習/.test(sourceHalf)){
+    const mathRules = [
+      [/数(?:学)?(?:III|Ⅲ|3|三)(?:C|Ｃ)?|(?:III|Ⅲ|3|三)C|数学III|数学Ⅲ/i, '数学計算演習 数Ⅲ'],
+      [/数(?:学)?(?:IIB|ⅡB|2B|二B)|(?:II|Ⅱ|2|二)B|数学IIB|数学ⅡB/i, '数学計算演習 数ⅡB'],
+      [/数(?:学)?(?:IA|ⅠA|1A|一A)|(?:I|Ⅰ|1|一)A|数学IA|数学ⅠA/i, '数学計算演習 数IA'],
+      [/数(?:学)?(?:II|Ⅱ|2|二)(?!B|Ｃ|C)|数学II|数学Ⅱ/i, '数学計算演習 数Ⅱ'],
+      [/数(?:学)?(?:A|Ａ)(?![A-ZＡ-Ｚ])|数学A/i, '数学計算演習 数A'],
+      [/数(?:学)?(?:I|Ⅰ|1|一)(?!A|B|Ｃ|C|I|Ⅱ|Ⅲ)|数学I|数学Ⅰ/i, '数学計算演習 数Ⅰ']
+    ];
+    for(const [re, rep] of mathRules){
+      if(re.test(sourceHalf)) return rep;
+    }
+    return '数学計算演習';
+  }
+
   const rules = [
     [/英語?センター\s*1800|英単語(?:センター)?\s*1800|英単語1800|センター英単語1800/i, '英単語1800'],
     [/英熟語(?:センター)?\s*750|英熟語750/i, '英熟語750'],
     [/英文法\s*750|英文法750/i, '英文法750'],
     [/基本例文\s*300|基本例文300/i, '基本例文300'],
-    [/古文単語\s*250|古文単語250/i, '古文単語250'],
-    [/数学計算演習|計算演習/i, '数学計算演習']
+    [/古文単語\s*250|古文単語250/i, '古文単語250']
   ];
-  const source = norm(text);
   for(const [re, rep] of rules){
     if(re.test(source) || re.test(s)) return rep;
   }
