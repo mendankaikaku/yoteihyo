@@ -821,7 +821,7 @@ main.wrap{max-width:none!important;height:auto!important;min-height:0!important;
 
   <section class="card">
     <p class="sectionTitle">模試マスタ</p>
-    <div class="masterGridHint">模試名・日付・対象学年/生徒を登録します。対象学年/生徒が未選択の模試は、生徒の入力欄にも印刷にも表示しません。模試マスタでは科目型だけを選択します。生徒入力欄・面談準備印刷・統合用の科目リストでは、その科目型から科目チェックを自動表示します。</div>
+    <div class="masterGridHint">模試名・日付・対象学年/生徒を登録します。対象学年/生徒が未選択の模試は、生徒の入力欄にも印刷にも表示しません。模試マスタでは週開始日から3週間以内の模試だけ表示し、科目型だけを選択します。生徒入力欄・面談準備印刷・統合用の科目リストでは、その科目型から科目チェックを自動表示します。</div>
     <details class="advanced">
       <summary>模試マスタを編集</summary>
       <div id="examMasterPanel"></div>
@@ -2150,12 +2150,13 @@ function applyPreviousExamTargetsWithConfirm(rows){
 }
 function renderExamMasterPanel(){
   const host=$('#examMasterPanel');
-  const rows=getExamMaster();
-  host.innerHTML=rows.map((ex,i)=>{
+  const allRows=getExamMaster();
+  const visibleRows=allRows.map((ex,i)=>({ex,i})).filter(item=>examMasterVisibleInPanel(item.ex));
+  host.innerHTML=visibleRows.map(({ex,i})=>{
     const type=ex.type||'common';
     const tmpl=ex.subjectTemplate||defaultTemplateNameForType(type);
     const targetNames=(Array.isArray(ex.students)?ex.students:splitTargetNames(ex.studentNames||'')).join('、');
-    return `<div class="examMasterRow" data-master-row="${i}">
+    return `<div class="examMasterRow" data-master-row="${i}" data-master-index="${i}">
       <div><label>模試名</label><input data-master-name value="${escapeHtml(ex.name||'')}" placeholder="例：全国統一高校生テスト"></div>
       <div><label>実施日</label><input data-master-date type="date" value="${escapeHtml(ex.date||'')}"></div>
       <div><label>模試型</label><select data-master-type><option value="common" ${type==='common'?'selected':''}>共テ型</option><option value="crown" ${type==='crown'?'selected':''}>冠模試型</option></select></div>
@@ -2163,9 +2164,9 @@ function renderExamMasterPanel(){
       <div><button type="button" class="small secondary" data-delete-master="${i}">削除</button></div>
       <div><label>対象学年</label><div class="checkRow">${examGradeCheckboxes(ex.grades||[])}</div></div>
       <div style="grid-column:2/-1"><label>対象生徒名</label><textarea data-master-students placeholder="未選択なら生徒欄・印刷には表示しません。例：北野、田中">${escapeHtml(targetNames)}</textarea></div>
-      <div style="grid-column:1/-1"><div class="hint">模試マスタでは科目を一覧表示せず、科目型だけを選びます。生徒入力欄・面談準備印刷・科目リストでは、この科目型から科目チェックを自動表示します。</div></div>
+      <div style="grid-column:1/-1"><div class="hint">模試マスタ編集欄は、週開始日から3週間以内の模試だけ表示します。表示されていない過去/遠い未来の模試も保存データには残ります。</div></div>
     </div>`;
-  }).join('')||'<div class="empty">まだ模試マスタがありません。</div>';
+  }).join('')||'<div class="empty">3週間以内に編集対象の模試はありません。必要なら「模試を追加」してください。</div>';
   $$('[data-delete-master]').forEach(btn=>btn.onclick=()=>{const arr=getExamMaster();arr.splice(Number(btn.dataset.deleteMaster),1);saveExamMasterData(arr);renderExamMasterPanel();renderStudents()});
   $$('.examMasterRow [data-master-type]').forEach(sel=>{
     sel.onchange=()=>{
@@ -2174,16 +2175,45 @@ function renderExamMasterPanel(){
       if(tmpl) tmpl.value=defaultTemplateNameForType(sel.value || 'common');
     };
   });
+  const info=`表示中：${visibleRows.length}件 / 全マスタ：${allRows.length}件（週開始日から3週間以内のみ表示）`;
+  host.insertAdjacentHTML('afterbegin', `<div class="hint" style="grid-column:1/-1;margin-bottom:8px">${escapeHtml(info)}</div>`);
   renderSubjectTemplateEditor();
 }
 function examGradeCheckboxes(selected=[]){
   const set=new Set(selected||[]);
   return GRADE_OPTIONS.filter(Boolean).map(g=>`<label><input type="checkbox" data-master-grade value="${escapeHtml(g)}" ${set.has(g)?'checked':''}>${escapeHtml(g)}</label>`).join('');
 }
+
+function examMasterVisibleInPanel(ex){
+  // 模試マスタ編集欄は、画面の週開始日から3週間以内の模試だけ表示する。
+  // 日付未入力の行は、新規入力用として表示する。
+  if(!ex || !ex.date) return true;
+  const start=new Date(($('#weekStart')?.value || ymd(new Date()))+'T00:00:00');
+  const d=new Date(ex.date+'T00:00:00');
+  const diff=daysBetween(start,d);
+  return diff>=0 && diff<=21;
+}
+function cleanExamMasterRowForSave(row){
+  const copy=Object.assign({}, row || {});
+  delete copy.__masterIndex;
+  return copy;
+}
+function mergeVisibleExamMasterRowsForSave(editedRows){
+  const all=getExamMaster().map(x=>Object.assign({},x));
+  (editedRows||[]).forEach(row=>{
+    const idx=Number(row.__masterIndex);
+    const clean=cleanExamMasterRowForSave(row);
+    if(Number.isInteger(idx) && idx>=0 && idx<all.length) all[idx]=clean;
+    else all.push(clean);
+  });
+  return all.filter(x=>x.name||x.date||(x.grades||[]).length||(x.students||[]).length||x.subjectTemplate);
+}
+
 function collectExamMasterFromPanel(){return $$('.examMasterRow').map(row=>{
   const type = row.querySelector('[data-master-type]')?.value || 'common';
   const subjectTemplate = row.querySelector('[data-master-template]')?.value || defaultTemplateNameForType(type);
   return {
+    __masterIndex:Number(row.dataset.masterIndex ?? -1),
     name:row.querySelector('[data-master-name]')?.value.trim()||'',
     date:row.querySelector('[data-master-date]')?.value||'',
     type,
@@ -2196,7 +2226,8 @@ function collectExamMasterFromPanel(){return $$('.examMasterRow').map(row=>{
 }).filter(x=>x.name||x.date||x.grades.length||x.students.length||x.subjectTemplate)}
 function addExamMasterRow(){const arr=collectExamMasterFromPanel();arr.push({name:'',date:'',type:'common',subjectTemplate:'',grades:[],students:[]});saveExamMasterData(arr);renderExamMasterPanel()}
 function saveExamMasterFromPanel(){
-  const rows=applyPreviousExamTargetsWithConfirm(collectExamMasterFromPanel());
+  const mergedRows=mergeVisibleExamMasterRowsForSave(collectExamMasterFromPanel());
+  const rows=applyPreviousExamTargetsWithConfirm(mergedRows);
   saveExamMasterData(rows);
   updateExamTargetHistoryFromMasters(rows);
   renderExamMasterPanel();
