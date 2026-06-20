@@ -6237,15 +6237,37 @@ function buildAllStudentPrintAoaFromFullAoa(grade, fullAoa){
   out._printPlanColumnCount = planCols.length;
   return out;
 }
+
+function applyCompactPrintRows(ws, aoa, widths){
+  const rowWidthChars = widths.map(w => {
+    if(typeof w === "object" && w !== null){
+      if(w.wch) return w.wch;
+      if(w.wpx) return Math.max(8, Math.round(w.wpx / 7));
+      return 18;
+    }
+    return w;
+  });
+  ws['!rows'] = (aoa || []).map((row, r) => {
+    if(r === 0) return {hpt:20};
+    if(r === 1) return {hpt:21};
+    let lines = 1;
+    (row || []).forEach((v, c) => {
+      lines = Math.max(lines, textLineCount(v, rowWidthChars[c] || 18));
+    });
+    // 以前の buildRowsForAoa は「10 + 行数×高さ」で下側に余白が出やすかった。
+    // 印刷用だけは基礎余白をかなり小さくして、中央揃えでも上下の空白が目立たない高さにする。
+    return {hpt:Math.max(12, Math.min(115, 3 + lines * 9))};
+  });
+}
+
 function styleAllStudentPrintSheet(ws, aoa){
   const manualCount = Math.max(0, Number(aoa?._manualPrintColumnCount || 0));
   const planCount = Math.max(0, Number(aoa?._printPlanColumnCount || 0));
   // 模試イベントを大きく、右側に3日間の予定欄を追加しても読めるように列幅を広げる。
   const widths = [10, 10, 6, 6, 22, 22, ...Array(manualCount).fill(16), 155, ...Array(planCount).fill(28)];
-  // 印刷用は上下の余白をできるだけ詰める。
-  // 横幅はこのファイルの設定を維持し、行高だけを文字量ぎりぎりまで小さくする。
-  const range = applyNiceSheetSettings(ws, aoa, widths, {rows:{min:13,max:130,header:24,pxPerLine:11}});
-  ws['!rows'][0] = {hpt:22};
+  // 印刷用は上下中央揃えを維持しつつ、行高だけを文字量ぎりぎりまで小さくする。
+  const range = applyNiceSheetSettings(ws, aoa, widths, {rows:{min:12,max:115,header:21,pxPerLine:9}});
+  applyCompactPrintRows(ws, aoa, widths);
   ws['!freeze'] = {xSplit:2, ySplit:2};
   ws['!pageSetup'] = {orientation:'landscape', paperSize:12, fitToWidth:1, fitToHeight:0};
   ws['!margins'] = {left:0.08, right:0.08, top:0.18, bottom:0.18, header:0.04, footer:0.04};
@@ -6277,7 +6299,7 @@ function styleAllStudentPrintSheet(ws, aoa){
       /Comiru[:：]\s*×/.test(text) ||
       /科目変更[:：]\s*〇/.test(text)
     );
-    const style = {font:R===0?fontTitle:(R===1?fontHeader:(hasNeedsHearing?fontMissing:fontBase)), alignment:{vertical:R<=1?'center':'bottom', horizontal:'center', wrapText:true, shrinkToFit:!hasNeedsHearing}, border};
+    const style = {font:R===0?fontTitle:(R===1?fontHeader:(hasNeedsHearing?fontMissing:fontBase)), alignment:{vertical:'center', horizontal:'center', wrapText:true, shrinkToFit:!hasNeedsHearing}, border};
     if(R===0) style.fill = titleFill;
     else if(R===1) style.fill = headerFill;
     else if(C<=1) style.fill = nameFill;
@@ -6285,7 +6307,7 @@ function styleAllStudentPrintSheet(ws, aoa){
     else if(C===eventCol) style.fill = hasNeedsHearing ? missingFill : eventFill;
     else if(C>eventCol) style.fill = planFill;
     if(hasNeedsHearing){
-      style.alignment = {vertical:'bottom', horizontal:'center', wrapText:true, shrinkToFit:false};
+      style.alignment = {vertical:'center', horizontal:'center', wrapText:true, shrinkToFit:false};
     }
     return style;
   });
