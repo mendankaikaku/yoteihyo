@@ -3387,11 +3387,29 @@ function allListMergeEventPatch(data, patch){
   return changed;
 }
 
+
+
+function allListSlotDateClean(value){
+  return allListCellText(value).replace(/[（(][日月火水木金土][）)]/g,'').trim();
+}
+
+function allListSlotKindFromName(name, answer=''){
+  const n=allListCellText(name);
+  const a=allListCellText(answer).replace(/\s/g,'');
+  if(/【模試】/.test(n)) return '模試';
+  if(/【イベント】/.test(n)) return 'イベント';
+  if(/当日|後日|不受験|^(当|後|不)$/.test(a)) return '模試';
+  return 'イベント';
+}
+function allListSlotCleanName(name){
+  return allListCellText(name).replace(/^【(?:模試|イベント)】/,'').trim();
+}
+
 function allListParseSmallSlotsFromHeaderRow(headers, row, matched){
   const slots=new Map();
   headers.forEach((h,i)=>{
     const t=String(h || '').replace(/\r\n/g,'\n').replace(/\r/g,'\n');
-    const m=t.match(/小規模\s*([0-9０-９]+)[\s\S]*(種別|日付|日時|名称|回答|Comiru|コミル|備考)/);
+    const m=t.match(/(?:小規模\s*)?([0-9０-９]+)[\s\S]*(種別|日付|日時|名称|回答|Comiru|コミル|備考)/);
     if(!m) return;
     const no=String(m[1]).replace(/[０-９]/g,ch=>String.fromCharCode(ch.charCodeAt(0)-0xFEE0));
     const field=m[2].includes('日') || m[2].includes('時') ? 'date' :
@@ -3407,14 +3425,15 @@ function allListParseSmallSlotsFromHeaderRow(headers, row, matched){
   const out=[];
   for(const slot of slots.values()){
     const kindRaw=slot.kind!=null ? allListCellText(row[slot.kind]) : '';
-    const name=slot.name!=null ? allListCellText(row[slot.name]) : '';
-    const date=slot.date!=null ? allListCellText(row[slot.date]) : '';
+    const nameRaw=slot.name!=null ? allListCellText(row[slot.name]) : '';
+    const date=slot.date!=null ? allListSlotDateClean(row[slot.date]) : '';
     const answer=slot.answer!=null ? allListCellText(row[slot.answer]) : '';
     const comiru=slot.comiru!=null ? allListCellText(row[slot.comiru]) : '';
     const note=slot.note!=null ? allListCellText(row[slot.note]) : '';
-    if(!name && !kindRaw && !answer && !comiru && !note) continue;
+    if(!nameRaw && !kindRaw && !answer && !comiru && !note) continue;
     let kind=kindRaw.includes('模試') ? '模試' : (kindRaw.includes('イベント') ? 'イベント' : '');
-    if(!kind) kind=/当日|後日|不受験|^(当|後|不)$/.test(answer) ? '模試' : 'イベント';
+    if(!kind) kind=allListSlotKindFromName(nameRaw, answer);
+    const name=allListSlotCleanName(nameRaw);
     const comiruBool=allListMarkToBool(comiru);
     if(kind==='模試'){
       out.push({kind:'模試', patch:{id:['模試',name,date].join('|'), name, date, status:allListStatusFromValue(answer,['当日','後日','不受験']), comiruAnswered:comiruBool, subjectChanged:undefined, note}});
@@ -3451,7 +3470,7 @@ function parseAllListOverridesFromRows(aoa, targetNames){
       const matched=matchAllListStudentName(row[nameIdx],targetNames) || matchAllListStudentName(row[noIdx],targetNames);
       if(!matched) continue;
       const bucket=ensure(matched);
-      // 全員分リスト本体の「小規模① 種別/日付/名称/回答/Comiru/備考」列を読む。
+      // 全員分リスト本体の「① 日付/名称/回答/Comiru/備考」列を読む。
       const smallSlotItems=allListParseSmallSlotsFromHeaderRow(headers,row,matched);
       smallSlotItems.forEach(item=>{
         if(item.kind==='模試') allListAddPatchWithPriority(bucket,'exam',item.patch);
