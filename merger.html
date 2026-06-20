@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>予定統合アプリあ</title>　
+  <title>予定統合アプリああ</title>　
   <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
   <script src="./libs/xlsx.bundle.js"></script>
   <script>
@@ -4394,13 +4394,115 @@ function styleAllListUpdateLogSheet(ws, aoa){
   }
 }
 
+
+function allListClonePlain(obj){
+  if(obj == null) return obj;
+  try{return JSON.parse(JSON.stringify(obj));}catch(e){return Object.assign({}, obj);}
+}
+function allListCaptureSheetStyles(ws){
+  const cellStyles = {};
+  const ref = ws && ws['!ref'] ? XLSX.utils.decode_range(ws['!ref']) : null;
+  if(ref){
+    for(let R=ref.s.r; R<=ref.e.r; R++){
+      for(let C=ref.s.c; C<=ref.e.c; C++){
+        const addr = XLSX.utils.encode_cell({r:R,c:C});
+        const cell = ws[addr];
+        if(!cell) continue;
+        const keep = {};
+        if(cell.s) keep.s = allListClonePlain(cell.s);
+        if(cell.z) keep.z = cell.z;
+        if(cell.numFmt) keep.numFmt = cell.numFmt;
+        if(Object.keys(keep).length){
+          if(!cellStyles[R]) cellStyles[R] = {};
+          cellStyles[R][C] = keep;
+        }
+      }
+    }
+  }
+  return {
+    cols: allListClonePlain(ws['!cols'] || []),
+    rows: allListClonePlain(ws['!rows'] || []),
+    merges: allListClonePlain(ws['!merges'] || []),
+    cellStyles
+  };
+}
+function allListApplyRestoredSheetStyle(ws, aoa){
+  const meta = aoa && aoa._allListStyleMeta;
+  if(!meta || !meta.restoreStyle) return ws;
+  const st = meta.restoreStyle;
+  const colMap = meta.outputColToRestoreCol || [];
+  const rowMap = meta.outputRowToRestoreRow || [];
+
+  // 列幅：読み込んだ全員分リストに存在していた列は、その幅を優先する。
+  ws['!cols'] = ws['!cols'] || [];
+  for(let c=0;c<colMap.length;c++){
+    const rc = colMap[c];
+    if(rc == null || rc < 0) continue;
+    if(st.cols && st.cols[rc]){
+      ws['!cols'][c] = Object.assign({}, ws['!cols'][c] || {}, allListClonePlain(st.cols[rc]));
+    }
+  }
+
+  // 行高さ：手で挿入・調整した行高さをできるだけ維持する。
+  ws['!rows'] = ws['!rows'] || [];
+  for(let r=0;r<rowMap.length;r++){
+    const rr = rowMap[r];
+    if(rr == null || rr < 0) continue;
+    if(st.rows && st.rows[rr]){
+      ws['!rows'][r] = Object.assign({}, ws['!rows'][r] || {}, allListClonePlain(st.rows[rr]));
+    }
+  }
+
+  // セル書式：値は新しい出力を使い、見た目だけ前回Excelを優先する。
+  if(st.cellStyles){
+    for(let r=0;r<rowMap.length;r++){
+      const rr = rowMap[r];
+      if(rr == null || rr < 0 || !st.cellStyles[rr]) continue;
+      for(let c=0;c<colMap.length;c++){
+        const rc = colMap[c];
+        if(rc == null || rc < 0) continue;
+        const keep = st.cellStyles[rr][rc];
+        if(!keep) continue;
+        const addr = XLSX.utils.encode_cell({r,c});
+        if(!ws[addr]) continue;
+        if(keep.s) ws[addr].s = allListClonePlain(keep.s);
+        if(keep.z) ws[addr].z = keep.z;
+        if(keep.numFmt) ws[addr].numFmt = keep.numFmt;
+      }
+    }
+  }
+
+  // 結合セル：前回Excelの結合範囲を、残っている行列だけ座標変換して維持する。
+  const outRowByRestore = new Map();
+  const outColByRestore = new Map();
+  rowMap.forEach((rr,r)=>{ if(rr != null && rr >= 0 && !outRowByRestore.has(rr)) outRowByRestore.set(rr,r); });
+  colMap.forEach((rc,c)=>{ if(rc != null && rc >= 0 && !outColByRestore.has(rc)) outColByRestore.set(rc,c); });
+  const existing = ws['!merges'] || [];
+  const mergeKey = m => `${m.s.r}:${m.s.c}:${m.e.r}:${m.e.c}`;
+  const seen = new Set(existing.map(mergeKey));
+  for(const m of (st.merges || [])){
+    const sr = outRowByRestore.get(m.s.r), er = outRowByRestore.get(m.e.r);
+    const sc = outColByRestore.get(m.s.c), ec = outColByRestore.get(m.e.c);
+    if(sr == null || er == null || sc == null || ec == null) continue;
+    const nm = {s:{r:sr,c:sc}, e:{r:er,c:ec}};
+    const key = mergeKey(nm);
+    if(!seen.has(key)){
+      existing.push(nm);
+      seen.add(key);
+    }
+  }
+  ws['!merges'] = existing;
+  return ws;
+}
+
 async function parseAllListRestoreFile(file){
   const gradeMap = new Map();
   const buf = await file.arrayBuffer();
-  const wb = XLSX.read(buf, {type:'array', cellDates:true});
+  const wb = XLSX.read(buf, {type:'array', cellDates:true, cellStyles:true});
   for(const sheetName of wb.SheetNames){
     if(String(sheetName || '').includes('小規模模試イベント')) continue;
     const ws = wb.Sheets[sheetName];
+    const restoreStyle = allListCaptureSheetStyles(ws);
     const aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:'', raw:false});
     if(!aoa.length) continue;
     let headerRow = -1;
@@ -4436,7 +4538,7 @@ async function parseAllListRestoreFile(file){
       return safeSheetName(sheetName);
     })();
     const grade = gradeFromFirstRow || safeSheetName(sheetName);
-    gradeMap.set(grade, {sourceFile:file.name, sheetName, titleRows, headerRow, header, headerCanon, rows, order, rawRows});
+    gradeMap.set(grade, {sourceFile:file.name, sheetName, titleRows, headerRow, header, headerCanon, rows, order, rawRows, restoreStyle});
   }
   return gradeMap;
 }
@@ -4524,6 +4626,10 @@ function mergeRestoredAllListAoa(grade, generatedAoa){
   const headerCanon = slots.map(x=>x.canon);
   const out = [title, header];
   const used = new Set();
+  const outputRowToRestoreRow = [];
+  outputRowToRestoreRow[0] = 0;
+  outputRowToRestoreRow[1] = restore.headerRow >= 0 ? restore.headerRow : 1;
+  const outputColToRestoreCol = slots.map(x => x.restoreIndex >= 0 ? x.restoreIndex : null);
 
   const generatedRows = generatedAoa.slice(2);
   const generatedByKey = new Map();
@@ -4532,10 +4638,12 @@ function mergeRestoredAllListAoa(grade, generatedAoa){
     if(key && key !== 'name:') generatedByKey.set(key, row);
   }
 
-  const rawRows = restore.rawRows || (restore.order || []).map(key => ({key, row:restore.rows.get(key)||[], isBlank:false}));
+  const rawRows = restore.rawRows || (restore.order || []).map(key => ({key, row:restore.rows.get(key)||[], isBlank:false, sourceRowNumber:null}));
   for(const item of rawRows){
     const restored = item.row || [];
     const key = item.key || allListRowKeyFromCells(restored, restoreHeader);
+    const outputRowIndex = out.length;
+    outputRowToRestoreRow[outputRowIndex] = item.sourceRowNumber ? item.sourceRowNumber - 1 : null;
 
     if(item.isBlank || !key || key === 'name:'){
       const manualRow = Array(header.length).fill('');
@@ -4568,6 +4676,7 @@ function mergeRestoredAllListAoa(grade, generatedAoa){
       const autoVal = gen ? norm(gen[gi]) : '';
 
       if(genDynamic[gi]){
+        // 予定・結果は値だけ自動更新。書式は後段で読み込んだExcel側を優先する。
         newRow[c] = autoVal;
         if(restoredVal && restoredVal !== autoVal){
           const kind = /結果/.test(col) ? '結果上書き' : '予定上書き';
@@ -4595,6 +4704,7 @@ function mergeRestoredAllListAoa(grade, generatedAoa){
     const key = allListRowKeyFromCells(row, genHeader);
     if(!key || key === 'name:' || used.has(key)) continue;
     const newRow = Array(header.length).fill('');
+    outputRowToRestoreRow[out.length] = null;
     for(let c=0;c<slots.length;c++){
       const slot = slots[c];
       if(slot.type === 'gen') newRow[c] = row[slot.genIndex] || '';
@@ -4604,6 +4714,7 @@ function mergeRestoredAllListAoa(grade, generatedAoa){
     allListAddUpdateLog('自動行追加', grade, key, studentName, '生徒行', '行', '', '入力用/対応表に存在', '末尾へ追加', '全員分リストにない自動データ生徒を追加。不要なら全員分リスト側で確認');
   }
 
+  out._allListStyleMeta = {restoreStyle: restore.restoreStyle, outputRowToRestoreRow, outputColToRestoreCol};
   return out;
 }
 
@@ -4983,6 +5094,7 @@ function styleAllStudentGradeSheet(ws, aoa){
     }
     return style;
   });
+  allListApplyRestoredSheetStyle(ws, aoa);
   return ws;
 }
 async function downloadAllStudentList(){
@@ -5021,7 +5133,7 @@ async function downloadAllStudentList(){
     XLSX.writeFile(wb, `全員分リスト_学年別_B4横_${ymd(base)}基準.xlsx`);
     if(typeof log === 'function'){
       const count = Math.max(0, (state.allListUpdateLog?.length || 1) - 1);
-      log(`全員分リストを出力しました。\n対象人数が少ない模試・イベントは、各生徒ごとの追加スロット列にまとめました。列数は学年内の最大対象数に合わせて自動で増えます。回答・Comiru・科目変更はプルダウンで更新できます。\n手修正・自動データの衝突ログ: ${count}件${count ? '\nExcel内の「更新ログ」シートを確認してください。' : ''}`);
+      log(`全員分リストを出力しました。\n対象人数が少ない模試・イベントは、各生徒ごとの追加スロット列にまとめました。列数は学年内の最大対象数に合わせて自動で増えます。回答・Comiru・科目変更はプルダウンで更新できます。前回の列幅・行高さ・セル書式も、読み込んだ全員分リスト側をできるだけ維持します。\n手修正・自動データの衝突ログ: ${count}件${count ? '\nExcel内の「更新ログ」シートを確認してください。' : ''}`);
     }
   }catch(e){
     console.error('全員分リスト出力エラー', e);
