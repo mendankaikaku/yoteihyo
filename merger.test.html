@@ -2802,8 +2802,58 @@ const POSTER_ABBREV_RULES = [
   [/情報I|情報Ⅰ/g, "情報"],
 ];
 
+
+function normalizeCommonTestSubjectForPrint(raw){
+  let s = toHalfWidth(String(raw ?? ""))
+    .replace(/[･・]/g, '')
+    .replace(/\s+/g, '')
+    .trim();
+
+  const level = /実力完成/.test(s) ? '実' : (/基礎力練成|基礎力錬成|基礎/.test(s) ? '基' : '');
+  s = s.replace(/実力完成|基礎力練成|基礎力錬成|基礎/g, '');
+
+  const subjectRules = [
+    [/英語Reading|英語リーディング|Reading/i, '英R'],
+    [/英語Listening|英語リスニング|Listening/i, '英L'],
+    [/英語.*(Listening|リスニング).*(Reading|リーディング)|英語.*(Reading|リーディング).*(Listening|リスニング)|英語L.*R|英語R.*L/i, '英LR'],
+    [/数学I+A|数学ⅠA|数学1A|数学IA/i, '数ⅠA'],
+    [/数学II+B+C|数学ⅡBC|数学2BC|数学IIBC|数学ⅡBＣ/i, '数ⅡBC'],
+    [/数学II+B|数学ⅡB|数学2B|数学IIB/i, '数ⅡB'],
+    [/数学II+C|数学ⅡC|数学2C|数学IIC/i, '数ⅡC'],
+    [/数学III+C|数学ⅢC|数学3C|数学IIIC/i, '数ⅢC'],
+    [/数学I|数学Ⅰ|数学1/i, '数Ⅰ'],
+    [/数学II|数学Ⅱ|数学2/i, '数Ⅱ'],
+    [/数学III|数学Ⅲ|数学3/i, '数Ⅲ'],
+    [/国語/i, '国語'],
+    [/現代文/i, '現文'],
+    [/古文/i, '古文'],
+    [/漢文/i, '漢文'],
+    [/物理/i, '物理'],
+    [/化学/i, '化学'],
+    [/生物/i, '生物'],
+    [/地学/i, '地学'],
+    [/日本史/i, '日史'],
+    [/世界史/i, '世史'],
+    [/地理/i, '地理'],
+    [/公共.*政治.*経済|公共政経|政治経済|政経/i, '公政経'],
+    [/倫理/i, '倫理'],
+    [/情報I|情報Ⅰ|情報1|情報/i, '情報']
+  ];
+  for(const [re, abbr] of subjectRules){
+    if(re.test(s)) return `共テ${abbr}${level}`;
+  }
+  return level ? `共テ${level}` : '共テ';
+}
+
+function applyCommonTestSubjectAbbrev(text){
+  return String(text ?? '').replace(
+    /(大学入学)?共通[テﾃ][スｽ][トﾄ]対策\s*([^\/\n\r（）()]+?)(?=\s*[\/／\n\r（）()]|第\s*\d|確認|受講|初回|初めて|$)/gi,
+    (m, _prefix, subject) => normalizeCommonTestSubjectForPrint(subject)
+  );
+}
+
 function applyPosterAbbrevDictionary(text){
-  let s = String(text ?? "");
+  let s = applyCommonTestSubjectAbbrev(String(text ?? ""));
   for(const [pattern, replacement] of POSTER_ABBREV_RULES){
     s = s.replace(pattern, replacement);
   }
@@ -3077,6 +3127,8 @@ function contentLabelFromChunk(chunk){
     .replace(/^.*?(確認テスト|修了判定テスト|終了判定テスト|受講|結果)\s*[:：]\s*/g, "")
     .replace(/^\d{1,2}:\d{2}\s*/g, "")
     .trim();
+  const commonSubject = applyCommonTestSubjectAbbrev(cleaned);
+  if(commonSubject && commonSubject !== cleaned && /^共テ/.test(commonSubject)) return commonSubject;
   for(const [pattern, abbr] of POSTER_CONTENT_EXTRACT_RULES){
     const flags = (pattern.flags || "").replace(/g/g, "");
     const re = new RegExp(pattern.source, flags);
