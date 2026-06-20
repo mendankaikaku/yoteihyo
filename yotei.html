@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>面談予定入力・準備資料アプリ v34（合格設計図Excel A列固定・印刷PDF優先版）</title>
+<title>面談予定入力・準備資料アプリ 18:04（合格設計図Excel A列固定・印刷PDF優先版）</title>
 <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
 <script src="./libs/xlsx.bundle.js"></script>
 <script>if(!window.XLSX){document.write('<script src="./libs/xlsx.full.min.js"><\/script>');}</script>
@@ -3205,6 +3205,13 @@ function allListIsChecked(v){
 }
 function allListStatusFromValue(v, allowed){
   const s=allListCellText(v).replace(/\s/g,'');
+  if(!s) return '';
+  if((allowed||[]).includes('当日') && (s==='当' || s==='当日')) return '当日';
+  if((allowed||[]).includes('後日') && (s==='後' || s==='後日')) return '後日';
+  if((allowed||[]).includes('不受験') && (s==='不' || s==='不受験')) return '不受験';
+  if((allowed||[]).includes('参加') && /^(〇|○|◯|参加)$/.test(s)) return '参加';
+  if((allowed||[]).includes('不参加') && /^(×|✕|✖|不参加)$/.test(s)) return '不参加';
+  if(s==='未' || s==='未聞き取り') return '未聞き取り';
   return (allowed||[]).find(x=>s===x || s.includes(x)) || '';
 }
 function allListSplitSubjects(v){
