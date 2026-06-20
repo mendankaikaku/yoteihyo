@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>予定統合アプリ17:35</title>　
+  <title>予定統合アプリ17:55</title>　
   <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
   <script src="./libs/xlsx.bundle.js"></script>
   <script>
@@ -3707,12 +3707,107 @@ function allListGroupTargetCountByBase(records, keyFn, visibleFn){
   for(const [k,set] of map.entries()) out.set(k, set.size);
   return out;
 }
-function allListCellText(v){
-  return String(v ?? '').replace(/\r\n/g,'\n').replace(/\r/g,'\n').trim();
-}
+function allListCellText(v){return String(v ?? '').replace(/\r\n/g,'\n').replace(/\r/g,'\n').trim();}
 function allListIsSmallTargetCount(count){
   return Number(count || 0) > 0 && Number(count || 0) <= ALL_LIST_SMALL_TARGET_LIMIT;
 }
+
+function allListMarkToBool(v){
+  const s=allListCellText(v).replace(/\s/g,'');
+  if(/^(〇|○|◯|済|回答済|あり|有|true|yes|y|1)$/i.test(s)) return true;
+  if(/^(×|✕|✖|未|未回答|なし|無|false|no|n|0)$/i.test(s)) return false;
+  if(/[〇○◯✓✔☑]/.test(s)) return true;
+  if(/[×✕✖]/.test(s)) return false;
+  return undefined;
+}
+function allListFormatSmallComiru(v){
+  const b=allListMarkToBool(v);
+  return b === true ? 'C:〇' : 'C:×';
+}
+function allListSmallStatusToken(obj){
+  const st=allListCellText(obj?.status || '');
+  if(obj?.kind === '模試'){
+    if(st.includes('当日')) return '受:当';
+    if(st.includes('後日')) return '受:後';
+    if(st.includes('不受験')) return '受:不';
+    if(st.includes('未')) return '受:未';
+    return '受:未';
+  }
+  if(st.includes('不参加')) return '参:×';
+  if(st.includes('参加')) return '参:〇';
+  if(st.includes('未')) return '参:未';
+  return '参:未';
+}
+function allListSmallSubjectToken(obj){
+  if(obj?.kind !== '模試') return '';
+  const s=allListCellText(obj.subject || '');
+  return (s && !/なし|無|×/.test(s)) ? '科:〇' : '科:×';
+}
+function allListSmallReadableName(name, maxLen=18){
+  const n = String(name || '')
+    .replace(/大学入学共通テスト/g,'共テ')
+    .replace(/共通テスト/g,'共テ')
+    .replace(/本番レベル模試/g,'本レ')
+    .replace(/全国統一高校生テスト/g,'全統高')
+    .replace(/\s+/g,'')
+    .trim();
+  return n.length > maxLen ? n.slice(0, maxLen) + '…' : (n || '名称未');
+}
+function allListSmallBlockStrip(text){
+  return String(text || '')
+    .replace(/(^|\n)【小規模】[\s\S]*?(?=\n【|$)/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+function allListParseSmallLine(line, studentName='', studentNo=''){
+  let s=allListCellText(line).replace(/^[・･\-\*]\s*/,'').trim();
+  if(!s) return null;
+  let date='';
+  const dm=s.match(/^((?:\d{4}[\/\-年])?\d{1,2}[\/\-月]\d{1,2}日?)(?:\s+|　+)?/);
+  if(dm){
+    date=dm[1].replace(/年/g,'/').replace(/月/g,'/').replace(/日/g,'').replace(/\/+/g,'/').trim();
+    s=s.slice(dm[0].length).trim();
+  }
+  const isExam=/受\s*:/.test(s);
+  const isEvent=/参\s*:/.test(s);
+  if(!isExam && !isEvent) return null;
+  const firstToken=s.search(/\s*(受|参|科|C|備)\s*:/);
+  const name=(firstToken>=0?s.slice(0,firstToken):s).trim();
+  const noteMatch=s.match(/備\s*:\s*([\s\S]*)$/);
+  const note=noteMatch ? allListCellText(noteMatch[1]) : '';
+  const cMatch=s.match(/C\s*:\s*([〇○◯×✕✖済未回答]+|true|false|yes|no|1|0)/i);
+  const comiruAnswered=cMatch ? allListMarkToBool(cMatch[1]) : undefined;
+  if(isExam){
+    const stMatch=s.match(/受\s*:\s*(当日|後日|不受験|当|後|不|未)/);
+    const stRaw=stMatch ? stMatch[1] : '';
+    const status=stRaw==='当'?'当日':stRaw==='後'?'後日':stRaw==='不'?'不受験':stRaw==='未'?'未聞き取り':stRaw;
+    const subMatch=s.match(/科\s*:\s*([〇○◯×✕✖ありなし有無済未]+)/);
+    const subjectChanged=subMatch ? allListMarkToBool(subMatch[1]) : undefined;
+    return {kind:'模試', date, name, status, subject:subjectChanged===true?'あり':'', subjectChanged, comiruAnswered, comiru:comiruAnswered?'済':'未聞き取り', note, student:studentName, studentNo, machineKey:['模試',name,date].join('|'), studentKey:studentKeyForList(studentName,studentNo)};
+  }
+  const stMatch=s.match(/参\s*:\s*(参加|不参加|〇|○|◯|×|✕|✖|未)/);
+  const stRaw=stMatch ? stMatch[1] : '';
+  let status='';
+  if(/^(〇|○|◯|参加)$/.test(stRaw)) status='参加';
+  else if(/^(×|✕|✖|不参加)$/.test(stRaw)) status='不参加';
+  else if(stRaw==='未') status='未聞き取り';
+  return {kind:'イベント', date, datetime:date, name, status, subject:'', comiruAnswered, comiru:comiruAnswered?'済':'未聞き取り', note, student:studentName, studentNo, machineKey:['イベント',name,date].join('|'), studentKey:studentKeyForList(studentName,studentNo)};
+}
+function allListParseSmallBlock(text, studentName='', studentNo=''){
+  const raw=String(text || '');
+  const idx=raw.indexOf('【小規模】');
+  if(idx < 0) return [];
+  const part=raw.slice(idx).replace(/^【小規模】/,'');
+  const lines=part.split(/\n+/).map(x=>x.trim()).filter(Boolean);
+  const out=[];
+  for(const line of lines){
+    if(/^【/.test(line)) break;
+    const obj=allListParseSmallLine(line, studentName, studentNo);
+    if(obj && obj.name) out.push(obj);
+  }
+  return out;
+}
+
 function allListSmallDateLabel(dateText){
   const d = String(dateText || '').trim();
   if(!d) return '';
@@ -3763,16 +3858,12 @@ function allListSmallRowKey(kind, machineKey, studentKey){
 function allListSmallRowObjectToLine(obj){
   if(!obj) return '';
   const date = obj.date ? allListSmallDateLabel(obj.date) + ' ' : '';
-  const name = allListCompactName(obj.name, 13);
-  const c = allListCompactComiruText(obj.comiru || '未');
+  const name = allListSmallReadableName(obj.name, 18);
   if(obj.kind === '模試'){
-    const st = allListCompactStatusText(obj.status, 'exam');
-    const subj = obj.subject ? ' 科○' : '';
-    return `${date}${name} ${st} ${c}${subj}`;
+    return `${date}${name}　${allListSmallStatusToken(obj)}　${allListSmallSubjectToken(obj)}　${allListFormatSmallComiru(obj.comiru || (obj.comiruAnswered ? '済' : '未'))}`;
   }
-  const st = allListCompactStatusText(obj.status, 'event');
-  const note = obj.note ? ` 備:${String(obj.note).slice(0,12)}${String(obj.note).length>12?'…':''}` : '';
-  return `${date}${name} ${st} ${c}${note}`;
+  const note = allListCellText(obj.note || '');
+  return `${date}${name}　${allListSmallStatusToken(obj)}　${allListFormatSmallComiru(obj.comiru || (obj.comiruAnswered ? '済' : '未'))}　備:${note}`;
 }
 function allListSmallRowObjectPending(obj){
   return !obj || !norm(obj.status || '') || String(obj.status || '').includes('未') || !norm(obj.comiru || '') || String(obj.comiru || '').includes('未');
@@ -3802,6 +3893,36 @@ function allListSmallHeaderIndex(header, names){
   }
   return -1;
 }
+
+function parseSmallAllListNotesFromRestoreMap(gradeMap){
+  const out={rowObjects:[]};
+  for(const data of (gradeMap || new Map()).values()){
+    const header=data.header || [];
+    const canon=(data.headerCanon || header.map(allListCanonicalHeader));
+    const idxNote=canon.findIndex(h=>h==='備考');
+    const idxName=canon.findIndex(h=>h==='生徒名');
+    const idxNo=canon.findIndex(h=>h==='生徒番号');
+    const idxGrade=canon.findIndex(h=>h==='学年');
+    if(idxNote < 0) continue;
+    for(const row of (data.rows ? data.rows.values() : [])){
+      const note=idxNote>=0 ? allListCellText(row[idxNote]) : '';
+      if(!note.includes('【小規模】')) continue;
+      const student=idxName>=0 ? allListCellText(row[idxName]) : '';
+      const studentNo=idxNo>=0 ? allListCellText(row[idxNo]) : '';
+      const grade=idxGrade>=0 ? allListCellText(row[idxGrade]) : '';
+      const objs=allListParseSmallBlock(note, student, studentNo);
+      for(const obj of objs){
+        obj.grade=obj.grade || grade;
+        obj.student=student || obj.student || '';
+        obj.studentNo=studentNo || obj.studentNo || '';
+        obj.studentKey=studentKeyForList(obj.student, obj.studentNo);
+        if(obj.kind && obj.name && obj.studentKey) out.rowObjects.push(obj);
+      }
+    }
+  }
+  return out;
+}
+
 async function parseSmallAllListRestoreFile(file){
   const out = {rowObjects:[]};
   const buf = await file.arrayBuffer();
@@ -3946,7 +4067,7 @@ function buildSmallExamEventNoteMaps(examRecords=[], eventRecords=[]){
   return {noteMap, pendingMap, restoreRows};
 }
 function appendSmallNotesToBaseNote(baseNote, extraLines){
-  const base = norm(baseNote || '');
+  const base = allListSmallBlockStrip(baseNote || '');
   const lines = (extraLines || []).filter(Boolean);
   if(!lines.length) return base;
   const block = "【小規模】\n" + lines.map(x => "・" + x).join("\n");
@@ -4192,9 +4313,13 @@ async function loadAllListRestoreFiles(files){
     try{
       const parsed = await parseAllListRestoreFile(file);
       for(const [grade, data] of parsed.entries()) merged.set(grade, data);
+      const noteParsed = parseSmallAllListNotesFromRestoreMap(parsed);
+      if(noteParsed && noteParsed.rowObjects) small.rowObjects.push(...noteParsed.rowObjects);
+      // 旧版互換：過去に作った「小規模模試イベント_復元用」シートがある場合だけ読む。
       const smallParsed = await parseSmallAllListRestoreFile(file);
       if(smallParsed && smallParsed.rowObjects) small.rowObjects.push(...smallParsed.rowObjects);
-      const smallMsg = smallParsed && smallParsed.rowObjects && smallParsed.rowObjects.length ? ` / 小規模${smallParsed.rowObjects.length}件` : '';
+      const smallCount = (noteParsed?.rowObjects?.length || 0) + (smallParsed?.rowObjects?.length || 0);
+      const smallMsg = smallCount ? ` / 小規模備考${smallCount}件` : '';
       logs.push(`${file.name}: ${parsed.size}シート${smallMsg}`);
     }catch(e){
       logs.push(`${file.name}: 読み込み失敗 ${e.message || e}`);
@@ -4443,19 +4568,10 @@ async function downloadAllStudentList(){
   if(!gradeAoas.length){ alert('出力する生徒が見つかりません'); return; }
 
   const wb = XLSX.utils.book_new();
-  let smallRestoreAoa = [["区分","日付/日時","名称","対象人数","学年","生徒番号","生徒名","受験方法/参加","科目変更","Comiru回答","備考","機械キー"]];
   for(const item of gradeAoas){
     const ws = aoaToSheet(item.aoa);
     styleAllStudentGradeSheet(ws, item.aoa);
     XLSX.utils.book_append_sheet(wb, ws, safeSheetName(item.grade));
-    if(item.smallRestoreRows && item.smallRestoreRows.length > 1){
-      smallRestoreAoa.push(...item.smallRestoreRows.slice(1));
-    }
-  }
-  if(smallRestoreAoa.length > 1){
-    const wsSmall = aoaToSheet(smallRestoreAoa);
-    applyNiceSheetSettings(wsSmall, smallRestoreAoa, [10,16,28,10,10,12,18,16,14,14,34,44], {rows:{min:22,max:90,header:32,pxPerLine:16}});
-    XLSX.utils.book_append_sheet(wb, wsSmall, safeSheetName('小規模模試イベント_復元用'));
   }
 
   if(state.allListUpdateLog && state.allListUpdateLog.length > 1){
@@ -4468,7 +4584,7 @@ async function downloadAllStudentList(){
   XLSX.writeFile(wb, `全員分リスト_学年別_B4横_${ymd(base)}基準.xlsx`);
   if(typeof log === 'function'){
     const count = Math.max(0, (state.allListUpdateLog?.length || 1) - 1);
-    log(`全員分リストを出力しました。\n対象15人以下の模試・イベントは備考欄に短縮表示し、Excel内の「小規模模試イベント_復元用」シートにも保存しました。手修正はそのシートを更新してください。\n手修正・自動データの衝突ログ: ${count}件${count ? '\nExcel内の「更新ログ」シートを確認してください。' : ''}`);
+    log(`全員分リストを出力しました。\n対象15人以下の模試・イベントは備考欄の【小規模】ブロックに〇×形式で出力しました。手修正も備考欄の〇×と備:コメントを更新してください。\n手修正・自動データの衝突ログ: ${count}件${count ? '\nExcel内の「更新ログ」シートを確認してください。' : ''}`);
   }
 }
 
