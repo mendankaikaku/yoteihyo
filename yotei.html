@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ja">
-<head>　
+<head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>面談予定入力・準備資料アプリ v34（合格設計図Excel A列固定・印刷PDF優先版）</title>
@@ -820,7 +820,7 @@ main.wrap{max-width:none!important;height:auto!important;min-height:0!important;
 
   <section class="card">
     <p class="sectionTitle">模試マスタ</p>
-    <div class="masterGridHint">模試名・日付・対象学年/生徒を登録します。対象学年・対象生徒が空欄の模試は表示しません。</div>
+    <div class="masterGridHint">模試名・日付・対象学年/生徒を登録します。面談では当日/後日/不受験、Comiru回答、コメントだけ確認します。</div>
     <details class="advanced">
       <summary>模試マスタを編集</summary>
       <div id="examMasterPanel"></div>
@@ -1873,14 +1873,11 @@ function visibleExamMastersForStudent(name){
     const diff=daysBetween(start,d);
     if(diff<0||diff>21)return false;
     const targetGrades=Array.isArray(ex.grades)?ex.grades.filter(Boolean):[];
-    const targetNames=Array.isArray(ex.students)?ex.students:splitTargetNames(ex.studentNames||'');
-    // 模試は対象学年・対象生徒がどちらも空なら「対象なし」。
-    // 新規追加時に勝手に全員へ表示しない。
-    if(!targetGrades.length && !targetNames.length) return false;
     if(targetGrades.length){
       if(!grade) return false;
       if(!targetGrades.includes(grade)) return false;
     }
+    const targetNames=Array.isArray(ex.students)?ex.students:splitTargetNames(ex.studentNames||'');
     return examTargetNameMatch(name,targetNames);
   });
 }
@@ -2040,32 +2037,16 @@ function applyPreviousExamTargetsWithConfirm(rows){
     return Object.assign({},ex,{grades:[...(previous.grades||[])],students:[...(previous.students||[])]});
   });
 }
-function examMasterVisibleWindow(){
-  const baseStr=$('#weekStart')?.value || new Date().toISOString().slice(0,10);
-  const from=new Date(baseStr+'T00:00:00');
-  const to=new Date(from);
-  to.setMonth(to.getMonth()+2);
-  to.setHours(23,59,59,999);
-  return {from,to};
-}
-function isExamMasterVisibleInPanel(ex){
-  if(!ex || !ex.date) return true; // 日付未入力の新規行は表示する
-  const {from,to}=examMasterVisibleWindow();
-  const d=new Date(String(ex.date)+'T00:00:00');
-  if(Number.isNaN(d.getTime())) return true;
-  return d>=from && d<=to;
-}
 function renderExamMasterPanel(){
   const host=$('#examMasterPanel');
   const rows=getExamMaster();
-  const visibleRows=rows.map((ex,i)=>({ex,i})).filter(item=>isExamMasterVisibleInPanel(item.ex));
-  const hiddenCount=Math.max(0, rows.length-visibleRows.length);
-  const info=`<div class="hint" style="margin:4px 0 8px;">表示中：${visibleRows.length}件 / 登録済み：${rows.length}件（開始日 ${escapeHtml($('#weekStart')?.value||'今日')} から2か月以内のみ表示${hiddenCount?`・非表示 ${hiddenCount}件は保存時も消えません`:''}）</div>`;
-  const body=visibleRows.map(({ex,i})=>{
+  const templates=getSubjectTemplates();
+  const templateOptions=(selected)=>templates.map(t=>`<option value="${escapeHtml(t.name)}" ${t.name===(selected||'')?'selected':''}>${escapeHtml(t.name)}</option>`).join('');
+  host.innerHTML=rows.map((ex,i)=>{
+    const tmpl=ex.subjectTemplate||defaultTemplateNameForType(ex.type||'common');
     const targetNames=(Array.isArray(ex.students)?ex.students:splitTargetNames(ex.studentNames||'')).join('、');
-    return `<div class="examMasterRow" data-master-row="${i}"><div><label>模試名</label><input data-master-name value="${escapeHtml(ex.name||'')}" placeholder="例：全国統一高校生テスト"></div><div><label>実施日</label><input data-master-date type="date" value="${escapeHtml(ex.date||'')}"></div><div><label>対象学年</label><div class="checkRow">${examGradeCheckboxes(ex.grades||[])}</div></div><div><label>対象生徒名</label><textarea data-master-students placeholder="空欄なら対象なし。例：北野、田中">${escapeHtml(targetNames)}</textarea></div><div><button type="button" class="small secondary" data-delete-master="${i}">削除</button></div></div>`;
-  }).join('');
-  host.innerHTML=info+(body||'<div class="empty">開始日から2か月以内に表示対象の模試はありません。追加ボタンで新規登録できます。</div>');
+    return `<div class="examMasterRow" data-master-row="${i}"><div><label>模試名</label><input data-master-name value="${escapeHtml(ex.name||'')}" placeholder="例：全国統一高校生テスト"></div><div><label>実施日</label><input data-master-date type="date" value="${escapeHtml(ex.date||'')}"></div><div><label>対象学年</label><div class="checkRow">${examGradeCheckboxes(ex.grades||[])}</div></div><div><label>対象生徒名</label><textarea data-master-students placeholder="空欄なら全員。例：北野、田中">${escapeHtml(targetNames)}</textarea></div><div><button type="button" class="small secondary" data-delete-master="${i}">削除</button></div></div>`;
+  }).join('')||'<div class="empty">まだ模試マスタがありません。</div>';
   $$('[data-delete-master]').forEach(btn=>btn.onclick=()=>{const arr=getExamMaster();arr.splice(Number(btn.dataset.deleteMaster),1);saveExamMasterData(arr);renderExamMasterPanel();renderStudents()});
   renderSubjectTemplateEditor();
 }
@@ -2073,34 +2054,17 @@ function examGradeCheckboxes(selected=[]){
   const set=new Set(selected||[]);
   return GRADE_OPTIONS.filter(Boolean).map(g=>`<label><input type="checkbox" data-master-grade value="${escapeHtml(g)}" ${set.has(g)?'checked':''}>${escapeHtml(g)}</label>`).join('');
 }
-function collectExamMasterFromPanel(){
-  const arr=getExamMaster().map(ex=>Object.assign({},ex));
-  $$('.examMasterRow').forEach(row=>{
-    const idx=Number(row.dataset.masterRow);
-    const item={
-      name:row.querySelector('[data-master-name]')?.value.trim()||'',
-      date:row.querySelector('[data-master-date]')?.value||'',
-      type:'common',
-      subjectTemplate:'',
-      grades:Array.from(row.querySelectorAll('[data-master-grade]:checked')).map(x=>x.value),
-      students:splitTargetNames(row.querySelector('[data-master-students]')?.value||'')
-    };
-    if(Number.isFinite(idx) && idx>=0) arr[idx]=item;
-    else arr.push(item);
-  });
-  return arr.filter(x=>x && (x.name||x.date||(x.grades||[]).length||(x.students||[]).length));
-}
-function addExamMasterRow(){const arr=collectExamMasterFromPanel();arr.push({name:'',date:'',type:'common',subjectTemplate:'',grades:[],students:[],targetMode:'none'});saveExamMasterData(arr);renderExamMasterPanel()}
-function bindExamMasterWindowRefresh(){
-  const week=document.getElementById('weekStart');
-  if(!week || week.dataset.examMasterWindowBound==='1') return;
-  week.dataset.examMasterWindowBound='1';
-  week.addEventListener('change', function(){
-    if(typeof renderExamMasterPanel==='function') renderExamMasterPanel();
-  });
-}
+function collectExamMasterFromPanel(){return $$('.examMasterRow').map(row=>({
+  name:row.querySelector('[data-master-name]')?.value.trim()||'',
+  date:row.querySelector('[data-master-date]')?.value||'',
+  type:'common',
+  subjectTemplate:'',
+  grades:Array.from(row.querySelectorAll('[data-master-grade]:checked')).map(x=>x.value),
+  students:splitTargetNames(row.querySelector('[data-master-students]')?.value||'')
+})).filter(x=>x.name||x.date||x.grades.length||x.students.length)}
+function addExamMasterRow(){const arr=collectExamMasterFromPanel();arr.push({name:'',date:'',type:'common',subjectTemplate:'',grades:[],students:[]});saveExamMasterData(arr);renderExamMasterPanel()}
 function saveExamMasterFromPanel(){
-  const rows=collectExamMasterFromPanel();
+  const rows=applyPreviousExamTargetsWithConfirm(collectExamMasterFromPanel());
   saveExamMasterData(rows);
   updateExamTargetHistoryFromMasters(rows);
   renderExamMasterPanel();
@@ -2189,7 +2153,7 @@ function renderEventMasterPanel(){
     <div><label>イベント名</label><input data-event-master-name value="${escapeHtml(ev.name||'')}" placeholder="例：公開授業・説明会・面談会"></div>
     <div><label>日時</label><input data-event-master-datetime type="datetime-local" value="${escapeHtml(toDateTimeLocalValue(ev.datetime||''))}"></div>
     <div><label>対象学年</label><div class="checkRow">${gradeCheckboxes(ev.grades||[])}</div></div>
-    <div><label>対象生徒名</label><textarea data-event-master-students placeholder="空欄なら対象なし。例：北野、田中">${escapeHtml(targetNames)}</textarea></div>
+    <div><label>対象生徒名</label><textarea data-event-master-students placeholder="空欄なら全員。例：北野、田中">${escapeHtml(targetNames)}</textarea></div>
     <div><button type="button" class="small secondary" data-delete-event-master="${i}">削除</button></div>
   </div>`;
   }).join('')||'<div class="empty">まだイベントマスタがありません。</div>';
@@ -3283,6 +3247,104 @@ function matchAllListStudentName(rowName, targetNames){
   }
   return '';
 }
+function studentKeyForList(student, studentNo){return String(studentNo||'').trim()?`no:${String(studentNo).trim()}`:`name:${String(student||'').replace(/[\s\u3000]+/g,'')}`;}
+
+function allListMarkToBool(v){
+  const s=allListCellText(v).replace(/\s/g,'');
+  if(/^(〇|○|◯|済|回答済|あり|有|true|yes|y|1)$/i.test(s)) return true;
+  if(/^(×|✕|✖|未|未回答|なし|無|false|no|n|0)$/i.test(s)) return false;
+  if(/[〇○◯✓✔☑]/.test(s)) return true;
+  if(/[×✕✖]/.test(s)) return false;
+  return undefined;
+}
+function allListFormatSmallComiru(v){
+  const b=allListMarkToBool(v);
+  return b === true ? 'C:〇' : 'C:×';
+}
+function allListSmallStatusToken(obj){
+  const st=allListCellText(obj?.status || '');
+  if(obj?.kind === '模試'){
+    if(st.includes('当日')) return '受:当';
+    if(st.includes('後日')) return '受:後';
+    if(st.includes('不受験')) return '受:不';
+    if(st.includes('未')) return '受:未';
+    return '受:未';
+  }
+  if(st.includes('不参加')) return '参:×';
+  if(st.includes('参加')) return '参:〇';
+  if(st.includes('未')) return '参:未';
+  return '参:未';
+}
+function allListSmallSubjectToken(obj){
+  if(obj?.kind !== '模試') return '';
+  const s=allListCellText(obj.subject || '');
+  return (s && !/なし|無|×/.test(s)) ? '科:〇' : '科:×';
+}
+function allListSmallReadableName(name, maxLen=18){
+  const n = String(name || '')
+    .replace(/大学入学共通テスト/g,'共テ')
+    .replace(/共通テスト/g,'共テ')
+    .replace(/本番レベル模試/g,'本レ')
+    .replace(/全国統一高校生テスト/g,'全統高')
+    .replace(/\s+/g,'')
+    .trim();
+  return n.length > maxLen ? n.slice(0, maxLen) + '…' : (n || '名称未');
+}
+function allListSmallBlockStrip(text){
+  return String(text || '')
+    .replace(/(^|\n)【小規模】[\s\S]*?(?=\n【|$)/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+function allListParseSmallLine(line, studentName='', studentNo=''){
+  let s=allListCellText(line).replace(/^[・･\-\*]\s*/,'').trim();
+  if(!s) return null;
+  let date='';
+  const dm=s.match(/^((?:\d{4}[\/\-年])?\d{1,2}[\/\-月]\d{1,2}日?)(?:\s+|　+)?/);
+  if(dm){
+    date=dm[1].replace(/年/g,'/').replace(/月/g,'/').replace(/日/g,'').replace(/\/+/g,'/').trim();
+    s=s.slice(dm[0].length).trim();
+  }
+  const isExam=/受\s*:/.test(s);
+  const isEvent=/参\s*:/.test(s);
+  if(!isExam && !isEvent) return null;
+  const firstToken=s.search(/\s*(受|参|科|C|備)\s*:/);
+  const name=(firstToken>=0?s.slice(0,firstToken):s).trim();
+  const noteMatch=s.match(/備\s*:\s*([\s\S]*)$/);
+  const note=noteMatch ? allListCellText(noteMatch[1]) : '';
+  const cMatch=s.match(/C\s*:\s*([〇○◯×✕✖済未回答]+|true|false|yes|no|1|0)/i);
+  const comiruAnswered=cMatch ? allListMarkToBool(cMatch[1]) : undefined;
+  if(isExam){
+    const stMatch=s.match(/受\s*:\s*(当日|後日|不受験|当|後|不|未)/);
+    const stRaw=stMatch ? stMatch[1] : '';
+    const status=stRaw==='当'?'当日':stRaw==='後'?'後日':stRaw==='不'?'不受験':stRaw==='未'?'未聞き取り':stRaw;
+    const subMatch=s.match(/科\s*:\s*([〇○◯×✕✖ありなし有無済未]+)/);
+    const subjectChanged=subMatch ? allListMarkToBool(subMatch[1]) : undefined;
+    return {kind:'模試', date, name, status, subject:subjectChanged===true?'あり':'', subjectChanged, comiruAnswered, comiru:comiruAnswered?'済':'未聞き取り', note, student:studentName, studentNo, machineKey:['模試',name,date].join('|'), studentKey:studentKeyForList(studentName,studentNo)};
+  }
+  const stMatch=s.match(/参\s*:\s*(参加|不参加|〇|○|◯|×|✕|✖|未)/);
+  const stRaw=stMatch ? stMatch[1] : '';
+  let status='';
+  if(/^(〇|○|◯|参加)$/.test(stRaw)) status='参加';
+  else if(/^(×|✕|✖|不参加)$/.test(stRaw)) status='不参加';
+  else if(stRaw==='未') status='未聞き取り';
+  return {kind:'イベント', date, datetime:date, name, status, subject:'', comiruAnswered, comiru:comiruAnswered?'済':'未聞き取り', note, student:studentName, studentNo, machineKey:['イベント',name,date].join('|'), studentKey:studentKeyForList(studentName,studentNo)};
+}
+function allListParseSmallBlock(text, studentName='', studentNo=''){
+  const raw=String(text || '');
+  const idx=raw.indexOf('【小規模】');
+  if(idx < 0) return [];
+  const part=raw.slice(idx).replace(/^【小規模】/,'');
+  const lines=part.split(/\n+/).map(x=>x.trim()).filter(Boolean);
+  const out=[];
+  for(const line of lines){
+    if(/^【/.test(line)) break;
+    const obj=allListParseSmallLine(line, studentName, studentNo);
+    if(obj && obj.name) out.push(obj);
+  }
+  return out;
+}
+
 function allListMergeExamPatch(data, patch){
   if(!patch || !patch.name) return false;
   if(!Array.isArray(data.exams)) data.exams=[];
@@ -3343,6 +3405,35 @@ function parseAllListOverridesFromRows(aoa, targetNames){
       const matched=matchAllListStudentName(row[nameIdx],targetNames) || matchAllListStudentName(row[noIdx],targetNames);
       if(!matched) continue;
       const bucket=ensure(matched);
+      // 全員分リスト本体の備考欄にある【小規模】ブロックを読む。
+      // 例: 6/20 保護者会　参:〇　C:×　備:電話済
+      if(genericNoteIdx>=0 && allListCellText(row[genericNoteIdx]).includes('【小規模】')){
+        const studentNameForSmall=nameIdx>=0?allListCellText(row[nameIdx]):matched;
+        const studentNoForSmall=noIdx>=0?allListCellText(row[noIdx]):'';
+        const smallObjs=allListParseSmallBlock(row[genericNoteIdx], studentNameForSmall, studentNoForSmall);
+        smallObjs.forEach(obj=>{
+          if(obj.kind==='模試'){
+            allListAddPatchWithPriority(bucket,'exam',{
+              id:obj.machineKey,
+              name:obj.name,
+              date:obj.date,
+              status:obj.status,
+              comiruAnswered:obj.comiruAnswered,
+              subjectChanged:obj.subjectChanged,
+              note:obj.note
+            });
+          }else if(obj.kind==='イベント'){
+            allListAddPatchWithPriority(bucket,'event',{
+              id:obj.machineKey,
+              name:obj.name,
+              datetime:obj.datetime || obj.date,
+              status:obj.status,
+              comiruAnswered:obj.comiruAnswered,
+              note:obj.note
+            });
+          }
+        });
+      }
       // 行形式：模試名/イベント名の列がある場合
       if(examNameIdx>=0 && allListCellText(row[examNameIdx])){
         allListAddPatchWithPriority(bucket,'exam',{
@@ -5325,7 +5416,6 @@ renderStudents=function(){
   v33ResetStudentScrollLeft();
 };
 
-bindExamMasterWindowRefresh();
 init();
 initV32();
 initRealAppUX();
