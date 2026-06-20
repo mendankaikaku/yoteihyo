@@ -6250,7 +6250,7 @@ function allListPrintHasWarningText(text){
 }
 function allListApplyRichWarningsToCell(cell){
   const text = cell && cell.v != null ? String(cell.v) : '';
-  if(!text || !allListPrintHasWarningText(text)) return;
+  if(!text || !allListPrintHasWarningText(text)) return false;
   const redFont = {name:'Yu Gothic', sz:8, bold:true, color:{rgb:'991B1B'}};
   const baseFont = {name:'Yu Gothic', sz:8, color:{rgb:'111827'}};
   const runs = [];
@@ -6259,14 +6259,16 @@ function allListApplyRichWarningsToCell(cell){
   let m;
   while((m = re.exec(text))){
     if(m.index > last) runs.push({t:text.slice(last, m.index), s:{font:baseFont}});
+    // さっきまで赤セル判定していた文字だけ赤文字にする。
     runs.push({t:m[0], s:{font:redFont}});
     last = m.index + m[0].length;
   }
   if(last < text.length) runs.push({t:text.slice(last), s:{font:baseFont}});
-  // SheetJS系で対応している環境ではセル内の該当文字だけ赤くなる。
-  // 非対応環境でも通常のセル文字としては残る。
+  // SheetJS / xlsx-js-style が rich text を扱える環境では、この文字単位の赤字が出る。
+  // セル値 v は残すので、非対応でも文字自体は消えない。
   cell.r = runs;
   cell.h = text;
+  return true;
 }
 
 function allListPrintWriteValue(value){
@@ -6487,8 +6489,8 @@ function styleAllStudentPrintSheet(ws, aoa){
     return style;
   });
 
-  // 模試イベント欄の旧赤判定語は、セル全体ではなく該当文字だけ赤くする。
-  // 模試だけでなくイベントも同じ扱い。
+  // 旧赤セル判定していた文字は、印刷用の「模試イベント欄」だけで該当文字だけ赤くする。
+  // 予定・結果・備考など他の列には赤文字処理をかけない。
   for(let R=2; R<=range.e.r; R++){
     const addr = XLSX.utils.encode_cell({r:R, c:eventCol});
     if(ws[addr]) allListApplyRichWarningsToCell(ws[addr]);
