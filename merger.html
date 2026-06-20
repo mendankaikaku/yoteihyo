@@ -3049,14 +3049,13 @@ function dailyPosterSheetAliases(name){
 }
 async function parseDailyPosterRestoreFile(file){
   const buf = await file.arrayBuffer();
-  const wb = XLSX.read(buf, {type:'array', cellDates:true, cellStyles:true});
+  const wb = XLSX.read(buf, {type:'array', cellDates:true});
   const map = new Map();
   for(const sheetName of wb.SheetNames || []){
     const ws = wb.Sheets[sheetName];
-    const restoreStyle = allListCaptureSheetStyles(ws);
     const aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:'', raw:false});
     if(!aoa || !aoa.some(row => (row || []).some(v => norm(v)))) continue;
-    const data = {sourceFile:file.name, sheetName, aoa, restoreStyle};
+    const data = {sourceFile:file.name, sheetName, aoa};
     for(const alias of dailyPosterSheetAliases(sheetName)) map.set(alias, data);
   }
   return map;
@@ -3112,21 +3111,16 @@ function mergeRestoredDailyPosterAoa(sheetName, generatedAoa){
   const restoreHeader = (restoredAoa[1] || []).map(v => norm(v));
   const keyFn = isRanking ? rankingRowKey : posterRowKey;
 
-  // タイトルと見出しの値は従来どおり。列幅・色・罫線などは後段で前回Excel側を優先する。
+  // タイトルは手修正版Excelの1行目を優先。これにより「分」などの細かい表記もExcel側の手修正を正とする。
   const titleRow = (restoredAoa[0] || []).some(v => norm(v)) ? restoredAoa[0] : generatedAoa[0];
   const header = restoreHeader.length >= genHeader.length ? restoreHeader : genHeader;
   const out = [titleRow, header];
-  const outputRowToRestoreRow = [0, 1];
-  const outputColToRestoreCol = header.map((h,c)=>{
-    const exact = restoreHeader.findIndex(x => x && h && x === h);
-    return exact >= 0 ? exact : (c < restoreHeader.length ? c : null);
-  });
   const used = new Set();
-  const restoredRows = restoredAoa.slice(2).map((row,i)=>({row, sourceRow:i+2})).filter(x => x.row.some(v => norm(v)));
+  const restoredRows = restoredAoa.slice(2).filter(row => row.some(v => norm(v)));
   const restoreMap = new Map();
-  for(const item of restoredRows){
-    const key = keyFn(item.row, restoreHeader);
-    if(key && key !== '|') restoreMap.set(key, item);
+  for(const row of restoredRows){
+    const key = keyFn(row, restoreHeader);
+    if(key && key !== '|') restoreMap.set(key, row);
   }
 
   // 生成側に存在する行は、同じ生徒・内容が手修正版にあれば手修正版を採用。
@@ -3135,21 +3129,17 @@ function mergeRestoredDailyPosterAoa(sheetName, generatedAoa){
     const restored = restoreMap.get(key);
     if(restored){
       used.add(key);
-      outputRowToRestoreRow[out.length] = restored.sourceRow;
-      out.push([...restored.row, ...Array(Math.max(0, header.length - restored.row.length)).fill('')]);
+      out.push([...restored, ...Array(Math.max(0, header.length - restored.length)).fill('')]);
     }else{
-      outputRowToRestoreRow[out.length] = null;
       out.push([...grow, ...Array(Math.max(0, header.length - grow.length)).fill('')]);
     }
   }
   // 手修正版にだけある行も消さずに残す。
-  for(const item of restoredRows){
-    const key = keyFn(item.row, restoreHeader);
+  for(const row of restoredRows){
+    const key = keyFn(row, restoreHeader);
     if(key && used.has(key)) continue;
-    outputRowToRestoreRow[out.length] = item.sourceRow;
-    out.push([...item.row, ...Array(Math.max(0, header.length - item.row.length)).fill('')]);
+    out.push([...row, ...Array(Math.max(0, header.length - row.length)).fill('')]);
   }
-  out._allListStyleMeta = {restoreStyle: restore.restoreStyle, outputRowToRestoreRow, outputColToRestoreCol};
   return out;
 }
 
@@ -3170,14 +3160,13 @@ function wholeScheduleSheetAliases(name){
 }
 async function parseWholeScheduleRestoreFile(file){
   const buf = await file.arrayBuffer();
-  const wb = XLSX.read(buf, {type:'array', cellDates:true, cellStyles:true});
+  const wb = XLSX.read(buf, {type:'array', cellDates:true});
   const map = new Map();
   for(const sheetName of wb.SheetNames || []){
     const ws = wb.Sheets[sheetName];
-    const restoreStyle = allListCaptureSheetStyles(ws);
     const aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:'', raw:false});
     if(!aoa || !aoa.some(row => (row || []).some(v => norm(v)))) continue;
-    const data = {sourceFile:file.name, sheetName, aoa, restoreStyle};
+    const data = {sourceFile:file.name, sheetName, aoa};
     for(const alias of wholeScheduleSheetAliases(sheetName)) map.set(alias, data);
   }
   return map;
@@ -3225,17 +3214,12 @@ function mergeRestoredWholeScheduleAoa(sheetName, generatedAoa){
   const restoreHeader = (restoredAoa[0] || []).map(v => norm(v));
   const header = genHeader.length >= restoreHeader.length ? genHeader : restoreHeader;
   const out = [header];
-  const outputRowToRestoreRow = [0];
-  const outputColToRestoreCol = header.map((h,c)=>{
-    const exact = restoreHeader.findIndex(x => x && h && x === h);
-    return exact >= 0 ? exact : (c < restoreHeader.length ? c : null);
-  });
   const used = new Set();
-  const restoreRows = restoredAoa.slice(1).map((row,i)=>({row, sourceRow:i+1})).filter(x => x.row.some(v => norm(v)));
+  const restoreRows = restoredAoa.slice(1).filter(row => row.some(v => norm(v)));
   const restoreMap = new Map();
-  for(const item of restoreRows){
-    const key = wholeScheduleRowKey(item.row, restoreHeader);
-    if(key && !key.endsWith('|')) restoreMap.set(key, item);
+  for(const row of restoreRows){
+    const key = wholeScheduleRowKey(row, restoreHeader);
+    if(key && !key.endsWith('|')) restoreMap.set(key, row);
   }
 
   for(const grow of generatedAoa.slice(1)){
@@ -3244,28 +3228,23 @@ function mergeRestoredWholeScheduleAoa(sheetName, generatedAoa){
     const newRow = [...grow, ...Array(Math.max(0, header.length - grow.length)).fill('')];
     if(restored){
       used.add(key);
-      outputRowToRestoreRow[out.length] = restored.sourceRow;
       for(let c=0;c<header.length;c++){
         const gh = genHeader[c] || '';
         let ri = restoreHeader.findIndex(h => h && gh && h === gh);
         // 掲示用カレンダーは日付見出しの右列が空欄になりやすいので、見出し一致できない列は同じ列番号を使う。
-        if(ri < 0 && restored.row.length > c) ri = c;
-        if(ri >= 0 && norm(restored.row[ri]) !== '') newRow[c] = restored.row[ri];
+        if(ri < 0 && restored.length > c) ri = c;
+        if(ri >= 0 && norm(restored[ri]) !== '') newRow[c] = restored[ri];
       }
-    }else{
-      outputRowToRestoreRow[out.length] = null;
     }
     out.push(newRow);
   }
 
   // 手修正版にだけある生徒行も消さずに残す。
-  for(const item of restoreRows){
-    const key = wholeScheduleRowKey(item.row, restoreHeader);
+  for(const row of restoreRows){
+    const key = wholeScheduleRowKey(row, restoreHeader);
     if(key && used.has(key)) continue;
-    outputRowToRestoreRow[out.length] = item.sourceRow;
-    out.push([...item.row, ...Array(Math.max(0, header.length - item.row.length)).fill('')]);
+    out.push([...row, ...Array(Math.max(0, header.length - row.length)).fill('')]);
   }
-  out._allListStyleMeta = {restoreStyle: restore.restoreStyle, outputRowToRestoreRow, outputColToRestoreCol};
   return out;
 }
 
@@ -3388,7 +3367,6 @@ function styleMonthlyPosterSheet(ws, aoa){
     else if(C < 2){ style.fill = nameFill; }
     return style;
   });
-  allListApplyRestoredSheetStyle(ws, aoa);
 }
 async function loadMonthlyPosterResultsDirectly(){
   let records = [];
@@ -5300,10 +5278,6 @@ function downloadWorkbookFromAoa(calendarAoa, listAoa, resultAoa, rosterAoa, log
   wsResult["!freeze"] = {ySplit:1};
   wsRoster["!freeze"] = {ySplit:1};
   wsLog["!freeze"] = {ySplit:1};
-
-  // 全体予定表・掲示用カレンダーは、値を更新した後に前回Excelの列幅・行高さ・色・罫線などを戻す。
-  allListApplyRestoredSheetStyle(wsCal, calendarAoa);
-  allListApplyRestoredSheetStyle(wsPoster, posterAoa);
 
   XLSX.utils.book_append_sheet(wb, wsCal, "カレンダー");
   XLSX.utils.book_append_sheet(wb, wsPoster, "掲示用カレンダー");
