@@ -6235,13 +6235,48 @@ function allListPrintCell(row, idx){
   return idx >= 0 ? norm(row[idx]) : '';
 }
 
-function allListPrintStatusWithArrow(value){
-  const v = norm(value);
-  return v ? `${v}→　　　　` : '';
+
+function allListPrintHasBlankWritingField(text){
+  const s = String(text ?? '');
+  // 「回答:　　　 /」「Comiru:　　 /」「科目変更:　　 /」「科目リスト:　　 ）」など、
+  // 値が空の書き込み欄があれば、その人だけ赤セルにする。
+  return /(回答|Comiru|科目変更|科目リスト)\s*[:：][ 　]*(?=\/|／|）|\)|\n|$)/.test(s);
 }
-function allListPrintDetailWithArrow(label, value){
-  const v = allListPrintStatusWithArrow(value);
-  return v ? `${label}:${v}` : '';
+function allListPrintWarningRegex(){
+  return /(科目リスト\s*[:：]\s*未入力|(?:回答|受験|参加)\s*[:：]\s*未|(?:受|参)\s*[:：]\s*未|未聞き取り|Comiru\s*[:：]\s*×|科目変更\s*[:：]\s*〇)/g;
+}
+function allListPrintHasWarningText(text){
+  return allListPrintWarningRegex().test(String(text ?? ''));
+}
+function allListApplyRichWarningsToCell(cell){
+  const text = cell && cell.v != null ? String(cell.v) : '';
+  if(!text || !allListPrintHasWarningText(text)) return;
+  const redFont = {name:'Yu Gothic', sz:8, bold:true, color:{rgb:'991B1B'}};
+  const baseFont = {name:'Yu Gothic', sz:8, color:{rgb:'111827'}};
+  const runs = [];
+  let last = 0;
+  const re = allListPrintWarningRegex();
+  let m;
+  while((m = re.exec(text))){
+    if(m.index > last) runs.push({t:text.slice(last, m.index), s:{font:baseFont}});
+    runs.push({t:m[0], s:{font:redFont}});
+    last = m.index + m[0].length;
+  }
+  if(last < text.length) runs.push({t:text.slice(last), s:{font:baseFont}});
+  // SheetJS系で対応している環境ではセル内の該当文字だけ赤くなる。
+  // 非対応環境でも通常のセル文字としては残る。
+  cell.r = runs;
+  cell.h = text;
+}
+
+function allListPrintWriteValue(value){
+  const v = norm(value);
+  // 未聞き取りの人にその場で聞いて書けるよう、値がなくても空白欄を出す。
+  // 値がある場合は値を入れたうえで、後ろに少し余白を残す。
+  return v ? `${v}　　　　` : '　　　　　　';
+}
+function allListPrintDetailForWriting(label, value){
+  return `${label}:${allListPrintWriteValue(value)}`;
 }
 
 function allListPrintEventLine(parts, details){
@@ -6330,11 +6365,12 @@ function buildAllStudentPrintAoaFromFullAoa(grade, fullAoa){
       const subject = allListPrintCell(row, find('科目変更'));
       const subjectList = allListPrintCell(row, find('科目リスト'));
       if(d || name || ans || comiru || note || subject || subjectList){
-        const details = [];
-        if(ans) details.push(allListPrintDetailWithArrow('回答', ans));
-        if(comiru) details.push(allListPrintDetailWithArrow('Comiru', comiru));
-        if(subject) details.push(allListPrintDetailWithArrow('科目変更', subject));
-        if(subjectList) details.push(allListPrintDetailWithArrow('科目リスト', subjectList));
+        const details = [
+          allListPrintDetailForWriting('回答', ans),
+          allListPrintDetailForWriting('Comiru', comiru),
+          allListPrintDetailForWriting('科目変更', subject),
+          allListPrintDetailForWriting('科目リスト', subjectList)
+        ];
         if(note) details.push(`備考:${note}`);
         lines.push(allListPrintEventLine([d, name], details));
       }
@@ -6342,17 +6378,22 @@ function buildAllStudentPrintAoaFromFullAoa(grade, fullAoa){
 
     for(const [baseRaw, cols] of largeGroups.entries()){
       const base = applyAllStudentPrintAbbrev(baseRaw);
-      const details = [];
+      const vals = {};
       for(const x of cols){
         const v = allListPrintCell(row, x.col);
         if(!v) continue;
-        if(['受験','参加','Comiru','科目変更','科目リスト'].includes(x.field)){
-          details.push(allListPrintDetailWithArrow(x.field, v));
-        }else{
-          details.push(`${x.field}:${applyAllStudentPrintAbbrev(v)}`);
-        }
+        vals[x.field] = v;
       }
-      if(details.length) lines.push(allListPrintEventLine([base], details));
+      const answerValue = vals['受験'] || vals['参加'] || '';
+      const details = [
+        allListPrintDetailForWriting('回答', answerValue),
+        allListPrintDetailForWriting('Comiru', vals['Comiru'] || ''),
+        allListPrintDetailForWriting('科目変更', vals['科目変更'] || ''),
+        allListPrintDetailForWriting('科目リスト', vals['科目リスト'] || '')
+      ];
+      if(vals['備考']) details.push(`備考:${applyAllStudentPrintAbbrev(vals['備考'])}`);
+      // 聞き取り用なので、対象行では値が空でも4項目の書き込み欄を出す。
+      lines.push(allListPrintEventLine([base], details));
     }
 
     const outRow = [
@@ -6430,26 +6471,28 @@ function styleAllStudentPrintSheet(ws, aoa){
   const eventCol = totalCols - 1 - planCount;
   setRangeStyle(ws, range, (R,C,cell)=>{
     const text = cell && cell.v != null ? String(cell.v) : '';
-    const hasNeedsHearing = R>1 && (
-      text.includes('科目リスト:未入力') ||
-      /(?:回答|受験|参加)[:：]\s*未/.test(text) ||
-      /(?:受|参)[:：]\s*未/.test(text) ||
-      /未聞き取り/.test(text) ||
-      /Comiru[:：]\s*×/.test(text) ||
-      /科目変更[:：]\s*〇/.test(text)
-    );
-    const style = {font:R===0?fontTitle:(R===1?fontHeader:(hasNeedsHearing?fontMissing:fontBase)), alignment:{vertical:'center', horizontal:'center', wrapText:true, shrinkToFit:!hasNeedsHearing}, border};
+    // 模試イベント欄は、模試・イベントどちらも「書き込み空欄が残っている人」だけセル背景を赤くする。
+    // 旧赤判定語はセル全体を赤くせず、後段で該当文字だけ赤字にする。
+    const hasBlankWritingField = R>1 && C===eventCol && allListPrintHasBlankWritingField(text);
+    const style = {font:R===0?fontTitle:(R===1?fontHeader:fontBase), alignment:{vertical:'center', horizontal:'center', wrapText:true, shrinkToFit:!hasBlankWritingField}, border};
     if(R===0) style.fill = titleFill;
     else if(R===1) style.fill = headerFill;
     else if(C<=1) style.fill = nameFill;
     else if(C>=6 && C<eventCol) style.fill = manualFill;
-    else if(C===eventCol) style.fill = hasNeedsHearing ? missingFill : eventFill;
+    else if(C===eventCol) style.fill = hasBlankWritingField ? missingFill : eventFill;
     else if(C>eventCol) style.fill = planFill;
-    if(hasNeedsHearing){
+    if(hasBlankWritingField){
       style.alignment = {vertical:'center', horizontal:'center', wrapText:true, shrinkToFit:false};
     }
     return style;
   });
+
+  // 模試イベント欄の旧赤判定語は、セル全体ではなく該当文字だけ赤くする。
+  // 模試だけでなくイベントも同じ扱い。
+  for(let R=2; R<=range.e.r; R++){
+    const addr = XLSX.utils.encode_cell({r:R, c:eventCol});
+    if(ws[addr]) allListApplyRichWarningsToCell(ws[addr]);
+  }
   return ws;
 }
 
