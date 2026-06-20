@@ -2719,6 +2719,8 @@ function cleanPosterPlanText(value){
 // 6. 掲示用カレンダー：略称辞書・表示用整形
 // ============================================================
 const POSTER_ABBREV_RULES = [
+  [/大学入学共通[テﾃ][スｽ][トﾄ]対策\s*数学\s*Ⅱ[・･]?\s*[BＢ][・･]?\s*[CＣ]\s*実力完成/gi, "共テ数ⅡBC実"],
+  [/共通[テﾃ][スｽ][トﾄ]対策\s*数学\s*Ⅱ[・･]?\s*[BＢ][・･]?\s*[CＣ]\s*実力完成/gi, "共テ数ⅡBC実"],
   [/大学入学共通テスト対策\s*英語\s*Listening\s*[＆&]\s*Read\w*/gi, "共テ英L&R"],
   [/大学入学共通テスト対策\s*英語\s*Reading/gi, "共テ英R"],
   [/大学入学共通テスト対策\s*英語\s*Listening/gi, "共テ英L"],
@@ -2889,6 +2891,8 @@ function hasCourseNumber(text){
 // 掲示用の結果名は「東進コンテンツ名として認識できる語」だけを表示する。
 // 結果文の「初めてSS判定を取得」の「て」などは、ここで必ず捨てる。
 const POSTER_CONTENT_EXTRACT_RULES = [
+  [/大学入学共通[テﾃ][スｽ][トﾄ]対策\s*数学\s*Ⅱ[・･]?\s*[BＢ][・･]?\s*[CＣ]\s*実力完成/gi, "共テ数ⅡBC実"],
+  [/共通[テﾃ][スｽ][トﾄ]対策\s*数学\s*Ⅱ[・･]?\s*[BＢ][・･]?\s*[CＣ]\s*実力完成/gi, "共テ数ⅡBC実"],
   [/大学入学共通テスト対策\s*英語\s*Listening\s*[＆&]\s*Read\w*/gi, "共テ英L&R"],
   [/大学入学共通テスト対策\s*英語\s*Reading/gi, "共テ英R"],
   [/大学入学共通テスト対策\s*英語\s*Listening/gi, "共テ英L"],
@@ -3149,14 +3153,27 @@ function cleanPosterResultText(value){
 
     const kind = posterResultKind(line);
     if(!kind) continue;
-    const name = shortenPosterResultName(line, kind);
-    if(!name) continue;
+    const nameRaw = shortenPosterResultName(line, kind);
+    if(!nameRaw) continue;
+    const name = (typeof allListPrintLectureNumberToCircle === 'function')
+      ? allListPrintLectureNumberToCircle(nameRaw)
+      : nameRaw;
 
     // S/SS/習得/完全習得は桜付き。受講開始は情報として出すだけ。
     if(kind === "受講") out.push(`・${name} 受講`);
     else out.push(`・🌸 ${name} ${kind}`);
   }
-  return [...new Set(out)].join("\n");
+
+  // 同じ講座・同じ講で SS がある場合は、同じ対象の S を省く。
+  const hasSS = new Set(out
+    .map(x => x.match(/^・🌸\s*(.+)\s+SS$/))
+    .filter(Boolean)
+    .map(m => m[1]));
+  const filtered = out.filter(x => {
+    const m = x.match(/^・🌸\s*(.+)\s+S$/);
+    return !(m && hasSS.has(m[1]));
+  });
+  return [...new Set(filtered)].join("\n");
 }
 
 
