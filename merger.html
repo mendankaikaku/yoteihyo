@@ -3682,12 +3682,48 @@ function buildMonthlyPosterContinuousAoa(records, rule, label){
   if(rows.length === 0) aoa.push(['', '', '該当なし']);
   return posterMoveNoHitRowsToBottom(aoa);
 }
+
+function monthlyPosterAchievementCourseKey(rec){
+  const course = posterShortCourseName(rec.study) || posterShortCourseName(rec.result) || norm(rec.study) || norm(rec.result);
+  return normalizeComiruMatchText ? normalizeComiruMatchText(course) : String(course || '').replace(/\s+/g,'');
+}
+function dedupeAchievementRecordsByOldestDate(records){
+  const map = new Map();
+  for(const r of records || []){
+    const meta = resultPosterStudentMeta(r);
+    const studentKey = normalizeStudentNoKey(r.studentNo || meta.studentNo || '') || normalizeNameKey(meta.student || r.student || r.rawName || '');
+    const courseKey = monthlyPosterAchievementCourseKey(r);
+    const key = `${studentKey}|${courseKey}`;
+    if(!studentKey || !courseKey){
+      const looseKey = `__loose__|${records.indexOf(r)}`;
+      map.set(looseKey, r);
+      continue;
+    }
+    const old = map.get(key);
+    if(!old){
+      map.set(key, r);
+      continue;
+    }
+    const oldDate = old.dateObj instanceof Date && !isNaN(old.dateObj) ? old.dateObj : new Date(old.dateKey || '9999-12-31');
+    const newDate = r.dateObj instanceof Date && !isNaN(r.dateObj) ? r.dateObj : new Date(r.dateKey || '9999-12-31');
+    if(newDate < oldDate || (+newDate === +oldDate && String(r.timeLabel || '').localeCompare(String(old.timeLabel || '')) < 0)){
+      map.set(key, r);
+    }
+  }
+  return [...map.values()];
+}
+
 function buildMonthlyPosterResultAoa(records, rule, label){
   if(rule.keyword === '連続で実施') return buildMonthlyPosterContinuousAoa(records, rule, label);
-  const rows = (records || [])
+  const matchedRecords = (records || [])
     // 以前は r.result だけを見ていたため、「講座を修得」が学習内容/summary側に入った行を落とす可能性があった。
     // ここでは study + result + summary + category 全体を見て判定する。
-    .filter(r => resultKeywordMatches(r, rule.keyword))
+    .filter(r => resultKeywordMatches(r, rule.keyword));
+
+  // 同じ生徒・同じ修得講座が複数件一致した場合は、一番日付が古いものだけを採用する。
+  const dedupedRecords = dedupeAchievementRecordsByOldestDate(matchedRecords);
+
+  const rows = dedupedRecords
     .map(r => ({...resultPosterStudentMeta(r), content:monthlyPosterAchievementContent(r), dateKey:r.dateKey || '', timeLabel:r.timeLabel || ''}))
     .sort((a,b)=> String(a.grade||'').localeCompare(String(b.grade||''),'ja') || String(a.kana || a.student).localeCompare(String(b.kana || b.student),'ja') || String(a.dateKey).localeCompare(String(b.dateKey)) || String(a.timeLabel).localeCompare(String(b.timeLabel)));
   const title = `${label}　${rule.keyword}`;
