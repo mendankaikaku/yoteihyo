@@ -5634,12 +5634,20 @@ async function setBundleFolderFiles(fileList){
     const isJson = /\.json$/i.test(name);
     const parts = pathPartsOfFile(f).map(p => p.toLowerCase());
     const relLower = String(f.webkitRelativePath || f.name || '').toLowerCase();
+    const isDailyResultWorkbook = isExcel && (
+      name === '毎日更新.xlsx' ||
+      /^毎日更新\.(xlsx|xlsm|xls)$/i.test(name) ||
+      /毎日更新\.xlsx$/i.test(relLower) ||
+      /毎日更新[\/\\]+毎日更新\.(xlsx|xlsm|xls)$/i.test(relLower)
+    );
     if(isJson && (parts.some(p => p === 'json' || p.includes('json') || p.includes('履歴')) || /result[_-]?history|結果履歴/.test(relLower))) histories.push(f);
-    else if(isExcel && (filePathIncludes(f, '毎日掲示') || filePathIncludes(f, '毎日更新'))) dailyPosters.push(f);
+    // 重要：毎日更新.xlsx は結果データとして読む。ここを掲示用復元に分類すると、毎日更新.xlsxが結果として読まれない。
+    else if(isDailyResultWorkbook) results.push(f);
     else if(isExcel && (filePathIncludes(f, '全員分リスト') || filePathIncludes(f, '全員リスト'))) allLists.push(f);
     else if(isExcel && filePathIncludes(f, '全体予定表')) wholeSchedules.push(f);
     else if(isCsv && (filePathIncludes(f, 'Comiru') || filePathIncludes(f, 'コミル') || /comiru|コミル/i.test(relLower))) comiruCsvs.push(f);
-    else if(isExcel && (filePathIncludes(f, '毎日更新') || filePathIncludes(f, '毎日更新') || name === '毎日更新.xlsx')) results.push(f);
+    // 掲示用手修正版は「毎日掲示」フォルダー、または毎日更新.xlsx以外の掲示用Excelだけ読む。
+    else if(isExcel && (filePathIncludes(f, '毎日掲示') || (filePathIncludes(f, '毎日更新') && !isDailyResultWorkbook))) dailyPosters.push(f);
     else if(isExcel && filePathIncludes(f, '打ち込み結果')) planned.push(f);
     else if((isExcel || isCsv) && filePathIncludes(f, '対応表')) rosters.push(f);
   }
@@ -5668,10 +5676,10 @@ async function setBundleFolderFiles(fileList){
   updateStats(state.files, [], [], [], state.resultRecords);
   const summary = `読み取り完了
 予定Excel（打ち込み結果）: ${planned.length}件
-毎日更新.xlsx（毎日更新）: ${results.length}件
+毎日更新.xlsx（結果データ）: ${results.length}件
 結果履歴JSON（json）: ${histories.length}件
 全員分リスト復元Excel（全員分リスト）: ${allLists.length}件${allListRestoreLogs.length ? '（' + allListRestoreLogs.join(' / ') + '）' : ''}
-掲示用手修正Excel（毎日更新）: ${dailyPosters.length}件${dailyPosterRestoreLogs.length ? '（' + dailyPosterRestoreLogs.join(' / ') + '）' : ''}
+掲示用手修正Excel（毎日掲示/毎日更新内の毎日更新.xlsx以外）: ${dailyPosters.length}件${dailyPosterRestoreLogs.length ? '（' + dailyPosterRestoreLogs.join(' / ') + '）' : ''}
 全体予定表手修正Excel（全体予定表）: ${wholeSchedules.length}件${wholeScheduleRestoreLogs.length ? '（' + wholeScheduleRestoreLogs.join(' / ') + '）' : ''}
 Comiru CSV（Comiru）: ${comiruCsvs.length}件
 ${rosterMsg}`;
