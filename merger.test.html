@@ -5456,11 +5456,25 @@ function mergeRestoredAllListAoa(grade, generatedAoa){
     slots.push({type:'extra', restoreIndex:i, header:h, canon:hc});
   }
 
-  // 新しく自動生成された列だけ末尾に追加する。
-  // 手動列は上の slots で元位置維持、追加自動列だけ末尾。
+  // 新しく自動生成された列を追加する。
+  // ただし小規模 1/2/3... の「科目リスト」列は、末尾ではなく各スロットの「備考」の直後へ入れる。
+  function insertMissingGeneratedSlot(slotObj){
+    const h = normalizeAllListHeaderText(slotObj.header || '');
+    const m = h.match(/^(?:小規模\s*)?([0-9０-９]+)\s*\n科目リスト$/);
+    if(m){
+      const n = String(m[1]).replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0)-0xFEE0));
+      const target = new RegExp(`^(?:小規模\\s*)?${n}\\s*\\n備考$`);
+      const idx = slots.findIndex(x => target.test(normalizeAllListHeaderText(x.header || '')));
+      if(idx >= 0){
+        slots.splice(idx + 1, 0, slotObj);
+        return;
+      }
+    }
+    slots.push(slotObj);
+  }
   for(let i=0;i<genHeader.length;i++){
     if(usedGen.has(i)) continue;
-    slots.push({type:'gen', genIndex:i, restoreIndex:-1, header:genHeader[i], canon:genCanon[i]});
+    insertMissingGeneratedSlot({type:'gen', genIndex:i, restoreIndex:-1, header:genHeader[i], canon:genCanon[i]});
   }
 
   const header = slots.map(x=>x.header);
@@ -5854,7 +5868,7 @@ function buildAllStudentListAoaByGrade(examRecords=[], eventRecords=[]){
     }
     const extraHeaders = [];
     for(let i=1;i<=maxSmallSlots;i++){
-      extraHeaders.push(`${i}\n日付`, `${i}\n名称`, `${i}\n回答`, `${i}\nComiru`, `${i}\n備考`, `${i}\n科目変更`, `${i}\n科目リスト`);
+      extraHeaders.push(`${i}\n日付`, `${i}\n名称`, `${i}\n回答`, `${i}\nComiru`, `${i}\n備考`, `${i}\n科目リスト`, `${i}\n科目変更`);
     }
     const header = ['学年','生徒番号','生徒名','読み仮名','担当','高校','備考', ...extraHeaders, ...examGroups.map(g=>g.label), ...eventGroups.map(g=>g.label)];
     for(const d of windowDates){
@@ -5869,7 +5883,7 @@ function buildAllStudentListAoaByGrade(examRecords=[], eventRecords=[]){
       for(let i=0;i<maxSmallSlots;i++){
         const item = smallItems[i];
         if(item){
-          row.push(allListSlotDateDisplay(item.date || ''), allListSlotDisplayName(item), allListSmallSlotAnswer(item), allListSmallSlotComiru(item), item.note || '', item.kind === '模試' ? (allListSmallSlotSubjectChanged(item) ? '〇' : '×') : '', item.kind === '模試' ? allListSmallSlotSubjectListStatus(item, subjectStatusIndex) : '');
+          row.push(allListSlotDateDisplay(item.date || ''), allListSlotDisplayName(item), allListSmallSlotAnswer(item), allListSmallSlotComiru(item), item.note || '', item.kind === '模試' ? allListSmallSlotSubjectListStatus(item, subjectStatusIndex) : '', item.kind === '模試' ? (allListSmallSlotSubjectChanged(item) ? '〇' : '×') : '');
         }else{
           row.push('', '', '', '', '', '', '');
         }
@@ -6018,6 +6032,14 @@ function buildAllStudentPrintAoaFromFullAoa(grade, fullAoa){
   const idxTeacher = allListPrintFindIndex(canon, ['担当']);
   const idxNote = allListPrintFindIndex(canon, ['備考']);
 
+  const planCols = [];
+  for(let c=0;c<header.length;c++){
+    const h = header[c];
+    if(/\n予定$/.test(h)){
+      planCols.push({col:c, label:h.replace(/\n予定$/, '').replace(/\n+/g,' ') + ' 予定'});
+    }
+  }
+
   const smallNos = [];
   for(const h of header){
     const m = h.match(/^(?:小規模\s*)?([0-9０-９]+)\s*\n日付$/);
@@ -6062,6 +6084,7 @@ function buildAllStudentPrintAoaFromFullAoa(grade, fullAoa){
   const printHeader = ['生徒番号','名前','高校','担当','備考(書き込み欄)', ...manualCols.map(x => x.label || '書き込み欄')];
   if(manualCols.length === 0) printHeader.push('書き込み欄');
   printHeader.push('模試イベント');
+  planCols.forEach(x => printHeader.push(x.label || '予定'));
 
   const out = [[`${grade} 印刷用リスト`], printHeader];
   for(let r=2;r<(fullAoa || []).length;r++){
@@ -6114,19 +6137,23 @@ function buildAllStudentPrintAoaFromFullAoa(grade, fullAoa){
     ];
     if(manualCols.length === 0) outRow.push('');
     outRow.push(lines.join('\n'));
+    planCols.forEach(x => outRow.push(allListPrintCell(row, x.col)));
     if(outRow.some(v => norm(v))) out.push(outRow);
   }
   out._manualPrintColumnCount = manualCols.length || 1;
+  out._printPlanColumnCount = planCols.length;
   return out;
 }
 function styleAllStudentPrintSheet(ws, aoa){
   const manualCount = Math.max(1, Number(aoa?._manualPrintColumnCount || 1));
-  const widths = [10, 14, 18, 12, 22, ...Array(manualCount).fill(16), 80];
-  const range = applyNiceSheetSettings(ws, aoa, widths, {rows:{min:24,max:150,header:34,pxPerLine:16}});
+  const planCount = Math.max(0, Number(aoa?._printPlanColumnCount || 0));
+  // 模試イベントを大きく、右側に3日間の予定欄を追加しても読めるように列幅を広げる。
+  const widths = [10, 14, 18, 12, 22, ...Array(manualCount).fill(16), 118, ...Array(planCount).fill(28)];
+  const range = applyNiceSheetSettings(ws, aoa, widths, {rows:{min:28,max:190,header:36,pxPerLine:18}});
   ws['!rows'][0] = {hpt:28};
   ws['!freeze'] = {xSplit:2, ySplit:2};
   ws['!pageSetup'] = {orientation:'landscape', paperSize:12, fitToWidth:1, fitToHeight:0};
-  ws['!margins'] = {left:0.12, right:0.12, top:0.20, bottom:0.20, header:0.05, footer:0.05};
+  ws['!margins'] = {left:0.08, right:0.08, top:0.18, bottom:0.18, header:0.04, footer:0.04};
   if((aoa[1] || []).length > 1){
     ws['!merges'] = ws['!merges'] || [];
     ws['!merges'].push({s:{r:0,c:0}, e:{r:0,c:(aoa[1] || []).length-1}});
@@ -6137,17 +6164,27 @@ function styleAllStudentPrintSheet(ws, aoa){
   const nameFill = {fgColor:{rgb:'F1F5F9'}};
   const manualFill = {fgColor:{rgb:'FFFBEB'}};
   const eventFill = {fgColor:{rgb:'F5F3FF'}};
+  const planFill = {fgColor:{rgb:'FFF7ED'}};
+  const missingFill = {fgColor:{rgb:'FECACA'}};
   const fontTitle = {name:'Yu Gothic', sz:14, bold:true, color:{rgb:'111827'}};
   const fontHeader = {name:'Yu Gothic', sz:9, bold:true, color:{rgb:'111827'}};
   const fontBase = {name:'Yu Gothic', sz:8, color:{rgb:'111827'}};
-  const eventCol = (aoa[1] || []).length - 1;
+  const fontMissing = {name:'Yu Gothic', sz:12, bold:true, color:{rgb:'991B1B'}};
+  const totalCols = (aoa[1] || []).length;
+  const eventCol = totalCols - 1 - planCount;
   setRangeStyle(ws, range, (R,C,cell)=>{
-    const style = {font:R===0?fontTitle:(R===1?fontHeader:fontBase), alignment:{vertical:'center', horizontal:'center', wrapText:true, shrinkToFit:true}, border};
+    const text = cell && cell.v != null ? String(cell.v) : '';
+    const hasSubjectMissing = R>1 && text.includes('科目リスト:未入力');
+    const style = {font:R===0?fontTitle:(R===1?fontHeader:(hasSubjectMissing?fontMissing:fontBase)), alignment:{vertical:'center', horizontal:'center', wrapText:true, shrinkToFit:!hasSubjectMissing}, border};
     if(R===0) style.fill = titleFill;
     else if(R===1) style.fill = headerFill;
     else if(C<=1) style.fill = nameFill;
     else if(C>=5 && C<eventCol) style.fill = manualFill;
-    else if(C===eventCol) style.fill = eventFill;
+    else if(C===eventCol) style.fill = hasSubjectMissing ? missingFill : eventFill;
+    else if(C>eventCol) style.fill = planFill;
+    if(hasSubjectMissing){
+      style.alignment = {vertical:'center', horizontal:'center', wrapText:true, shrinkToFit:false};
+    }
     return style;
   });
   return ws;
