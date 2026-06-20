@@ -3707,6 +3707,9 @@ function allListGroupTargetCountByBase(records, keyFn, visibleFn){
   for(const [k,set] of map.entries()) out.set(k, set.size);
   return out;
 }
+function allListCellText(v){
+  return String(v ?? '').replace(/\r\n/g,'\n').replace(/\r/g,'\n').trim();
+}
 function allListIsSmallTargetCount(count){
   return Number(count || 0) > 0 && Number(count || 0) <= ALL_LIST_SMALL_TARGET_LIMIT;
 }
@@ -3731,7 +3734,7 @@ function allListSmallComiruText(answered){
   return answered ? '済' : '未聞き取り';
 }
 function allListCompactStatusText(status, kind){
-  const st = allListCellText ? allListCellText(status) : String(status || '').trim();
+  const st = (typeof allListCellText === 'function') ? allListCellText(status) : String(status || '').trim();
   if(kind === 'exam'){
     if(st.includes('当日')) return '当';
     if(st.includes('後日')) return '後';
