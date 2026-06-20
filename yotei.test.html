@@ -821,7 +821,7 @@ main.wrap{max-width:none!important;height:auto!important;min-height:0!important;
 
   <section class="card">
     <p class="sectionTitle">模試マスタ</p>
-    <div class="masterGridHint">模試名・日付・対象学年/生徒を登録します。対象学年/生徒が未選択の模試は、生徒の入力欄にも印刷にも表示しません。模試型・科目型で科目候補を出し、受験科目チェックは入力欄・面談準備印刷・統合用の科目リストに反映します。</div>
+    <div class="masterGridHint">模試名・日付・対象学年/生徒を登録します。対象学年/生徒が未選択の模試は、生徒の入力欄にも印刷にも表示しません。模試マスタでは科目型だけを選択します。生徒入力欄・面談準備印刷・統合用の科目リストでは、その科目型から科目チェックを自動表示します。</div>
     <details class="advanced">
       <summary>模試マスタを編集</summary>
       <div id="examMasterPanel"></div>
@@ -2155,7 +2155,6 @@ function renderExamMasterPanel(){
     const type=ex.type||'common';
     const tmpl=ex.subjectTemplate||defaultTemplateNameForType(type);
     const targetNames=(Array.isArray(ex.students)?ex.students:splitTargetNames(ex.studentNames||'')).join('、');
-    const selectedSubjects=examMasterSubjects(ex);
     return `<div class="examMasterRow" data-master-row="${i}">
       <div><label>模試名</label><input data-master-name value="${escapeHtml(ex.name||'')}" placeholder="例：全国統一高校生テスト"></div>
       <div><label>実施日</label><input data-master-date type="date" value="${escapeHtml(ex.date||'')}"></div>
@@ -2164,7 +2163,7 @@ function renderExamMasterPanel(){
       <div><button type="button" class="small secondary" data-delete-master="${i}">削除</button></div>
       <div><label>対象学年</label><div class="checkRow">${examGradeCheckboxes(ex.grades||[])}</div></div>
       <div style="grid-column:2/-1"><label>対象生徒名</label><textarea data-master-students placeholder="未選択なら生徒欄・印刷には表示しません。例：北野、田中">${escapeHtml(targetNames)}</textarea></div>
-      <div style="grid-column:1/-1"><label>受験科目</label><div class="checkRow" data-master-subject-host>${examMasterSubjectCheckboxes(selectedSubjects)}</div><div class="hint">「模試型」「科目型」を選ぶと、受験科目チェックの初期候補になります。ここで選んだ科目が、生徒の入力欄・面談準備印刷・統合用の科目リストに反映されます。</div></div>
+      <div style="grid-column:1/-1"><div class="hint">模試マスタでは科目を一覧表示せず、科目型だけを選びます。生徒入力欄・面談準備印刷・科目リストでは、この科目型から科目チェックを自動表示します。</div></div>
     </div>`;
   }).join('')||'<div class="empty">まだ模試マスタがありません。</div>';
   $$('[data-delete-master]').forEach(btn=>btn.onclick=()=>{const arr=getExamMaster();arr.splice(Number(btn.dataset.deleteMaster),1);saveExamMasterData(arr);renderExamMasterPanel();renderStudents()});
@@ -2173,11 +2172,7 @@ function renderExamMasterPanel(){
       const row=sel.closest('.examMasterRow');
       const tmpl=row?.querySelector('[data-master-template]');
       if(tmpl) tmpl.value=defaultTemplateNameForType(sel.value || 'common');
-      updateExamMasterSubjectChecksFromTemplate(row);
     };
-  });
-  $$('.examMasterRow [data-master-template]').forEach(sel=>{
-    sel.onchange=()=>updateExamMasterSubjectChecksFromTemplate(sel.closest('.examMasterRow'));
   });
   renderSubjectTemplateEditor();
 }
@@ -2195,9 +2190,10 @@ function collectExamMasterFromPanel(){return $$('.examMasterRow').map(row=>{
     subjectTemplate,
     grades:Array.from(row.querySelectorAll('[data-master-grade]:checked')).map(x=>x.value),
     students:splitTargetNames(row.querySelector('[data-master-students]')?.value||''),
-    subjects:Array.from(row.querySelectorAll('[data-master-subject]:checked')).map(x=>x.value)
+    // 模試マスタでは科目を個別に持たず、科目型から自動展開する。
+    subjects:[]
   };
-}).filter(x=>x.name||x.date||x.grades.length||x.students.length||x.subjects.length)}
+}).filter(x=>x.name||x.date||x.grades.length||x.students.length||x.subjectTemplate)}
 function addExamMasterRow(){const arr=collectExamMasterFromPanel();arr.push({name:'',date:'',type:'common',subjectTemplate:'',grades:[],students:[]});saveExamMasterData(arr);renderExamMasterPanel()}
 function saveExamMasterFromPanel(){
   const rows=applyPreviousExamTargetsWithConfirm(collectExamMasterFromPanel());
