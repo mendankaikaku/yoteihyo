@@ -6195,7 +6195,7 @@ function buildAllStudentPrintAoaFromFullAoa(grade, fullAoa){
     const h = header[c];
     const m = h.match(/\n(予定|結果)$/);
     if(m){
-      planCols.push({col:c, label:h.replace(/\n(予定|結果)$/, '').replace(/\n+/g,' ') + ' ' + m[1]});
+      planCols.push({col:c, kind:m[1], label:h.replace(/\n(予定|結果)$/, '').replace(/\n+/g,' ') + ' ' + m[1]});
     }
   }
 
@@ -6296,7 +6296,10 @@ function buildAllStudentPrintAoaFromFullAoa(grade, fullAoa){
       ...manualCols.map(x => allListPrintCell(row, x.col))
     ];
     outRow.push(lines.join('\n'));
-    planCols.forEach(x => outRow.push(allListPrintAbbrevCell(allListPrintCell(row, x.col))));
+    planCols.forEach(x => {
+      const raw = allListPrintCell(row, x.col);
+      outRow.push(x.kind === '結果' ? cleanPosterResultText(raw) : allListPrintAbbrevCell(raw));
+    });
     if(outRow.some(v => norm(v))) out.push(outRow);
   }
   out._manualPrintColumnCount = manualCols.length;
