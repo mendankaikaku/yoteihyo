@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>予定統合アプリ完成</title>　
+  <title>予定統合アプリ</title>　
   <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
   <script src="./libs/xlsx.bundle.js"></script>
   <script>
@@ -4552,6 +4552,20 @@ function compactResultLine(r){
   const study = r.study ? `（${r.study}）` : '';
   return [time, `${title}${study}`].filter(Boolean).join(' ');
 }
+
+function buildInputNoteMapForAllList(){
+  const map = new Map();
+  const items = (state.records || [])
+    .filter(r => norm(r.rowName || '') === '備考' && norm(r.content || ''))
+    .sort((a,b)=>String(a.weekStart || a.dateKey || '').localeCompare(String(b.weekStart || b.dateKey || '')));
+  for(const r of items){
+    const key = allListStudentKeyFromRecord(r);
+    if(!key) continue;
+    map.set(key, norm(r.content || ''));
+  }
+  return map;
+}
+
 function shortExamNameForAllList(name){
   return String(name || '模試')
     .replace(/本番レベル模試/g,'本')
@@ -5221,11 +5235,16 @@ function isAllListDateDynamicHeader(h){
   return /\d{1,2}\/\d{1,2}.*\n(予定|結果)$/.test(t) || /\n(予定|結果)$/.test(t);
 }
 function allListCanonicalHeader(h){
-  const t = normalizeAllListHeaderText(h).replace(/\s+/g,'');
+  const raw = normalizeAllListHeaderText(h);
+  const t = raw.replace(/\s+/g,'');
   if(['氏名','名前'].includes(t)) return '生徒名';
   if(['生徒No','生徒Ｎｏ','番号','生徒番号'].includes(t)) return '生徒番号';
   if(['よみがな','ふりがな','フリガナ','読み'].includes(t)) return '読み仮名';
-  return normalizeAllListHeaderText(h);
+  // 旧版の「備考」は、入力用アプリと相互反映する欄として扱う。
+  if(['備考','入力用備考','個別備考','面談備考'].includes(t)) return '入力用備考';
+  // 全員分リスト内だけで保存復元するメモ欄。
+  if(['全員分リスト備考','全体備考','確認メモ','全員分備考'].includes(t)) return '全員分リスト備考';
+  return raw;
 }
 function allListRowKeyFromCells(row, header){
   const headerCanon = header.map(allListCanonicalHeader);
@@ -5328,7 +5347,7 @@ function allListStudentNameFromRow(row, headerCanon){
   return idx >= 0 ? norm(row[idx]) : '';
 }
 function allListIsIdentityCanon(canon){
-  return ['学年','生徒番号','生徒名','名前','氏名','読み仮名','担当','高校','備考'].includes(String(canon || ''));
+  return ['学年','生徒番号','生徒名','名前','氏名','読み仮名','担当','高校','入力用備考'].includes(String(canon || ''));
 }
 function allListIsManualPriorityHeader(headerText, canonText){
   const h = String(headerText || '').replace(/\s/g,'');
@@ -5409,8 +5428,9 @@ async function parseAllListRestoreFile(file){
       headerCanon.includes('読み仮名') ||
       headerCanon.includes('担当') ||
       headerCanon.includes('高校') ||
-      headerCanon.includes('備考') ||
-      header.some(h => /\n予定$|\n結果$|(?:小規模\s*)?\d+\n(日付|名称|回答|Comiru|備考|科目変更)$/.test(h));
+      headerCanon.includes('入力用備考') ||
+      headerCanon.includes('全員分リスト備考') ||
+      header.some(h => /\n予定$|\n結果$|(?:小規模\s*)?\d+\n(日付|名称|回答|Comiru|備考|科目リスト|科目変更)$/.test(h));
     if(looksLikeUpdateLog || !looksLikeAllStudentList) continue;
 
     const titleRows = aoa.slice(0, headerRow).map(row => (row || []).map(v => norm(v)));
@@ -5924,6 +5944,7 @@ function buildAllStudentListAoaByGrade(examRecords=[], eventRecords=[]){
   const {smallByStudent, smallPendingMap} = buildSmallSlotObjectsByStudent(examRecords, eventRecords);
   const windowDates = allListWindowDates();
   const {planByStudentDate, resultByStudentDate} = buildPlanResultMapsForAllList(windowDates);
+  const inputNoteByStudent = buildInputNoteMapForAllList();
 
   const gradeAoas = [];
   for(const [grade, students] of byGrade.entries()){
@@ -5937,7 +5958,7 @@ function buildAllStudentListAoaByGrade(examRecords=[], eventRecords=[]){
     for(let i=1;i<=maxSmallSlots;i++){
       extraHeaders.push(`${i}\n日付`, `${i}\n名称`, `${i}\n回答`, `${i}\nComiru`, `${i}\n備考`, `${i}\n科目リスト`, `${i}\n科目変更`);
     }
-    const header = ['学年','生徒番号','生徒名','読み仮名','担当','高校','備考', ...extraHeaders, ...examGroups.map(g=>g.label), ...eventGroups.map(g=>g.label)];
+    const header = ['学年','生徒番号','生徒名','読み仮名','担当','高校','入力用備考','全員分リスト備考', ...extraHeaders, ...examGroups.map(g=>g.label), ...eventGroups.map(g=>g.label)];
     for(const d of windowDates){
       header.push(`${mmdd(d)}(${WEEK_JA[d.getDay()]})\n予定`);
       header.push(`${mmdd(d)}(${WEEK_JA[d.getDay()]})\n結果`);
@@ -5945,7 +5966,8 @@ function buildAllStudentListAoaByGrade(examRecords=[], eventRecords=[]){
     const aoa = [[title], header];
     for(const st of students){
       const key = studentKeyForList(st.student, st.studentNo);
-      const row = [st.grade, st.studentNo, st.student, st.kana, st.teacher, st.school, allListSmallBlockStrip(st.note || '')];
+      const inputNote = inputNoteByStudent.get(key) || allListSmallBlockStrip(st.note || '');
+      const row = [st.grade, st.studentNo, st.student, st.kana, st.teacher, st.school, inputNote, ''];
       const smallItems = smallByStudent.get(key) || [];
       for(let i=0;i<maxSmallSlots;i++){
         const item = smallItems[i];
@@ -5988,7 +6010,8 @@ function styleAllStudentGradeSheet(ws, aoa){
     else if(c===3) widths.push(8);     // 読み仮名
     else if(c===4) widths.push(9);     // 担当
     else if(c===5) widths.push(10);    // 高校
-    else if(c===6) widths.push(12);    // 備考
+    else if(c===6) widths.push(16);    // 入力用備考
+    else if(c===7) widths.push(18);    // 全員分リスト備考
     else if(/(?:小規模\s*)?\d+\n日付$/.test(h)) widths.push(9);
     else if(/(?:小規模\s*)?\d+\n名称$/.test(h)) widths.push(16);
     else if(/(?:小規模\s*)?\d+\n回答$/.test(h)) widths.push(7);
@@ -6049,7 +6072,7 @@ function styleAllStudentGradeSheet(ws, aoa){
     if(R===0) style.fill = titleFill;
     else if(R===1) style.fill = headerFill;
     else if(C<=2) style.fill = nameFill;
-    else if(R>1 && C>=7){
+    else if(R>1 && C>=8){
       if(headerText.includes('\n予定')) style.fill = planFill;
       else if(headerText.includes('\n結果')) style.fill = resultFill;
       else if(isExtra) style.fill = extraFill;
@@ -6100,7 +6123,8 @@ function buildAllStudentPrintAoaFromFullAoa(grade, fullAoa){
   const idxName = allListPrintFindIndex(canon, ['生徒名']);
   const idxSchool = allListPrintFindIndex(canon, ['高校']);
   const idxTeacher = allListPrintFindIndex(canon, ['担当']);
-  const idxNote = allListPrintFindIndex(canon, ['備考']);
+  const idxInputNote = allListPrintFindIndex(canon, ['入力用備考','備考']);
+  const idxAllListNote = allListPrintFindIndex(canon, ['全員分リスト備考','確認メモ']);
 
   const planCols = [];
   for(let c=0;c<header.length;c++){
@@ -6139,7 +6163,7 @@ function buildAllStudentPrintAoaFromFullAoa(grade, fullAoa){
   // 手で追加した列を印刷用にも出す。
   // 標準列・小規模列・人数多い模試/イベント列・3日予定結果列以外を「手追加列」とみなす。
   const manualCols = [];
-  const identity = new Set(['学年','生徒番号','生徒名','読み仮名','担当','高校','備考']);
+  const identity = new Set(['学年','生徒番号','生徒名','読み仮名','担当','高校','入力用備考','全員分リスト備考']);
   for(let c=0;c<header.length;c++){
     const h = header[c];
     const hc = canon[c];
@@ -6151,7 +6175,7 @@ function buildAllStudentPrintAoaFromFullAoa(grade, fullAoa){
     manualCols.push({col:c, label:h.replace(/\n+/g, ' ')});
   }
 
-  const printHeader = ['生徒番号','名前','高校','担当','備考(書き込み欄)', ...manualCols.map(x => x.label || '書き込み欄')];
+  const printHeader = ['生徒番号','名前','高校','担当','入力用備考','全員分リスト備考', ...manualCols.map(x => x.label || '書き込み欄')];
   printHeader.push('模試イベント');
   planCols.forEach(x => printHeader.push(x.label || '予定'));
 
@@ -6201,7 +6225,8 @@ function buildAllStudentPrintAoaFromFullAoa(grade, fullAoa){
       allListPrintCell(row, idxName),
       allListPrintCell(row, idxSchool),
       allListPrintCell(row, idxTeacher),
-      allListPrintCell(row, idxNote),
+      allListPrintCell(row, idxInputNote),
+      allListPrintCell(row, idxAllListNote),
       ...manualCols.map(x => allListPrintCell(row, x.col))
     ];
     outRow.push(lines.join('\n'));
@@ -6216,7 +6241,7 @@ function styleAllStudentPrintSheet(ws, aoa){
   const manualCount = Math.max(0, Number(aoa?._manualPrintColumnCount || 0));
   const planCount = Math.max(0, Number(aoa?._printPlanColumnCount || 0));
   // 模試イベントを大きく、右側に3日間の予定欄を追加しても読めるように列幅を広げる。
-  const widths = [10, 10, 6, 6, 22, ...Array(manualCount).fill(16), 155, ...Array(planCount).fill(28)];
+  const widths = [10, 14, 18, 12, 22, 22, ...Array(manualCount).fill(16), 155, ...Array(planCount).fill(28)];
   const range = applyNiceSheetSettings(ws, aoa, widths, {rows:{min:28,max:190,header:36,pxPerLine:18}});
   ws['!rows'][0] = {hpt:28};
   ws['!freeze'] = {xSplit:2, ySplit:2};
@@ -6254,7 +6279,7 @@ function styleAllStudentPrintSheet(ws, aoa){
     if(R===0) style.fill = titleFill;
     else if(R===1) style.fill = headerFill;
     else if(C<=1) style.fill = nameFill;
-    else if(C>=5 && C<eventCol) style.fill = manualFill;
+    else if(C>=6 && C<eventCol) style.fill = manualFill;
     else if(C===eventCol) style.fill = hasNeedsHearing ? missingFill : eventFill;
     else if(C>eventCol) style.fill = planFill;
     if(hasNeedsHearing){
