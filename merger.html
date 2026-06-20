@@ -3650,6 +3650,14 @@ function posterShortCourseName(text){
   const cut = s.split(/連続で実施|初回合格|確認テスト|終了判定テスト|判定テスト/)[0].trim();
   return cut || s;
 }
+
+function monthlyPosterAchievementCourseOnly(rec){
+  return posterShortCourseName(rec.study) || posterShortCourseName(rec.result) || norm(rec.study) || norm(rec.result);
+}
+function monthlyPosterAchievementDateText(rec){
+  return rec.dateObj ? `${rec.dateObj.getMonth()+1}/${rec.dateObj.getDate()}(${WEEK_JA[rec.dateObj.getDay()]})` : (rec.dateLabel || rec.dateKey || '');
+}
+
 function monthlyPosterAchievementContent(rec){
   const dateText = rec.dateObj ? `${rec.dateObj.getMonth()+1}/${rec.dateObj.getDate()}(${WEEK_JA[rec.dateObj.getDay()]})` : (rec.dateLabel || '');
   const course = posterShortCourseName(rec.study) || posterShortCourseName(rec.result) || norm(rec.study) || norm(rec.result);
@@ -3724,12 +3732,24 @@ function buildMonthlyPosterResultAoa(records, rule, label){
   const dedupedRecords = dedupeAchievementRecordsByOldestDate(matchedRecords);
 
   const rows = dedupedRecords
-    .map(r => ({...resultPosterStudentMeta(r), content:monthlyPosterAchievementContent(r), dateKey:r.dateKey || '', timeLabel:r.timeLabel || ''}))
-    .sort((a,b)=> String(a.grade||'').localeCompare(String(b.grade||''),'ja') || String(a.kana || a.student).localeCompare(String(b.kana || b.student),'ja') || String(a.dateKey).localeCompare(String(b.dateKey)) || String(a.timeLabel).localeCompare(String(b.timeLabel)));
+    .map(r => ({
+      ...resultPosterStudentMeta(r),
+      content: monthlyPosterAchievementCourseOnly(r),
+      hiddenDate: monthlyPosterAchievementDateText(r),
+      dateKey:r.dateKey || '',
+      timeLabel:r.timeLabel || ''
+    }))
+    // 修得・完全修得は、日付が古いものを上に表示する。
+    .sort((a,b)=>
+      String(a.dateKey).localeCompare(String(b.dateKey)) ||
+      String(a.timeLabel).localeCompare(String(b.timeLabel)) ||
+      String(a.grade||'').localeCompare(String(b.grade||''),'ja') ||
+      String(a.kana || a.student).localeCompare(String(b.kana || b.student),'ja')
+    );
   const title = `${label}　${rule.keyword}`;
-  const aoa = [[title], ['学年','氏名','内容']];
-  for(const r of rows) aoa.push([r.grade, r.student, r.content]);
-  if(rows.length === 0) aoa.push(['', '', '該当なし']);
+  const aoa = [[title], ['学年','氏名','内容','日付']];
+  for(const r of rows) aoa.push([r.grade, r.student, r.content, r.hiddenDate]);
+  if(rows.length === 0) aoa.push(['', '', '該当なし', '']);
   return posterMoveNoHitRowsToBottom(aoa);
 }
 function styleMonthlyPosterSheet(ws, aoa){
