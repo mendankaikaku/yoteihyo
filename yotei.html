@@ -2040,16 +2040,32 @@ function applyPreviousExamTargetsWithConfirm(rows){
     return Object.assign({},ex,{grades:[...(previous.grades||[])],students:[...(previous.students||[])]});
   });
 }
+function examMasterVisibleWindow(){
+  const baseStr=$('#weekStart')?.value || new Date().toISOString().slice(0,10);
+  const from=new Date(baseStr+'T00:00:00');
+  const to=new Date(from);
+  to.setMonth(to.getMonth()+2);
+  to.setHours(23,59,59,999);
+  return {from,to};
+}
+function isExamMasterVisibleInPanel(ex){
+  if(!ex || !ex.date) return true; // 日付未入力の新規行は表示する
+  const {from,to}=examMasterVisibleWindow();
+  const d=new Date(String(ex.date)+'T00:00:00');
+  if(Number.isNaN(d.getTime())) return true;
+  return d>=from && d<=to;
+}
 function renderExamMasterPanel(){
   const host=$('#examMasterPanel');
   const rows=getExamMaster();
-  const templates=getSubjectTemplates();
-  const templateOptions=(selected)=>templates.map(t=>`<option value="${escapeHtml(t.name)}" ${t.name===(selected||'')?'selected':''}>${escapeHtml(t.name)}</option>`).join('');
-  host.innerHTML=rows.map((ex,i)=>{
-    const tmpl=ex.subjectTemplate||defaultTemplateNameForType(ex.type||'common');
+  const visibleRows=rows.map((ex,i)=>({ex,i})).filter(item=>isExamMasterVisibleInPanel(item.ex));
+  const hiddenCount=Math.max(0, rows.length-visibleRows.length);
+  const info=`<div class="hint" style="margin:4px 0 8px;">表示中：${visibleRows.length}件 / 登録済み：${rows.length}件（開始日 ${escapeHtml($('#weekStart')?.value||'今日')} から2か月以内のみ表示${hiddenCount?`・非表示 ${hiddenCount}件は保存時も消えません`:''}）</div>`;
+  const body=visibleRows.map(({ex,i})=>{
     const targetNames=(Array.isArray(ex.students)?ex.students:splitTargetNames(ex.studentNames||'')).join('、');
     return `<div class="examMasterRow" data-master-row="${i}"><div><label>模試名</label><input data-master-name value="${escapeHtml(ex.name||'')}" placeholder="例：全国統一高校生テスト"></div><div><label>実施日</label><input data-master-date type="date" value="${escapeHtml(ex.date||'')}"></div><div><label>対象学年</label><div class="checkRow">${examGradeCheckboxes(ex.grades||[])}</div></div><div><label>対象生徒名</label><textarea data-master-students placeholder="空欄なら対象なし。例：北野、田中">${escapeHtml(targetNames)}</textarea></div><div><button type="button" class="small secondary" data-delete-master="${i}">削除</button></div></div>`;
-  }).join('')||'<div class="empty">まだ模試マスタがありません。</div>';
+  }).join('');
+  host.innerHTML=info+(body||'<div class="empty">開始日から2か月以内に表示対象の模試はありません。追加ボタンで新規登録できます。</div>');
   $$('[data-delete-master]').forEach(btn=>btn.onclick=()=>{const arr=getExamMaster();arr.splice(Number(btn.dataset.deleteMaster),1);saveExamMasterData(arr);renderExamMasterPanel();renderStudents()});
   renderSubjectTemplateEditor();
 }
@@ -2057,15 +2073,32 @@ function examGradeCheckboxes(selected=[]){
   const set=new Set(selected||[]);
   return GRADE_OPTIONS.filter(Boolean).map(g=>`<label><input type="checkbox" data-master-grade value="${escapeHtml(g)}" ${set.has(g)?'checked':''}>${escapeHtml(g)}</label>`).join('');
 }
-function collectExamMasterFromPanel(){return $$('.examMasterRow').map(row=>({
-  name:row.querySelector('[data-master-name]')?.value.trim()||'',
-  date:row.querySelector('[data-master-date]')?.value||'',
-  type:'common',
-  subjectTemplate:'',
-  grades:Array.from(row.querySelectorAll('[data-master-grade]:checked')).map(x=>x.value),
-  students:splitTargetNames(row.querySelector('[data-master-students]')?.value||'')
-})).filter(x=>x.name||x.date||x.grades.length||x.students.length)}
+function collectExamMasterFromPanel(){
+  const arr=getExamMaster().map(ex=>Object.assign({},ex));
+  $$('.examMasterRow').forEach(row=>{
+    const idx=Number(row.dataset.masterRow);
+    const item={
+      name:row.querySelector('[data-master-name]')?.value.trim()||'',
+      date:row.querySelector('[data-master-date]')?.value||'',
+      type:'common',
+      subjectTemplate:'',
+      grades:Array.from(row.querySelectorAll('[data-master-grade]:checked')).map(x=>x.value),
+      students:splitTargetNames(row.querySelector('[data-master-students]')?.value||'')
+    };
+    if(Number.isFinite(idx) && idx>=0) arr[idx]=item;
+    else arr.push(item);
+  });
+  return arr.filter(x=>x && (x.name||x.date||(x.grades||[]).length||(x.students||[]).length));
+}
 function addExamMasterRow(){const arr=collectExamMasterFromPanel();arr.push({name:'',date:'',type:'common',subjectTemplate:'',grades:[],students:[],targetMode:'none'});saveExamMasterData(arr);renderExamMasterPanel()}
+function bindExamMasterWindowRefresh(){
+  const week=document.getElementById('weekStart');
+  if(!week || week.dataset.examMasterWindowBound==='1') return;
+  week.dataset.examMasterWindowBound='1';
+  week.addEventListener('change', function(){
+    if(typeof renderExamMasterPanel==='function') renderExamMasterPanel();
+  });
+}
 function saveExamMasterFromPanel(){
   const rows=collectExamMasterFromPanel();
   saveExamMasterData(rows);
@@ -5292,6 +5325,7 @@ renderStudents=function(){
   v33ResetStudentScrollLeft();
 };
 
+bindExamMasterWindowRefresh();
 init();
 initV32();
 initRealAppUX();
