@@ -3951,6 +3951,76 @@ function styleHighSpeedRankingSheet(ws, aoa){
     return style;
   });
 }
+
+function formatLogRowsForDailyDiagnosis(rows, limit=60){
+  const arr = (rows || []).slice(-limit);
+  if(!arr.length) return 'なし';
+  return arr.map(r => {
+    const a = Array.isArray(r) ? r : [String(r)];
+    return a.map(x => norm(x)).filter(Boolean).join(' / ');
+  }).join('\n');
+}
+function summarizeResultSourcesForDailyDiagnosis(records){
+  const map = new Map();
+  for(const r of records || []){
+    const key = [r.sourceFile || '不明ファイル', r.sourceSheet || '不明シート', r.sourceFormat || ''].filter(Boolean).join(' / ');
+    map.set(key, (map.get(key) || 0) + 1);
+  }
+  if(!map.size) return '結果recordsなし';
+  return [...map.entries()].sort((a,b)=>b[1]-a[1]).slice(0,12).map(([k,v])=>`${k}: ${v}件`).join('\n');
+}
+function sampleResultLinesForDailyDiagnosis(records, limit=8){
+  const arr = (records || []).slice(0, limit);
+  if(!arr.length) return 'サンプルなし';
+  return arr.map(resultDebugLine).join('\n');
+}
+function diagnoseHighSpeedSheetsForDaily(sheets, from, to){
+  const lines = [];
+  for(const sh of sheets || []){
+    const aoa = sheetObjectToAoa(sh).filter(row => (row || []).some(v => norm(v)));
+    if(!aoa.length){
+      lines.push(`${sh.sourceFile || ''}/${sh.sheetName || ''}: 空`);
+      continue;
+    }
+    let hr = findHeaderRowIndexByKeywords(aoa, ['正解数','不正解数']);
+    if(hr < 0) hr = findHeaderRowIndexByKeywords(aoa, ['合格数']);
+    if(hr < 0){
+      const headSample = aoa.slice(0,3).map((row,i)=>`${i+1}行目:${(row||[]).slice(0,8).map(norm).join('|')}`).join(' / ');
+      lines.push(`${sh.sourceFile || ''}/${sh.sheetName || ''}: 高速ランキング用見出しなし / ${headSample}`);
+      continue;
+    }
+    const header = aoa[hr] || [];
+    const idx = {
+      date: headerIndexIncludes(header, ['日付','日時']),
+      studentNo: headerIndexIncludes(header, ['生徒番号','番号','ID']),
+      student: headerIndexIncludes(header, ['生徒名','氏名','名前']),
+      correct: headerIndexIncludes(header, ['合格数','正解数']),
+      incorrect: headerIndexIncludes(header, ['不正解数']),
+      pass: headerIndexIncludes(header, ['合否','合格','判定'])
+    };
+    let totalRows = 0, dateOkRows = 0, scoreRows = 0, usedRows = 0;
+    const samples = [];
+    for(let r=hr+1;r<aoa.length;r++){
+      const row = aoa[r] || [];
+      if(!row.some(v=>norm(v))) continue;
+      totalRows++;
+      const dt = idx.date >= 0 ? parseDateLoose(row[idx.date]) : null;
+      const correct = idx.correct >= 0 ? numberLoose(row[idx.correct]) : 0;
+      const incorrect = idx.incorrect >= 0 ? numberLoose(row[idx.incorrect]) : 0;
+      if(dt && dt >= from && dt <= to) dateOkRows++;
+      if(correct || incorrect) scoreRows++;
+      if(dt && dt >= from && dt <= to && (correct || incorrect)){
+        usedRows++;
+        if(samples.length < 3){
+          samples.push(`${ymd(dt)} ${norm(idx.student>=0?row[idx.student]:'')} 正解${correct} 不正解${incorrect}`);
+        }
+      }
+    }
+    lines.push(`${sh.sourceFile || ''}/${sh.sheetName || ''}: 見出し${hr+1}行目 / 日付列=${idx.date+1} / 正解数列=${idx.correct+1} / データ行${totalRows} / 対象日${ymd(from)}の行${dateOkRows} / 点数あり${scoreRows} / ランキング採用${usedRows}${samples.length ? ' / 例: '+samples.join(' / ') : ''}`);
+  }
+  return lines.join('\n') || 'シートなし';
+}
+
 async function downloadMonthlyPosterResultWorkbook(){
   if(!state.resultFiles.length && !state.resultHistoryFiles.length && !state.resultRecords.length){
     alert('毎日更新.xlsxまたは結果履歴JSONを選択してください。');
@@ -3959,12 +4029,22 @@ async function downloadMonthlyPosterResultWorkbook(){
   $('downloadMonthlyPosterBtn').disabled = true;
   try{
     log('毎日更新を作成中...\n連続実施と高速基礎ランキングは前日1日分、修得系は今月分から抽出しています。');
-    let allResults = state.resultRecords && state.resultRecords.length ? state.resultRecords : (await loadMonthlyPosterResultsDirectly()).records;
+
+    // 毎日更新出力は、画面上の古い統合結果に引っ張られないように、毎回JSON＋毎日更新.xlsxを直接読み直す。
+    const directLoaded = await loadMonthlyPosterResultsDirectly();
+    let allResults = directLoaded.records || [];
+    let sourceMode = 'JSON＋毎日更新.xlsxを直接読込';
+    if(!allResults.length && state.resultRecords && state.resultRecords.length){
+      allResults = state.resultRecords;
+      sourceMode = '直接読込0件のため、画面上の統合結果を使用';
+    }
     allResults = mergeResultRecordsUnique(allResults);
+
     const month = monthRangeForOpenedPage(new Date());
     const yesterday = previousDayRangeForOpenedPage(new Date());
     const monthResults = allResults.filter(r => inDateRange(r, month.from, month.to));
     const yesterdayResults = allResults.filter(r => inDateRange(r, yesterday.from, yesterday.to));
+
     const wb = XLSX.utils.book_new();
     const used = new Set();
     for(const rule of MONTHLY_POSTER_RESULT_RULES){
@@ -3976,6 +4056,7 @@ async function downloadMonthlyPosterResultWorkbook(){
       styleMonthlyPosterSheet(ws, mergedAoa);
       XLSX.utils.book_append_sheet(wb, ws, uniqueSheetName(rule.sheetName, used));
     }
+
     const rawSheets = await loadRawResultSheetsDirectly();
     const highSpeedRows = extractHighSpeedRowsFromSheets(rawSheets.sheets, yesterday.from, yesterday.to);
     const rankingAoa = buildHighSpeedRankingAoa(highSpeedRows, yesterday.label);
@@ -3983,12 +4064,50 @@ async function downloadMonthlyPosterResultWorkbook(){
     const rankingWs = aoaToSheet(rankingAoa);
     styleHighSpeedRankingSheet(rankingWs, rankingAoa);
     XLSX.utils.book_append_sheet(wb, rankingWs, uniqueSheetName('高速基礎ランキング', used));
+
     XLSX.writeFile(wb, `校舎掲示用_毎日更新_${ymd(month.from)}-${ymd(month.to)}.xlsx`);
+
     const counts = MONTHLY_POSTER_RESULT_RULES.map(rule => {
       const src = rule.keyword === '連続で実施' ? yesterdayResults : monthResults;
       return `${rule.keyword}: ${src.filter(r => resultKeywordMatches(r, rule.keyword)).length}件`;
     }).join('\n');
-    log(`毎日更新を作成しました\n連続実施・高速基礎ランキング対象日: ${ymd(yesterday.from)}\n修得系対象期間: ${ymd(month.from)}〜${ymd(month.to)}\n${counts}\n高速基礎ランキング: ${highSpeedRows.length}件`);
+    const achAll = allResults.filter(isAchievementResultRecord);
+    const achMonth = monthResults.filter(isAchievementResultRecord);
+    const hsDiag = diagnoseHighSpeedSheetsForDaily(rawSheets.sheets, yesterday.from, yesterday.to);
+
+    log(`毎日更新を作成しました
+連続実施・高速基礎ランキング対象日: ${ymd(yesterday.from)}
+修得系対象期間: ${ymd(month.from)}〜${ymd(month.to)}
+${counts}
+高速基礎ランキング: ${highSpeedRows.length}件
+
+--- 毎日更新読取診断 ---
+読込モード: ${sourceMode}
+選択中の毎日更新.xlsx: ${state.resultFiles.length}件
+選択中のresult_history.json: ${state.resultHistoryFiles.length}件
+読込後records合計: ${allResults.length}件
+今月records: ${monthResults.length}件
+前日records: ${yesterdayResults.length}件
+修得系records合計: ${achAll.length}件
+今月修得系records: ${achMonth.length}件
+
+--- recordsの出どころ ---
+${summarizeResultSourcesForDailyDiagnosis(allResults)}
+
+--- recordsサンプル ---
+${sampleResultLinesForDailyDiagnosis(allResults)}
+
+--- JSON/毎日更新.xlsx 読取ログ ---
+${formatLogRowsForDailyDiagnosis(directLoaded.logRows, 80)}
+
+--- 高速マスターシート診断 ---
+元シート数: ${(rawSheets.sheets || []).length}
+高速基礎ランキング採用行: ${highSpeedRows.length}
+${diagnoseHighSpeedSheetsForDaily(rawSheets.sheets, yesterday.from, yesterday.to)}
+
+--- 元シート読取ログ ---
+${formatLogRowsForDailyDiagnosis(rawSheets.logRows, 40)}
+`);
   }catch(e){
     alert(e.message || String(e));
     log('毎日更新の作成に失敗しました。');
