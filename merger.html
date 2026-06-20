@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>予定統合アプリｑｑ</title>　
+  <title>予定統合アプリ</title>　
   <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
   <script src="./libs/xlsx.bundle.js"></script>
   <script>
@@ -1567,10 +1567,11 @@ function getResultHeaderMap(aoa){
     student: find(["フルネーム","名前","生徒名","氏名","生徒氏名","氏名漢字"]),
     grade: find(["学年"]),
     type: find(["区分"]),
-    study: find(["学習内容","講座","コンテンツ"]),
-    result: find(["毎日更新","結果","内容"]),
+    study: find(["学習内容","学習講座","講座","コンテンツ"]),
+    // ここが弱かった：新しい1枚目シートのF列「学習結果」を結果列として認識する。
+    result: find(["学習結果","毎日更新","結果","学習状況","ステータス","内容"]),
     like: find(["いいね"]),
-    datetime: find(["日時","日付","時刻","実施日時"])
+    datetime: find(["日時","日付","時刻","実施日時","更新日時"])
   };
 }
 
@@ -1623,19 +1624,19 @@ function summarizeResult(study, result){
 
 function looksLikeResultHeader(row){
   const joined = (row || []).map(v => norm(v)).join("|");
-  return /生徒番号|名前|生徒名|学習内容|毎日更新|日時|区分/.test(joined);
+  return /生徒番号|名前|生徒名|学習内容|学習結果|毎日更新|日時|区分/.test(joined);
 }
 
 function fixedResultHeaderMap(){
   // 列名なし毎日更新.xlsx用の固定レイアウト
-  // A:生徒番号 B:フルネーム C:学年 D:区分 E:学習内容 F:毎日更新 G:いいね H:日時
+  // A:生徒番号 B:フルネーム C:学年 D:区分 E:学習内容 F:学習結果(旧:毎日更新) G:いいね H:日時
   return {studentNo:0, student:1, grade:2, type:3, study:4, result:5, like:6, datetime:7};
 }
 
 function fixedTwoRowResultMap(){
   // 2行1セット形式も、列配置は従来形式と同じ A〜H 固定。
   // 上の行: A:生徒番号 B:名前 C:学年 D:区分 E/F:空白 G:いいね H:日時
-  // 下の行: A〜D:空白 E:学習内容 F:毎日更新 G:いいねなど H:空白
+  // 下の行: A〜D:空白 E:学習内容 F:学習結果(旧:毎日更新) G:いいねなど H:空白
   return {studentNo:0, student:1, grade:2, type:3, study:4, result:5, like:6, datetime:7};
 }
 
@@ -1682,7 +1683,7 @@ function looksLikeTwoRowDetailRow(row){
 
 function looksLikeTwoRowHeaderPair(top, bottom){
   const joined = `${(top || []).map(v=>norm(v)).join('|')}|${(bottom || []).map(v=>norm(v)).join('|')}`;
-  return /生徒番号/.test(joined) && /学習内容/.test(joined) && /毎日更新/.test(joined);
+  return /生徒番号/.test(joined) && /学習内容/.test(joined) && /(学習結果|毎日更新|結果)/.test(joined);
 }
 
 function parseTwoRowResultSheet(aoa, file, sheetName){
@@ -1739,7 +1740,7 @@ function parseOneRowResultSheet(aoa, file, sheetName){
   const startRow = hasHeader ? 1 : 0;
 
   if(h.study < 0 || h.result < 0 || h.datetime < 0){
-    logRows.push([file.name, "注意", `毎日更新.xlsxの列不足のためスキップ: ${sheetName}`, "1行形式は A:生徒番号 B:名前 C:学年 D:区分 E:学習内容 F:毎日更新 G:いいね H:日時。2行形式は1行目=A〜D生徒情報/E-F空白、2行目=A〜D空白/E学習内容/F毎日更新、日時は上下どちらかのH列が必要です"]);
+    logRows.push([file.name, "注意", `結果データExcelの列不足のためスキップ: ${sheetName}`, "1行形式は A:生徒番号 B:名前 C:学年 D:区分 E:学習内容 F:学習結果(旧:毎日更新/結果) G:いいね H:日時。2行形式は1行目=A〜D生徒情報/E-F空白、2行目=A〜D空白/E学習内容/F学習結果、日時は上下どちらかのH列が必要です"]);
     return {records, logRows};
   }
   let count = 0;
@@ -1761,7 +1762,7 @@ function parseOneRowResultSheet(aoa, file, sheetName){
     if(!rawName && row.length > 1) rawName = norm(row[1]);
     const student = resolveResultStudent(rawName, studentNo);
     if(!student && !rawName && !studentNo){
-      logRows.push([file.name, "注意", `氏名・生徒番号が空のため未照合: ${sheetName} ${r+1}行目`, `学年=${h.grade>=0?norm(row[h.grade]):""} / 学習内容=${study} / 結果=${result}`]);
+      logRows.push([file.name, "注意", `氏名・生徒番号が空のため未照合: ${sheetName} ${r+1}行目`, `学年=${h.grade>=0?norm(row[h.grade]):""} / 学習内容=${study} / 学習結果=${result}`]);
     }
     const grade = h.grade >= 0 ? norm(row[h.grade]) : "";
     const type = h.type >= 0 ? norm(row[h.type]) : "";
@@ -2262,10 +2263,21 @@ function resultKeywordMatches(r, keyword){
   const k = norm(keyword);
   const text = resultFullText(r);
   if(!k) return true;
+
+  const isCompleteKeyword = /完全(修得|習得)|講座を?完全(修得|習得)/.test(k);
+  const isNormalKeyword = /講座を?(修得|習得)|\b修得\b|\b習得\b|修得|習得/.test(k) && !isCompleteKeyword;
+
+  // 完全修得は普通の「修得」と混ざらないように先に判定する。
+  if(isCompleteKeyword){
+    return /講座を?完全(修得|習得)|完全(修得|習得)/.test(text);
+  }
+
+  // 修得は「完全修得」も広義には修得だが、通常シートを分けたい場合は完全を除外する。
+  if(isNormalKeyword){
+    return /講座を?(修得|習得)|修得|習得/.test(text) && !/講座を?完全(修得|習得)|完全(修得|習得)/.test(text);
+  }
+
   if(text.includes(k)) return true;
-  // 「習得」と「修得」の表記ゆれを許可。毎日更新側は「修得」、掲示ルール側は「習得」などでも拾う。
-  if(/修得|習得/.test(k)) return /修得|習得/.test(text);
-  if(/完全修得|完全習得/.test(k)) return /完全(修得|習得)|講座を完全(修得|習得)/.test(text);
   return false;
 }
 
