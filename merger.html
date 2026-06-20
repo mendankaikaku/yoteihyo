@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>予定統合アプリ</title>　
+  <title>予定統合アプリああ</title>　
   <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
   <script src="./libs/xlsx.bundle.js"></script>
   <script>
@@ -4868,7 +4868,7 @@ function buildAllStudentListAoaByGrade(examRecords=[], eventRecords=[]){
     }
     const extraHeaders = [];
     for(let i=1;i<=maxSmallSlots;i++){
-      extraHeaders.push(`${i}\n日付`, `${i}\n名称`, `${i}\n回答`, `${i}\n科目変更`, `${i}\nComiru`, `${i}\n備考`);
+      extraHeaders.push(`${i}\n日付`, `${i}\n名称`, `${i}\n回答`, `${i}\nComiru`, `${i}\n備考`, `${i}\n科目変更`);
     }
     const header = ['学年','生徒番号','生徒名','読み仮名','担当','高校','備考', ...extraHeaders, ...examGroups.map(g=>g.label), ...eventGroups.map(g=>g.label)];
     for(const d of windowDates){
@@ -4883,7 +4883,7 @@ function buildAllStudentListAoaByGrade(examRecords=[], eventRecords=[]){
       for(let i=0;i<maxSmallSlots;i++){
         const item = smallItems[i];
         if(item){
-          row.push(allListSlotDateDisplay(item.date || ''), allListSlotDisplayName(item), allListSmallSlotAnswer(item), item.kind === '模試' ? (allListSmallSlotSubjectChanged(item) ? '〇' : '×') : '', allListSmallSlotComiru(item), item.note || '');
+          row.push(allListSlotDateDisplay(item.date || ''), allListSlotDisplayName(item), allListSmallSlotAnswer(item), allListSmallSlotComiru(item), item.note || '', item.kind === '模試' ? (allListSmallSlotSubjectChanged(item) ? '〇' : '×') : '');
         }else{
           row.push('', '', '', '', '', '');
         }
@@ -5021,7 +5021,7 @@ async function downloadAllStudentList(){
     XLSX.writeFile(wb, `全員分リスト_学年別_B4横_${ymd(base)}基準.xlsx`);
     if(typeof log === 'function'){
       const count = Math.max(0, (state.allListUpdateLog?.length || 1) - 1);
-      log(`全員分リストを出力しました。\n対象人数が少ない模試・イベントは、各生徒ごとの追加スロット列にまとめました。列数は学年内の最大対象数に合わせて自動で増えます。回答・科目変更・Comiruはプルダウンで更新できます。\n手修正・自動データの衝突ログ: ${count}件${count ? '\nExcel内の「更新ログ」シートを確認してください。' : ''}`);
+      log(`全員分リストを出力しました。\n対象人数が少ない模試・イベントは、各生徒ごとの追加スロット列にまとめました。列数は学年内の最大対象数に合わせて自動で増えます。回答・Comiru・科目変更はプルダウンで更新できます。\n手修正・自動データの衝突ログ: ${count}件${count ? '\nExcel内の「更新ログ」シートを確認してください。' : ''}`);
     }
   }catch(e){
     console.error('全員分リスト出力エラー', e);
