@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>予定統合アプリあ</title>　
+  <title>予定統合アプリ</title>　
   <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
   <script src="./libs/xlsx.bundle.js"></script>
   <script>
@@ -6193,8 +6193,9 @@ function buildAllStudentPrintAoaFromFullAoa(grade, fullAoa){
   const planCols = [];
   for(let c=0;c<header.length;c++){
     const h = header[c];
-    if(/\n予定$/.test(h)){
-      planCols.push({col:c, label:h.replace(/\n予定$/, '').replace(/\n+/g,' ') + ' 予定'});
+    const m = h.match(/\n(予定|結果)$/);
+    if(m){
+      planCols.push({col:c, label:h.replace(/\n(予定|結果)$/, '').replace(/\n+/g,' ') + ' ' + m[1]});
     }
   }
 
@@ -6299,7 +6300,7 @@ function buildAllStudentPrintAoaFromFullAoa(grade, fullAoa){
     if(outRow.some(v => norm(v))) out.push(outRow);
   }
   out._manualPrintColumnCount = manualCols.length;
-  out._printPlanColumnCount = planCols.length;
+  out._printPlanColumnCount = planCols.length; // 3日間の予定・結果列数
   return out;
 }
 
@@ -6351,8 +6352,8 @@ function styleAllStudentPrintSheet(ws, aoa){
   const fontTitle = {name:'Yu Gothic', sz:14, bold:true, color:{rgb:'111827'}};
   const fontHeader = {name:'Yu Gothic', sz:9, bold:true, color:{rgb:'111827'}};
   const fontBase = {name:'Yu Gothic', sz:8, color:{rgb:'111827'}};
-  // 赤セル文字は名前/通常文字(sz:8)の1.5倍。
-  const fontMissing = {name:'Yu Gothic', sz:12, bold:true, color:{rgb:'991B1B'}};
+  // 赤セル文字は名前/通常文字と同じサイズ。
+  const fontMissing = {name:'Yu Gothic', sz:8, bold:true, color:{rgb:'991B1B'}};
   const totalCols = (aoa[1] || []).length;
   const eventCol = totalCols - 1 - planCount;
   setRangeStyle(ws, range, (R,C,cell)=>{
