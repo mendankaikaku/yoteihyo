@@ -2809,6 +2809,66 @@ function applyPosterAbbrevDictionary(text){
   return s.replace(/\s+/g, " ").trim();
 }
 
+
+function allListPrintCircledNumber(n){
+  const num = Number(String(n ?? '').replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0)-0xFEE0)));
+  if(!Number.isFinite(num) || num <= 0) return String(n ?? '');
+  const circled = {
+    1:'①',2:'②',3:'③',4:'④',5:'⑤',6:'⑥',7:'⑦',8:'⑧',9:'⑨',10:'⑩',
+    11:'⑪',12:'⑫',13:'⑬',14:'⑭',15:'⑮',16:'⑯',17:'⑰',18:'⑱',19:'⑲',20:'⑳',
+    21:'㉑',22:'㉒',23:'㉓',24:'㉔',25:'㉕',26:'㉖',27:'㉗',28:'㉘',29:'㉙',30:'㉚',
+    31:'㉛',32:'㉜',33:'㉝',34:'㉞',35:'㉟',36:'㊱',37:'㊲',38:'㊳',39:'㊴',40:'㊵',
+    41:'㊶',42:'㊷',43:'㊸',44:'㊹',45:'㊺',46:'㊻',47:'㊼',48:'㊽',49:'㊾',50:'㊿'
+  };
+  return circled[num] || String(num);
+}
+function allListPrintLectureNumberToCircle(text){
+  return String(text ?? '')
+    .replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0)-0xFEE0))
+    // 「/ 第26講」「：第26講」などは、印刷用では講座名の直後に丸数字として詰める。
+    .replace(/\s*[\/／]\s*第?\s*(\d{1,2})\s*(講|回)/g, (_, n) => allListPrintCircledNumber(n))
+    .replace(/\s*[：:]\s*第?\s*(\d{1,2})\s*(講|回)/g, (_, n) => allListPrintCircledNumber(n))
+    .replace(/第\s*(\d{1,2})\s*(講|回)/g, (_, n) => allListPrintCircledNumber(n))
+    .replace(/(^|[^\d])(\d{1,2})\s*(講|回)/g, (_, p, n) => `${p}${allListPrintCircledNumber(n)}`);
+}
+
+function applyAllStudentPrintAbbrev(text){
+  let s = String(text ?? "");
+  if(!s) return "";
+  // 印刷用の予定・結果だけに使う短縮。全体予定表や保存データ自体は変えない。
+  s = applyPosterAbbrevDictionary(s);
+  s = allListPrintLectureNumberToCircle(s);
+  s = s
+    .replace(/大学受験講座/g, '')
+    .replace(/東進ハイスクール/g, '')
+    .replace(/講座を?完全修得/g, '完修')
+    .replace(/講座を?修得/g, '修得')
+    .replace(/完全修得/g, '完修')
+    .replace(/修得/g, '修得')
+    .replace(/受講開始/g, '受講')
+    .replace(/確認テスト/g, '確認')
+    .replace(/修了判定テスト|終了判定テスト/g, '修判')
+    .replace(/高速基礎マスター/g, '高マス')
+    .replace(/学習内容\s*[:：]\s*/g, '')
+    .replace(/受講[①②③123]?\s*[:：]\s*/g, '')
+    .replace(/その他[①②③123]?\s*[:：]\s*/g, '')
+    .replace(/\s*\/\s*/g, '/')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return allListPrintLectureNumberToCircle(s).replace(/\s+/g, ' ').trim();
+}
+function allListPrintAbbrevCell(value){
+  return String(value ?? '')
+    .split(/\r?\n/)
+    .map(line => {
+      const bullet = String(line).match(/^(\s*[・･\-*]\s*)/);
+      const prefix = bullet ? bullet[1] : '';
+      const body = bullet ? String(line).slice(prefix.length) : String(line);
+      return prefix + applyAllStudentPrintAbbrev(body);
+    })
+    .join('\n');
+}
+
 function posterResultKind(text){
   const t = toHalfWidth(String(text ?? "")).toUpperCase();
   if(/SS判定|SS/.test(t)) return "SS";
@@ -5984,7 +6044,11 @@ function buildAllStudentListAoaByGrade(examRecords=[], eventRecords=[]){
       for(const g of eventGroups) row.push(eventByStudent.get(key)?.get(g.key) || '');
       for(const d of windowDates){
         const dk = ymd(d);
-        row.push((planByStudentDate.get(`${key}|${dk}`) || []).filter(Boolean).map(x=>`・${x}`).join('\n'));
+        row.push((planByStudentDate.get(`${key}|${dk}`) || [])
+          .filter(Boolean)
+          .filter(x => !/^\s*備考\s*[:：]/.test(String(x)))
+          .map(x=>`・${x}`)
+          .join('\n'));
         row.push((resultByStudentDate.get(`${key}|${dk}`) || []).filter(Boolean).map(x=>`・${x}`).join('\n'));
       }
       aoa.push(row);
@@ -6189,10 +6253,10 @@ function buildAllStudentPrintAoaFromFullAoa(grade, fullAoa){
     for(const n of smallNos){
       const find = field => header.findIndex(h => new RegExp(`^(?:小規模\\s*)?${n}\\s*\\n${field}$`).test(h));
       const d = allListPrintCell(row, find('日付'));
-      const name = allListPrintCell(row, find('名称'));
+      const name = applyAllStudentPrintAbbrev(allListPrintCell(row, find('名称')));
       const ans = allListPrintCell(row, find('回答'));
       const comiru = allListPrintCell(row, find('Comiru'));
-      const note = allListPrintCell(row, find('備考'));
+      const note = applyAllStudentPrintAbbrev(allListPrintCell(row, find('備考')));
       const subject = allListPrintCell(row, find('科目変更'));
       const subjectList = allListPrintCell(row, find('科目リスト'));
       if(d || name || ans || comiru || note || subject || subjectList){
@@ -6206,7 +6270,8 @@ function buildAllStudentPrintAoaFromFullAoa(grade, fullAoa){
       }
     }
 
-    for(const [base, cols] of largeGroups.entries()){
+    for(const [baseRaw, cols] of largeGroups.entries()){
+      const base = applyAllStudentPrintAbbrev(baseRaw);
       const details = [];
       for(const x of cols){
         const v = allListPrintCell(row, x.col);
@@ -6214,7 +6279,7 @@ function buildAllStudentPrintAoaFromFullAoa(grade, fullAoa){
         if(['受験','参加','Comiru','科目変更','科目リスト'].includes(x.field)){
           details.push(allListPrintDetailWithArrow(x.field, v));
         }else{
-          details.push(`${x.field}:${v}`);
+          details.push(`${x.field}:${applyAllStudentPrintAbbrev(v)}`);
         }
       }
       if(details.length) lines.push(allListPrintEventLine([base], details));
@@ -6230,7 +6295,7 @@ function buildAllStudentPrintAoaFromFullAoa(grade, fullAoa){
       ...manualCols.map(x => allListPrintCell(row, x.col))
     ];
     outRow.push(lines.join('\n'));
-    planCols.forEach(x => outRow.push(allListPrintCell(row, x.col)));
+    planCols.forEach(x => outRow.push(allListPrintAbbrevCell(allListPrintCell(row, x.col))));
     if(outRow.some(v => norm(v))) out.push(outRow);
   }
   out._manualPrintColumnCount = manualCols.length;
@@ -6286,7 +6351,8 @@ function styleAllStudentPrintSheet(ws, aoa){
   const fontTitle = {name:'Yu Gothic', sz:14, bold:true, color:{rgb:'111827'}};
   const fontHeader = {name:'Yu Gothic', sz:9, bold:true, color:{rgb:'111827'}};
   const fontBase = {name:'Yu Gothic', sz:8, color:{rgb:'111827'}};
-  const fontMissing = {name:'Yu Gothic', sz:10, bold:true, color:{rgb:'991B1B'}};
+  // 赤セル文字は名前/通常文字(sz:8)の1.5倍。
+  const fontMissing = {name:'Yu Gothic', sz:12, bold:true, color:{rgb:'991B1B'}};
   const totalCols = (aoa[1] || []).length;
   const eventCol = totalCols - 1 - planCount;
   setRangeStyle(ws, range, (R,C,cell)=>{
