@@ -570,6 +570,7 @@ const state = {
   dailyPosterFiles: [],
   dailyPosterRestores: new Map(),
   wholeScheduleFiles: [],
+  comiruCsvFiles: [],
   wholeScheduleRestores: new Map(),
   resultHistoryRecords: [],
   resultSheetRows: [],
@@ -820,6 +821,177 @@ function parseCsvText(text){
   row.push(cell); rows.push(row);
   return rows.filter(r => r.some(v => norm(v)));
 }
+
+// ============================================================
+// Comiru CSV照合
+// ルール：CSVに対象生徒の回答あり → Comiru〇。
+// CSVにない場合は入力用Excel/全員分リストの値を使い、どちらもなければ×。
+// 全員分リストの手修正は後段の復元処理で優先される。
+// ============================================================
+function normalizeComiruMatchText(s){
+  return String(s ?? '')
+    .replace(/[０-９Ａ-Ｚａ-ｚ]/g, ch => String.fromCharCode(ch.charCodeAt(0)-0xFEE0))
+    .replace(/\r?\n/g, ' ')
+    .replace(/\s+/g, '')
+    .replace(/[【】\[\]（）()「」『』"'“”‘’・:：／\/\\|｜,，.．。_-]/g, '')
+    .toLowerCase();
+}
+function comiruFindHeaderIndex(header, names){
+  const hs = (header || []).map(h => norm(h));
+  for(const name of names){
+    const idx = hs.findIndex(h => h === name);
+    if(idx >= 0) return idx;
+  }
+  for(let i=0;i<hs.length;i++){
+    const h = hs[i];
+    if(names.some(n => h.includes(n))) return i;
+  }
+  return -1;
+}
+function comiruLooksLikeHeader(row){
+  const t = (row || []).map(norm).join('|');
+  return /(生徒|氏名|名前|回答者|対象者|ユーザー|ユーザ)/.test(t) || /(回答|提出|申込|参加|イベント|模試|タイトル|件名)/.test(t);
+}
+function comiruStudentKeyFromCsv(studentName, studentNo){
+  const no = normalizeStudentNoKey(studentNo);
+  if(no) return `no:${no.replace(/^0+(?=\d)/,'')}`;
+  const meta = rosterMetaForStudent(studentName);
+  const mNo = normalizeStudentNoKey(meta['生徒番号']);
+  if(mNo) return `no:${mNo.replace(/^0+(?=\d)/,'')}`;
+  return `name:${normalizeNameKey(meta['生徒名'] || studentName)}`;
+}
+function comiruStudentKeyForRecord(r){
+  const meta = rosterMetaForStudent(r.student);
+  const no = normalizeStudentNoKey(meta['生徒番号'] || r.studentNo || '');
+  if(no) return `no:${no.replace(/^0+(?=\d)/,'')}`;
+  return `name:${normalizeNameKey(meta['生徒名'] || r.student)}`;
+}
+function comiruDateTokensForRecord(r, kind){
+  const raw = kind === 'event' ? (r.datetime || '') : (r.examDate || '');
+  const out = [];
+  const dt = parseDateTimeLoose(raw) || parseDateLoose(raw);
+  if(dt){
+    out.push(`${dt.getMonth()+1}/${dt.getDate()}`);
+    out.push(`${pad2(dt.getMonth()+1)}/${pad2(dt.getDate())}`);
+    out.push(`${dt.getMonth()+1}月${dt.getDate()}日`);
+    out.push(`${pad2(dt.getMonth()+1)}月${pad2(dt.getDate())}日`);
+  }else if(raw){
+    const s = String(raw);
+    out.push(s);
+    if(/^\d{4}-\d{2}-\d{2}/.test(s)) out.push(s.slice(5,10).replace('-','/'));
+  }
+  return [...new Set(out.filter(Boolean).map(normalizeComiruMatchText).filter(Boolean))];
+}
+function comiruTargetTextForRecord(r, kind){
+  return kind === 'event' ? (r.eventName || '') : (r.examName || '');
+}
+function comiruTargetMatchesRecord(csv, r, kind){
+  const target = normalizeComiruMatchText(comiruTargetTextForRecord(r, kind));
+  const csvText = normalizeComiruMatchText([csv.targetText, csv.fileText, csv.rowText].filter(Boolean).join(' '));
+  if(!target || !csvText) return false;
+
+  // 名前がそのまま含まれる場合
+  if(target.length >= 3 && csvText.includes(target)) return true;
+  if(csvText.length >= 3 && target.includes(csvText)) return true;
+
+  // 略称・ファイル名で一部だけ一致する場合に備え、そこそこ長い共通部分を許す
+  const parts = target.split(/(?=模試|イベント|説明会|HR|ホームルーム|共通|冠|本番|レベル)/).filter(x => x.length >= 3);
+  if(parts.some(p => csvText.includes(p))) return true;
+
+  // 日付と種別が合う場合
+  const dateHit = comiruDateTokensForRecord(r, kind).some(t => csvText.includes(t));
+  const kindHit = kind === 'event'
+    ? /(イベント|説明会|HR|ホームルーム|会)/i.test(csvText)
+    : /(模試|テスト|共通|冠|本番|レベル)/i.test(csvText);
+  return dateHit && kindHit;
+}
+function comiruCsvStatusIsAnswered(rowText){
+  const t = normalizeComiruMatchText(rowText);
+  // 未回答/未提出だけは除外。CSVに回答行がある場合は、不受験/不参加でも回答済み扱い。
+  if(/未回答|未提出|未送信|未完了/.test(t)) return false;
+  return true;
+}
+async function parseComiruCsvFile(file){
+  const text = await file.text();
+  const aoa = parseCsvText(text);
+  const records = [];
+  if(!aoa.length) return records;
+
+  let headerRow = 0;
+  for(let r=0; r<Math.min(5, aoa.length); r++){
+    if(comiruLooksLikeHeader(aoa[r])){ headerRow = r; break; }
+  }
+  const header = (aoa[headerRow] || []).map(norm);
+  const idxStudent = comiruFindHeaderIndex(header, ['生徒名','氏名','名前','回答者','対象者','ユーザー名','ユーザ名','会員名']);
+  const idxNo = comiruFindHeaderIndex(header, ['生徒番号','番号','生徒No','会員番号','ID','id']);
+  const idxTarget = comiruFindHeaderIndex(header, ['タイトル','件名','模試名','イベント名','申込名','フォーム名','アンケート名','講座名','内容']);
+  const idxStatus = comiruFindHeaderIndex(header, ['回答状況','回答','提出状況','ステータス','状態','申込状況']);
+  const fileText = String(file.webkitRelativePath || file.name || '').replace(/\.[^.]+$/,'');
+
+  for(let r=headerRow+1; r<aoa.length; r++){
+    const row = aoa[r] || [];
+    if(!row.some(v => norm(v))) continue;
+    const rowText = row.map(norm).join(' ');
+    const statusText = idxStatus >= 0 ? norm(row[idxStatus]) : rowText;
+    if(!comiruCsvStatusIsAnswered(statusText)) continue;
+
+    const studentName = idxStudent >= 0 ? norm(row[idxStudent]) : '';
+    const studentNo = idxNo >= 0 ? norm(row[idxNo]) : '';
+    if(!studentName && !studentNo) continue;
+
+    const targetText = idxTarget >= 0 ? norm(row[idxTarget]) : '';
+    records.push({
+      studentName,
+      studentNo,
+      studentKey: comiruStudentKeyFromCsv(studentName, studentNo),
+      targetText,
+      fileText,
+      rowText,
+      sourceFile: file.name
+    });
+  }
+  return records;
+}
+async function loadComiruCsvRecords(files){
+  const out = [];
+  const logs = [];
+  for(const file of files || []){
+    try{
+      const rows = await parseComiruCsvFile(file);
+      out.push(...rows);
+      logs.push(`${file.name}:${rows.length}件`);
+    }catch(e){
+      logs.push(`${file.name}:読み込み失敗 ${e.message || e}`);
+    }
+  }
+  return {records:out, logs};
+}
+function applyComiruCsvAnswersToExamEventRecords(examRecords, eventRecords, comiruRows){
+  const rows = comiruRows || [];
+  if(!rows.length) return {examApplied:0, eventApplied:0};
+  let examApplied = 0;
+  let eventApplied = 0;
+  function hasAnswerFor(r, kind){
+    const key = comiruStudentKeyForRecord(r);
+    return rows.some(csv => csv.studentKey === key && comiruTargetMatchesRecord(csv, r, kind));
+  }
+  for(const r of examRecords || []){
+    if(hasAnswerFor(r, 'exam')){
+      if(!r.comiruAnswered) examApplied++;
+      r.comiruAnswered = true;
+      r.comiruCsvAnswered = true;
+    }
+  }
+  for(const r of eventRecords || []){
+    if(hasAnswerFor(r, 'event')){
+      if(!r.comiruAnswered) eventApplied++;
+      r.comiruAnswered = true;
+      r.comiruCsvAnswered = true;
+    }
+  }
+  return {examApplied, eventApplied};
+}
+
 async function parseRosterFile(file){
   if(!file){
     state.rosterAoa = [ROSTER_COLUMNS];
@@ -2212,6 +2384,14 @@ async function merge(){
     allEventRecords.push(...eventParsed.records);
     allLogs.push(...eventParsed.logRows);
   }
+  let comiruCsvInfo = {records:[], logs:[]};
+  if(state.comiruCsvFiles && state.comiruCsvFiles.length){
+    log(`Comiru CSV照合中...\nCSV: ${state.comiruCsvFiles.length}件`);
+    comiruCsvInfo = await loadComiruCsvRecords(state.comiruCsvFiles);
+    const applied = applyComiruCsvAnswersToExamEventRecords(allExamRecords, allEventRecords, comiruCsvInfo.records);
+    allLogs.push(['Comiru CSV', '成功', `CSV回答行 ${comiruCsvInfo.records.length}件 / 模試Comiru〇反映 ${applied.examApplied}件 / イベントComiru〇反映 ${applied.eventApplied}件`, comiruCsvInfo.logs.join(' / ')]);
+  }
+
   const planCountBeforeDateLimit = allRecords.length;
   allRecords = filterRecords(allRecords);
   const planSkippedByDateLimit = planCountBeforeDateLimit - allRecords.length;
@@ -2258,7 +2438,8 @@ async function merge(){
   const fail = allLogs.filter(x => x[1] === "失敗").length;
   log(`統合プレビュー作成完了\n成功ファイル: ${success}\n失敗ファイル: ${fail}\n予定件数: ${allRecords.length}\n結果件数: ${allResults.length}\n生徒数: ${out.students.length}\n日付数: ${out.dateKeys.length}
 模試確認件数: ${allExamRecords.length}
-イベント確認件数: ${allEventRecords.length}`);
+イベント確認件数: ${allEventRecords.length}
+Comiru CSV回答行: ${comiruCsvInfo.records.length}`);
 }
 
 function aoaToSheet(aoa){ return XLSX.utils.aoa_to_sheet(aoa); }
@@ -5135,7 +5316,7 @@ function buildAllStudentPrintAoaFromFullAoa(grade, fullAoa){
     manualCols.push({col:c, label:h.replace(/\n+/g, ' ')});
   }
 
-  const printHeader = ['生徒番号','名前','高校','担当','備考(その他聞き取り欄)', ...manualCols.map(x => x.label || '書き込み欄')];
+  const printHeader = ['生徒番号','名前','高校','担当','備考(書き込み欄)', ...manualCols.map(x => x.label || '書き込み欄')];
   if(manualCols.length === 0) printHeader.push('書き込み欄');
   printHeader.push('模試イベント');
 
@@ -5445,6 +5626,7 @@ async function setBundleFolderFiles(fileList){
   const allLists = [];
   const dailyPosters = [];
   const wholeSchedules = [];
+  const comiruCsvs = [];
   for(const f of files){
     const name = f.name || '';
     const isExcel = /\.(xlsx|xlsm|xls)$/i.test(name);
@@ -5456,6 +5638,7 @@ async function setBundleFolderFiles(fileList){
     else if(isExcel && (filePathIncludes(f, '毎日掲示') || filePathIncludes(f, '毎日更新'))) dailyPosters.push(f);
     else if(isExcel && (filePathIncludes(f, '全員分リスト') || filePathIncludes(f, '全員リスト'))) allLists.push(f);
     else if(isExcel && filePathIncludes(f, '全体予定表')) wholeSchedules.push(f);
+    else if(isCsv && (filePathIncludes(f, 'Comiru') || filePathIncludes(f, 'コミル') || /comiru|コミル/i.test(relLower))) comiruCsvs.push(f);
     else if(isExcel && (filePathIncludes(f, '毎日更新') || filePathIncludes(f, '毎日更新') || name === '毎日更新.xlsx')) results.push(f);
     else if(isExcel && filePathIncludes(f, '打ち込み結果')) planned.push(f);
     else if((isExcel || isCsv) && filePathIncludes(f, '対応表')) rosters.push(f);
@@ -5467,6 +5650,7 @@ async function setBundleFolderFiles(fileList){
   state.allListFiles = allLists;
   state.dailyPosterFiles = dailyPosters;
   state.wholeScheduleFiles = wholeSchedules;
+  state.comiruCsvFiles = comiruCsvs;
   const allListRestoreLogs = await loadAllListRestoreFiles(allLists);
   const dailyPosterRestoreLogs = await loadDailyPosterRestoreFiles(dailyPosters);
   const wholeScheduleRestoreLogs = await loadWholeScheduleRestoreFiles(wholeSchedules);
@@ -5489,6 +5673,7 @@ async function setBundleFolderFiles(fileList){
 全員分リスト復元Excel（全員分リスト）: ${allLists.length}件${allListRestoreLogs.length ? '（' + allListRestoreLogs.join(' / ') + '）' : ''}
 掲示用手修正Excel（毎日更新）: ${dailyPosters.length}件${dailyPosterRestoreLogs.length ? '（' + dailyPosterRestoreLogs.join(' / ') + '）' : ''}
 全体予定表手修正Excel（全体予定表）: ${wholeSchedules.length}件${wholeScheduleRestoreLogs.length ? '（' + wholeScheduleRestoreLogs.join(' / ') + '）' : ''}
+Comiru CSV（Comiru）: ${comiruCsvs.length}件
 ${rosterMsg}`;
   if($("bundleReadSummary")) $("bundleReadSummary").textContent = summary;
   log(`${summary}
