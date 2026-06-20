@@ -4838,7 +4838,7 @@ function styleAllStudentGradeSheet(ws, aoa){
     else if(c===6) widths.push(12);    // 備考
     else if(/(?:小規模\s*)?\d+\n日付$/.test(h)) widths.push(9);
     else if(/(?:小規模\s*)?\d+\n名称$/.test(h)) widths.push(16);
-    else if(/(?:小規模\s*)?\d+\n参加不参加or当日後日不受験$/.test(h)) widths.push(6);
+    else if(/(?:小規模\s*)?\d+\n回答$/.test(h)) widths.push(6);
     else if(/(?:小規模\s*)?\d+\nComiru$/.test(h)) widths.push(3);
     else if(/(?:小規模\s*)?\d+\n備考$/.test(h)) widths.push(13);
     else if(/\n(受験|参加)$/.test(h)) widths.push(6);
