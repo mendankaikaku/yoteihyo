@@ -4565,13 +4565,22 @@ function examStatusChecksForPrint(ex){
   return ['当日','後日','不受験'].map(st=>checkboxMark(st,status===st)).join('　');
 }
 function examPrintDetailHtml(ex){
-  const parts=[];
-  parts.push(`受験方法：${examStatusChecksForPrint(ex)}`);
-  const subjects=normalizeExamSubjects(ex?.subjects||[]);
-  if(subjects.length) parts.push(`科目：${subjects.map(s=>`□${esc(s)}`).join(' ')}`);
-  parts.push(`Comiru回答：${checkboxMark('回答済み',!!ex?.comiruAnswered)}`);
-  parts.push(`科目変更：${checkboxMark('あり',!!ex?.subjectChanged)}`);
-  return parts.join(' / ');
+  const selectedSubjects=normalizeExamSubjects(ex?.subjects||[]);
+  const status=String(ex?.status||'').trim();
+  const master=findExamMasterForPrint(ex);
+  // 印刷用では、当日/後日など「不受験ではない」状態で科目チェックが空なら、
+  // 聞き取り漏れを防ぐため模試マスタ側の全科目チェックを表示する。
+  const subjects = selectedSubjects.length
+    ? selectedSubjects
+    : (status !== '不受験' ? normalizeExamSubjects(examMasterSubjects(master || ex)) : []);
+  const subjectHtml = subjects.length
+    ? `<div class="examPrintLine subjectLine"><b>科目：</b><span class="subjectWrap">${subjects.map(s=>`<span class="printCheck">□${esc(s)}</span>`).join('')}</span></div>`
+    : '';
+  return `<div class="examPrintDetail">
+    <div class="examPrintLine"><b>受験方法：</b>${examStatusChecksForPrint(ex)}</div>
+    ${subjectHtml}
+    <div class="examPrintLine smallChecks"><b>その他：</b>${checkboxMark('Comiru回答済み',!!ex?.comiruAnswered)}　${checkboxMark('科目変更あり',!!ex?.subjectChanged)}</div>
+  </div>`;
 }
 function eventStatusChecksForPrint(ev){
   const status=String(ev?.status||'');
@@ -4668,12 +4677,12 @@ function meetingPrepCurrentPlanHtml(name){
   html+='<h3>備考（記入用）</h3><div class="box blankBox"></div>';
   html+='<h3>達成できなかった理由（記入用）</h3><div class="box blankBox"></div>';
   html+='</section></div>';
-  html+='<div class="twoCols">';
-  html+='<section><h3>模試確認</h3>';
-  if(exams.length){html+='<table class="prepTable"><thead><tr><th>模試名</th><th>チェック反映</th></tr></thead><tbody>';exams.forEach(ex=>{html+=`<tr><td>${esc(ex.name||'')}</td><td>${examPrintDetailHtml(ex)}</td></tr>`});html+='</tbody></table>';}else html+='<p class="muted">対象模試なし</p>';
-  html+='</section><section><h3>イベント確認</h3>';
-  if(events.length){html+='<table class="prepTable"><thead><tr><th>イベント名</th><th>チェック反映</th></tr></thead><tbody>';events.forEach(ev=>{html+=`<tr><td>${esc(ev.name||'')}</td><td>${eventPrintDetailHtml(ev)}</td></tr>`});html+='</tbody></table>';}else html+='<p class="muted">対象イベントなし</p>';
-  html+='</section></div>';
+  html+='<section class="examConfirmBlock"><h3>模試確認</h3>';
+  if(exams.length){html+='<table class="prepTable examConfirmTable"><thead><tr><th>模試名</th><th>チェック反映</th></tr></thead><tbody>';exams.forEach(ex=>{html+=`<tr><td>${esc(ex.name||'')}</td><td>${examPrintDetailHtml(ex)}</td></tr>`});html+='</tbody></table>';}else html+='<p class="muted">対象模試なし</p>';
+  html+='</section>';
+  html+='<section class="eventConfirmBlock"><h3>イベント確認</h3>';
+  if(events.length){html+='<table class="prepTable eventConfirmTable"><thead><tr><th>イベント名</th><th>チェック反映</th></tr></thead><tbody>';events.forEach(ev=>{html+=`<tr><td>${esc(ev.name||'')}</td><td>${eventPrintDetailHtml(ev)}</td></tr>`});html+='</tbody></table>';}else html+='<p class="muted">対象イベントなし</p>';
+  html+='</section>';
   return html;
 }
 
@@ -4871,7 +4880,7 @@ function buildMeetingPrepPrintHtml(resultRecords, weeklyHtml){
     .sheetMark{position:absolute;right:3mm;top:2mm;font-size:8px;color:#667085;border:1px solid #d1d5db;border-radius:999px;padding:.7mm 1.6mm;background:#fff;}
     h1{font-size:18px;margin:0 0 3px;} h2{font-size:14px;margin:8px 0 6px;border-left:4px solid #2563eb;padding-left:7px;} h3{font-size:12px;margin:7px 0 4px;}
     .subline,.muted{color:#667085;font-size:10px}.box{border:1px solid #9ca3af;padding:6px;border-radius:6px;white-space:pre-wrap;}
-    .prepTable{border-collapse:collapse;width:100%;font-size:10px;margin:4px 0 7px;}.prepTable th,.prepTable td{border:1px solid #9ca3af;padding:3px 4px;vertical-align:top;word-break:break-word;}.prepTable th{background:#f3f4f6;text-align:center;font-weight:800;}.prepTable ul{margin:0;padding-left:1.1em;}.prepTable li{margin:0 0 1px;}.listenTable th{background:#eef2ff}.listenTable td{font-size:11px;line-height:1.45}.twoCols{display:grid;grid-template-columns:1fr 1fr;gap:7px;align-items:start}.weekly{font-size:9px}.weekly th,.weekly td{padding:3px;}.blankTable td{height:12mm}.blankLines div{height:6mm;border-bottom:1px solid #d1d5db}.blankBox{height:24mm}
+    .prepTable{border-collapse:collapse;width:100%;font-size:10px;margin:4px 0 7px;}.prepTable th,.prepTable td{border:1px solid #9ca3af;padding:3px 4px;vertical-align:top;word-break:break-word;}.prepTable th{background:#f3f4f6;text-align:center;font-weight:800;}.prepTable ul{margin:0;padding-left:1.1em;}.prepTable li{margin:0 0 1px;}.listenTable th{background:#eef2ff}.listenTable td{font-size:11px;line-height:1.45}.twoCols{display:grid;grid-template-columns:1fr 1fr;gap:7px;align-items:start}.examConfirmBlock,.eventConfirmBlock{margin-top:4px;break-inside:avoid;page-break-inside:avoid}.examConfirmTable{table-layout:fixed;width:100%;font-size:9.2px;line-height:1.22}.examConfirmTable th:first-child,.examConfirmTable td:first-child{width:27mm}.examConfirmTable th,.examConfirmTable td{padding:2px 3px}.examPrintDetail{line-height:1.23}.examPrintLine{margin:0 0 1px}.subjectWrap{display:flex;flex-wrap:wrap;gap:1px 5px;align-items:flex-start}.printCheck{display:inline-block;white-space:nowrap;min-width:13mm}.smallChecks{font-size:9px}.eventConfirmTable{font-size:9.2px;line-height:1.25;table-layout:fixed;width:100%}.eventConfirmTable th:first-child,.eventConfirmTable td:first-child{width:34mm}.weekly{font-size:9px}.weekly th,.weekly td{padding:3px;}.blankTable td{height:12mm}.blankLines div{height:6mm;border-bottom:1px solid #d1d5db}.blankBox{height:24mm}
     .prevResultPage{padding:5mm;overflow:hidden}.fitPageShell{width:100%;height:270mm;overflow:hidden;position:relative}.fitPageInner{transform-origin:top left;width:100%;}.prevResultPage h1{font-size:17px}.prevResultPage h2{font-size:13px;margin:6px 0 4px}.prevResultPage h3{font-size:11.5px;margin:4px 0 3px}.prevResultPage .prepTable{font-size:9.8px;margin:3px 0 5px}.prevResultPage .prepTable th,.prevResultPage .prepTable td{padding:2.4px 3.4px}.prevResultPage .box{padding:4.5px}
     .weeklyPage{padding:5mm;}
     .goukakuPrintPage{padding:5mm;overflow:hidden;display:flex;flex-direction:column;height:282mm!important;max-height:282mm!important}.goukakuPrintPage h1{font-size:13px;margin:0 0 .8mm;flex:0 0 auto}.goukakuPrintPage h2{font-size:10px;margin:0 0 .8mm;flex:0 0 auto}.goukakuPrintPage .muted{font-size:8px;margin-top:1mm;flex:0 0 auto}.goukakuPrintPdf{height:auto;width:100%;flex:1 1 auto;min-height:0;border:1px solid #9ca3af;background:#f8fafc;overflow:hidden;position:relative;display:flex;align-items:center;justify-content:center}.goukakuPrintPdf iframe{width:100%;height:100%;border:0;background:#fff}.goukakuPrintPdf canvas.goukakuAllPagesCanvas{max-width:100%;max-height:100%;width:auto;height:auto;display:block;background:#fff}.goukakuPdfRenderStatus{position:absolute;left:4mm;right:4mm;bottom:4mm;padding:2mm;background:rgba(255,255,255,.92);border:1px solid #d1d5db;border-radius:4px;font-size:9px;color:#475569;text-align:center}.goukakuPrintPdf.rendered .goukakuFallbackPdf,.goukakuPrintPdf.rendered .goukakuPdfRenderStatus{display:none}.goukakuPrintPdf.fallback .goukakuPdfRenderStatus{background:#fff7ed;color:#9a3412;border-color:#fed7aa}.goukakuStyledSheetTable{border-collapse:collapse;width:max-content;min-width:100%;font-size:10px;line-height:1.2;table-layout:auto}.goukakuStyledSheetTable th,.goukakuStyledSheetTable td{border:1px solid #d0d5dd;padding:2px 4px;min-width:26px;max-width:180px;white-space:pre-wrap;word-break:break-word;vertical-align:middle}.goukakuStyledSheetTable .goukakuColHeader th,.goukakuStyledSheetTable .goukakuRowHeader{background:#f2f4f7;color:#475569;font-weight:800;text-align:center}.goukakuPrintExcelWrap{flex:1 1 auto;min-height:0;overflow:hidden;border:1px solid #9ca3af;background:#fff}.goukakuPrintExcelWrap .goukakuStyledSheetTable{width:100%;font-size:6px;line-height:1.03;table-layout:fixed}.goukakuPrintExcelWrap .goukakuStyledSheetTable th,.goukakuPrintExcelWrap .goukakuStyledSheetTable td{padding:.35mm .55mm;max-width:none;min-width:0}.goukakuPrintTable{font-size:6.8px;table-layout:fixed;width:100%;line-height:1.12}.goukakuPrintTable th,.goukakuPrintTable td{padding:1px 2px;min-width:0;max-width:none;white-space:normal;word-break:break-word;}
