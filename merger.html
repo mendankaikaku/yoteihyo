@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>予定統合アプリ！</title>　
+  <title>予定統合アプリ</title>　
   <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
   <script src="./libs/xlsx.bundle.js"></script>
   <script>
@@ -5059,6 +5059,131 @@ function styleAllStudentGradeSheet(ws, aoa){
   });
   return ws;
 }
+
+function allListPrintFindIndex(headerCanon, names){
+  for(const name of names){
+    const idx = headerCanon.findIndex(h => h === name);
+    if(idx >= 0) return idx;
+  }
+  return -1;
+}
+function allListPrintCell(row, idx){
+  return idx >= 0 ? norm(row[idx]) : '';
+}
+function allListPrintEventLine(parts, details){
+  const head = parts.filter(Boolean).join(' ');
+  const body = details.filter(Boolean).join(' / ');
+  return body ? `${head}（${body}）` : head;
+}
+function buildAllStudentPrintAoaFromFullAoa(grade, fullAoa){
+  const header = (fullAoa?.[1] || []).map(normalizeAllListHeaderText);
+  const canon = header.map(allListCanonicalHeader);
+  const idxNo = allListPrintFindIndex(canon, ['生徒番号']);
+  const idxName = allListPrintFindIndex(canon, ['生徒名']);
+  const idxSchool = allListPrintFindIndex(canon, ['高校']);
+  const idxTeacher = allListPrintFindIndex(canon, ['担当']);
+  const idxNote = allListPrintFindIndex(canon, ['備考']);
+
+  const smallNos = [];
+  for(const h of header){
+    const m = h.match(/^(?:小規模\s*)?([0-9０-９]+)\s*\n日付$/);
+    if(m){
+      const n = String(m[1]).replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0)-0xFEE0));
+      if(!smallNos.includes(n)) smallNos.push(n);
+    }
+  }
+  smallNos.sort((a,b)=>Number(a)-Number(b));
+
+  const largeGroups = new Map();
+  for(let c=0;c<header.length;c++){
+    const h = header[c];
+    if(!h || isAllListDateDynamicHeader(h)) continue;
+    if(/^(?:小規模\s*)?[0-9０-９]+\s*\n(日付|名称|回答|Comiru|備考|科目変更)$/.test(h)) continue;
+    const m = h.match(/^(.+)\n(受験|参加|Comiru|科目変更|備考)$/s);
+    if(!m) continue;
+    const base = m[1].replace(/\n+/g, ' ').trim();
+    const field = m[2];
+    if(!base) continue;
+    if(!largeGroups.has(base)) largeGroups.set(base, []);
+    largeGroups.get(base).push({field, col:c});
+  }
+
+  const out = [[`${grade} 印刷用リスト`], ['生徒番号','名前','高校','担当','備考','模試イベント']];
+  for(let r=2;r<(fullAoa || []).length;r++){
+    const row = fullAoa[r] || [];
+    if(!row.some(v => norm(v))) continue;
+
+    const lines = [];
+
+    for(const n of smallNos){
+      const find = field => header.findIndex(h => new RegExp(`^(?:小規模\\s*)?${n}\\s*\\n${field}$`).test(h));
+      const d = allListPrintCell(row, find('日付'));
+      const name = allListPrintCell(row, find('名称'));
+      const ans = allListPrintCell(row, find('回答'));
+      const comiru = allListPrintCell(row, find('Comiru'));
+      const note = allListPrintCell(row, find('備考'));
+      const subject = allListPrintCell(row, find('科目変更'));
+      if(d || name || ans || comiru || note || subject){
+        const details = [];
+        if(ans) details.push(`回答:${ans}`);
+        if(comiru) details.push(`Comiru:${comiru}`);
+        if(subject) details.push(`科目変更:${subject}`);
+        if(note) details.push(`備考:${note}`);
+        lines.push(allListPrintEventLine([d, name], details));
+      }
+    }
+
+    for(const [base, cols] of largeGroups.entries()){
+      const details = [];
+      for(const x of cols){
+        const v = allListPrintCell(row, x.col);
+        if(v) details.push(`${x.field}:${v}`);
+      }
+      if(details.length) lines.push(allListPrintEventLine([base], details));
+    }
+
+    const outRow = [
+      allListPrintCell(row, idxNo),
+      allListPrintCell(row, idxName),
+      allListPrintCell(row, idxSchool),
+      allListPrintCell(row, idxTeacher),
+      allListPrintCell(row, idxNote),
+      lines.join('\n')
+    ];
+    if(outRow.some(v => norm(v))) out.push(outRow);
+  }
+  return out;
+}
+function styleAllStudentPrintSheet(ws, aoa){
+  const widths = [10, 14, 18, 12, 22, 95];
+  const range = applyNiceSheetSettings(ws, aoa, widths, {rows:{min:22,max:140,header:34,pxPerLine:16}});
+  ws['!rows'][0] = {hpt:28};
+  ws['!freeze'] = {xSplit:2, ySplit:2};
+  ws['!pageSetup'] = {orientation:'landscape', paperSize:12, fitToWidth:1, fitToHeight:0};
+  ws['!margins'] = {left:0.12, right:0.12, top:0.20, bottom:0.20, header:0.05, footer:0.05};
+  if((aoa[1] || []).length > 1){
+    ws['!merges'] = ws['!merges'] || [];
+    ws['!merges'].push({s:{r:0,c:0}, e:{r:0,c:(aoa[1] || []).length-1}});
+  }
+  const border = {top:{style:'thin',color:{rgb:'98A2B3'}},bottom:{style:'thin',color:{rgb:'98A2B3'}},left:{style:'thin',color:{rgb:'98A2B3'}},right:{style:'thin',color:{rgb:'98A2B3'}}};
+  const titleFill = {fgColor:{rgb:'DBEAFE'}};
+  const headerFill = {fgColor:{rgb:'E0F2FE'}};
+  const nameFill = {fgColor:{rgb:'F1F5F9'}};
+  const eventFill = {fgColor:{rgb:'F5F3FF'}};
+  const fontTitle = {name:'Yu Gothic', sz:14, bold:true, color:{rgb:'111827'}};
+  const fontHeader = {name:'Yu Gothic', sz:9, bold:true, color:{rgb:'111827'}};
+  const fontBase = {name:'Yu Gothic', sz:8, color:{rgb:'111827'}};
+  setRangeStyle(ws, range, (R,C,cell)=>{
+    const style = {font:R===0?fontTitle:(R===1?fontHeader:fontBase), alignment:{vertical:'center', horizontal:'center', wrapText:true, shrinkToFit:true}, border};
+    if(R===0) style.fill = titleFill;
+    else if(R===1) style.fill = headerFill;
+    else if(C<=1) style.fill = nameFill;
+    else if(C===5) style.fill = eventFill;
+    return style;
+  });
+  return ws;
+}
+
 async function downloadAllStudentList(){
   try{
     if(!window.XLSX){ alert('Excel出力ライブラリが読み込めていません。libs/xlsx.bundle.js を確認してください。'); return; }
@@ -5083,6 +5208,11 @@ async function downloadAllStudentList(){
       const ws = aoaToSheet(item.aoa);
       styleAllStudentGradeSheet(ws, item.aoa);
       XLSX.utils.book_append_sheet(wb, ws, safeSheetName(item.grade));
+
+      const printAoa = buildAllStudentPrintAoaFromFullAoa(item.grade, item.aoa);
+      const wsPrint = aoaToSheet(printAoa);
+      styleAllStudentPrintSheet(wsPrint, printAoa);
+      XLSX.utils.book_append_sheet(wb, wsPrint, safeSheetName(`印刷用_${item.grade}`));
     }
 
     if(state.allListUpdateLog && state.allListUpdateLog.length > 1){
