@@ -4829,17 +4829,17 @@ function styleAllStudentGradeSheet(ws, aoa){
   const widths = [];
   for(let c=0;c<colCount;c++){
     const h=String(aoa[1]?.[c]||'');
-    if(c===0) widths.push(5);          // 学年
+    if(c===0) widths.push(3);          // 学年
     else if(c===1) widths.push(9);     // 生徒番号
-    else if(c===2) widths.push(11);    // 生徒名
+    else if(c===2) widths.push(8);    // 生徒名
     else if(c===3) widths.push(8);     // 読み仮名
-    else if(c===4) widths.push(9);     // 担当
-    else if(c===5) widths.push(10);    // 高校
+    else if(c===4) widths.push(3);     // 担当
+    else if(c===5) widths.push(3);    // 高校
     else if(c===6) widths.push(12);    // 備考
     else if(/(?:小規模\s*)?\d+\n日付$/.test(h)) widths.push(9);
     else if(/(?:小規模\s*)?\d+\n名称$/.test(h)) widths.push(16);
-    else if(/(?:小規模\s*)?\d+\n回答$/.test(h)) widths.push(7);
-    else if(/(?:小規模\s*)?\d+\nComiru$/.test(h)) widths.push(7);
+    else if(/(?:小規模\s*)?\d+\n参加不参加or当日後日不受験$/.test(h)) widths.push(6);
+    else if(/(?:小規模\s*)?\d+\nComiru$/.test(h)) widths.push(3);
     else if(/(?:小規模\s*)?\d+\n備考$/.test(h)) widths.push(13);
     else if(/\n(受験|参加)$/.test(h)) widths.push(6);
     else if(/\nComiru$/.test(h)) widths.push(7);
