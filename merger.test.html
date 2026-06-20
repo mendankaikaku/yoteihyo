@@ -1,9 +1,9 @@
 <!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8" />　
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>予定統合アプリ７</title>　
+  <title>予定統合アプリ</title>　
   <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
   <script src="./libs/xlsx.bundle.js"></script>
   <script>
@@ -5236,6 +5236,70 @@ function allListRowKeyFromCells(row, header){
   return studentKeyForList(name, no);
 }
 
+function allListSmallSlotNoFromHeader(h, field){
+  const t = normalizeAllListHeaderText(h);
+  const re = new RegExp(`^(?:小規模\\s*)?([0-9０-９]+)\\s*\\n${field}$`);
+  const m = t.match(re);
+  if(!m) return '';
+  return String(m[1]).replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0)-0xFEE0));
+}
+function allListFindSmallSlotColumn(header, no, field){
+  const n = String(no || '').replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0)-0xFEE0));
+  return (header || []).findIndex(h => allListSmallSlotNoFromHeader(h, field) === n);
+}
+function ensureAllListSmallSubjectListColumns(mergedAoa, generatedAoa){
+  if(!mergedAoa || mergedAoa.length < 2) return mergedAoa;
+  const out = mergedAoa.map(row => Array.isArray(row) ? row.slice() : []);
+  const header = out[1].map(normalizeAllListHeaderText);
+  const genHeader = (generatedAoa?.[1] || []).map(normalizeAllListHeaderText);
+  const allNos = new Set();
+  for(const h of header){
+    ['日付','名称','回答','Comiru','備考','科目変更','科目リスト'].forEach(field => {
+      const n = allListSmallSlotNoFromHeader(h, field);
+      if(n) allNos.add(n);
+    });
+  }
+  for(const h of genHeader){
+    ['日付','名称','回答','Comiru','備考','科目変更','科目リスト'].forEach(field => {
+      const n = allListSmallSlotNoFromHeader(h, field);
+      if(n) allNos.add(n);
+    });
+  }
+  if(!allNos.size) return mergedAoa;
+
+  const outHeader = out[1].map(normalizeAllListHeaderText);
+  const genCanon = genHeader.map(allListCanonicalHeader);
+  const generatedByKey = new Map();
+  for(const row of (generatedAoa || []).slice(2)){
+    const key = allListRowKeyFromCells(row, genHeader);
+    if(key && key !== 'name:') generatedByKey.set(key, row);
+  }
+
+  const sortedNos = [...allNos].sort((a,b)=>Number(a)-Number(b));
+  for(const no of sortedNos){
+    if(allListFindSmallSlotColumn(outHeader, no, '科目リスト') >= 0) continue;
+    const noteIdx = allListFindSmallSlotColumn(outHeader, no, '備考');
+    const subjectIdx = allListFindSmallSlotColumn(outHeader, no, '科目変更');
+    const insertAt = noteIdx >= 0 ? noteIdx + 1 : (subjectIdx >= 0 ? subjectIdx : outHeader.length);
+    const newHeader = `${no}\n科目リスト`;
+    outHeader.splice(insertAt, 0, newHeader);
+    out[1].splice(insertAt, 0, newHeader);
+
+    const genIdx = allListFindSmallSlotColumn(genHeader, no, '科目リスト');
+    for(let r=2; r<out.length; r++){
+      const row = out[r] || [];
+      const key = allListRowKeyFromCells(row, outHeader.filter((_,i)=>i!==insertAt));
+      const genRow = generatedByKey.get(key);
+      const val = genRow && genIdx >= 0 ? (genRow[genIdx] || '') : '';
+      row.splice(insertAt, 0, val);
+      out[r] = row;
+    }
+  }
+  if(mergedAoa._allListConflictCells) out._allListConflictCells = mergedAoa._allListConflictCells;
+  return out;
+}
+
+
 
 // ============================================================
 // ???????????????? ????
@@ -5650,12 +5714,13 @@ function allListParseSmallSlotRowsFromRestoreMap(gradeMap){
     const slots=new Map();
     header.forEach((h,i)=>{
       const t=String(h || '').replace(/\r\n/g,'\n').replace(/\r/g,'\n');
-      const m=t.match(/(?:小規模\s*)?([0-9０-９]+)[\s\S]*(日付|日時|名称|回答|科目変更|科変|Comiru|コミル|備考)/);
+      const m=t.match(/(?:小規模\s*)?([0-9０-９]+)[\s\S]*(日付|日時|名称|回答|科目リスト|科目確認|科目変更|科変|Comiru|コミル|備考)/);
       if(!m) return;
       const no=String(m[1]).replace(/[０-９]/g,ch=>String.fromCharCode(ch.charCodeAt(0)-0xFEE0));
       const field=m[2].includes('日') || m[2].includes('時') ? 'date' :
         m[2].includes('名称') ? 'name' :
         m[2].includes('回答') ? 'answer' :
+        /科目リスト|科目確認/.test(m[2]) ? 'subjectList' :
         /科目変更|科変/.test(m[2]) ? 'subject' :
         /Comiru|コミル/i.test(m[2]) ? 'comiru' :
         m[2].includes('備考') ? 'note' : '';
@@ -5675,6 +5740,7 @@ function allListParseSmallSlotRowsFromRestoreMap(gradeMap){
         const date=slot.date!=null ? allListCellText(row[slot.date]) : '';
         const answer=slot.answer!=null ? allListCellText(row[slot.answer]) : '';
         const subject=slot.subject!=null ? allListCellText(row[slot.subject]) : '';
+        const subjectList=slot.subjectList!=null ? allListCellText(row[slot.subjectList]) : '';
         const comiru=slot.comiru!=null ? allListCellText(row[slot.comiru]) : '';
         const note=slot.note!=null ? allListCellText(row[slot.note]) : '';
         if(!nameRaw && !answer && !subject && !comiru && !note) continue;
@@ -5687,6 +5753,7 @@ function allListParseSmallSlotRowsFromRestoreMap(gradeMap){
         const obj={
           kind,date,name,count:'',grade,studentNo,student,status,
           subject:subjectBool===true?'あり':(subjectBool===false?'なし':''),
+          subjectList:subjectList || '',
           comiru:comiruBool===true?'済':(comiruBool===false?'未聞き取り':''),
           comiruAnswered:comiruBool,
           subjectChanged:subjectBool,
@@ -5860,7 +5927,7 @@ function buildAllStudentListAoaByGrade(examRecords=[], eventRecords=[]){
 
   const gradeAoas = [];
   for(const [grade, students] of byGrade.entries()){
-    const title = `${grade} 全員分リスト（${mmdd(windowDates[0])}〜${mmdd(windowDates[windowDates.length-1])}の予定・結果）`;
+    const title = `${grade} 全員分リスト（更新入力シート：助手が聞き取り後に入力する / ${mmdd(windowDates[0])}〜${mmdd(windowDates[windowDates.length-1])}の予定・結果）`;
     let maxSmallSlots = 0;
     for(const st of students){
       const key = studentKeyForList(st.student, st.studentNo);
@@ -5900,7 +5967,8 @@ function buildAllStudentListAoaByGrade(examRecords=[], eventRecords=[]){
       }
       aoa.push(row);
     }
-    const mergedAoa = mergeRestoredAllListAoa(grade, aoa);
+    let mergedAoa = mergeRestoredAllListAoa(grade, aoa);
+    mergedAoa = ensureAllListSmallSubjectListColumns(mergedAoa, aoa);
     gradeAoas.push({grade, title, aoa:mergedAoa, windowDates, examCount:examGroups.length, eventCount:eventGroups.length, smallPendingMap, smallSlotCount:maxSmallSlots, restored: !!findAllListRestoreForGrade(grade)});
   }
   return gradeAoas;
@@ -5972,8 +6040,10 @@ function styleAllStudentGradeSheet(ws, aoa){
     const isExtra = /(?:小規模\s*)?\d+\n/.test(headerText);
     const isMissing = R>1 && (
       isBangMissing ||
+      (/\n科目リスト$/.test(headerText) && text === '未入力') ||
+      (/\n(受験|参加|回答)$/.test(headerText) && text === '未') ||
       (/\nComiru$/.test(headerText) && text === '×') ||
-      (/\n(受験|参加|回答)$/.test(headerText) && text === '未') || (/\n科目リスト$/.test(headerText) && text === '未入力')
+      (/\n科目変更$/.test(headerText) && text === '〇')
     );
     const style = {font:R===0?fontTitle:(R===1?fontHeader:fontBase), alignment:{vertical:'center', horizontal:'center', wrapText:true, shrinkToFit:true}, border};
     if(R===0) style.fill = titleFill;
@@ -6086,7 +6156,7 @@ function buildAllStudentPrintAoaFromFullAoa(grade, fullAoa){
   printHeader.push('模試イベント');
   planCols.forEach(x => printHeader.push(x.label || '予定'));
 
-  const out = [[`${grade} 印刷用リスト`], printHeader];
+  const out = [[`${grade} 印刷用リスト（入力しない・確認用）`], printHeader];
   for(let r=2;r<(fullAoa || []).length;r++){
     const row = fullAoa[r] || [];
     if(!row.some(v => norm(v))) continue;
@@ -6148,7 +6218,7 @@ function styleAllStudentPrintSheet(ws, aoa){
   const manualCount = Math.max(1, Number(aoa?._manualPrintColumnCount || 1));
   const planCount = Math.max(0, Number(aoa?._printPlanColumnCount || 0));
   // 模試イベントを大きく、右側に3日間の予定欄を追加しても読めるように列幅を広げる。
-  const widths = [10, 14, 18, 12, 22, ...Array(manualCount).fill(16), 118, ...Array(planCount).fill(28)];
+  const widths = [10, 14, 18, 12, 22, ...Array(manualCount).fill(16), 155, ...Array(planCount).fill(28)];
   const range = applyNiceSheetSettings(ws, aoa, widths, {rows:{min:28,max:190,header:36,pxPerLine:18}});
   ws['!rows'][0] = {hpt:28};
   ws['!freeze'] = {xSplit:2, ySplit:2};
@@ -6174,15 +6244,22 @@ function styleAllStudentPrintSheet(ws, aoa){
   const eventCol = totalCols - 1 - planCount;
   setRangeStyle(ws, range, (R,C,cell)=>{
     const text = cell && cell.v != null ? String(cell.v) : '';
-    const hasSubjectMissing = R>1 && text.includes('科目リスト:未入力');
-    const style = {font:R===0?fontTitle:(R===1?fontHeader:(hasSubjectMissing?fontMissing:fontBase)), alignment:{vertical:'center', horizontal:'center', wrapText:true, shrinkToFit:!hasSubjectMissing}, border};
+    const hasNeedsHearing = R>1 && (
+      text.includes('科目リスト:未入力') ||
+      /(?:回答|受験|参加)[:：]\s*未/.test(text) ||
+      /(?:受|参)[:：]\s*未/.test(text) ||
+      /未聞き取り/.test(text) ||
+      /Comiru[:：]\s*×/.test(text) ||
+      /科目変更[:：]\s*〇/.test(text)
+    );
+    const style = {font:R===0?fontTitle:(R===1?fontHeader:(hasNeedsHearing?fontMissing:fontBase)), alignment:{vertical:'center', horizontal:'center', wrapText:true, shrinkToFit:!hasNeedsHearing}, border};
     if(R===0) style.fill = titleFill;
     else if(R===1) style.fill = headerFill;
     else if(C<=1) style.fill = nameFill;
     else if(C>=5 && C<eventCol) style.fill = manualFill;
-    else if(C===eventCol) style.fill = hasSubjectMissing ? missingFill : eventFill;
+    else if(C===eventCol) style.fill = hasNeedsHearing ? missingFill : eventFill;
     else if(C>eventCol) style.fill = planFill;
-    if(hasSubjectMissing){
+    if(hasNeedsHearing){
       style.alignment = {vertical:'center', horizontal:'center', wrapText:true, shrinkToFit:false};
     }
     return style;
@@ -6213,12 +6290,12 @@ async function downloadAllStudentList(){
     for(const item of gradeAoas){
       const ws = aoaToSheet(item.aoa);
       styleAllStudentGradeSheet(ws, item.aoa);
-      XLSX.utils.book_append_sheet(wb, ws, safeSheetName(item.grade));
+      XLSX.utils.book_append_sheet(wb, ws, safeSheetName(`${item.grade}更新入力(助手用)`));
 
       const printAoa = buildAllStudentPrintAoaFromFullAoa(item.grade, item.aoa);
       const wsPrint = aoaToSheet(printAoa);
       styleAllStudentPrintSheet(wsPrint, printAoa);
-      XLSX.utils.book_append_sheet(wb, wsPrint, safeSheetName(`印刷用_${item.grade}`));
+      XLSX.utils.book_append_sheet(wb, wsPrint, safeSheetName(`${item.grade}印刷(入力しない)`));
     }
 
     if(state.allListUpdateLog && state.allListUpdateLog.length > 1){
