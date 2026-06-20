@@ -6277,7 +6277,7 @@ function styleAllStudentPrintSheet(ws, aoa){
       /Comiru[:：]\s*×/.test(text) ||
       /科目変更[:：]\s*〇/.test(text)
     );
-    const style = {font:R===0?fontTitle:(R===1?fontHeader:(hasNeedsHearing?fontMissing:fontBase)), alignment:{vertical:R<=1?'center':'top', horizontal:'center', wrapText:true, shrinkToFit:!hasNeedsHearing}, border};
+    const style = {font:R===0?fontTitle:(R===1?fontHeader:(hasNeedsHearing?fontMissing:fontBase)), alignment:{vertical:R<=1?'center':'bottom', horizontal:'center', wrapText:true, shrinkToFit:!hasNeedsHearing}, border};
     if(R===0) style.fill = titleFill;
     else if(R===1) style.fill = headerFill;
     else if(C<=1) style.fill = nameFill;
@@ -6285,7 +6285,7 @@ function styleAllStudentPrintSheet(ws, aoa){
     else if(C===eventCol) style.fill = hasNeedsHearing ? missingFill : eventFill;
     else if(C>eventCol) style.fill = planFill;
     if(hasNeedsHearing){
-      style.alignment = {vertical:'top', horizontal:'center', wrapText:true, shrinkToFit:false};
+      style.alignment = {vertical:'bottom', horizontal:'center', wrapText:true, shrinkToFit:false};
     }
     return style;
   });
