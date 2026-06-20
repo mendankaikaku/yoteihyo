@@ -5070,6 +5070,16 @@ function allListPrintFindIndex(headerCanon, names){
 function allListPrintCell(row, idx){
   return idx >= 0 ? norm(row[idx]) : '';
 }
+
+function allListPrintStatusWithArrow(value){
+  const v = norm(value);
+  return v ? `${v}→　　　　` : '';
+}
+function allListPrintDetailWithArrow(label, value){
+  const v = allListPrintStatusWithArrow(value);
+  return v ? `${label}:${v}` : '';
+}
+
 function allListPrintEventLine(parts, details){
   const head = parts.filter(Boolean).join(' ');
   const body = details.filter(Boolean).join(' / ');
@@ -5095,6 +5105,7 @@ function buildAllStudentPrintAoaFromFullAoa(grade, fullAoa){
   smallNos.sort((a,b)=>Number(a)-Number(b));
 
   const largeGroups = new Map();
+  const largeGroupCols = new Set();
   for(let c=0;c<header.length;c++){
     const h = header[c];
     if(!h || isAllListDateDynamicHeader(h)) continue;
@@ -5106,9 +5117,29 @@ function buildAllStudentPrintAoaFromFullAoa(grade, fullAoa){
     if(!base) continue;
     if(!largeGroups.has(base)) largeGroups.set(base, []);
     largeGroups.get(base).push({field, col:c});
+    largeGroupCols.add(c);
   }
 
-  const out = [[`${grade} 印刷用リスト`], ['生徒番号','名前','高校','担当','備考','模試イベント']];
+  // 手で追加した列を印刷用にも出す。
+  // 標準列・小規模列・人数多い模試/イベント列・3日予定結果列以外を「手追加列」とみなす。
+  const manualCols = [];
+  const identity = new Set(['学年','生徒番号','生徒名','読み仮名','担当','高校','備考']);
+  for(let c=0;c<header.length;c++){
+    const h = header[c];
+    const hc = canon[c];
+    if(!h) continue;
+    if(identity.has(hc)) continue;
+    if(isAllListDateDynamicHeader(h)) continue;
+    if(/^(?:小規模\s*)?[0-9０-９]+\s*\n(日付|名称|回答|Comiru|備考|科目変更)$/.test(h)) continue;
+    if(largeGroupCols.has(c)) continue;
+    manualCols.push({col:c, label:h.replace(/\n+/g, ' ')});
+  }
+
+  const printHeader = ['生徒番号','名前','高校','担当','備考', ...manualCols.map(x => x.label || '書き込み欄')];
+  if(manualCols.length === 0) printHeader.push('書き込み欄');
+  printHeader.push('模試イベント');
+
+  const out = [[`${grade} 印刷用リスト`], printHeader];
   for(let r=2;r<(fullAoa || []).length;r++){
     const row = fullAoa[r] || [];
     if(!row.some(v => norm(v))) continue;
@@ -5125,9 +5156,9 @@ function buildAllStudentPrintAoaFromFullAoa(grade, fullAoa){
       const subject = allListPrintCell(row, find('科目変更'));
       if(d || name || ans || comiru || note || subject){
         const details = [];
-        if(ans) details.push(`回答:${ans}`);
-        if(comiru) details.push(`Comiru:${comiru}`);
-        if(subject) details.push(`科目変更:${subject}`);
+        if(ans) details.push(allListPrintDetailWithArrow('回答', ans));
+        if(comiru) details.push(allListPrintDetailWithArrow('Comiru', comiru));
+        if(subject) details.push(allListPrintDetailWithArrow('科目変更', subject));
         if(note) details.push(`備考:${note}`);
         lines.push(allListPrintEventLine([d, name], details));
       }
@@ -5137,7 +5168,12 @@ function buildAllStudentPrintAoaFromFullAoa(grade, fullAoa){
       const details = [];
       for(const x of cols){
         const v = allListPrintCell(row, x.col);
-        if(v) details.push(`${x.field}:${v}`);
+        if(!v) continue;
+        if(['受験','参加','Comiru','科目変更'].includes(x.field)){
+          details.push(allListPrintDetailWithArrow(x.field, v));
+        }else{
+          details.push(`${x.field}:${v}`);
+        }
       }
       if(details.length) lines.push(allListPrintEventLine([base], details));
     }
@@ -5148,15 +5184,19 @@ function buildAllStudentPrintAoaFromFullAoa(grade, fullAoa){
       allListPrintCell(row, idxSchool),
       allListPrintCell(row, idxTeacher),
       allListPrintCell(row, idxNote),
-      lines.join('\n')
+      ...manualCols.map(x => allListPrintCell(row, x.col))
     ];
+    if(manualCols.length === 0) outRow.push('');
+    outRow.push(lines.join('\n'));
     if(outRow.some(v => norm(v))) out.push(outRow);
   }
+  out._manualPrintColumnCount = manualCols.length || 1;
   return out;
 }
 function styleAllStudentPrintSheet(ws, aoa){
-  const widths = [10, 14, 18, 12, 22, 95];
-  const range = applyNiceSheetSettings(ws, aoa, widths, {rows:{min:22,max:140,header:34,pxPerLine:16}});
+  const manualCount = Math.max(1, Number(aoa?._manualPrintColumnCount || 1));
+  const widths = [10, 14, 18, 12, 22, ...Array(manualCount).fill(16), 80];
+  const range = applyNiceSheetSettings(ws, aoa, widths, {rows:{min:24,max:150,header:34,pxPerLine:16}});
   ws['!rows'][0] = {hpt:28};
   ws['!freeze'] = {xSplit:2, ySplit:2};
   ws['!pageSetup'] = {orientation:'landscape', paperSize:12, fitToWidth:1, fitToHeight:0};
@@ -5169,16 +5209,19 @@ function styleAllStudentPrintSheet(ws, aoa){
   const titleFill = {fgColor:{rgb:'DBEAFE'}};
   const headerFill = {fgColor:{rgb:'E0F2FE'}};
   const nameFill = {fgColor:{rgb:'F1F5F9'}};
+  const manualFill = {fgColor:{rgb:'FFFBEB'}};
   const eventFill = {fgColor:{rgb:'F5F3FF'}};
   const fontTitle = {name:'Yu Gothic', sz:14, bold:true, color:{rgb:'111827'}};
   const fontHeader = {name:'Yu Gothic', sz:9, bold:true, color:{rgb:'111827'}};
   const fontBase = {name:'Yu Gothic', sz:8, color:{rgb:'111827'}};
+  const eventCol = (aoa[1] || []).length - 1;
   setRangeStyle(ws, range, (R,C,cell)=>{
     const style = {font:R===0?fontTitle:(R===1?fontHeader:fontBase), alignment:{vertical:'center', horizontal:'center', wrapText:true, shrinkToFit:true}, border};
     if(R===0) style.fill = titleFill;
     else if(R===1) style.fill = headerFill;
     else if(C<=1) style.fill = nameFill;
-    else if(C===5) style.fill = eventFill;
+    else if(C>=5 && C<eventCol) style.fill = manualFill;
+    else if(C===eventCol) style.fill = eventFill;
     return style;
   });
   return ws;
