@@ -1779,6 +1779,99 @@ function parseOneRowResultSheet(aoa, file, sheetName){
   return {records, logRows};
 }
 
+
+function flexibleResultTextLooksImportant(text){
+  const t = norm(text);
+  return /講座を?(完全)?(修得|習得)|完全(修得|習得)|修得|習得|SS判定|S判定|合格|受講開始|完全修得|完全習得/.test(t);
+}
+function findDateTimeNearRows(aoa, r, c){
+  const tryCells = [];
+  for(const rr of [r, r-1, r-2, r+1]){
+    if(rr < 0 || rr >= aoa.length) continue;
+    const row = aoa[rr] || [];
+    for(const cc of [c, c+1, c+2, 7, 8, 9, row.length-1]){
+      if(cc >= 0 && cc < row.length) tryCells.push(row[cc]);
+    }
+    for(let i=0;i<Math.min(row.length, 12);i++) tryCells.push(row[i]);
+  }
+  for(const v of tryCells){
+    const dt = parseDateTimeLoose(v) || parseDateLoose(v);
+    if(dt) return dt;
+  }
+  return null;
+}
+function findStudentInfoNearRows(aoa, r){
+  const candidates = [];
+  for(const rr of [r, r-1, r-2, r+1]){
+    if(rr < 0 || rr >= aoa.length) continue;
+    const row = aoa[rr] || [];
+    const no = norm(row[0]);
+    const name = norm(row[1]);
+    if(no || name) candidates.push({studentNo:no, rawName:name});
+    for(let c=0;c<Math.min(row.length, 6);c++){
+      const v = norm(row[c]);
+      if(!v) continue;
+      if(/^\d{3,}$/.test(toHalfWidth(v).replace(/\D/g,''))) candidates.push({studentNo:v, rawName:''});
+    }
+  }
+  for(const cand of candidates){
+    if(cand.rawName || cand.studentNo) return cand;
+  }
+  return {studentNo:'', rawName:''};
+}
+function flexibleStudyAround(row, resultCol){
+  const cells = (row || []).map(norm);
+  const left = resultCol > 0 ? cells[resultCol-1] : '';
+  const right = resultCol+1 < cells.length ? cells[resultCol+1] : '';
+  const joined = cells.filter(Boolean).join(' / ');
+  if(left && !flexibleResultTextLooksImportant(left)) return left;
+  if(right && !flexibleResultTextLooksImportant(right)) return right;
+  return joined.replace(/日時|生徒番号|名前|学年|区分|いいね/g,'').trim();
+}
+
+function isHighMasterDailyAoa(aoa){
+  const hr = findHeaderRowIndexByKeywords(aoa, ['正解数','不正解数']);
+  if(hr < 0) return false;
+  const joined = (aoa[hr] || []).map(v => norm(v)).join('|');
+  return /日付/.test(joined) && /生徒番号/.test(joined) && /講座名/.test(joined) && /合否/.test(joined);
+}
+
+function parseFlexibleResultSheet(aoa, file, sheetName){
+  const records = [];
+  const logRows = [];
+  const seen = new Set();
+  for(let r=0; r<aoa.length; r++){
+    const row = aoa[r] || [];
+    for(let c=0; c<row.length; c++){
+      const cellText = norm(row[c]);
+      if(!cellText || !flexibleResultTextLooksImportant(cellText)) continue;
+      const dt = findDateTimeNearRows(aoa, r, c);
+      if(!dt){
+        logRows.push([file.name, "注意", `柔軟読取で日時なしのためスキップ: ${sheetName} ${r+1}行${c+1}列`, cellText]);
+        continue;
+      }
+      const {studentNo, rawName} = findStudentInfoNearRows(aoa, r);
+      const student = resolveResultStudent(rawName, studentNo);
+      const study = flexibleStudyAround(row, c);
+      const result = cellText;
+      const dateOnly = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
+      const key = [normalizeStudentNoKey(studentNo) || normalizeNameKey(rawName || student), ymdhm(dt), study, result].join('|');
+      if(seen.has(key)) continue;
+      seen.add(key);
+      records.push({
+        student, rawName, studentNo, grade:'', type:'', study, result, like:'',
+        dateObj: dateOnly, dateKey: ymd(dateOnly), dateLabel: `${mmdd(dateOnly)}(${WEEK_JA[dateOnly.getDay()]})`,
+        datetime: dt, timeLabel: hm(dt), category: classifyResult(study, result),
+        summary: summarizeResult(study, result), sourceFile:file.name, sourceSheet:sheetName, sourceFormat:"柔軟読取（別構造シート）"
+      });
+    }
+  }
+  if(records.length){
+    logRows.push([file.name, "成功", `結果 ${records.length}件読み込み（柔軟読取：別構造シート）`, sheetName]);
+  }
+  return {records, logRows};
+}
+
 async function parseResultFile(file){
   const logRows = [];
   const records = [];
@@ -1797,6 +1890,12 @@ async function parseResultFile(file){
       }
 
       const before = records.length;
+
+      if(isHighMasterDailyAoa(aoa)){
+        logRows.push([file.name, "情報", `高速マスターデイリー形式を検出: ${sheetName}`, "このシートは修得結果ではなく、高速基礎ランキングの正解数として使います"]);
+        continue;
+      }
+
       const twoRowParsed = parseTwoRowResultSheet(aoa, file, sheetName);
       if(twoRowParsed.records.length){
         records.push(...twoRowParsed.records);
@@ -1819,8 +1918,19 @@ async function parseResultFile(file){
       if(oneRowParsed.records.length){
         logRows.push([file.name, "情報", `シート読取完了: ${sheetName} / 1行形式 / ${oneRowParsed.records.length}件`, ""]);
       }else{
-        const sample = aoa.slice(0,4).map((row,i)=>`${i+1}行目: ${(row || []).slice(0,10).map(norm).join(" | ")}`).join(" / ");
-        logRows.push([file.name, "注意", `シートから結果0件: ${sheetName}`, sample || "サンプルなし"]);
+        const flexibleParsed = parseFlexibleResultSheet(aoa, file, sheetName);
+        records.push(...flexibleParsed.records);
+        logRows.push(...flexibleParsed.logRows);
+        const achF = flexibleParsed.records.filter(isAchievementResultRecord);
+        if(achF.length){
+          logRows.push([file.name, "情報", `修得系 ${achF.length}件検出（柔軟読取）`, achF.slice(0,5).map(resultDebugLine).join(" / ")]);
+        }
+        if(flexibleParsed.records.length){
+          logRows.push([file.name, "情報", `シート読取完了: ${sheetName} / 柔軟読取 / ${flexibleParsed.records.length}件`, ""]);
+        }else{
+          const sample = aoa.slice(0,4).map((row,i)=>`${i+1}行目: ${(row || []).slice(0,10).map(norm).join(" | ")}`).join(" / ");
+          logRows.push([file.name, "注意", `シートから結果0件: ${sheetName}`, sample || "サンプルなし"]);
+        }
       }
     }
     logRows.push([file.name, records.length ? "成功" : "注意", `結果Excel合計 ${records.length}件読み込み`, "parseResultFile"]);
@@ -3669,7 +3779,8 @@ function extractHighSpeedRowsFromSheets(sheets, from, to){
       stage: headerIndexIncludes(header, ['ステージ','ユニット']),
       test: headerIndexIncludes(header, ['テスト']),
       correct: headerIndexIncludes(header, ['合格数','正解数']),
-      incorrect: headerIndexIncludes(header, ['不正解数'])
+      incorrect: headerIndexIncludes(header, ['不正解数']),
+      pass: headerIndexIncludes(header, ['合否','合格','判定'])
     };
     if(idx.correct < 0) continue;
     for(let r=hr+1;r<aoa.length;r++){
@@ -3689,10 +3800,11 @@ function extractHighSpeedRowsFromSheets(sheets, from, to){
       const course = idx.course >= 0 ? norm(row[idx.course]) : '';
       const stage = idx.stage >= 0 ? norm(row[idx.stage]) : '';
       const test = idx.test >= 0 ? norm(row[idx.test]) : '';
-      const key = [ymd(dt), normalizeStudentNoKey(studentNo) || normalizeNameKey(resolvedName), course, stage, test, correct, incorrect, sh.sourceFile, sh.sheetName, r].join('|');
+      const pass = idx.pass >= 0 ? norm(row[idx.pass]) : '';
+      const key = [ymd(dt), normalizeStudentNoKey(studentNo) || normalizeNameKey(resolvedName), course, stage, test, correct, incorrect, pass, sh.sourceFile, sh.sheetName, r].join('|');
       if(seen.has(key)) continue;
       seen.add(key);
-      rows.push({dateObj:dt, studentNo, student:resolvedName, rawName, grade, correct, incorrect, total, course, stage, test, sourceFile:sh.sourceFile, sourceSheet:sh.sheetName});
+      rows.push({dateObj:dt, studentNo, student:resolvedName, rawName, grade, correct, incorrect, total, course, stage, test, pass, sourceFile:sh.sourceFile, sourceSheet:sh.sheetName});
     }
   }
   return rows;
@@ -3788,7 +3900,7 @@ async function downloadMonthlyPosterResultWorkbook(){
     XLSX.writeFile(wb, `校舎掲示用_毎日更新_${ymd(month.from)}-${ymd(month.to)}.xlsx`);
     const counts = MONTHLY_POSTER_RESULT_RULES.map(rule => {
       const src = rule.keyword === '連続で実施' ? yesterdayResults : monthResults;
-      return `${rule.keyword}: ${src.filter(r => norm(r.result).includes(rule.keyword)).length}件`;
+      return `${rule.keyword}: ${src.filter(r => resultKeywordMatches(r, rule.keyword)).length}件`;
     }).join('\n');
     log(`毎日更新を作成しました\n連続実施・高速基礎ランキング対象日: ${ymd(yesterday.from)}\n修得系対象期間: ${ymd(month.from)}〜${ymd(month.to)}\n${counts}\n高速基礎ランキング: ${highSpeedRows.length}件`);
   }catch(e){
