@@ -634,13 +634,25 @@ function parseDateLoose(value, fallbackYear = new Date().getFullYear()){
   let s = String(value).trim();
   if(!s) return null;
   s = s.replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0)-0xFEE0));
-  s = s.replace(/[年月]/g,"/").replace(/日/g,"").replace(/\(.+?\)|（.+?）/g,"").trim();
-  let m = s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})$/);
+  s = s.replace(/[－ー―]/g, "-");
+  s = s.replace(/[年月]/g,"/").replace(/日/g," ");
+  s = s.replace(/\(.+?\)|（.+?）/g," ").replace(/\s+/g," ").trim();
+
+  // 高速マスターデイリーの日付は 2026/6/19 のような表示。
+  // さらに、JSON/シート保持側では 2026-06-19 00:00 のように時刻付き文字列になることがある。
+  // そのため、末尾に時刻や余分な文字があっても先頭の日付部分だけ拾う。
+  let m = s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})(?:\s+.*)?$/);
   if(m) return new Date(Number(m[1]), Number(m[2])-1, Number(m[3]));
-  m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})$/);
+
+  m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})(?:\s+.*)?$/);
   if(m) return new Date(fallbackYear, Number(m[1])-1, Number(m[2]));
+
   m = s.match(/(\d{1,2})\s*月\s*(\d{1,2})\s*日?/);
   if(m) return new Date(fallbackYear, Number(m[1])-1, Number(m[2]));
+
+  const parsed = new Date(s);
+  if(!isNaN(parsed)) return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+
   return null;
 }
 
@@ -3974,6 +3986,49 @@ function sampleResultLinesForDailyDiagnosis(records, limit=8){
   if(!arr.length) return 'サンプルなし';
   return arr.map(resultDebugLine).join('\n');
 }
+
+function highSpeedDateDistributionFromSheets(sheets){
+  const map = new Map();
+  for(const sh of sheets || []){
+    const aoa = sheetObjectToAoa(sh).filter(row => (row || []).some(v => norm(v)));
+    if(!aoa.length) continue;
+    let hr = findHeaderRowIndexByKeywords(aoa, ['正解数','不正解数']);
+    if(hr < 0) hr = findHeaderRowIndexByKeywords(aoa, ['合格数']);
+    if(hr < 0) continue;
+    const header = aoa[hr] || [];
+    const idx = {
+      date: headerIndexIncludes(header, ['日付','日時']),
+      correct: headerIndexIncludes(header, ['合格数','正解数']),
+      incorrect: headerIndexIncludes(header, ['不正解数'])
+    };
+    if(idx.date < 0 || idx.correct < 0) continue;
+    for(let r=hr+1; r<aoa.length; r++){
+      const row = aoa[r] || [];
+      if(!row.some(v => norm(v))) continue;
+      const dt = parseDateLoose(row[idx.date]);
+      const correct = numberLoose(row[idx.correct]);
+      const incorrect = idx.incorrect >= 0 ? numberLoose(row[idx.incorrect]) : 0;
+      if(!dt || (!correct && !incorrect)) continue;
+      const key = ymd(dt);
+      map.set(key, (map.get(key) || 0) + 1);
+    }
+  }
+  return [...map.entries()].sort((a,b)=>a[0].localeCompare(b[0]));
+}
+function latestHighSpeedDateRangeFromSheets(sheets){
+  const dist = highSpeedDateDistributionFromSheets(sheets);
+  if(!dist.length) return null;
+  const latest = dist[dist.length - 1][0];
+  const d = parseDateLoose(latest);
+  if(!d) return null;
+  return {from:new Date(d.getFullYear(), d.getMonth(), d.getDate()), to:new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23,59,59,999), label:`${d.getMonth()+1}/${d.getDate()}(${WEEK_JA[d.getDay()]})`, count:dist[dist.length-1][1], distribution:dist};
+}
+function formatHighSpeedDistribution(distribution){
+  const arr = distribution || [];
+  if(!arr.length) return '日付分布なし';
+  return arr.map(([d,c])=>`${d}: ${c}行`).join(' / ');
+}
+
 function diagnoseHighSpeedSheetsForDaily(sheets, from, to){
   const lines = [];
   for(const sh of sheets || []){
@@ -4058,8 +4113,18 @@ async function downloadMonthlyPosterResultWorkbook(){
     }
 
     const rawSheets = await loadRawResultSheetsDirectly();
-    const highSpeedRows = extractHighSpeedRowsFromSheets(rawSheets.sheets, yesterday.from, yesterday.to);
-    const rankingAoa = buildHighSpeedRankingAoa(highSpeedRows, yesterday.label);
+    let highSpeedTarget = yesterday;
+    let highSpeedRows = extractHighSpeedRowsFromSheets(rawSheets.sheets, highSpeedTarget.from, highSpeedTarget.to);
+    const highSpeedLatestInfo = latestHighSpeedDateRangeFromSheets(rawSheets.sheets);
+    let highSpeedFallbackMessage = '';
+    // 原則は前日1日分。ただし毎日更新.xlsx側に前日の高速マスターデータが0件で、
+    // 別日付の高速マスターデータが存在する場合は、空ランキング事故を避けるため最新日へ自動切替する。
+    if(!highSpeedRows.length && highSpeedLatestInfo){
+      highSpeedFallbackMessage = `高速基礎ランキングは対象日 ${ymd(yesterday.from)} が0件だったため、毎日更新.xlsx内の最新日 ${ymd(highSpeedLatestInfo.from)} に自動切替しました。`;
+      highSpeedTarget = highSpeedLatestInfo;
+      highSpeedRows = extractHighSpeedRowsFromSheets(rawSheets.sheets, highSpeedTarget.from, highSpeedTarget.to);
+    }
+    const rankingAoa = buildHighSpeedRankingAoa(highSpeedRows, highSpeedTarget.label);
     // 高速基礎ランキングは毎回きれいな順位表にするため、過去Excelの手修正復元は使わない。
     const rankingWs = aoaToSheet(rankingAoa);
     styleHighSpeedRankingSheet(rankingWs, rankingAoa);
@@ -4076,7 +4141,8 @@ async function downloadMonthlyPosterResultWorkbook(){
     const hsDiag = diagnoseHighSpeedSheetsForDaily(rawSheets.sheets, yesterday.from, yesterday.to);
 
     log(`毎日更新を作成しました
-連続実施・高速基礎ランキング対象日: ${ymd(yesterday.from)}
+連続実施対象日: ${ymd(yesterday.from)}
+高速基礎ランキング対象日: ${ymd(highSpeedTarget.from)}${highSpeedFallbackMessage ? '（自動切替）' : ''}
 修得系対象期間: ${ymd(month.from)}〜${ymd(month.to)}
 ${counts}
 高速基礎ランキング: ${highSpeedRows.length}件
@@ -4103,7 +4169,8 @@ ${formatLogRowsForDailyDiagnosis(directLoaded.logRows, 80)}
 --- 高速マスターシート診断 ---
 元シート数: ${(rawSheets.sheets || []).length}
 高速基礎ランキング採用行: ${highSpeedRows.length}
-${diagnoseHighSpeedSheetsForDaily(rawSheets.sheets, yesterday.from, yesterday.to)}
+高速マスターデイリー日付分布: ${formatHighSpeedDistribution(highSpeedLatestInfo ? highSpeedLatestInfo.distribution : highSpeedDateDistributionFromSheets(rawSheets.sheets))}
+${highSpeedFallbackMessage ? highSpeedFallbackMessage + '\n' : ''}${diagnoseHighSpeedSheetsForDaily(rawSheets.sheets, highSpeedTarget.from, highSpeedTarget.to)}
 
 --- 元シート読取ログ ---
 ${formatLogRowsForDailyDiagnosis(rawSheets.logRows, 40)}
