@@ -5135,7 +5135,7 @@ function buildAllStudentPrintAoaFromFullAoa(grade, fullAoa){
     manualCols.push({col:c, label:h.replace(/\n+/g, ' ')});
   }
 
-  const printHeader = ['生徒番号','名前','高校','担当','備考', ...manualCols.map(x => x.label || '書き込み欄')];
+  const printHeader = ['生徒番号','名前','高校','担当','備考(書き込み欄)', ...manualCols.map(x => x.label || '書き込み欄')];
   if(manualCols.length === 0) printHeader.push('書き込み欄');
   printHeader.push('模試イベント');
 
