@@ -4482,21 +4482,44 @@ function mergeRestoredAllListAoa(grade, generatedAoa){
   const genCanon = genHeader.map(allListCanonicalHeader);
   const genDynamic = genHeader.map(isAllListDateDynamicHeader);
 
-  const restoreHeader = restore.header || [];
+  const restoreHeader = (restore.header || []).map(normalizeAllListHeaderText);
   const restoreCanon = restore.headerCanon || restoreHeader.map(allListCanonicalHeader);
 
-  // 既存の手修正版にだけある列は、日付の予定/結果列以外なら残す。
-  const extraHeaders = [];
+  function findUnusedGenIndexByRestoreHeader(h, hc, usedGen){
+    const raw = normalizeAllListHeaderText(h);
+    let idx = genHeader.findIndex((gh,i)=> !usedGen.has(i) && gh === raw);
+    if(idx >= 0) return idx;
+    idx = genCanon.findIndex((gc,i)=> !usedGen.has(i) && gc === hc && !genDynamic[i]);
+    return idx;
+  }
+
+  // 既存の全員分リストの列順をベースにして、手で挿入した列を元の位置に残す。
+  // 旧日付の予定/結果列だけは、基準日が変わると不要になるので、現在の自動列に一致しない場合は捨てる。
+  const slots = [];
+  const usedGen = new Set();
   for(let i=0;i<restoreHeader.length;i++){
     const h = restoreHeader[i];
     const hc = restoreCanon[i];
-    if(!h || isAllListDateDynamicHeader(h)) continue;
-    if(genCanon.includes(hc) || genHeader.includes(h)) continue;
-    extraHeaders.push({header:h, canon:hc, restoreIndex:i});
+    if(!h) continue;
+    const genIdx = findUnusedGenIndexByRestoreHeader(h, hc, usedGen);
+    if(genIdx >= 0){
+      slots.push({type:'gen', genIndex:genIdx, restoreIndex:i, header:genHeader[genIdx], canon:genCanon[genIdx]});
+      usedGen.add(genIdx);
+      continue;
+    }
+    if(isAllListDateDynamicHeader(h)) continue;
+    slots.push({type:'extra', restoreIndex:i, header:h, canon:hc});
   }
 
-  const header = [...genHeader, ...extraHeaders.map(x=>x.header)];
-  const headerCanon = [...genCanon, ...extraHeaders.map(x=>x.canon)];
+  // 新しく自動生成された列だけ末尾に追加する。
+  // 手動列は上の slots で元位置維持、追加自動列だけ末尾。
+  for(let i=0;i<genHeader.length;i++){
+    if(usedGen.has(i)) continue;
+    slots.push({type:'gen', genIndex:i, restoreIndex:-1, header:genHeader[i], canon:genCanon[i]});
+  }
+
+  const header = slots.map(x=>x.header);
+  const headerCanon = slots.map(x=>x.canon);
   const out = [title, header];
   const used = new Set();
 
@@ -4507,15 +4530,17 @@ function mergeRestoredAllListAoa(grade, generatedAoa){
     if(key && key !== 'name:') generatedByKey.set(key, row);
   }
 
-  // 既存の全員分リストの行順を先に再現する。
-  // 空白行・区切り行・手動メモ行は、可能な範囲で残す。
   const rawRows = restore.rawRows || (restore.order || []).map(key => ({key, row:restore.rows.get(key)||[], isBlank:false}));
   for(const item of rawRows){
     const restored = item.row || [];
     const key = item.key || allListRowKeyFromCells(restored, restoreHeader);
 
     if(item.isBlank || !key || key === 'name:'){
-      const manualRow = allListMapRowByHeaders(restored, restoreCanon, headerCanon, header);
+      const manualRow = Array(header.length).fill('');
+      for(let c=0;c<slots.length;c++){
+        const ri = slots[c].restoreIndex;
+        if(ri >= 0) manualRow[c] = restored[ri] || '';
+      }
       out.push(manualRow);
       continue;
     }
@@ -4526,15 +4551,21 @@ function mergeRestoredAllListAoa(grade, generatedAoa){
     const newRow = Array(header.length).fill('');
     const studentName = allListStudentNameFromRow(restored, restoreCanon) || (gen ? allListStudentNameFromRow(gen, genCanon) : '');
 
-    for(let c=0;c<genHeader.length;c++){
-      const col = genHeader[c];
-      const canon = genCanon[c];
-      const restoredIdx = restoreCanon.findIndex(h => h === canon);
-      const restoredVal = restoredIdx >= 0 ? norm(restored[restoredIdx]) : '';
-      const autoVal = gen ? norm(gen[c]) : '';
+    for(let c=0;c<slots.length;c++){
+      const slot = slots[c];
+      if(slot.type === 'extra'){
+        newRow[c] = slot.restoreIndex >= 0 ? (restored[slot.restoreIndex] || '') : '';
+        continue;
+      }
 
-      if(genDynamic[c]){
-        // 予定・結果は自動データ優先。違えばログに残す。
+      const gi = slot.genIndex;
+      const col = genHeader[gi];
+      const canon = genCanon[gi];
+      const restoredIdx = slot.restoreIndex >= 0 ? slot.restoreIndex : restoreCanon.findIndex(h => h === canon);
+      const restoredVal = restoredIdx >= 0 ? norm(restored[restoredIdx]) : '';
+      const autoVal = gen ? norm(gen[gi]) : '';
+
+      if(genDynamic[gi]){
         newRow[c] = autoVal;
         if(restoredVal && restoredVal !== autoVal){
           const kind = /結果/.test(col) ? '結果上書き' : '予定上書き';
@@ -4544,7 +4575,6 @@ function mergeRestoredAllListAoa(grade, generatedAoa){
       }
 
       if(allListIsManualPriorityHeader(col, canon)){
-        // 模試・イベント・手動確認欄などは全員分リスト優先。
         newRow[c] = restoredVal !== '' ? restoredVal : autoVal;
         if(restoredVal && gen && restoredVal !== autoVal){
           allListAddUpdateLog('手修正優先', grade, key, studentName, col, col, restoredVal, autoVal, restoredVal, '模試・イベント・確認メモ系は全員分リストの手修正を採用');
@@ -4552,23 +4582,21 @@ function mergeRestoredAllListAoa(grade, generatedAoa){
         continue;
       }
 
-      // 基本情報などは、手修正版に値があれば維持。空なら自動値。
       newRow[c] = restoredVal !== '' ? restoredVal : autoVal;
     }
 
-    for(let i=0;i<extraHeaders.length;i++){
-      const ex = extraHeaders[i];
-      newRow[genHeader.length+i] = restored[ex.restoreIndex] || '';
-    }
     out.push(newRow);
   }
 
   // 自動データにはいるが、既存全員分リストにない生徒は末尾へ追加。
-  // 行削除との区別がつかないため、ログに出す。
   for(const row of generatedRows){
     const key = allListRowKeyFromCells(row, genHeader);
     if(!key || key === 'name:' || used.has(key)) continue;
-    const newRow = [...row, ...extraHeaders.map(()=> '')];
+    const newRow = Array(header.length).fill('');
+    for(let c=0;c<slots.length;c++){
+      const slot = slots[c];
+      if(slot.type === 'gen') newRow[c] = row[slot.genIndex] || '';
+    }
     const studentName = allListStudentNameFromRow(row, genCanon);
     out.push(newRow);
     allListAddUpdateLog('自動行追加', grade, key, studentName, '生徒行', '行', '', '入力用/対応表に存在', '末尾へ追加', '全員分リストにない自動データ生徒を追加。不要なら全員分リスト側で確認');
@@ -4829,17 +4857,17 @@ function styleAllStudentGradeSheet(ws, aoa){
   const widths = [];
   for(let c=0;c<colCount;c++){
     const h=String(aoa[1]?.[c]||'');
-    if(c===0) widths.push(3);          // 学年
+    if(c===0) widths.push(5);          // 学年
     else if(c===1) widths.push(9);     // 生徒番号
-    else if(c===2) widths.push(8);    // 生徒名
+    else if(c===2) widths.push(11);    // 生徒名
     else if(c===3) widths.push(8);     // 読み仮名
-    else if(c===4) widths.push(3);     // 担当
-    else if(c===5) widths.push(4);    // 高校
+    else if(c===4) widths.push(9);     // 担当
+    else if(c===5) widths.push(10);    // 高校
     else if(c===6) widths.push(12);    // 備考
     else if(/(?:小規模\s*)?\d+\n日付$/.test(h)) widths.push(9);
     else if(/(?:小規模\s*)?\d+\n名称$/.test(h)) widths.push(16);
-    else if(/(?:小規模\s*)?\d+\n回答$/.test(h)) widths.push(3);
-    else if(/(?:小規模\s*)?\d+\nComiru$/.test(h)) widths.push(3);
+    else if(/(?:小規模\s*)?\d+\n回答$/.test(h)) widths.push(7);
+    else if(/(?:小規模\s*)?\d+\nComiru$/.test(h)) widths.push(7);
     else if(/(?:小規模\s*)?\d+\n備考$/.test(h)) widths.push(13);
     else if(/\n(受験|参加)$/.test(h)) widths.push(6);
     else if(/\nComiru$/.test(h)) widths.push(7);
