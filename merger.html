@@ -2124,6 +2124,18 @@ function matchTokens(s){
 function resultFullText(r){
   return `${r.study || ""} ${r.result || ""} ${r.summary || ""} ${r.category || ""}`;
 }
+
+function resultKeywordMatches(r, keyword){
+  const k = norm(keyword);
+  const text = resultFullText(r);
+  if(!k) return true;
+  if(text.includes(k)) return true;
+  // 「習得」と「修得」の表記ゆれを許可。毎日更新側は「修得」、掲示ルール側は「習得」などでも拾う。
+  if(/修得|習得/.test(k)) return /修得|習得/.test(text);
+  if(/完全修得|完全習得/.test(k)) return /完全(修得|習得)|講座を完全(修得|習得)/.test(text);
+  return false;
+}
+
 function isCourseMatch(planContent, resultRec){
   const p = normalizeMatchText(planContent);
   const rt = normalizeMatchText(resultFullText(resultRec));
@@ -3518,7 +3530,9 @@ function buildMonthlyPosterContinuousAoa(records, rule, label){
 function buildMonthlyPosterResultAoa(records, rule, label){
   if(rule.keyword === '連続で実施') return buildMonthlyPosterContinuousAoa(records, rule, label);
   const rows = (records || [])
-    .filter(r => norm(r.result).includes(rule.keyword))
+    // 以前は r.result だけを見ていたため、「講座を修得」が学習内容/summary側に入った行を落とす可能性があった。
+    // ここでは study + result + summary + category 全体を見て判定する。
+    .filter(r => resultKeywordMatches(r, rule.keyword))
     .map(r => ({...resultPosterStudentMeta(r), content:monthlyPosterAchievementContent(r), dateKey:r.dateKey || '', timeLabel:r.timeLabel || ''}))
     .sort((a,b)=> String(a.grade||'').localeCompare(String(b.grade||''),'ja') || String(a.kana || a.student).localeCompare(String(b.kana || b.student),'ja') || String(a.dateKey).localeCompare(String(b.dateKey)) || String(a.timeLabel).localeCompare(String(b.timeLabel)));
   const title = `${label}　${rule.keyword}`;
@@ -5634,20 +5648,26 @@ async function setBundleFolderFiles(fileList){
     const isJson = /\.json$/i.test(name);
     const parts = pathPartsOfFile(f).map(p => p.toLowerCase());
     const relLower = String(f.webkitRelativePath || f.name || '').toLowerCase();
+
+    // 現在の運用：
+    // 保存復元フォルダ/毎日更新/毎日更新.xlsx は「結果データ」。
+    // 掲示用Excelは毎日更新フォルダには入れない。
     const isDailyResultWorkbook = isExcel && (
       name === '毎日更新.xlsx' ||
       /^毎日更新\.(xlsx|xlsm|xls)$/i.test(name) ||
       /毎日更新\.xlsx$/i.test(relLower) ||
-      /毎日更新[\/\\]+毎日更新\.(xlsx|xlsm|xls)$/i.test(relLower)
+      /毎日更新[\/\\]+毎日更新\.(xlsx|xlsm|xls)$/i.test(relLower) ||
+      (filePathIncludes(f, '毎日更新') && !filePathIncludes(f, '毎日掲示'))
     );
+
     if(isJson && (parts.some(p => p === 'json' || p.includes('json') || p.includes('履歴')) || /result[_-]?history|結果履歴/.test(relLower))) histories.push(f);
-    // 重要：毎日更新.xlsx は結果データとして読む。ここを掲示用復元に分類すると、毎日更新.xlsxが結果として読まれない。
+    // 毎日更新フォルダ内のExcelは、掲示用ではなく結果データとして読む。
     else if(isDailyResultWorkbook) results.push(f);
     else if(isExcel && (filePathIncludes(f, '全員分リスト') || filePathIncludes(f, '全員リスト'))) allLists.push(f);
     else if(isExcel && filePathIncludes(f, '全体予定表')) wholeSchedules.push(f);
     else if(isCsv && (filePathIncludes(f, 'Comiru') || filePathIncludes(f, 'コミル') || /comiru|コミル/i.test(relLower))) comiruCsvs.push(f);
-    // 掲示用手修正版は「毎日掲示」フォルダー、または毎日更新.xlsx以外の掲示用Excelだけ読む。
-    else if(isExcel && (filePathIncludes(f, '毎日掲示') || (filePathIncludes(f, '毎日更新') && !isDailyResultWorkbook))) dailyPosters.push(f);
+    // 掲示用手修正版を置く場合は「毎日掲示」フォルダだけを使う。
+    else if(isExcel && filePathIncludes(f, '毎日掲示')) dailyPosters.push(f);
     else if(isExcel && filePathIncludes(f, '打ち込み結果')) planned.push(f);
     else if((isExcel || isCsv) && filePathIncludes(f, '対応表')) rosters.push(f);
   }
@@ -5679,7 +5699,7 @@ async function setBundleFolderFiles(fileList){
 毎日更新.xlsx（結果データ）: ${results.length}件
 結果履歴JSON（json）: ${histories.length}件
 全員分リスト復元Excel（全員分リスト）: ${allLists.length}件${allListRestoreLogs.length ? '（' + allListRestoreLogs.join(' / ') + '）' : ''}
-掲示用手修正Excel（毎日掲示/毎日更新内の毎日更新.xlsx以外）: ${dailyPosters.length}件${dailyPosterRestoreLogs.length ? '（' + dailyPosterRestoreLogs.join(' / ') + '）' : ''}
+掲示用手修正Excel（毎日掲示）: ${dailyPosters.length}件${dailyPosterRestoreLogs.length ? '（' + dailyPosterRestoreLogs.join(' / ') + '）' : ''}
 全体予定表手修正Excel（全体予定表）: ${wholeSchedules.length}件${wholeScheduleRestoreLogs.length ? '（' + wholeScheduleRestoreLogs.join(' / ') + '）' : ''}
 Comiru CSV（Comiru）: ${comiruCsvs.length}件
 ${rosterMsg}`;
