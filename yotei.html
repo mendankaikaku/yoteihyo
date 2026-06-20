@@ -820,7 +820,7 @@ main.wrap{max-width:none!important;height:auto!important;min-height:0!important;
 
   <section class="card">
     <p class="sectionTitle">模試マスタ</p>
-    <div class="masterGridHint">模試名・日付・対象学年/生徒を登録します。面談では当日/後日/不受験、Comiru回答、コメントだけ確認します。</div>
+    <div class="masterGridHint">模試名・日付・対象学年/生徒を登録します。対象学年・対象生徒が空欄の模試は表示しません。</div>
     <details class="advanced">
       <summary>模試マスタを編集</summary>
       <div id="examMasterPanel"></div>
@@ -1873,11 +1873,14 @@ function visibleExamMastersForStudent(name){
     const diff=daysBetween(start,d);
     if(diff<0||diff>21)return false;
     const targetGrades=Array.isArray(ex.grades)?ex.grades.filter(Boolean):[];
+    const targetNames=Array.isArray(ex.students)?ex.students:splitTargetNames(ex.studentNames||'');
+    // 模試は対象学年・対象生徒がどちらも空なら「対象なし」。
+    // 新規追加時に勝手に全員へ表示しない。
+    if(!targetGrades.length && !targetNames.length) return false;
     if(targetGrades.length){
       if(!grade) return false;
       if(!targetGrades.includes(grade)) return false;
     }
-    const targetNames=Array.isArray(ex.students)?ex.students:splitTargetNames(ex.studentNames||'');
     return examTargetNameMatch(name,targetNames);
   });
 }
@@ -2045,7 +2048,7 @@ function renderExamMasterPanel(){
   host.innerHTML=rows.map((ex,i)=>{
     const tmpl=ex.subjectTemplate||defaultTemplateNameForType(ex.type||'common');
     const targetNames=(Array.isArray(ex.students)?ex.students:splitTargetNames(ex.studentNames||'')).join('、');
-    return `<div class="examMasterRow" data-master-row="${i}"><div><label>模試名</label><input data-master-name value="${escapeHtml(ex.name||'')}" placeholder="例：全国統一高校生テスト"></div><div><label>実施日</label><input data-master-date type="date" value="${escapeHtml(ex.date||'')}"></div><div><label>対象学年</label><div class="checkRow">${examGradeCheckboxes(ex.grades||[])}</div></div><div><label>対象生徒名</label><textarea data-master-students placeholder="空欄なら全員。例：北野、田中">${escapeHtml(targetNames)}</textarea></div><div><button type="button" class="small secondary" data-delete-master="${i}">削除</button></div></div>`;
+    return `<div class="examMasterRow" data-master-row="${i}"><div><label>模試名</label><input data-master-name value="${escapeHtml(ex.name||'')}" placeholder="例：全国統一高校生テスト"></div><div><label>実施日</label><input data-master-date type="date" value="${escapeHtml(ex.date||'')}"></div><div><label>対象学年</label><div class="checkRow">${examGradeCheckboxes(ex.grades||[])}</div></div><div><label>対象生徒名</label><textarea data-master-students placeholder="空欄なら対象なし。例：北野、田中">${escapeHtml(targetNames)}</textarea></div><div><button type="button" class="small secondary" data-delete-master="${i}">削除</button></div></div>`;
   }).join('')||'<div class="empty">まだ模試マスタがありません。</div>';
   $$('[data-delete-master]').forEach(btn=>btn.onclick=()=>{const arr=getExamMaster();arr.splice(Number(btn.dataset.deleteMaster),1);saveExamMasterData(arr);renderExamMasterPanel();renderStudents()});
   renderSubjectTemplateEditor();
@@ -2062,9 +2065,9 @@ function collectExamMasterFromPanel(){return $$('.examMasterRow').map(row=>({
   grades:Array.from(row.querySelectorAll('[data-master-grade]:checked')).map(x=>x.value),
   students:splitTargetNames(row.querySelector('[data-master-students]')?.value||'')
 })).filter(x=>x.name||x.date||x.grades.length||x.students.length)}
-function addExamMasterRow(){const arr=collectExamMasterFromPanel();arr.push({name:'',date:'',type:'common',subjectTemplate:'',grades:[],students:[]});saveExamMasterData(arr);renderExamMasterPanel()}
+function addExamMasterRow(){const arr=collectExamMasterFromPanel();arr.push({name:'',date:'',type:'common',subjectTemplate:'',grades:[],students:[],targetMode:'none'});saveExamMasterData(arr);renderExamMasterPanel()}
 function saveExamMasterFromPanel(){
-  const rows=applyPreviousExamTargetsWithConfirm(collectExamMasterFromPanel());
+  const rows=collectExamMasterFromPanel();
   saveExamMasterData(rows);
   updateExamTargetHistoryFromMasters(rows);
   renderExamMasterPanel();
@@ -2153,7 +2156,7 @@ function renderEventMasterPanel(){
     <div><label>イベント名</label><input data-event-master-name value="${escapeHtml(ev.name||'')}" placeholder="例：公開授業・説明会・面談会"></div>
     <div><label>日時</label><input data-event-master-datetime type="datetime-local" value="${escapeHtml(toDateTimeLocalValue(ev.datetime||''))}"></div>
     <div><label>対象学年</label><div class="checkRow">${gradeCheckboxes(ev.grades||[])}</div></div>
-    <div><label>対象生徒名</label><textarea data-event-master-students placeholder="空欄なら全員。例：北野、田中">${escapeHtml(targetNames)}</textarea></div>
+    <div><label>対象生徒名</label><textarea data-event-master-students placeholder="空欄なら対象なし。例：北野、田中">${escapeHtml(targetNames)}</textarea></div>
     <div><button type="button" class="small secondary" data-delete-event-master="${i}">削除</button></div>
   </div>`;
   }).join('')||'<div class="empty">まだイベントマスタがありません。</div>';
