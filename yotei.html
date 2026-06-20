@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>面談予定入力・準備資料アプリ now（合格設計図Excel A列固定・印刷PDF優先版）</title>
+<title>面談予定入力・準備資料アプリ v34（合格設計図Excel A列固定・印刷PDF優先版）</title>
 <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
 <script src="./libs/xlsx.bundle.js"></script>
 <script>if(!window.XLSX){document.write('<script src="./libs/xlsx.full.min.js"><\/script>');}</script>
@@ -820,7 +820,7 @@ main.wrap{max-width:none!important;height:auto!important;min-height:0!important;
 
   <section class="card">
     <p class="sectionTitle">模試マスタ</p>
-    <div class="masterGridHint">模試名・日付・対象学年/生徒を登録します。面談では当日/後日/不受験、Comiru回答、コメントだけ確認します。</div>
+    <div class="masterGridHint">模試名・日付・対象学年/生徒を登録します。対象学年/生徒が未選択の模試は、生徒の入力欄にも印刷にも表示しません。</div>
     <details class="advanced">
       <summary>模試マスタを編集</summary>
       <div id="examMasterPanel"></div>
@@ -1863,22 +1863,45 @@ function examTargetNameMatch(studentName, targetNames){
     return key && (stu===key || stu.startsWith(key) || key.startsWith(stu));
   });
 }
+
+function examMasterExplicitTargets(ex){
+  const targetGrades = Array.isArray(ex?.grades) ? ex.grades.filter(Boolean) : [];
+  const targetNames = Array.isArray(ex?.students) ? ex.students.filter(Boolean) : splitTargetNames(ex?.studentNames || '');
+  return {targetGrades, targetNames, hasTarget: targetGrades.length > 0 || targetNames.length > 0};
+}
+function examMasterTargetsStudent(ex, name){
+  const data = ensureStudent(name);
+  const grade = data.grade || '';
+  const {targetGrades, targetNames, hasTarget} = examMasterExplicitTargets(ex);
+  // 対象学年も対象生徒も未選択の模試マスタは、入力欄にも印刷にも出さない。
+  if(!hasTarget) return false;
+  if(targetGrades.length){
+    if(!grade || !targetGrades.includes(grade)) return false;
+  }
+  if(targetNames.length){
+    return examTargetNameMatch(name, targetNames);
+  }
+  return true;
+}
+function visibleExamIdSetForStudent(name){
+  return new Set(visibleExamMastersForStudent(name).map(ex => examId(ex)));
+}
+function filterVisibleExamRowsForStudent(name, exams){
+  const visibleIds = visibleExamIdSetForStudent(name);
+  return (Array.isArray(exams) ? exams : []).filter(ex => {
+    const id = ex.id || `${ex.name || ''}|${ex.date || ''}|${ex.type || 'common'}|${ex.subjectTemplate || defaultTemplateNameForType(ex.type || 'common')}`;
+    return visibleIds.has(id);
+  });
+}
+
 function visibleExamMastersForStudent(name){
   const start=new Date($('#weekStart').value+'T00:00:00');
-  const data=ensureStudent(name);
-  const grade=data.grade||'';
   return getExamMaster().filter(ex=>{
     if(!ex.date)return false;
     const d=new Date(ex.date+'T00:00:00');
     const diff=daysBetween(start,d);
     if(diff<0||diff>21)return false;
-    const targetGrades=Array.isArray(ex.grades)?ex.grades.filter(Boolean):[];
-    if(targetGrades.length){
-      if(!grade) return false;
-      if(!targetGrades.includes(grade)) return false;
-    }
-    const targetNames=Array.isArray(ex.students)?ex.students:splitTargetNames(ex.studentNames||'');
-    return examTargetNameMatch(name,targetNames);
+    return examMasterTargetsStudent(ex, name);
   });
 }
 function examPanelHtml(name){
@@ -2045,7 +2068,7 @@ function renderExamMasterPanel(){
   host.innerHTML=rows.map((ex,i)=>{
     const tmpl=ex.subjectTemplate||defaultTemplateNameForType(ex.type||'common');
     const targetNames=(Array.isArray(ex.students)?ex.students:splitTargetNames(ex.studentNames||'')).join('、');
-    return `<div class="examMasterRow" data-master-row="${i}"><div><label>模試名</label><input data-master-name value="${escapeHtml(ex.name||'')}" placeholder="例：全国統一高校生テスト"></div><div><label>実施日</label><input data-master-date type="date" value="${escapeHtml(ex.date||'')}"></div><div><label>対象学年</label><div class="checkRow">${examGradeCheckboxes(ex.grades||[])}</div></div><div><label>対象生徒名</label><textarea data-master-students placeholder="空欄なら全員。例：北野、田中">${escapeHtml(targetNames)}</textarea></div><div><button type="button" class="small secondary" data-delete-master="${i}">削除</button></div></div>`;
+    return `<div class="examMasterRow" data-master-row="${i}"><div><label>模試名</label><input data-master-name value="${escapeHtml(ex.name||'')}" placeholder="例：全国統一高校生テスト"></div><div><label>実施日</label><input data-master-date type="date" value="${escapeHtml(ex.date||'')}"></div><div><label>対象学年</label><div class="checkRow">${examGradeCheckboxes(ex.grades||[])}</div></div><div><label>対象生徒名</label><textarea data-master-students placeholder="未選択なら生徒欄・印刷には表示しません。例：北野、田中">${escapeHtml(targetNames)}</textarea></div><div><button type="button" class="small secondary" data-delete-master="${i}">削除</button></div></div>`;
   }).join('')||'<div class="empty">まだ模試マスタがありません。</div>';
   $$('[data-delete-master]').forEach(btn=>btn.onclick=()=>{const arr=getExamMaster();arr.splice(Number(btn.dataset.deleteMaster),1);saveExamMasterData(arr);renderExamMasterPanel();renderStudents()});
   renderSubjectTemplateEditor();
@@ -2660,7 +2683,7 @@ function cellXml(r,c,v,style=0){if(v===undefined||v===null||v==='')return '';ret
 function rowXml(r,cells){return `<row r="${r}">${cells.join('')}</row>`}
 function buildPlanSheetXml(name){const data=ensureStudent(name),dates=getDates();let rows=[],r=1;rows.push(rowXml(r,[cellXml(r,1,'予定入力表',1)]));r++;rows.push(rowXml(r,[cellXml(r,1,'生徒名',2),cellXml(r,2,name,0),cellXml(r,4,'週開始',2),cellXml(r,5,$('#weekStart').value,0)]));r+=2;rows.push(rowXml(r,[cellXml(r,1,'予定/日付',2),...dates.map((d,i)=>cellXml(r,2+i,`${jpDate(d)}（${DOW[d.getDay()]}）`,2))]));r++;LIMITS.forEach((lim,li)=>{rows.push(rowXml(r,[cellXml(r,1,lim,2),...data.schedule.map((day,di)=>cellXml(r,2+di,day[li]||'',0))]));r++});r++;const headerRow=r;rows.push(rowXml(r,[cellXml(r,1,'教科',2),cellXml(r,2,'問題集/高速マスター',2),cellXml(r,5,'内容',2)]));r++;data.materials.forEach(m=>{if(m.subject||m.book||m.content){rows.push(rowXml(r,[cellXml(r,1,m.subject,0),cellXml(r,2,m.book,0),cellXml(r,5,m.content,0)]));r++}});const remarksRow=r;rows.push(rowXml(r,[cellXml(r,1,'備考',2),cellXml(r,2,data.remarks,0)]));r++;const failureRow=r;rows.push(rowXml(r,[cellXml(r,1,'達成できなかった理由',2),cellXml(r,2,data.failureReason||'',0)]));r++;const absentRow=r;rows.push(rowXml(r,[cellXml(r,1,'週面欠席',2),cellXml(r,2,data.weeklyMeetingAbsent?'欠席':'',0)]));const merges=[`<mergeCell ref="A1:H1"/>`,`<mergeCell ref="B${headerRow}:D${headerRow}"/>`,`<mergeCell ref="E${headerRow}:H${headerRow}"/>`];for(let rr=headerRow+1;rr<remarksRow;rr++)merges.push(`<mergeCell ref="B${rr}:D${rr}"/>`,`<mergeCell ref="E${rr}:H${rr}"/>`);merges.push(`<mergeCell ref="B${remarksRow}:H${remarksRow}"/>`,`<mergeCell ref="B${failureRow}:H${failureRow}"/>`,`<mergeCell ref="B${absentRow}:H${absentRow}"/>`);return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="4" topLeftCell="A5" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols><col min="1" max="1" width="15" customWidth="1"/><col min="2" max="8" width="20" customWidth="1"/></cols><sheetData>${rows.join('')}</sheetData><mergeCells count="${merges.length}">${merges.join('')}</mergeCells><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`}
 function simpleSheetXml(aoa){const rows=[];aoa.forEach((row,idx)=>{const r=idx+1;rows.push(rowXml(r,row.map((v,c)=>cellXml(r,c+1,v,idx===0?2:0))))});return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols><col min="1" max="12" width="22" customWidth="1"/></cols><sheetData>${rows.join('')}</sheetData><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`}
-function buildExamSheetXml(name){const data=ensureStudent(name);const aoa=[['生徒名','生徒番号','週開始','模試名','実施日','受験方法','Comiru回答','科目変更あり','保存日時']];(data.exams||[]).forEach(ex=>{if(ex.name||ex.status||ex.comiruAnswered||ex.subjectChanged)aoa.push([name,data.studentNo||'',$('#weekStart').value,ex.name,ex.date,ex.status,ex.comiruAnswered?'済':'',ex.subjectChanged?'○':'',new Date().toLocaleString('ja-JP')])});return simpleSheetXml(aoa)}
+function buildExamSheetXml(name){const data=ensureStudent(name);const aoa=[['生徒名','生徒番号','週開始','模試名','実施日','受験方法','Comiru回答','科目変更あり','保存日時']];filterVisibleExamRowsForStudent(name, data.exams||[]).forEach(ex=>{if(ex.name||ex.status||ex.comiruAnswered||ex.subjectChanged)aoa.push([name,data.studentNo||'',$('#weekStart').value,ex.name,ex.date,ex.status,ex.comiruAnswered?'済':'',ex.subjectChanged?'○':'',new Date().toLocaleString('ja-JP')])});return simpleSheetXml(aoa)}
 function buildEventSheetXml(name){const data=ensureStudent(name);const aoa=[['生徒名','生徒番号','学年','週開始','イベント名','日時','参加/不参加','Comiru回答','備考','保存日時']];(data.events||[]).forEach(ev=>{if(ev.name||ev.datetime||ev.status||ev.comiruAnswered||ev.note)aoa.push([name,data.studentNo||'',data.grade||'',$('#weekStart').value,ev.name,ev.datetime||'',ev.status,ev.comiruAnswered?'済':'',ev.note,new Date().toLocaleString('ja-JP')])});return simpleSheetXml(aoa)}
 function buildCommentSheetXml(name){const data=ensureStudent(name);const aoa=[['生徒名','生徒番号','学年','週開始','タイトル','今週の方針/コメント','個別メモ','保存日時']];(data.comments||[]).forEach(cm=>{if(cm.title||cm.text||cm.note)aoa.push([name,data.studentNo||'',data.grade||'',$('#weekStart').value,cm.title||'',cm.text||'',cm.note||'',new Date().toLocaleString('ja-JP')])});return simpleSheetXml(aoa)}
 const enc=new TextEncoder();function bytes(s){return enc.encode(s)}function crcTable(){let t=[];for(let i=0;i<256;i++){let c=i;for(let k=0;k<8;k++)c=(c&1)?(0xedb88320^(c>>>1)):(c>>>1);t[i]=c>>>0}return t}const CRC_TABLE=crcTable();function crc32Bytes(arr){let crc=0xffffffff;for(let i=0;i<arr.length;i++)crc=(crc>>>8)^CRC_TABLE[(crc^arr[i])&0xff];return (crc^0xffffffff)>>>0}function put16(a,o,v){a[o]=v&255;a[o+1]=(v>>>8)&255}function put32(a,o,v){a[o]=v&255;a[o+1]=(v>>>8)&255;a[o+2]=(v>>>16)&255;a[o+3]=(v>>>24)&255}function concat(parts){let len=parts.reduce((s,p)=>s+p.length,0),out=new Uint8Array(len),pos=0;parts.forEach(p=>{out.set(p,pos);pos+=p.length});return out}
@@ -4388,8 +4411,9 @@ function meetingPrepCurrentPlanHtml(name){
   // 面談準備資料の2ページ目は「これから今週分を打ち込むための白紙」にする。
   // 画面上の復元内容は消さず、印刷時だけ予定・下段・備考を空欄表示にする。
   // 模試・イベントは確認用なので、現在表示されている対象があればそのまま載せる。
+  // ただし、対象学年/対象生徒が未選択の模試マスタは印刷にも出さない。
   const data=ensureStudent(name), dates=getMeetingPrepCurrentDates();
-  const exams=(data.exams||[]).filter(ex=>ex.name||ex.status||ex.comiruAnswered||ex.subjectChanged);
+  const exams=filterVisibleExamRowsForStudent(name, data.exams||[]).filter(ex=>ex.name||ex.status||ex.comiruAnswered||ex.subjectChanged);
   const events=(data.events||[]).filter(ev=>ev.name||ev.status||ev.comiruAnswered||ev.note||ev.datetime);
   let html='<div class="twoCols">';
   html+='<section><h3>今週の予定（記入用）</h3><table class="prepTable blankTable"><tbody>';
