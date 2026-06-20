@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>面談予定入力・準備資料アプリ （合格設計図Excel A列固定・印刷PDF優先版）</title>
+<title>面談予定入力・準備資料アプリ v34（合格設計図Excel A列固定・印刷PDF優先版）</title>
 <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
 <script src="./libs/xlsx.bundle.js"></script>
 <script>if(!window.XLSX){document.write('<script src="./libs/xlsx.full.min.js"><\/script>');}</script>
@@ -3752,9 +3752,28 @@ function allListParseSmallSlotsFromHeaderRow(headers, row, matched){
   return out;
 }
 
+
+function allListHeaderNormLoose(h){
+  return String(h || '').replace(/\r\n/g,'\n').replace(/\r/g,'\n').replace(/\s+/g,'').trim();
+}
+function allListFindInputNoteIndex(rawHeaders, headers){
+  const raw = (rawHeaders || []).map(allListHeaderNormLoose);
+  const joined = (headers || []).map(allListHeaderNormLoose);
+  // 新版：入力用アプリと相互反映する欄
+  let idx = raw.findIndex(h => h === '入力用備考' || h === '個別備考' || h === '面談備考');
+  if(idx >= 0) return idx;
+  idx = joined.findIndex(h => h.includes('入力用備考') || h.includes('個別備考') || h.includes('面談備考'));
+  if(idx >= 0) return idx;
+  // 旧版互換：「備考」は入力用備考として扱う。ただし「全員分リスト備考」は除外。
+  idx = raw.findIndex(h => h === '備考');
+  if(idx >= 0) return idx;
+  idx = joined.findIndex(h => h === '備考' || (h.endsWith('備考') && !h.includes('全員分リスト') && !h.includes('全体') && !h.includes('確認メモ')));
+  return idx;
+}
+
 function parseAllListOverridesFromRows(aoa, targetNames){
   const patches={};
-  const ensure=(name)=>patches[name]||(patches[name]={exams:[],events:[]});
+  const ensure=(name)=>patches[name]||(patches[name]={exams:[],events:[],remarks:''});
   for(let hr=0; hr<Math.min(aoa.length,15); hr++){
     const rawHeaders=(aoa[hr]||[]).map(allListCellText);
     const prevHeaders=hr>0 ? (aoa[hr-1]||[]).map(allListCellText) : [];
@@ -3767,7 +3786,9 @@ function parseAllListOverridesFromRows(aoa, targetNames){
     const examStatusIdx=allListFindHeaderIndex(headers,['受験方法','受験区分','当日後日','当日/後日','受験']);
     const examComiruIdx=allListFindHeaderIndex(headers,['Comiru回答','コミル回答','Comiru','コミル']);
     const examSubjectChangedIdx=allListFindHeaderIndex(headers,['科目変更あり','科目変更','科変']);
-    const genericNoteIdx=allListFindHeaderIndex(headers,['備考']);
+    // 「入力用備考」は入力用アプリの remarks に戻す。
+    // 「全員分リスト備考」はここでは読まない。
+    const inputNoteIdx=allListFindInputNoteIndex(rawHeaders, headers);
     const eventNameIdx=allListFindHeaderIndex(headers,['イベント名']);
     const eventDateIdx=allListFindHeaderIndex(headers,['日時','イベント日']);
     const eventStatusIdx=allListFindHeaderIndex(headers,['参加/不参加','参加状況','参加']);
@@ -3778,18 +3799,26 @@ function parseAllListOverridesFromRows(aoa, targetNames){
       const matched=matchAllListStudentName(row[nameIdx],targetNames) || matchAllListStudentName(row[noIdx],targetNames);
       if(!matched) continue;
       const bucket=ensure(matched);
+
+      if(inputNoteIdx>=0){
+        const noteRaw=allListCellText(row[inputNoteIdx]);
+        const noteClean=allListSmallBlockStrip(noteRaw);
+        if(noteClean) bucket.remarks=noteClean;
+      }
+
       // 全員分リスト本体の「① 日付/名称/回答/科目変更/Comiru/備考」列を読む。
       const smallSlotItems=allListParseSmallSlotsFromHeaderRow(headers,row,matched);
       smallSlotItems.forEach(item=>{
         if(item.kind==='模試') allListAddPatchWithPriority(bucket,'exam',item.patch);
         else if(item.kind==='イベント') allListAddPatchWithPriority(bucket,'event',item.patch);
       });
-      // 全員分リスト本体の備考欄にある【小規模】ブロックを読む。
-      // 例: 6/20 保護者会　参:〇　C:×　備:電話済
-      if(genericNoteIdx>=0 && allListCellText(row[genericNoteIdx]).includes('【小規模】')){
+
+      // 旧版互換：入力用備考/旧「備考」欄にある【小規模】ブロックを読む。
+      // 新版の「全員分リスト備考」は入力用には戻さない。
+      if(inputNoteIdx>=0 && allListCellText(row[inputNoteIdx]).includes('【小規模】')){
         const studentNameForSmall=nameIdx>=0?allListCellText(row[nameIdx]):matched;
         const studentNoForSmall=noIdx>=0?allListCellText(row[noIdx]):'';
-        const smallObjs=allListParseSmallBlock(row[genericNoteIdx], studentNameForSmall, studentNoForSmall);
+        const smallObjs=allListParseSmallBlock(row[inputNoteIdx], studentNameForSmall, studentNoForSmall);
         smallObjs.forEach(obj=>{
           if(obj.kind==='模試'){
             allListAddPatchWithPriority(bucket,'exam',{
@@ -3829,7 +3858,7 @@ function parseAllListOverridesFromRows(aoa, targetNames){
           datetime:eventDateIdx>=0?allListCellText(row[eventDateIdx]):'',
           status:eventStatusIdx>=0?allListStatusFromValue(row[eventStatusIdx],['参加','不参加']):'',
           comiruAnswered:eventComiruIdx>=0?allListIsChecked(row[eventComiruIdx]):undefined,
-          note:eventNoteIdx>=0?allListCellText(row[eventNoteIdx]):(genericNoteIdx>=0?allListCellText(row[genericNoteIdx]):'')
+          note:eventNoteIdx>=0?allListCellText(row[eventNoteIdx]):''
         });
       }
       // 横持ち形式：列見出しに模試名/イベント名が入っている場合
@@ -3857,7 +3886,7 @@ function parseAllListOverridesFromRows(aoa, targetNames){
           if(/参加|不参加/.test(h) && allListIsChecked(v)) p.status=(h.match(/不参加|参加/)||[''])[0];
           const st=allListStatusFromValue(v,['参加','不参加']); if(st) p.status=st;
           if(/Comiru|コミル/.test(h)) p.comiruAnswered=allListIsChecked(v);
-          if(/備考|メモ/.test(h)) p.note=allListCellText(v);
+          if(/イベント備考|イベントメモ/.test(h)) p.note=allListCellText(v);
         });
         if(p.status || p.comiruAnswered!==undefined || p.note) allListAddPatchWithPriority(bucket,'event',p);
       });
@@ -3983,13 +4012,18 @@ async function applyAllStudentListOverridesToInput(names){
       const isSmallSheet=String(sheetName||'').includes('小規模模試イベント');
       const patches=isSmallSheet ? parseSmallAllListOverridesFromRows(aoa,names) : parseAllListOverridesFromRows(aoa,names);
       Object.entries(patches).forEach(([name,p])=>{
-        const b=allPatches[name]||(allPatches[name]={exams:[],events:[]});
+        const b=allPatches[name]||(allPatches[name]={exams:[],events:[],remarks:''});
+        if(allListCellText(p.remarks)) b.remarks=allListCellText(p.remarks);
         (p.exams||[]).forEach(ex=>allListAddPatchWithPriority(b,'exam',ex));
         (p.events||[]).forEach(ev=>allListAddPatchWithPriority(b,'event',ev));
       });
     });
     Object.entries(allPatches).forEach(([name,p])=>{
       const data=ensureStudent(name);
+      if(allListCellText(p.remarks) && data.remarks !== allListCellText(p.remarks)){
+        data.remarks=allListCellText(p.remarks);
+        applied++;
+      }
       (p.exams||[]).forEach(ex=>{ if(allListMergeExamPatch(data,ex)) applied++; });
       (p.events||[]).forEach(ev=>{ if(allListMergeEventPatch(data,ev)) applied++; });
     });
