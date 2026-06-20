@@ -895,14 +895,18 @@ const $$=(s)=>Array.from(document.querySelectorAll(s));
 const DOW=['日','月','火','水','木','金','土'];
 const LIMITS=['受講①','受講②','受講③','その他①','その他②','その他③'];
 const MAX_SCHEDULE_ROWS=3;
+// 共テ型の初期科目は、模試マスタ画面の写真と同じ並び。
 const COMMON_TEST_SUBJECTS=['英語R','英語L','数学ⅠA','数学ⅡBC','国語','物理','化学','生物','地学','日本史','世界史','地理','公共政経','情報'];
-const CROWN_TEST_SUBJECTS=['英語','数学','国語','物理','化学','生物','地学','日本史','世界史','地理','小論文'];
+// 冠模試型の初期科目は、細かい科目名ではなく大分類で聞き取る。
+const CROWN_TEST_SUBJECTS=['文系','理系','理系数学','文系数学','英語','理科','地理歴史'];
 const SUBJECT_TEMPLATE_KEY='yoteiSubjectTemplates';
+const SUBJECT_TEMPLATE_DEFAULT_VERSION_KEY='yoteiSubjectTemplateDefaultVersion';
+const DEFAULT_SUBJECT_TEMPLATE_VERSION='subject_templates_20260621_common_photo_crown_groups';
 const DEFAULT_SUBJECT_TEMPLATES=[
   {name:'共テ型', subjects:COMMON_TEST_SUBJECTS},
   {name:'冠模試型', subjects:CROWN_TEST_SUBJECTS}
 ];
-const SUBJECT_POOL=[...new Set([...COMMON_TEST_SUBJECTS,...CROWN_TEST_SUBJECTS,'数学','英語','理科','社会','総合問題','面接','小論文'])];
+const SUBJECT_POOL=[...new Set([...COMMON_TEST_SUBJECTS,...CROWN_TEST_SUBJECTS,'数学','社会','総合問題','面接','小論文'])];
 const EXAM_MASTER_KEY='yoteiExamMaster';
 const EXAM_MASTER_DEFAULT_VERSION_KEY='yoteiExamMasterDefaultVersion';
 const DEFAULT_TOSHIN_EXAM_VERSION='toshin_2026_schedule_20260620_fix_unicode';
@@ -1854,18 +1858,32 @@ function getSubjectTemplates(){
   try{
     const saved=JSON.parse(localStorage.getItem(SUBJECT_TEMPLATE_KEY)||'[]');
     const base=DEFAULT_SUBJECT_TEMPLATES.map(t=>({name:t.name,subjects:[...t.subjects]}));
+    const defaultNames=new Set(DEFAULT_SUBJECT_TEMPLATES.map(t=>t.name));
+    const versionOk=localStorage.getItem(SUBJECT_TEMPLATE_DEFAULT_VERSION_KEY)===DEFAULT_SUBJECT_TEMPLATE_VERSION;
     if(Array.isArray(saved)){
       saved.forEach(t=>{
         if(!t||!t.name||!Array.isArray(t.subjects))return;
         const item={name:t.name,subjects:[...new Set(t.subjects.map(x=>String(x).trim()).filter(Boolean))]};
         const idx=base.findIndex(x=>x.name===item.name);
-        if(idx>=0)base[idx]=item; else base.push(item);
+        // 初期テンプレート名（共テ型・冠模試型）は、既定バージョン更新時だけ新初期値を優先する。
+        // これで古いlocalStorageに旧冠模試型が残っていても、今回の初期設定へ更新される。
+        if(idx>=0){
+          if(versionOk || !defaultNames.has(item.name)) base[idx]=item;
+        }else{
+          base.push(item);
+        }
       });
     }
+    if(!versionOk){
+      localStorage.setItem(SUBJECT_TEMPLATE_KEY, JSON.stringify(base));
+      localStorage.setItem(SUBJECT_TEMPLATE_DEFAULT_VERSION_KEY, DEFAULT_SUBJECT_TEMPLATE_VERSION);
+    }
     return base;
-  }catch(e){return DEFAULT_SUBJECT_TEMPLATES.map(t=>({name:t.name,subjects:[...t.subjects]}));}
+  }catch(e){
+    return DEFAULT_SUBJECT_TEMPLATES.map(t=>({name:t.name,subjects:[...t.subjects]}));
+  }
 }
-function saveSubjectTemplates(list){localStorage.setItem(SUBJECT_TEMPLATE_KEY,JSON.stringify(list));}
+function saveSubjectTemplates(list){localStorage.setItem(SUBJECT_TEMPLATE_KEY,JSON.stringify(list));localStorage.setItem(SUBJECT_TEMPLATE_DEFAULT_VERSION_KEY,DEFAULT_SUBJECT_TEMPLATE_VERSION);}
 function findSubjectTemplate(name){return getSubjectTemplates().find(t=>t.name===name)||null}
 function defaultTemplateNameForType(type){return type==='crown'?'冠模試型':'共テ型'}
 function examSubjectsForType(type,templateName){const t=findSubjectTemplate(templateName||defaultTemplateNameForType(type));return t?t.subjects:(type==='crown'?CROWN_TEST_SUBJECTS:COMMON_TEST_SUBJECTS)}
