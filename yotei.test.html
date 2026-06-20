@@ -830,6 +830,24 @@ main.wrap{max-width:none!important;height:auto!important;min-height:0!important;
   </section>
 
   <section class="card">
+    <p class="sectionTitle">科目型マスタ</p>
+    <div class="masterGridHint">模試マスタで選ぶ「科目型」を作成・編集します。共テ型・冠模試型もここで編集できます。</div>
+    <details class="advanced">
+      <summary>科目型マスタを編集</summary>
+      <div class="field"><label>編集する科目型</label><select id="subjectTemplateSelect"></select></div>
+      <div class="actions"><button class="secondary small" id="loadSubjectTemplate" type="button">選択中の科目型を読み込み</button></div>
+      <div class="field"><label>科目型名</label><input id="subjectTemplateName" placeholder="例：共テ型、冠模試型、私大型"></div>
+      <div class="field"><label>基本科目チェック</label><div id="subjectTemplateChecks" class="checkRow"></div></div>
+      <div class="field"><label>追加科目</label><textarea id="subjectTemplateCustom" placeholder="チェック欄にない科目を、読点または改行区切りで入力。例：面接、小論文"></textarea></div>
+      <div class="actions">
+        <button class="secondary" id="saveSubjectTemplate" type="button">科目型を保存</button>
+        <button class="secondary danger" id="deleteSubjectTemplate" type="button">科目型を削除</button>
+      </div>
+      <div class="hint">保存後、模試マスタの「科目型」プルダウンに反映されます。模試マスタ側で科目型を選ぶと、その科目チェックが候補として出ます。</div>
+    </details>
+  </section>
+
+  <section class="card">
     <p class="sectionTitle">イベントマスタ</p>
     <div class="masterGridHint">イベント名・日時・対象学年/生徒を登録します。必要なときだけ開いて編集してください。</div>
     <details class="advanced">
@@ -2383,6 +2401,27 @@ function saveSubjectTemplateFromEditor(){
     alert(`科目型「${name}」を保存しました。保存用フォルダへ反映する場合は「保存用フォルダを選んで全データを保存・反映」を押してください。`);
   }
 }
+
+function deleteSubjectTemplateFromEditor(){
+  const name=($('#subjectTemplateName')?.value||$('#subjectTemplateSelect')?.value||'').trim();
+  if(!name)return alert('削除する科目型を選んでください。');
+  if(['共テ型','冠模試型'].includes(name)){
+    if(!confirm(`標準の科目型「${name}」です。削除すると初期値に戻ります。編集だけなら「科目型を保存」を使ってください。\n本当に削除しますか？`)) return;
+  }else if(!confirm(`科目型「${name}」を削除しますか？`)) return;
+  const list=getSubjectTemplates().filter(t=>t.name!==name);
+  saveSubjectTemplates(list);
+  const nameInput=$('#subjectTemplateName'); if(nameInput) nameInput.value='共テ型';
+  const custom=$('#subjectTemplateCustom'); if(custom) custom.value='';
+  renderSubjectTemplateEditor();
+  renderExamMasterPanel();
+  renderStudents();
+  if(sharedDirHandle){
+    saveMasterSettingsToShared(false).then(()=>alert(`科目型「${name}」を削除し、保存用フォルダにも反映しました。`)).catch(()=>alert(`科目型「${name}」はブラウザ内で削除しましたが、保存用フォルダへの反映に失敗しました。`));
+  }else{
+    alert(`科目型「${name}」を削除しました。保存用フォルダへ反映する場合は「④ 保存」または「模試マスタを保存」を押してください。`);
+  }
+}
+
 
 /* =========================================================
    5. 保存・復元
@@ -5175,7 +5214,7 @@ function bindGlobalEvents(){
   const acm=$('#addCommentMaster'); if(acm)acm.onclick=addCommentMasterRow;
   const scm=$('#saveCommentMaster'); if(scm)scm.onclick=saveCommentMasterFromPanel;
   const lts=$('#loadSubjectTemplate'); if(lts)lts.onclick=loadSubjectTemplateToEditor;
-  const sts=$('#saveSubjectTemplate'); if(sts)sts.onclick=saveSubjectTemplateFromEditor;
+  const sts=$('#saveSubjectTemplate'); if(sts)sts.onclick=saveSubjectTemplateFromEditor; const dts=$('#deleteSubjectTemplate'); if(dts)dts.onclick=deleteSubjectTemplateFromEditor;
   const clear=$('#clearAll'); if(clear)clear.onclick=()=>{if(confirm('入力内容をすべて消しますか？')){localStorage.removeItem(groupKey()); students.forEach(n=>localStorage.removeItem(indivKey(n))); location.reload()}};
 }
 
