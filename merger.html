@@ -1785,22 +1785,45 @@ async function parseResultFile(file){
   try{
     const buf = await file.arrayBuffer();
     const wb = XLSX.read(buf, {type:"array", cellDates:true});
+    logRows.push([file.name, "情報", `結果Excelのシート一覧: ${wb.SheetNames.join(" / ")}`, "parseResultFile"]);
     for(const sheetName of wb.SheetNames){
       const ws = wb.Sheets[sheetName];
-      const aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:"", raw:true}).filter(row => (row || []).some(v => norm(v)));
-      if(aoa.length < 1) continue;
+      const rawAoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:"", raw:true});
+      const aoa = rawAoa.filter(row => (row || []).some(v => norm(v)));
+      logRows.push([file.name, "情報", `シート読取開始: ${sheetName} / 生行${rawAoa.length}行 / 空白除外後${aoa.length}行`, "parseResultFile"]);
+      if(aoa.length < 1){
+        logRows.push([file.name, "注意", `空シートとしてスキップ: ${sheetName}`, ""]);
+        continue;
+      }
 
+      const before = records.length;
       const twoRowParsed = parseTwoRowResultSheet(aoa, file, sheetName);
       if(twoRowParsed.records.length){
         records.push(...twoRowParsed.records);
         logRows.push(...twoRowParsed.logRows);
+        const ach2 = twoRowParsed.records.filter(isAchievementResultRecord);
+        if(ach2.length){
+          logRows.push([file.name, "情報", `修得系 ${ach2.length}件検出（2行形式）`, ach2.slice(0,5).map(resultDebugLine).join(" / ")]);
+        }
+        logRows.push([file.name, "情報", `シート読取完了: ${sheetName} / 2行形式 / ${records.length - before}件`, ""]);
         continue;
       }
 
       const oneRowParsed = parseOneRowResultSheet(aoa, file, sheetName);
       records.push(...oneRowParsed.records);
       logRows.push(...oneRowParsed.logRows);
+      const ach1 = oneRowParsed.records.filter(isAchievementResultRecord);
+      if(ach1.length){
+        logRows.push([file.name, "情報", `修得系 ${ach1.length}件検出（1行形式）`, ach1.slice(0,5).map(resultDebugLine).join(" / ")]);
+      }
+      if(oneRowParsed.records.length){
+        logRows.push([file.name, "情報", `シート読取完了: ${sheetName} / 1行形式 / ${oneRowParsed.records.length}件`, ""]);
+      }else{
+        const sample = aoa.slice(0,4).map((row,i)=>`${i+1}行目: ${(row || []).slice(0,10).map(norm).join(" | ")}`).join(" / ");
+        logRows.push([file.name, "注意", `シートから結果0件: ${sheetName}`, sample || "サンプルなし"]);
+      }
     }
+    logRows.push([file.name, records.length ? "成功" : "注意", `結果Excel合計 ${records.length}件読み込み`, "parseResultFile"]);
   }catch(e){
     logRows.push([file.name, "失敗", e.message || String(e), "毎日更新.xlsx"]);
   }
@@ -2136,6 +2159,14 @@ function resultKeywordMatches(r, keyword){
   return false;
 }
 
+function isAchievementResultRecord(r){
+  return /講座を?(完全)?(修得|習得)|完全(修得|習得)|修得|習得/.test(resultFullText(r));
+}
+function resultDebugLine(r){
+  return `${r.dateKey || ''} ${r.timeLabel || ''} ${r.student || r.rawName || ''} / ${r.study || ''} / ${r.result || ''} / ${r.sourceFile || ''} / ${r.sourceFormat || ''}`;
+}
+
+
 function isCourseMatch(planContent, resultRec){
   const p = normalizeMatchText(planContent);
   const rt = normalizeMatchText(resultFullText(resultRec));
@@ -2425,6 +2456,8 @@ async function merge(){
     allLogs.push(...logRows);
   }
   allResults = filterResultRecords(mergeResultRecordsUnique(allResults));
+  const achievementResults = allResults.filter(isAchievementResultRecord);
+  allLogs.push(["結果診断", "情報", `統合後の結果件数 ${allResults.length}件 / 修得系 ${achievementResults.length}件`, achievementResults.slice(0,8).map(resultDebugLine).join(" / ") || "修得系なし"]);
 
   const out = buildOutputs(allRecords, allLogs, allResults);
   state.records = allRecords;
