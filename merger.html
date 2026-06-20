@@ -3361,7 +3361,7 @@ function styleMonthlyPosterSheet(ws, aoa){
   const fontHeader = {name:'Yu Gothic', sz:13, bold:true, color:{rgb:'111827'}};
   const fontBase = {name:'Yu Gothic', sz:12, color:{rgb:'111827'}};
   setRangeStyle(ws, range, (R,C,cell)=>{
-    const style = {font:fontBase, alignment:{vertical:'top', horizontal:C<2?'center':'left', wrapText:true}, border};
+    const style = {font:fontBase, alignment:{vertical:'center', horizontal:'center', wrapText:true}, border};
     if(R === 0){ style.font = fontTitle; style.fill = titleFill; style.alignment = {vertical:'center', horizontal:'center', wrapText:true}; }
     else if(R === 1){ style.font = fontHeader; style.fill = headerFill; style.alignment = {vertical:'center', horizontal:'center', wrapText:true}; }
     else if(C < 2){ style.fill = nameFill; }
@@ -5037,7 +5037,7 @@ function styleAllStudentGradeSheet(ws, aoa){
       (/\nComiru$/.test(headerText) && text === '×') ||
       (/\n(受験|参加|回答)$/.test(headerText) && text === '未')
     );
-    const style = {font:R===0?fontTitle:(R===1?fontHeader:fontBase), alignment:{vertical:'top', horizontal:'center', wrapText:true, shrinkToFit:true}, border};
+    const style = {font:R===0?fontTitle:(R===1?fontHeader:fontBase), alignment:{vertical:'center', horizontal:'center', wrapText:true, shrinkToFit:true}, border};
     if(R===0) style.fill = titleFill;
     else if(R===1) style.fill = headerFill;
     else if(C<=2) style.fill = nameFill;
@@ -5172,7 +5172,7 @@ function downloadWorkbookFromAoa(calendarAoa, listAoa, resultAoa, rosterAoa, log
   setRangeStyle(wsCal, calRange, (R,C,cell)=>{
     const headerText = String((calendarAoa[0] || [])[C] || "");
     const text = String(cell.v ?? "");
-    const style = {font:(R===0 || C<=2) ? fontHeader : fontBase, alignment:{vertical:R===0?"center":"top", horizontal:R===0?"center":(C<=1?"center":"left"), wrapText:true}, border};
+    const style = {font:(R===0 || C<=2) ? fontHeader : fontBase, alignment:{vertical:"center", horizontal:"center", wrapText:true}, border};
     if(R===0) style.fill = headerFill;
     if(R>0 && C<=2) style.fill = nameFill;
     if($("colorWeekend").checked && R>0 && C>6 && (headerText.includes("(土)") || headerText.includes("(日)"))) style.fill = weekendFill;
@@ -5186,7 +5186,7 @@ function downloadWorkbookFromAoa(calendarAoa, listAoa, resultAoa, rosterAoa, log
     const isResultColumn = C >= 3 && ((C - 3) % 2 === 0); // C列以降は「予定, 結果」の順。結果列だけ黄色判定
     const style = {
       font:(R===0 || C<=1) ? fontPosterHeader : posterFontByText(text),
-      alignment:{vertical:R===0?"center":"top", horizontal:R===0?"center":(C<=1?"center":"left"), wrapText:true},
+      alignment:{vertical:"center", horizontal:"center", wrapText:true},
       border
     };
     if(R===0) style.fill = headerFill;
@@ -5197,13 +5197,13 @@ function downloadWorkbookFromAoa(calendarAoa, listAoa, resultAoa, rosterAoa, log
     return style;
   });
 
-  const commonStyle = (range, ws, aoa) => setRangeStyle(ws, range, (R,C,cell)=>({font:R===0?fontHeader:fontBase, alignment:{vertical:"top", horizontal:R===0?"center":"left", wrapText:true}, border, fill:R===0?headerFill:undefined}));
+  const commonStyle = (range, ws, aoa) => setRangeStyle(ws, range, (R,C,cell)=>({font:R===0?fontHeader:fontBase, alignment:{vertical:"center", horizontal:"center", wrapText:true}, border, fill:R===0?headerFill:undefined}));
   commonStyle(listRange, wsList, listAoa);
   commonStyle(rosterRange, wsRoster, rosterAoa && rosterAoa.length ? rosterAoa : rosterHeader);
   commonStyle(logRange, wsLog, logAoa && logAoa.length ? logAoa : [["ファイル","結果","内容","シート名/詳細"]]);
   setRangeStyle(wsResult, resultRange, (R,C,cell)=>{
     const text = String(cell.v ?? "");
-    const style = {font:R===0?fontHeader:fontBase, alignment:{vertical:"top", horizontal:R===0?"center":"left", wrapText:true}, border};
+    const style = {font:R===0?fontHeader:fontBase, alignment:{vertical:"center", horizontal:"center", wrapText:true}, border};
     if(R===0) style.fill = headerFill;
     if(R>0 && isYellowResultCellText(text)) style.fill = yellowFill;
     return style;
