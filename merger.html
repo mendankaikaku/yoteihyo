@@ -5037,7 +5037,7 @@ function styleAllStudentGradeSheet(ws, aoa){
       (/\nComiru$/.test(headerText) && text === '×') ||
       (/\n(受験|参加|回答)$/.test(headerText) && text === '未')
     );
-    const style = {font:R===0?fontTitle:(R===1?fontHeader:fontBase), alignment:{vertical:'top', horizontal:(R<=1 || C<=2 || /\n(回答|科目変更|Comiru)$/.test(headerText))?'center':'left', wrapText:true, shrinkToFit:true}, border};
+    const style = {font:R===0?fontTitle:(R===1?fontHeader:fontBase), alignment:{vertical:'top', horizontal:'center', wrapText:true, shrinkToFit:true}, border};
     if(R===0) style.fill = titleFill;
     else if(R===1) style.fill = headerFill;
     else if(C<=2) style.fill = nameFill;
