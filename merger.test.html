@@ -6152,7 +6152,6 @@ function buildAllStudentPrintAoaFromFullAoa(grade, fullAoa){
   }
 
   const printHeader = ['生徒番号','名前','高校','担当','備考(書き込み欄)', ...manualCols.map(x => x.label || '書き込み欄')];
-  if(manualCols.length === 0) printHeader.push('書き込み欄');
   printHeader.push('模試イベント');
   planCols.forEach(x => printHeader.push(x.label || '予定'));
 
@@ -6205,17 +6204,16 @@ function buildAllStudentPrintAoaFromFullAoa(grade, fullAoa){
       allListPrintCell(row, idxNote),
       ...manualCols.map(x => allListPrintCell(row, x.col))
     ];
-    if(manualCols.length === 0) outRow.push('');
     outRow.push(lines.join('\n'));
     planCols.forEach(x => outRow.push(allListPrintCell(row, x.col)));
     if(outRow.some(v => norm(v))) out.push(outRow);
   }
-  out._manualPrintColumnCount = manualCols.length || 1;
+  out._manualPrintColumnCount = manualCols.length;
   out._printPlanColumnCount = planCols.length;
   return out;
 }
 function styleAllStudentPrintSheet(ws, aoa){
-  const manualCount = Math.max(1, Number(aoa?._manualPrintColumnCount || 1));
+  const manualCount = Math.max(0, Number(aoa?._manualPrintColumnCount || 0));
   const planCount = Math.max(0, Number(aoa?._printPlanColumnCount || 0));
   // 模試イベントを大きく、右側に3日間の予定欄を追加しても読めるように列幅を広げる。
   const widths = [10, 14, 18, 12, 22, ...Array(manualCount).fill(16), 155, ...Array(planCount).fill(28)];
