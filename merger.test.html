@@ -6445,7 +6445,7 @@ function applyCompactPrintRows(ws, aoa, widths){
       lines = Math.max(lines, textLineCount(v, rowWidthChars[c] || 18));
     });
     // B4横1ページに収めるため、印刷用だけ行高をさらに圧縮する。
-    return {hpt:Math.max(8, Math.min(72, 2 + lines * 6))};
+    return {hpt:Math.max(7, Math.min(64, 2 + lines * 5.5))};
   });
 }
 
@@ -6510,16 +6510,136 @@ function allListApplyB4LandscapeOnePagePrintSettings(ws){
   };
 }
 
+
+function allListPrintVisualTextLength(value){
+  const text = String(value ?? '');
+  if(!text) return 0;
+  return Math.max(...text.split(/\r?\n/).map(line =>
+    [...line].reduce((n, ch) => n + (ch.charCodeAt(0) > 255 ? 1.7 : 1), 0)
+  ), 0);
+}
+function allListPrintColumnNeedScore(aoa, col){
+  let maxLen = 0;
+  let sumLen = 0;
+  let count = 0;
+  for(let r=1; r<(aoa || []).length; r++){
+    const v = aoa?.[r]?.[col];
+    const len = allListPrintVisualTextLength(v);
+    if(len <= 0) continue;
+    maxLen = Math.max(maxLen, len);
+    sumLen += len;
+    count++;
+  }
+  const avgLen = count ? sumLen / count : 0;
+  // 最大値だけに寄せると1人の長文で幅を取りすぎるので、最大値と平均値を混ぜる。
+  return maxLen * 0.7 + avgLen * 0.3;
+}
+function allListPrintColumnIsTinyMarkColumn(aoa, col){
+  const vals = [];
+  for(let r=2; r<(aoa || []).length; r++){
+    const v = String(aoa?.[r]?.[col] ?? '').trim();
+    if(v) vals.push(v);
+  }
+  if(!vals.length) return false;
+  // 〇、×、△、済、未、空欄記号など、ほぼ1文字の確認列は1文字分だけでよい。
+  return vals.every(v => {
+    const t = v.replace(/\s+/g,'');
+    if(allListPrintVisualTextLength(t) > 2.5) return false;
+    return /^[〇○◯◎×✕△▲▽ー\-―–—✔✓済未有無]+$/.test(t);
+  });
+}
+function allListPrintClamp(n, min, max){
+  return Math.max(min, Math.min(max, n));
+}
+function allListBuildAutoPrintWidths(aoa, manualCount, planCount){
+  const header = aoa?.[1] || [];
+  const totalCols = header.length;
+  const eventCol = totalCols - 1 - planCount;
+
+  // B4横1ページに入りやすい総量。Excelのwch換算なので絶対値ではなく比率重視。
+  // 予定/結果をさらに小さくし、〇/×だけの列は1文字幅に寄せるため総量も少し絞る。
+  const targetTotal = 165;
+  const minW = [];
+  const maxW = [];
+  const weight = [];
+
+  for(let c=0; c<totalCols; c++){
+    const h = String(header[c] || '');
+    const need = allListPrintColumnNeedScore(aoa, c);
+    const tinyMark = allListPrintColumnIsTinyMarkColumn(aoa, c);
+    if(tinyMark){
+      // 〇や×だけの確認列は1文字分で十分。
+      minW[c]=2.2; maxW[c]=3.2; weight[c]=0.05;
+    }else if(c === 0){ minW[c]=4.5; maxW[c]=7; weight[c]=0.45; }          // 生徒番号
+    else if(c === 1){ minW[c]=6.5; maxW[c]=10; weight[c]=0.75; }          // 名前
+    else if(c === 2){ minW[c]=3; maxW[c]=5; weight[c]=0.3; }              // 高校
+    else if(c === 3){ minW[c]=3; maxW[c]=5; weight[c]=0.3; }              // 担当
+    else if(c === 4 || c === 5){ minW[c]=7; maxW[c]=15; weight[c]=0.7; }  // 備考系
+    else if(c >= 6 && c < eventCol){ minW[c]=4; maxW[c]=10; weight[c]=0.45; } // 手追加列
+    else if(c === eventCol){ minW[c]=65; maxW[c]=105; weight[c]=2.2; }    // 模試イベント
+    else { minW[c]=5; maxW[c]=11; weight[c]=0.55; }                       // 予定・結果
+    // 見出しが予定/結果ならさらに小さめに保つ
+    if(!tinyMark && /予定|結果/.test(h) && c > eventCol){ minW[c]=4.5; maxW[c]=9; weight[c]=0.45; }
+    weight[c] = tinyMark ? weight[c] : Math.max(0.1, weight[c] * Math.sqrt(Math.max(1, need)));
+  }
+
+  let widths = minW.slice();
+  let remaining = targetTotal - widths.reduce((a,b)=>a+b,0);
+  if(remaining > 0){
+    const flex = widths.map((w,c)=>Math.max(0, maxW[c]-w));
+    let guard = 0;
+    while(remaining > 0.1 && flex.some(x=>x>0.01) && guard++ < 200){
+      const totalWeight = flex.reduce((sum, f, c)=> sum + (f > 0 ? weight[c] : 0), 0) || 1;
+      let used = 0;
+      for(let c=0; c<widths.length; c++){
+        if(flex[c] <= 0) continue;
+        const add = Math.min(flex[c], remaining * (weight[c] / totalWeight));
+        widths[c] += add;
+        flex[c] -= add;
+        used += add;
+      }
+      if(used <= 0.01) break;
+      remaining -= used;
+    }
+  }
+
+  // 念のため総幅が大きすぎる場合は、最小値を割らない範囲で全体縮小。
+  const total = widths.reduce((a,b)=>a+b,0);
+  if(total > targetTotal){
+    const minTotal = minW.reduce((a,b)=>a+b,0);
+    const ratio = (targetTotal - minTotal) / Math.max(1, total - minTotal);
+    widths = widths.map((w,c)=>minW[c] + (w - minW[c]) * Math.max(0, ratio));
+  }
+  return widths.map(w => Math.round(w * 10) / 10);
+}
+
+
+function allListForcePrintTextFitAllCells(ws, range){
+  if(!ws || !range) return;
+  for(let R=range.s.r; R<=range.e.r; R++){
+    for(let C=range.s.c; C<=range.e.c; C++){
+      const addr = XLSX.utils.encode_cell({r:R,c:C});
+      if(!ws[addr]) continue;
+      ws[addr].s = ws[addr].s || {};
+      ws[addr].s.alignment = Object.assign({}, ws[addr].s.alignment || {}, {
+        vertical: 'center',
+        horizontal: 'center',
+        wrapText: true,
+        shrinkToFit: true
+      });
+    }
+  }
+}
+
 function styleAllStudentPrintSheet(ws, aoa){
   const manualCount = Math.max(0, Number(aoa?._manualPrintColumnCount || 0));
   const planCount = Math.max(0, Number(aoa?._printPlanColumnCount || 0));
   // 模試イベントを大きく、右側に3日間の予定欄を追加しても読めるように列幅を広げる。
-  // B4横1ページに収めるため印刷用だけ列幅を圧縮。
-  // 予定/結果列は28→14で半分、模試イベントは155→103で約2/3。
-  // 左側の基本情報・手追加列も同じ方向で縮める。
-  const widths = [6, 8, 4, 4, 12, 12, ...Array(manualCount).fill(9), 103, ...Array(planCount).fill(14)];
+  // 入っている文字量の割合で、印刷用の列幅を自動配分する。
+  // ただしB4横1ページに収めるため、列ごとに最小/最大幅を持たせて暴れすぎないようにする。
+  const widths = allListBuildAutoPrintWidths(aoa, manualCount, planCount);
   // 印刷用は上下中央揃えを維持しつつ、行高だけを文字量ぎりぎりまで小さくする。
-  const range = applyNiceSheetSettings(ws, aoa, widths, {rows:{min:8,max:72,header:16,pxPerLine:6}});
+  const range = applyNiceSheetSettings(ws, aoa, widths, {rows:{min:7,max:64,header:15,pxPerLine:5.5}});
   applyCompactPrintRows(ws, aoa, widths);
   ws['!freeze'] = {xSplit:2, ySplit:2};
   // 印刷用はB4横・1枚に収める。値がある範囲だけを印刷範囲にし、上下左右中央寄せ。
@@ -6567,6 +6687,10 @@ function styleAllStudentPrintSheet(ws, aoa){
     const addr = XLSX.utils.encode_cell({r:R, c:eventCol});
     if(ws[addr]) allListApplyRichWarningsToCell(ws[addr]);
   }
+
+  // 印刷用は全セルで「折り返して全体を表示」＋「縮小して全体を表示」を強制。
+  // 個別の赤セル・タイトル・ヘッダー設定の後にもう一度かける。
+  allListForcePrintTextFitAllCells(ws, range);
   return ws;
 }
 
