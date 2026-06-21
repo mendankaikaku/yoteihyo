@@ -6485,17 +6485,27 @@ function allListSetPrintAreaToUsedRange(wb, sheetName, ws){
 function allListApplyB4LandscapeOnePagePrintSettings(ws){
   if(!ws) return;
   // B4横・1ページ縮小をできるだけ強くExcelに渡す。
-  // SheetJS系の環境差に備えて、数値属性と明示属性を両方含める。
+  // Excelの印刷画面「設定」欄の初期値として読まれる想定。
+  // SheetJS / xlsx-js-style の環境差に備えて、数値・文字列・互換プロパティを重ねて入れる。
   ws['!pageSetup'] = {
     paperSize: 12,              // 12 = B4(JIS)
-    orientation: 'landscape',   // 横
+    orientation: 'landscape',   // 横方向
     fitToWidth: 1,
     fitToHeight: 1,
     fitToPage: true,
     usePrinterDefaults: false,
     horizontalDpi: 300,
-    verticalDpi: 300
+    verticalDpi: 300,
+    scale: 100,
+    pageOrder: 'downThenOver',
+    blackAndWhite: false,
+    draft: false
   };
+  ws['!pageSetup'].paperSize = 12;
+  ws['!pageSetup'].orientation = 'landscape';
+  ws['!pageSetup'].fitToWidth = 1;
+  ws['!pageSetup'].fitToHeight = 1;
+
   ws['!printOptions'] = {
     horizontalCentered: true,
     verticalCentered: true
