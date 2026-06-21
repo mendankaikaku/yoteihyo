@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>予定統合アプリあ</title>　
+  <title>予定統合アプリ</title>　
   <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
   <script src="./libs/xlsx.bundle.js"></script>
   <script>
@@ -6631,6 +6631,40 @@ function allListForcePrintTextFitAllCells(ws, range){
   }
 }
 
+
+function allListApplyPrintColumns(ws, widths){
+  if(!ws) return;
+  ws['!cols'] = (widths || []).map(w => ({wch:Math.max(1, Math.round(Number(w || 1) * 10) / 10)}));
+}
+function allListAdjustPrintWidthsToB4LandscapeAspect(ws, widths){
+  if(!ws || !Array.isArray(widths) || !widths.length) return widths;
+  const B4_LANDSCAPE_RATIO = 364 / 257; // B4横：横364mm / 縦257mm
+  const rows = ws['!rows'] || [];
+  const totalRowHpt = rows.reduce((sum, r) => sum + Number(r?.hpt || 12), 0);
+  if(!totalRowHpt) return widths;
+
+  // Excel列幅(wch)と行高(pt)は単位が違うため、一般的な表示換算で近似する。
+  // 1pt ≒ 96/72px、1wch ≒ 7px として、表全体の見た目比をB4横に合わせる。
+  const rowHeightPx = totalRowHpt * (96 / 72);
+  const targetTotalWch = (rowHeightPx * B4_LANDSCAPE_RATIO) / 7;
+  const currentTotalWch = widths.reduce((sum, w) => sum + Number(w || 0), 0);
+  if(!currentTotalWch || !targetTotalWch) return widths;
+
+  const scale = targetTotalWch / currentTotalWch;
+  const adjusted = widths.map(w => Math.max(1.5, Number(w || 1) * scale));
+
+  // これを入れておくと、印刷プレビュー時に上下左右の余白が出にくい。
+  allListApplyPrintColumns(ws, adjusted);
+  ws._allListB4AspectInfo = {
+    targetRatio: B4_LANDSCAPE_RATIO,
+    totalRowHpt,
+    targetTotalWch,
+    currentTotalWch,
+    scale
+  };
+  return adjusted;
+}
+
 function styleAllStudentPrintSheet(ws, aoa){
   const manualCount = Math.max(0, Number(aoa?._manualPrintColumnCount || 0));
   const planCount = Math.max(0, Number(aoa?._printPlanColumnCount || 0));
@@ -6641,6 +6675,9 @@ function styleAllStudentPrintSheet(ws, aoa){
   // 印刷用は上下中央揃えを維持しつつ、行高だけを文字量ぎりぎりまで小さくする。
   const range = applyNiceSheetSettings(ws, aoa, widths, {rows:{min:7,max:64,header:15,pxPerLine:5.5}});
   applyCompactPrintRows(ws, aoa, widths);
+  // 行高合計と列幅合計の比が、B4横の紙面比に近づくように列幅全体を拡大/縮小する。
+  // これで「1ページ縮小」時に上下左右の余白が偏りにくくなる。
+  allListAdjustPrintWidthsToB4LandscapeAspect(ws, widths);
   ws['!freeze'] = {xSplit:2, ySplit:2};
   // 印刷用はB4横・1枚に収める。値がある範囲だけを印刷範囲にし、上下左右中央寄せ。
   allListApplyB4LandscapeOnePagePrintSettings(ws);
