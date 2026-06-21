@@ -591,6 +591,10 @@ const state = {
   workbookReady: false
 };
 
+// 毎日掲示の「前日」は、読み込んだ毎日更新.xlsx内の最新日ではなく、
+// このアプリを開いた日の前日で固定する。
+const APP_OPENED_AT = new Date();
+
 const $ = id => document.getElementById(id);
 function setDownloadButtonsDisabled(disabled){
   ["downloadBtn","download2wBtn","download1mBtn","downloadAllListBtn","downloadExamSubjectListBtn"].forEach(id => {
@@ -4045,7 +4049,7 @@ const MONTHLY_POSTER_RESULT_RULES = [
   {keyword:'講座を修得', sheetName:'講座修得'},
   {keyword:'講座を完全修得', sheetName:'完全修得'}
 ];
-function monthRangeForOpenedPage(base = new Date()){
+function monthRangeForOpenedPage(base = APP_OPENED_AT){
   const from = new Date(base.getFullYear(), base.getMonth(), 1);
   const to = new Date(base.getFullYear(), base.getMonth() + 1, 0, 23, 59, 59, 999);
   return {from, to, label:`${base.getFullYear()}年${base.getMonth()+1}月`};
@@ -4336,7 +4340,7 @@ function extractHighSpeedRowsFromSheets(sheets, from, to){
   }
   return rows;
 }
-function previousDayRangeForOpenedPage(base = new Date()){
+function previousDayRangeForOpenedPage(base = APP_OPENED_AT){
   const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() - 1);
   const from = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
   const to = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
@@ -4524,9 +4528,11 @@ async function downloadMonthlyPosterResultWorkbook(){
     }
     allResults = mergeResultRecordsUnique(allResults);
 
-    const month = monthRangeForOpenedPage(new Date());
-    const yesterday = previousDayRangeForOpenedPage(new Date());
+    const dailyPosterBaseDate = APP_OPENED_AT;
+    const month = monthRangeForOpenedPage(dailyPosterBaseDate);
+    const yesterday = previousDayRangeForOpenedPage(dailyPosterBaseDate);
     const monthResults = allResults.filter(r => inDateRange(r, month.from, month.to));
+    // 連続実施は、毎日更新.xlsx内の最新日や手修正復元日を見ず、アプリを開いた日の前日だけに固定。
     const yesterdayResults = allResults.filter(r => inDateRange(r, yesterday.from, yesterday.to));
 
     const wb = XLSX.utils.book_new();
@@ -4535,7 +4541,9 @@ async function downloadMonthlyPosterResultWorkbook(){
       const sourceRecords = rule.keyword === '連続で実施' ? yesterdayResults : monthResults;
       const label = rule.keyword === '連続で実施' ? yesterday.label : month.label;
       const aoa = buildMonthlyPosterResultAoa(sourceRecords, rule, label);
-      const mergedAoa = mergeRestoredDailyPosterAoa(rule.sheetName, aoa);
+      // 連続実施は日付が最重要なので、前回の毎日掲示Excelから旧日付・旧行を復元しない。
+      // 必ず「アプリを開いた日の前日」で作った aoa をそのまま使う。
+      const mergedAoa = rule.keyword === '連続で実施' ? aoa : mergeRestoredDailyPosterAoa(rule.sheetName, aoa);
       const ws = aoaToSheet(mergedAoa);
       styleMonthlyPosterSheet(ws, mergedAoa);
       XLSX.utils.book_append_sheet(wb, ws, uniqueSheetName(rule.sheetName, used));
@@ -4570,7 +4578,8 @@ async function downloadMonthlyPosterResultWorkbook(){
     const hsDiag = diagnoseHighSpeedSheetsForDaily(rawSheets.sheets, yesterday.from, yesterday.to);
 
     log(`毎日更新を作成しました
-連続実施対象日: ${ymd(yesterday.from)}
+毎日掲示基準日（アプリを開いた日）: ${ymd(dailyPosterBaseDate)}
+連続実施対象日: ${ymd(yesterday.from)}（アプリを開いた日の前日で固定）
 高速基礎ランキング対象日: ${ymd(highSpeedTarget.from)}${highSpeedFallbackMessage ? '（自動切替）' : ''}
 修得系対象期間: ${ymd(month.from)}〜${ymd(month.to)}
 ${counts}
