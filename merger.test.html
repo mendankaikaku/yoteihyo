@@ -6450,6 +6450,38 @@ function applyCompactPrintRows(ws, aoa, widths){
   });
 }
 
+
+function allListSheetQuotedName(name){
+  return `'${String(name || '').replace(/'/g, "''")}'`;
+}
+function allListUsedPrintAreaRef(ws){
+  const ref = ws && ws['!ref'] ? ws['!ref'] : 'A1:A1';
+  const range = XLSX.utils.decode_range(ref);
+  let maxR = 0;
+  let maxC = 0;
+  for(let R=range.s.r; R<=range.e.r; R++){
+    for(let C=range.s.c; C<=range.e.c; C++){
+      const addr = XLSX.utils.encode_cell({r:R,c:C});
+      const cell = ws[addr];
+      if(cell && cell.v != null && String(cell.v).trim() !== ''){
+        if(R > maxR) maxR = R;
+        if(C > maxC) maxC = C;
+      }
+    }
+  }
+  return `$A$1:$${colName(maxC+1)}$${maxR+1}`;
+}
+function allListSetPrintAreaToUsedRange(wb, sheetName, ws){
+  if(!wb || !sheetName || !ws) return;
+  wb.Workbook = wb.Workbook || {};
+  wb.Workbook.Names = wb.Workbook.Names || [];
+  const sheetIndex = (wb.SheetNames || []).indexOf(sheetName);
+  const ref = `${allListSheetQuotedName(sheetName)}!${allListUsedPrintAreaRef(ws)}`;
+  // 同じシートの古い印刷範囲があれば置き換える。
+  wb.Workbook.Names = wb.Workbook.Names.filter(n => !(n && n.Name === '_xlnm.Print_Area' && n.Sheet === sheetIndex));
+  wb.Workbook.Names.push({Name:'_xlnm.Print_Area', Sheet:sheetIndex, Ref:ref});
+}
+
 function styleAllStudentPrintSheet(ws, aoa){
   const manualCount = Math.max(0, Number(aoa?._manualPrintColumnCount || 0));
   const planCount = Math.max(0, Number(aoa?._printPlanColumnCount || 0));
@@ -6459,8 +6491,10 @@ function styleAllStudentPrintSheet(ws, aoa){
   const range = applyNiceSheetSettings(ws, aoa, widths, {rows:{min:12,max:115,header:21,pxPerLine:9}});
   applyCompactPrintRows(ws, aoa, widths);
   ws['!freeze'] = {xSplit:2, ySplit:2};
-  ws['!pageSetup'] = {orientation:'landscape', paperSize:12, fitToWidth:1, fitToHeight:0};
-  ws['!margins'] = {left:0.08, right:0.08, top:0.18, bottom:0.18, header:0.04, footer:0.04};
+  // 印刷用はB4横・1枚に収める。値がある範囲だけを印刷範囲にし、上下左右中央寄せ。
+  ws['!pageSetup'] = {orientation:'landscape', paperSize:12, fitToWidth:1, fitToHeight:1, fitToPage:true, horizontalDpi:300, verticalDpi:300};
+  ws['!printOptions'] = {horizontalCentered:true, verticalCentered:true};
+  ws['!margins'] = {left:0.05, right:0.05, top:0.08, bottom:0.08, header:0.02, footer:0.02};
   if((aoa[1] || []).length > 1){
     ws['!merges'] = ws['!merges'] || [];
     ws['!merges'].push({s:{r:0,c:0}, e:{r:0,c:(aoa[1] || []).length-1}});
@@ -6535,7 +6569,10 @@ async function downloadAllStudentList(){
       const printAoa = buildAllStudentPrintAoaFromFullAoa(item.grade, item.aoa);
       const wsPrint = aoaToSheet(printAoa);
       styleAllStudentPrintSheet(wsPrint, printAoa);
-      XLSX.utils.book_append_sheet(wb, wsPrint, safeSheetName(`${item.grade}印刷(入力しない)`));
+      const printSheetName = safeSheetName(`${item.grade}印刷(入力しない)`);
+      XLSX.utils.book_append_sheet(wb, wsPrint, printSheetName);
+      // 印刷用シートだけ、値が入っている最終行・最終列までを印刷範囲に固定する。
+      allListSetPrintAreaToUsedRange(wb, printSheetName, wsPrint);
     }
 
     if(state.allListUpdateLog && state.allListUpdateLog.length > 1){
