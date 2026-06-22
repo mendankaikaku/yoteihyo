@@ -6599,15 +6599,9 @@ function allListBuildAutoPrintWidths(aoa, manualCount, planCount){
     else if(c === 4 || c === 5){ minW[c]=7; maxW[c]=15; weight[c]=0.7; }  // 備考系
     else if(c >= 6 && c < eventCol){ minW[c]=4; maxW[c]=10; weight[c]=0.45; } // 手追加列
     else if(c === eventCol){ minW[c]=65; maxW[c]=105; weight[c]=2.2; }    // 模試イベント
-    else {
-      const pw = allListPrintPlanResultNeedWidth(aoa, c);
-      minW[c]=pw; maxW[c]=pw; weight[c]=0;                                  // 予定・結果は「・1項目」が1行に入りやすい幅
-    }
-    // 見出しが予定/結果なら、・1項目あたりの最大文字数に横幅を合わせる
-    if(!tinyMark && /予定|結果/.test(h) && c > eventCol){
-      const pw = allListPrintPlanResultNeedWidth(aoa, c);
-      minW[c]=pw; maxW[c]=pw; weight[c]=0;
-    }
+    else { minW[c]=5; maxW[c]=11; weight[c]=0.55; }                       // 予定・結果
+    // 見出しが予定/結果ならさらに小さめに保つ
+    if(!tinyMark && /予定|結果/.test(h) && c > eventCol){ minW[c]=4.5; maxW[c]=9; weight[c]=0.45; }
     weight[c] = tinyMark ? weight[c] : Math.max(0.1, weight[c] * Math.sqrt(Math.max(1, need)));
   }
 
@@ -6671,19 +6665,17 @@ function allListAdjustPrintWidthsToB4LandscapeAspect(ws, widths){
   const totalRowHpt = rows.reduce((sum, r) => sum + Number(r?.hpt || 12), 0);
   if(!totalRowHpt) return widths;
 
+  // Excel列幅(wch)と行高(pt)は単位が違うため、一般的な表示換算で近似する。
+  // 1pt ≒ 96/72px、1wch ≒ 7px として、表全体の見た目比をB4横に合わせる。
   const rowHeightPx = totalRowHpt * (96 / 72);
   const targetTotalWch = (rowHeightPx * B4_LANDSCAPE_RATIO) / 7;
   const currentTotalWch = widths.reduce((sum, w) => sum + Number(w || 0), 0);
   if(!currentTotalWch || !targetTotalWch) return widths;
 
   const scale = targetTotalWch / currentTotalWch;
-  // 縮小時でも予定・結果の「・1項目」が割れすぎないよう、各列幅の55%未満までは落とさない。
-  const adjusted = widths.map(w => {
-    const base = Number(w || 1);
-    const scaled = base * scale;
-    return Math.max(1.5, Math.max(base * 0.55, scaled));
-  });
+  const adjusted = widths.map(w => Math.max(1.5, Number(w || 1) * scale));
 
+  // これを入れておくと、印刷プレビュー時に上下左右の余白が出にくい。
   allListApplyPrintColumns(ws, adjusted);
   ws._allListB4AspectInfo = {
     targetRatio: B4_LANDSCAPE_RATIO,
@@ -6699,7 +6691,7 @@ function styleAllStudentPrintSheet(ws, aoa){
   const manualCount = Math.max(0, Number(aoa?._manualPrintColumnCount || 0));
   const planCount = Math.max(0, Number(aoa?._printPlanColumnCount || 0));
   // 模試イベントを大きく、右側に3日間の予定欄を追加しても読めるように列幅を広げる。
-  // 予定・結果は「・1項目」が1行に入りやすい幅、その他は文字量で列幅を自動配分する。
+  // 予定・結果の列幅割合は従来のまま、文字だけ小さくしてセル内に入りやすくする。
   // ただしB4横1ページに収めるため、列ごとに最小/最大幅を持たせて暴れすぎないようにする。
   const widths = allListBuildAutoPrintWidths(aoa, manualCount, planCount);
   // 印刷用は上下中央揃えを維持しつつ、行高だけを文字量ぎりぎりまで小さくする。
@@ -6728,8 +6720,8 @@ function styleAllStudentPrintSheet(ws, aoa){
   const fontBase = {name:'Yu Gothic', sz:6, color:{rgb:'111827'}};
   // 赤セル文字は名前/通常文字と同じサイズ。
   const fontMissing = {name:'Yu Gothic', sz:6, bold:true, color:{rgb:'991B1B'}};
-  const fontPlanResultSmall = {name:'Yu Gothic', sz:4, color:{rgb:'111827'}};
-  const fontPlanResultHeader = {name:'Yu Gothic', sz:5, bold:true, color:{rgb:'111827'}};
+  const fontPlanResultSmall = {name:'Yu Gothic', sz:2.5, color:{rgb:'111827'}};
+  const fontPlanResultHeader = {name:'Yu Gothic', sz:3.5, bold:true, color:{rgb:'111827'}};
   const totalCols = (aoa[1] || []).length;
   const eventCol = totalCols - 1 - planCount;
   setRangeStyle(ws, range, (R,C,cell)=>{
