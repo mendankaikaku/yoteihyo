@@ -6445,7 +6445,7 @@ function applyCompactPrintRows(ws, aoa, widths){
       lines = Math.max(lines, textLineCount(v, rowWidthChars[c] || 18));
     });
     // B4横1ページに収めるため、印刷用だけ行高をさらに圧縮する。
-    return {hpt:Math.max(7, Math.min(64, 2 + lines * 5.5))};
+    return {hpt:Math.max(7, Math.min(64, 1 + lines * 5.5))};
   });
 }
 
