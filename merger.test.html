@@ -6677,7 +6677,7 @@ function allListBuildAutoPrintWidths(aoa, manualCount, planCount){
       flexCols.push(c);
     }else if(c === eventCol){
       widths[c]=24; maxW[c]=72; // 模試イベント：最優先だが幅割合は約1/2
-      reps[c] = Math.max(1, (rep + 3) * 0.5); // 模試イベント欄の幅割合は今の約1/2
+      reps[c] = Math.max(1, (rep + 3) * 0.2); // 模試イベント欄の幅割合は今の約1/2
       flexCols.push(c);
     }else{
       // 予定・結果は優先度低。存在確認程度でよいのでかなり狭くする。
