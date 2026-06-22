@@ -6534,6 +6534,28 @@ function allListPrintColumnNeedScore(aoa, col){
   // 最大値だけに寄せると1人の長文で幅を取りすぎるので、最大値と平均値を混ぜる。
   return maxLen * 0.7 + avgLen * 0.3;
 }
+function allListPrintBulletItemMaxLength(value){
+  const text = String(value ?? '');
+  if(!text.trim()) return 0;
+  // 予定・結果は「・」で1項目ずつ並ぶので、セル全体の文字量ではなく1項目ずつを見る。
+  // これで「・英語...」の1項目が幅不足で2行になるのを減らす。
+  const items = text
+    .split(/\r?\n+/)
+    .flatMap(line => String(line).split(/(?=・)/))
+    .map(s => s.replace(/^・\s*/, '').trim())
+    .filter(Boolean);
+  const targets = items.length ? items : text.split(/\r?\n+/).map(s => s.trim()).filter(Boolean);
+  if(!targets.length) return 1;
+  return Math.max(...targets.map(s => allListPrintVisualTextLength('・' + s)));
+}
+function allListPrintPlanResultNeedWidth(aoa, col){
+  let maxLen = 1;
+  for(let r=2; r<(aoa || []).length; r++){
+    maxLen = Math.max(maxLen, allListPrintBulletItemMaxLength(aoa?.[r]?.[col]));
+  }
+  // 1項目が入る幅を優先。ただしB4に収めるため上限は置く。
+  return Math.max(4.5, Math.min(18, maxLen + 1.5));
+}
 function allListPrintColumnIsTinyMarkColumn(aoa, col){
   const vals = [];
   for(let r=2; r<(aoa || []).length; r++){
@@ -6577,9 +6599,15 @@ function allListBuildAutoPrintWidths(aoa, manualCount, planCount){
     else if(c === 4 || c === 5){ minW[c]=7; maxW[c]=15; weight[c]=0.7; }  // 備考系
     else if(c >= 6 && c < eventCol){ minW[c]=4; maxW[c]=10; weight[c]=0.45; } // 手追加列
     else if(c === eventCol){ minW[c]=65; maxW[c]=105; weight[c]=2.2; }    // 模試イベント
-    else { minW[c]=5; maxW[c]=11; weight[c]=0.55; }                       // 予定・結果
-    // 見出しが予定/結果ならさらに小さめに保つ
-    if(!tinyMark && /予定|結果/.test(h) && c > eventCol){ minW[c]=4.5; maxW[c]=9; weight[c]=0.45; }
+    else {
+      const pw = allListPrintPlanResultNeedWidth(aoa, c);
+      minW[c]=pw; maxW[c]=pw; weight[c]=0;                                  // 予定・結果は「・1項目」が1行に入りやすい幅
+    }
+    // 見出しが予定/結果なら、・1項目あたりの最大文字数に横幅を合わせる
+    if(!tinyMark && /予定|結果/.test(h) && c > eventCol){
+      const pw = allListPrintPlanResultNeedWidth(aoa, c);
+      minW[c]=pw; maxW[c]=pw; weight[c]=0;
+    }
     weight[c] = tinyMark ? weight[c] : Math.max(0.1, weight[c] * Math.sqrt(Math.max(1, need)));
   }
 
@@ -6643,17 +6671,19 @@ function allListAdjustPrintWidthsToB4LandscapeAspect(ws, widths){
   const totalRowHpt = rows.reduce((sum, r) => sum + Number(r?.hpt || 12), 0);
   if(!totalRowHpt) return widths;
 
-  // Excel列幅(wch)と行高(pt)は単位が違うため、一般的な表示換算で近似する。
-  // 1pt ≒ 96/72px、1wch ≒ 7px として、表全体の見た目比をB4横に合わせる。
   const rowHeightPx = totalRowHpt * (96 / 72);
   const targetTotalWch = (rowHeightPx * B4_LANDSCAPE_RATIO) / 7;
   const currentTotalWch = widths.reduce((sum, w) => sum + Number(w || 0), 0);
   if(!currentTotalWch || !targetTotalWch) return widths;
 
   const scale = targetTotalWch / currentTotalWch;
-  const adjusted = widths.map(w => Math.max(1.5, Number(w || 1) * scale));
+  // 縮小時でも予定・結果の「・1項目」が割れすぎないよう、各列幅の55%未満までは落とさない。
+  const adjusted = widths.map(w => {
+    const base = Number(w || 1);
+    const scaled = base * scale;
+    return Math.max(1.5, Math.max(base * 0.55, scaled));
+  });
 
-  // これを入れておくと、印刷プレビュー時に上下左右の余白が出にくい。
   allListApplyPrintColumns(ws, adjusted);
   ws._allListB4AspectInfo = {
     targetRatio: B4_LANDSCAPE_RATIO,
@@ -6669,7 +6699,7 @@ function styleAllStudentPrintSheet(ws, aoa){
   const manualCount = Math.max(0, Number(aoa?._manualPrintColumnCount || 0));
   const planCount = Math.max(0, Number(aoa?._printPlanColumnCount || 0));
   // 模試イベントを大きく、右側に3日間の予定欄を追加しても読めるように列幅を広げる。
-  // 入っている文字量の割合で、印刷用の列幅を自動配分する。
+  // 予定・結果は「・1項目」が1行に入りやすい幅、その他は文字量で列幅を自動配分する。
   // ただしB4横1ページに収めるため、列ごとに最小/最大幅を持たせて暴れすぎないようにする。
   const widths = allListBuildAutoPrintWidths(aoa, manualCount, planCount);
   // 印刷用は上下中央揃えを維持しつつ、行高だけを文字量ぎりぎりまで小さくする。
@@ -6698,6 +6728,8 @@ function styleAllStudentPrintSheet(ws, aoa){
   const fontBase = {name:'Yu Gothic', sz:6, color:{rgb:'111827'}};
   // 赤セル文字は名前/通常文字と同じサイズ。
   const fontMissing = {name:'Yu Gothic', sz:6, bold:true, color:{rgb:'991B1B'}};
+  const fontPlanResultSmall = {name:'Yu Gothic', sz:4, color:{rgb:'111827'}};
+  const fontPlanResultHeader = {name:'Yu Gothic', sz:5, bold:true, color:{rgb:'111827'}};
   const totalCols = (aoa[1] || []).length;
   const eventCol = totalCols - 1 - planCount;
   setRangeStyle(ws, range, (R,C,cell)=>{
@@ -6705,7 +6737,11 @@ function styleAllStudentPrintSheet(ws, aoa){
     // 模試イベント欄は、模試・イベントどちらも「書き込み空欄が残っている人」だけセル背景を赤くする。
     // 旧赤判定語はセル全体を赤くせず、後段で該当文字だけ赤字にする。
     const hasBlankWritingField = R>1 && C===eventCol && allListPrintHasBlankWritingField(text);
-    const style = {font:R===0?fontTitle:(R===1?fontHeader:fontBase), alignment:{vertical:'center', horizontal:'center', wrapText:true, shrinkToFit:true}, border};
+    const isPlanResultCol = C > eventCol;
+    const cellFont = isPlanResultCol
+      ? (R===1 ? fontPlanResultHeader : fontPlanResultSmall)
+      : (R===0 ? fontTitle : (R===1 ? fontHeader : fontBase));
+    const style = {font:cellFont, alignment:{vertical:'center', horizontal:'center', wrapText:true, shrinkToFit:true}, border};
     if(R===0) style.fill = titleFill;
     else if(R===1) style.fill = headerFill;
     else if(C<=1) style.fill = nameFill;
