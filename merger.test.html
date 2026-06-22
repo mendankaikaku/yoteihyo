@@ -6452,65 +6452,25 @@ function applyCompactPrintRows(ws, aoa, widths){
 
 
 
-function allListApplyEqualPrintRowsForB4(ws, aoa, widths, eventCol){
-  // 印刷用は全員の行高を均等にする。
-  // ただし、聞き取りに使う「自分で追加した列」と「模試イベント欄」は最優先で、
-  // その中の文字が収まるだけの高さを全員に同じ高さで確保する。
-  const B4_HEIGHT_MM = 257;
-  const PT_PER_MM = 72 / 25.4;
-  const topBottomMarginPt = (0.05 + 0.05) * 72;
-  const printableHeightPt = B4_HEIGHT_MM * PT_PER_MM - topBottomMarginPt;
-
-  const titleH = 15;
-  const headerH = 15;
-  const dataRows = Math.max(1, (aoa || []).length - 2);
-  const paperEqualH = Math.max(7, (printableHeightPt - titleH - headerH) / dataRows);
-
-  const rowWidthChars = (widths || []).map(w => {
+function applyCompactPrintRowsByEventColumn(ws, aoa, widths, eventCol){
+  const rowWidthChars = widths.map(w => {
     if(typeof w === "object" && w !== null){
       if(w.wch) return w.wch;
       if(w.wpx) return Math.max(8, Math.round(w.wpx / 7));
       return 18;
     }
-    return Number(w || 18);
+    return w;
   });
-
-  // 優先列：手追加列（6列目以降〜模試イベントの直前）＋模試イベント列。
-  // 予定・結果列はここに含めない。予定・結果は小さい文字と縮小表示で中に入れる。
-  const priorityCols = [];
-  for(let c=6; c<eventCol; c++) priorityCols.push(c);
-  if(eventCol >= 0) priorityCols.push(eventCol);
-
-  let maxPriorityLines = 1;
-  for(let r=2; r<(aoa || []).length; r++){
-    for(const c of priorityCols){
-      const v = aoa?.[r]?.[c];
-      maxPriorityLines = Math.max(maxPriorityLines, textLineCount(v, rowWidthChars[c] || 18));
-    }
-  }
-
-  const priorityNeededH = 2 + maxPriorityLines * 6.2;
-  // 全員均等は維持しつつ、優先列が収まる高さを確保する。
-  // 高くなりすぎても1ページ印刷設定で紙面側に縮小する。
-  const equalH = Math.max(7, Math.min(120, Math.max(paperEqualH, priorityNeededH)));
-
+  const eventWidth = rowWidthChars[eventCol] || 18;
   ws['!rows'] = (aoa || []).map((row, r) => {
-    if(r === 0) return {hpt:titleH};
-    if(r === 1) return {hpt:headerH};
-    return {hpt:Math.round(equalH * 10) / 10};
+    if(r === 0) return {hpt:16};
+    if(r === 1) return {hpt:16};
+    // 印刷用の行高は「模試イベント」欄の文字量だけに合わせる。
+    // 予定・結果列は極小文字＋縮小表示にするので、行高を押し広げない。
+    const eventText = row?.[eventCol] ?? '';
+    const lines = textLineCount(eventText, eventWidth);
+    return {hpt:Math.max(7, Math.min(64, 2 + lines * 5.5))};
   });
-  ws._allListEqualRowHeightInfo = {
-    mode:'equal-priority-fit',
-    printableHeightPt,
-    titleH,
-    headerH,
-    dataRows,
-    paperEqualH,
-    maxPriorityLines,
-    priorityNeededH,
-    equalH,
-    priorityCols
-  };
 }
 
 function allListSheetQuotedName(name){
@@ -6612,16 +6572,6 @@ function allListPrintColumnNeedScore(aoa, col){
   // 最大値だけに寄せると1人の長文で幅を取りすぎるので、最大値と平均値を混ぜる。
   return maxLen * 0.7 + avgLen * 0.3;
 }
-function allListPrintColumnLongestLineRepresentative(aoa, col){
-  let maxLen = 0;
-  for(let r=2; r<(aoa || []).length; r++){
-    // allListPrintVisualTextLength は、セル内に複数行ある場合も「一番横に長い行」を返す。
-    maxLen = Math.max(maxLen, allListPrintVisualTextLength(aoa?.[r]?.[col]));
-  }
-  // データが空の列でも見出し分だけは少し見る。ただし見出しで幅を取りすぎない。
-  const headerLen = Math.min(8, allListPrintVisualTextLength(aoa?.[1]?.[col]));
-  return Math.max(1, maxLen, headerLen);
-}
 function allListPrintColumnIsTinyMarkColumn(aoa, col){
   const vals = [];
   for(let r=2; r<(aoa || []).length; r++){
@@ -6644,62 +6594,46 @@ function allListBuildAutoPrintWidths(aoa, manualCount, planCount){
   const totalCols = header.length;
   const eventCol = totalCols - 1 - planCount;
 
-  // 単純な文字量合計ではなく、
-  // 各列の「一番横に長い行」を代表値にして列幅比率を決める。
-  // 模試イベント欄はセル内に複数行あるため、その中の最長行だけを代表値にする。
-  const targetTotal = 155;
-  const widths = new Array(totalCols).fill(0);
-  const maxW = new Array(totalCols).fill(0);
-  const reps = new Array(totalCols).fill(1);
-  const flexCols = [];
+  // B4横1ページに入りやすい総量。Excelのwch換算なので絶対値ではなく比率重視。
+  // 予定/結果をさらに小さくし、〇/×だけの列は1文字幅に寄せるため総量も少し絞る。
+  const targetTotal = 165;
+  const minW = [];
+  const maxW = [];
+  const weight = [];
 
   for(let c=0; c<totalCols; c++){
     const h = String(header[c] || '');
+    const need = allListPrintColumnNeedScore(aoa, c);
     const tinyMark = allListPrintColumnIsTinyMarkColumn(aoa, c);
-    const rep = allListPrintColumnLongestLineRepresentative(aoa, c);
-    reps[c] = rep;
-
     if(tinyMark){
-      widths[c]=2.2; maxW[c]=3.2; // 〇/×だけの列
-    }else if(c === 0){
-      widths[c]=4.5; maxW[c]=6.5; // 生徒番号
-    }else if(c === 1){
-      widths[c]=6.5; maxW[c]=10; // 名前
-    }else if(c === 2){
-      widths[c]=3; maxW[c]=5; // 高校
-    }else if(c === 3){
-      widths[c]=3; maxW[c]=5; // 担当
-    }else if(c === 4 || c === 5){
-      widths[c]=6; maxW[c]=14; // 備考系
-      flexCols.push(c);
-    }else if(c >= 6 && c < eventCol){
-      widths[c]=7; maxW[c]=24; // 自分で追加した列：聞き取り用なので優先
-      flexCols.push(c);
-    }else if(c === eventCol){
-      widths[c]=24; maxW[c]=72; // 模試イベント：最優先だが幅割合は約1/2
-      reps[c] = Math.max(1, (rep + 3) * 0.2); // 模試イベント欄の幅割合は今の約1/2
-      flexCols.push(c);
-    }else{
-      // 予定・結果は優先度低。存在確認程度でよいのでかなり狭くする。
-      widths[c]=1.8; maxW[c]=3.8;
-    }
-
-    if(!tinyMark && /予定|結果/.test(h) && c > eventCol){
-      widths[c]=1.8; maxW[c]=3.8;
-    }
+      // 〇や×だけの確認列は1文字分で十分。
+      minW[c]=2.2; maxW[c]=3.2; weight[c]=0.05;
+    }else if(c === 0){ minW[c]=4.5; maxW[c]=7; weight[c]=0.45; }          // 生徒番号
+    else if(c === 1){ minW[c]=6.5; maxW[c]=10; weight[c]=0.75; }          // 名前
+    else if(c === 2){ minW[c]=3; maxW[c]=5; weight[c]=0.3; }              // 高校
+    else if(c === 3){ minW[c]=3; maxW[c]=5; weight[c]=0.3; }              // 担当
+    else if(c === 4 || c === 5){ minW[c]=7; maxW[c]=15; weight[c]=0.7; }  // 備考系
+    else if(c >= 6 && c < eventCol){ minW[c]=4; maxW[c]=10; weight[c]=0.45; } // 手追加列
+    else if(c === eventCol){ const ew = allListPrintEventTargetWidth(); minW[c]=ew; maxW[c]=ew; weight[c]=0; }    // 模試イベントは指定サンプル+3文字幅
+    else { minW[c]=5; maxW[c]=11; weight[c]=0.55; }                       // 予定・結果
+    // 見出しが予定/結果ならさらに小さめに保つ
+    if(!tinyMark && /予定|結果/.test(h) && c > eventCol){ minW[c]=4.5; maxW[c]=9; weight[c]=0.45; }
+    weight[c] = tinyMark ? weight[c] : Math.max(0.1, weight[c] * Math.sqrt(Math.max(1, need)));
   }
 
+  let widths = minW.slice();
   let remaining = targetTotal - widths.reduce((a,b)=>a+b,0);
-  if(remaining > 0 && flexCols.length){
+  if(remaining > 0){
+    const flex = widths.map((w,c)=>Math.max(0, maxW[c]-w));
     let guard = 0;
-    while(remaining > 0.1 && guard++ < 80){
-      const available = flexCols.filter(c => widths[c] < maxW[c] - 0.05);
-      if(!available.length) break;
-      const totalRep = available.reduce((sum, c) => sum + Math.max(1, reps[c]), 0) || 1;
+    while(remaining > 0.1 && flex.some(x=>x>0.01) && guard++ < 200){
+      const totalWeight = flex.reduce((sum, f, c)=> sum + (f > 0 ? weight[c] : 0), 0) || 1;
       let used = 0;
-      for(const c of available){
-        const add = Math.min(maxW[c] - widths[c], remaining * (Math.max(1, reps[c]) / totalRep));
+      for(let c=0; c<widths.length; c++){
+        if(flex[c] <= 0) continue;
+        const add = Math.min(flex[c], remaining * (weight[c] / totalWeight));
         widths[c] += add;
+        flex[c] -= add;
         used += add;
       }
       if(used <= 0.01) break;
@@ -6707,20 +6641,13 @@ function allListBuildAutoPrintWidths(aoa, manualCount, planCount){
     }
   }
 
-  // もし固定幅だけで大きすぎた場合は、予定・結果以外を少しずつ縮める。
+  // 念のため総幅が大きすぎる場合は、最小値を割らない範囲で全体縮小。
   const total = widths.reduce((a,b)=>a+b,0);
   if(total > targetTotal){
-    const shrinkable = flexCols.filter(c => c !== eventCol);
-    const shrinkCurrent = shrinkable.reduce((sum,c)=>sum+widths[c],0);
-    const mustReduce = total - targetTotal;
-    if(shrinkCurrent > 0){
-      for(const c of shrinkable){
-        const reduce = mustReduce * (widths[c] / shrinkCurrent);
-        widths[c] = Math.max(4, widths[c] - reduce);
-      }
-    }
+    const minTotal = minW.reduce((a,b)=>a+b,0);
+    const ratio = (targetTotal - minTotal) / Math.max(1, total - minTotal);
+    widths = widths.map((w,c)=>minW[c] + (w - minW[c]) * Math.max(0, ratio));
   }
-
   return widths.map(w => Math.round(w * 10) / 10);
 }
 
@@ -6754,32 +6681,38 @@ function allListAdjustPrintWidthsToB4LandscapeAspect(ws, widths, eventCol){
   const totalRowHpt = rows.reduce((sum, r) => sum + Number(r?.hpt || 12), 0);
   if(!totalRowHpt) return widths;
 
+  // Excel列幅(wch)と行高(pt)は単位が違うため、一般的な表示換算で近似する。
+  // 1pt ≒ 96/72px、1wch ≒ 7px として、表全体の見た目比をB4横に合わせる。
   const rowHeightPx = totalRowHpt * (96 / 72);
   const targetTotalWch = (rowHeightPx * B4_LANDSCAPE_RATIO) / 7;
-  if(!targetTotalWch) return widths;
+  const currentTotalWch = widths.reduce((sum, w) => sum + Number(w || 0), 0);
+  if(!currentTotalWch || !targetTotalWch) return widths;
 
   const adjusted = widths.map(w => Math.max(1.5, Number(w || 1)));
+  const fixedEventWidth = (Number.isInteger(eventCol) && eventCol >= 0 && eventCol < adjusted.length)
+    ? allListPrintEventTargetWidth()
+    : null;
+  if(fixedEventWidth != null){
+    adjusted[eventCol] = fixedEventWidth;
+    const otherCurrent = widths.reduce((sum, w, c) => c === eventCol ? sum : sum + Number(w || 0), 0);
+    const otherTarget = Math.max(1, targetTotalWch - fixedEventWidth);
+    const otherScale = otherTarget / Math.max(1, otherCurrent);
+    adjusted.forEach((w, c) => {
+      if(c !== eventCol) adjusted[c] = Math.max(1.5, Number(widths[c] || 1) * otherScale);
+    });
+  }else{
+    const scale = targetTotalWch / currentTotalWch;
+    adjusted.forEach((w, c) => adjusted[c] = Math.max(1.5, Number(widths[c] || 1) * scale));
+  }
 
-  // 予定・結果列は広げない。代表値比率は、模試イベントは1/2、手追加列・備考・名前側で保つ。
-  const fixedCols = new Set();
-  for(let c=(eventCol + 1); c<adjusted.length; c++) fixedCols.add(c);
-
-  const fixedTotal = adjusted.reduce((sum, w, c) => fixedCols.has(c) ? sum + w : sum, 0);
-  const flexCurrent = adjusted.reduce((sum, w, c) => fixedCols.has(c) ? sum : sum + w, 0);
-  const flexTarget = Math.max(1, targetTotalWch - fixedTotal);
-  const flexScale = flexTarget / Math.max(1, flexCurrent);
-
-  adjusted.forEach((w, c) => {
-    if(!fixedCols.has(c)) adjusted[c] = Math.max(1.5, w * flexScale);
-  });
-
+  // これを入れておくと、印刷プレビュー時に上下左右の余白が出にくい。
   allListApplyPrintColumns(ws, adjusted);
   ws._allListB4AspectInfo = {
     targetRatio: B4_LANDSCAPE_RATIO,
     totalRowHpt,
     targetTotalWch,
-    fixedPlanResultCols: adjusted.length - eventCol - 1,
-    flexScale
+    currentTotalWch,
+    fixedEventWidth
   };
   return adjusted;
 }
@@ -6788,15 +6721,15 @@ function styleAllStudentPrintSheet(ws, aoa){
   const manualCount = Math.max(0, Number(aoa?._manualPrintColumnCount || 0));
   const planCount = Math.max(0, Number(aoa?._printPlanColumnCount || 0));
   // 模試イベントを大きく、右側に3日間の予定欄を追加しても読めるように列幅を広げる。
-  // 各列の「一番横に長い行」を代表値にして、印刷用の列幅比率を自動配分する。
+  // 入っている文字量の割合で、印刷用の列幅を自動配分する。
   // ただしB4横1ページに収めるため、列ごとに最小/最大幅を持たせて暴れすぎないようにする。
   const widths = allListBuildAutoPrintWidths(aoa, manualCount, planCount);
   const totalCols = (aoa[1] || []).length;
   const eventCol = totalCols - 1 - planCount;
-  // 印刷用の行高は全員均等。ただし手追加列と模試イベント欄が収まる高さを優先し、予定・結果は極小文字＋縮小表示で中に入れる。
+  // 印刷用の行高は模試イベント欄だけに合わせる。予定・結果列は極小文字＋縮小表示で中に入れる。
   const range = applyNiceSheetSettings(ws, aoa, widths, {rows:{min:7,max:64,header:15,pxPerLine:5.5}});
-  allListApplyEqualPrintRowsForB4(ws, aoa, widths, eventCol);
-  // 均等配分した行高合計と列幅合計の比が、B4横の紙面比に近づくように列幅全体を拡大/縮小する。
+  applyCompactPrintRowsByEventColumn(ws, aoa, widths, eventCol);
+  // 行高合計と列幅合計の比が、B4横の紙面比に近づくように列幅全体を拡大/縮小する。
   // これで「1ページ縮小」時に上下左右の余白が偏りにくくなる。
   allListAdjustPrintWidthsToB4LandscapeAspect(ws, widths, eventCol);
   ws['!freeze'] = {xSplit:2, ySplit:2};
@@ -6820,8 +6753,8 @@ function styleAllStudentPrintSheet(ws, aoa){
   // 赤セル文字は名前/通常文字と同じサイズ。
   const fontMissing = {name:'Yu Gothic', sz:6, bold:true, color:{rgb:'991B1B'}};
   // 予定・結果欄は行高を広げないため、印刷用だけかなり小さい文字にする。
-  const fontPlanTinyHeader = {name:'Yu Gothic', sz:3, bold:true, color:{rgb:'111827'}};
-  const fontPlanTiny = {name:'Yu Gothic', sz:2, color:{rgb:'111827'}};
+  const fontPlanTinyHeader = {name:'Yu Gothic', sz:4, bold:true, color:{rgb:'111827'}};
+  const fontPlanTiny = {name:'Yu Gothic', sz:3, color:{rgb:'111827'}};
   setRangeStyle(ws, range, (R,C,cell)=>{
     const text = cell && cell.v != null ? String(cell.v) : '';
     // 模試イベント欄は、模試・イベントどちらも「書き込み空欄が残っている人」だけセル背景を赤くする。
