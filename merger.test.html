@@ -6551,6 +6551,11 @@ function allListPrintVisualTextLength(value){
     [...line].reduce((n, ch) => n + (ch.charCodeAt(0) > 255 ? 1.7 : 1), 0)
   ), 0);
 }
+const ALL_LIST_PRINT_EVENT_WIDTH_SAMPLE = '7/5(日) 【模試】医学部82大学判定テスト（回答:不受験　　　　 / Comiru:〇　　　　 / 科目変更:×　　　　 / 科目リスト:不受験　　　　）';
+function allListPrintEventTargetWidth(){
+  // 指定サンプル文字列 + 約3文字分の幅。
+  return Math.round((allListPrintVisualTextLength(ALL_LIST_PRINT_EVENT_WIDTH_SAMPLE) + 3) * 10) / 10;
+}
 function allListPrintColumnNeedScore(aoa, col){
   let maxLen = 0;
   let sumLen = 0;
@@ -6609,7 +6614,7 @@ function allListBuildAutoPrintWidths(aoa, manualCount, planCount){
     else if(c === 3){ minW[c]=3; maxW[c]=5; weight[c]=0.3; }              // 担当
     else if(c === 4 || c === 5){ minW[c]=7; maxW[c]=15; weight[c]=0.7; }  // 備考系
     else if(c >= 6 && c < eventCol){ minW[c]=4; maxW[c]=10; weight[c]=0.45; } // 手追加列
-    else if(c === eventCol){ minW[c]=65; maxW[c]=105; weight[c]=2.2; }    // 模試イベント
+    else if(c === eventCol){ const ew = allListPrintEventTargetWidth(); minW[c]=ew; maxW[c]=ew; weight[c]=0; }    // 模試イベントは指定サンプル+3文字幅
     else { minW[c]=5; maxW[c]=11; weight[c]=0.55; }                       // 予定・結果
     // 見出しが予定/結果ならさらに小さめに保つ
     if(!tinyMark && /予定|結果/.test(h) && c > eventCol){ minW[c]=4.5; maxW[c]=9; weight[c]=0.45; }
@@ -6669,7 +6674,7 @@ function allListApplyPrintColumns(ws, widths){
   if(!ws) return;
   ws['!cols'] = (widths || []).map(w => ({wch:Math.max(1, Math.round(Number(w || 1) * 10) / 10)}));
 }
-function allListAdjustPrintWidthsToB4LandscapeAspect(ws, widths){
+function allListAdjustPrintWidthsToB4LandscapeAspect(ws, widths, eventCol){
   if(!ws || !Array.isArray(widths) || !widths.length) return widths;
   const B4_LANDSCAPE_RATIO = 364 / 257; // B4横：横364mm / 縦257mm
   const rows = ws['!rows'] || [];
@@ -6683,8 +6688,22 @@ function allListAdjustPrintWidthsToB4LandscapeAspect(ws, widths){
   const currentTotalWch = widths.reduce((sum, w) => sum + Number(w || 0), 0);
   if(!currentTotalWch || !targetTotalWch) return widths;
 
-  const scale = targetTotalWch / currentTotalWch;
-  const adjusted = widths.map(w => Math.max(1.5, Number(w || 1) * scale));
+  const adjusted = widths.map(w => Math.max(1.5, Number(w || 1)));
+  const fixedEventWidth = (Number.isInteger(eventCol) && eventCol >= 0 && eventCol < adjusted.length)
+    ? allListPrintEventTargetWidth()
+    : null;
+  if(fixedEventWidth != null){
+    adjusted[eventCol] = fixedEventWidth;
+    const otherCurrent = widths.reduce((sum, w, c) => c === eventCol ? sum : sum + Number(w || 0), 0);
+    const otherTarget = Math.max(1, targetTotalWch - fixedEventWidth);
+    const otherScale = otherTarget / Math.max(1, otherCurrent);
+    adjusted.forEach((w, c) => {
+      if(c !== eventCol) adjusted[c] = Math.max(1.5, Number(widths[c] || 1) * otherScale);
+    });
+  }else{
+    const scale = targetTotalWch / currentTotalWch;
+    adjusted.forEach((w, c) => adjusted[c] = Math.max(1.5, Number(widths[c] || 1) * scale));
+  }
 
   // これを入れておくと、印刷プレビュー時に上下左右の余白が出にくい。
   allListApplyPrintColumns(ws, adjusted);
@@ -6693,7 +6712,7 @@ function allListAdjustPrintWidthsToB4LandscapeAspect(ws, widths){
     totalRowHpt,
     targetTotalWch,
     currentTotalWch,
-    scale
+    fixedEventWidth
   };
   return adjusted;
 }
@@ -6712,7 +6731,7 @@ function styleAllStudentPrintSheet(ws, aoa){
   applyCompactPrintRowsByEventColumn(ws, aoa, widths, eventCol);
   // 行高合計と列幅合計の比が、B4横の紙面比に近づくように列幅全体を拡大/縮小する。
   // これで「1ページ縮小」時に上下左右の余白が偏りにくくなる。
-  allListAdjustPrintWidthsToB4LandscapeAspect(ws, widths);
+  allListAdjustPrintWidthsToB4LandscapeAspect(ws, widths, eventCol);
   ws['!freeze'] = {xSplit:2, ySplit:2};
   // 印刷用はB4横・1枚に収める。値がある範囲だけを印刷範囲にし、上下左右中央寄せ。
   allListApplyB4LandscapeOnePagePrintSettings(ws);
