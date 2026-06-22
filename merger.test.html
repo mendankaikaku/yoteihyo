@@ -6437,12 +6437,22 @@ function applyCompactPrintRows(ws, aoa, widths){
     }
     return w;
   });
+
+  const header = aoa?.[1] || [];
+  const planResultStartCol = header.findIndex(h => String(h || '').includes('予定'));
+  const planResultWidthMultiplier = 2.2; // 予定・結果は小さい文字なので、高さ計算では横幅を広めに見積もる
+
   ws['!rows'] = (aoa || []).map((row, r) => {
     if(r === 0) return {hpt:16};
     if(r === 1) return {hpt:16};
     let lines = 1;
     (row || []).forEach((v, c) => {
-      lines = Math.max(lines, textLineCount(v, rowWidthChars[c] || 18));
+      const isPlanResultCol = planResultStartCol >= 0 && c >= planResultStartCol;
+      const effectiveWidth = isPlanResultCol
+        ? (rowWidthChars[c] || 18) * planResultWidthMultiplier
+        : (rowWidthChars[c] || 18);
+
+      lines = Math.max(lines, textLineCount(v, effectiveWidth));
     });
     // B4横1ページに収めるため、印刷用だけ行高をさらに圧縮する。
     return {hpt:Math.max(7, Math.min(64, 1 + lines * 5.5))};
