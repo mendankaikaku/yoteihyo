@@ -6676,8 +6676,8 @@ function allListBuildAutoPrintWidths(aoa, manualCount, planCount){
       widths[c]=7; maxW[c]=24; // 自分で追加した列：聞き取り用なので優先
       flexCols.push(c);
     }else if(c === eventCol){
-      widths[c]=42; maxW[c]=135; // 模試イベント：最優先
-      reps[c] = rep + 3; // 少し余裕
+      widths[c]=24; maxW[c]=72; // 模試イベント：最優先だが幅割合は約1/2
+      reps[c] = Math.max(1, (rep + 3) * 0.5); // 模試イベント欄の幅割合は今の約1/2
       flexCols.push(c);
     }else{
       // 予定・結果は優先度低。存在確認程度でよいのでかなり狭くする。
@@ -6760,7 +6760,7 @@ function allListAdjustPrintWidthsToB4LandscapeAspect(ws, widths, eventCol){
 
   const adjusted = widths.map(w => Math.max(1.5, Number(w || 1)));
 
-  // 予定・結果列は広げない。代表値比率は、模試イベント・手追加列・備考・名前側で保つ。
+  // 予定・結果列は広げない。代表値比率は、模試イベントは1/2、手追加列・備考・名前側で保つ。
   const fixedCols = new Set();
   for(let c=(eventCol + 1); c<adjusted.length; c++) fixedCols.add(c);
 
