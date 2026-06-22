@@ -6210,8 +6210,7 @@ function styleAllStudentGradeSheet(ws, aoa){
       (/\nComiru$/.test(headerText) && text === '×') ||
       (/\n科目変更$/.test(headerText) && text === '〇')
     );
-    const cellFont = R===0 ? fontTitle : (R===1 ? fontHeader : fontBase);
-    const style = {font:cellFont, alignment:{vertical:'center', horizontal:'center', wrapText:true, shrinkToFit:true}, border};
+    const style = {font:R===0?fontTitle:(R===1?fontHeader:fontBase), alignment:{vertical:'center', horizontal:'center', wrapText:true, shrinkToFit:true}, border};
     if(R===0) style.fill = titleFill;
     else if(R===1) style.fill = headerFill;
     else if(C<=2) style.fill = nameFill;
@@ -6451,28 +6450,6 @@ function applyCompactPrintRows(ws, aoa, widths){
 }
 
 
-
-function applyCompactPrintRowsByEventColumn(ws, aoa, widths, eventCol){
-  const rowWidthChars = widths.map(w => {
-    if(typeof w === "object" && w !== null){
-      if(w.wch) return w.wch;
-      if(w.wpx) return Math.max(8, Math.round(w.wpx / 7));
-      return 18;
-    }
-    return w;
-  });
-  const eventWidth = rowWidthChars[eventCol] || 18;
-  ws['!rows'] = (aoa || []).map((row, r) => {
-    if(r === 0) return {hpt:16};
-    if(r === 1) return {hpt:16};
-    // 印刷用の行高は「模試イベント」欄の文字量だけに合わせる。
-    // 予定・結果列は極小文字＋縮小表示にするので、行高を押し広げない。
-    const eventText = row?.[eventCol] ?? '';
-    const lines = textLineCount(eventText, eventWidth);
-    return {hpt:Math.max(7, Math.min(64, 2 + lines * 5.5))};
-  });
-}
-
 function allListSheetQuotedName(name){
   return `'${String(name || '').replace(/'/g, "''")}'`;
 }
@@ -6551,11 +6528,6 @@ function allListPrintVisualTextLength(value){
     [...line].reduce((n, ch) => n + (ch.charCodeAt(0) > 255 ? 1.7 : 1), 0)
   ), 0);
 }
-const ALL_LIST_PRINT_EVENT_WIDTH_SAMPLE = '7/5(日) 【模試】医学部82大学判定テスト（回答:不受験　　　　 / Comiru:〇　　　　 / 科目変更:×　　　　 / 科目リスト:不受験　　　　）';
-function allListPrintEventTargetWidth(){
-  // 指定サンプル文字列 + 約3文字分の幅。
-  return Math.round((allListPrintVisualTextLength(ALL_LIST_PRINT_EVENT_WIDTH_SAMPLE) + 3) * 10) / 10;
-}
 function allListPrintColumnNeedScore(aoa, col){
   let maxLen = 0;
   let sumLen = 0;
@@ -6614,7 +6586,7 @@ function allListBuildAutoPrintWidths(aoa, manualCount, planCount){
     else if(c === 3){ minW[c]=3; maxW[c]=5; weight[c]=0.3; }              // 担当
     else if(c === 4 || c === 5){ minW[c]=7; maxW[c]=15; weight[c]=0.7; }  // 備考系
     else if(c >= 6 && c < eventCol){ minW[c]=4; maxW[c]=10; weight[c]=0.45; } // 手追加列
-    else if(c === eventCol){ const ew = allListPrintEventTargetWidth(); minW[c]=ew; maxW[c]=ew; weight[c]=0; }    // 模試イベントは指定サンプル+3文字幅
+    else if(c === eventCol){ minW[c]=65; maxW[c]=105; weight[c]=2.2; }    // 模試イベント
     else { minW[c]=5; maxW[c]=11; weight[c]=0.55; }                       // 予定・結果
     // 見出しが予定/結果ならさらに小さめに保つ
     if(!tinyMark && /予定|結果/.test(h) && c > eventCol){ minW[c]=4.5; maxW[c]=9; weight[c]=0.45; }
@@ -6674,7 +6646,7 @@ function allListApplyPrintColumns(ws, widths){
   if(!ws) return;
   ws['!cols'] = (widths || []).map(w => ({wch:Math.max(1, Math.round(Number(w || 1) * 10) / 10)}));
 }
-function allListAdjustPrintWidthsToB4LandscapeAspect(ws, widths, eventCol){
+function allListAdjustPrintWidthsToB4LandscapeAspect(ws, widths){
   if(!ws || !Array.isArray(widths) || !widths.length) return widths;
   const B4_LANDSCAPE_RATIO = 364 / 257; // B4横：横364mm / 縦257mm
   const rows = ws['!rows'] || [];
@@ -6688,22 +6660,8 @@ function allListAdjustPrintWidthsToB4LandscapeAspect(ws, widths, eventCol){
   const currentTotalWch = widths.reduce((sum, w) => sum + Number(w || 0), 0);
   if(!currentTotalWch || !targetTotalWch) return widths;
 
-  const adjusted = widths.map(w => Math.max(1.5, Number(w || 1)));
-  const fixedEventWidth = (Number.isInteger(eventCol) && eventCol >= 0 && eventCol < adjusted.length)
-    ? allListPrintEventTargetWidth()
-    : null;
-  if(fixedEventWidth != null){
-    adjusted[eventCol] = fixedEventWidth;
-    const otherCurrent = widths.reduce((sum, w, c) => c === eventCol ? sum : sum + Number(w || 0), 0);
-    const otherTarget = Math.max(1, targetTotalWch - fixedEventWidth);
-    const otherScale = otherTarget / Math.max(1, otherCurrent);
-    adjusted.forEach((w, c) => {
-      if(c !== eventCol) adjusted[c] = Math.max(1.5, Number(widths[c] || 1) * otherScale);
-    });
-  }else{
-    const scale = targetTotalWch / currentTotalWch;
-    adjusted.forEach((w, c) => adjusted[c] = Math.max(1.5, Number(widths[c] || 1) * scale));
-  }
+  const scale = targetTotalWch / currentTotalWch;
+  const adjusted = widths.map(w => Math.max(1.5, Number(w || 1) * scale));
 
   // これを入れておくと、印刷プレビュー時に上下左右の余白が出にくい。
   allListApplyPrintColumns(ws, adjusted);
@@ -6712,7 +6670,7 @@ function allListAdjustPrintWidthsToB4LandscapeAspect(ws, widths, eventCol){
     totalRowHpt,
     targetTotalWch,
     currentTotalWch,
-    fixedEventWidth
+    scale
   };
   return adjusted;
 }
@@ -6724,14 +6682,12 @@ function styleAllStudentPrintSheet(ws, aoa){
   // 入っている文字量の割合で、印刷用の列幅を自動配分する。
   // ただしB4横1ページに収めるため、列ごとに最小/最大幅を持たせて暴れすぎないようにする。
   const widths = allListBuildAutoPrintWidths(aoa, manualCount, planCount);
-  const totalCols = (aoa[1] || []).length;
-  const eventCol = totalCols - 1 - planCount;
-  // 印刷用の行高は模試イベント欄だけに合わせる。予定・結果列は極小文字＋縮小表示で中に入れる。
+  // 印刷用は上下中央揃えを維持しつつ、行高だけを文字量ぎりぎりまで小さくする。
   const range = applyNiceSheetSettings(ws, aoa, widths, {rows:{min:7,max:64,header:15,pxPerLine:5.5}});
-  applyCompactPrintRowsByEventColumn(ws, aoa, widths, eventCol);
+  applyCompactPrintRows(ws, aoa, widths);
   // 行高合計と列幅合計の比が、B4横の紙面比に近づくように列幅全体を拡大/縮小する。
   // これで「1ページ縮小」時に上下左右の余白が偏りにくくなる。
-  allListAdjustPrintWidthsToB4LandscapeAspect(ws, widths, eventCol);
+  allListAdjustPrintWidthsToB4LandscapeAspect(ws, widths);
   ws['!freeze'] = {xSplit:2, ySplit:2};
   // 印刷用はB4横・1枚に収める。値がある範囲だけを印刷範囲にし、上下左右中央寄せ。
   allListApplyB4LandscapeOnePagePrintSettings(ws);
@@ -6752,19 +6708,14 @@ function styleAllStudentPrintSheet(ws, aoa){
   const fontBase = {name:'Yu Gothic', sz:6, color:{rgb:'111827'}};
   // 赤セル文字は名前/通常文字と同じサイズ。
   const fontMissing = {name:'Yu Gothic', sz:6, bold:true, color:{rgb:'991B1B'}};
-  // 予定・結果欄は行高を広げないため、印刷用だけかなり小さい文字にする。
-  const fontPlanTinyHeader = {name:'Yu Gothic', sz:4, bold:true, color:{rgb:'111827'}};
-  const fontPlanTiny = {name:'Yu Gothic', sz:3, color:{rgb:'111827'}};
+  const totalCols = (aoa[1] || []).length;
+  const eventCol = totalCols - 1 - planCount;
   setRangeStyle(ws, range, (R,C,cell)=>{
     const text = cell && cell.v != null ? String(cell.v) : '';
     // 模試イベント欄は、模試・イベントどちらも「書き込み空欄が残っている人」だけセル背景を赤くする。
     // 旧赤判定語はセル全体を赤くせず、後段で該当文字だけ赤字にする。
     const hasBlankWritingField = R>1 && C===eventCol && allListPrintHasBlankWritingField(text);
-    const isPlanResultCol = C > eventCol;
-    const baseFont = isPlanResultCol
-      ? (R===1 ? fontPlanTinyHeader : fontPlanTiny)
-      : (R===0 ? fontTitle : (R===1 ? fontHeader : fontBase));
-    const style = {font:baseFont, alignment:{vertical:'center', horizontal:'center', wrapText:true, shrinkToFit:true}, border};
+    const style = {font:R===0?fontTitle:(R===1?fontHeader:fontBase), alignment:{vertical:'center', horizontal:'center', wrapText:true, shrinkToFit:true}, border};
     if(R===0) style.fill = titleFill;
     else if(R===1) style.fill = headerFill;
     else if(C<=1) style.fill = nameFill;
