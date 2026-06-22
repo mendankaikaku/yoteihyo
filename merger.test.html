@@ -6210,7 +6210,7 @@ function styleAllStudentGradeSheet(ws, aoa){
       (/\nComiru$/.test(headerText) && text === '×') ||
       (/\n科目変更$/.test(headerText) && text === '〇')
     );
-    const cellFont = R===0 ? fontTitle : (R===1 ? (C>eventCol ? fontPlanTinyHeader : fontHeader) : (C>eventCol ? fontPlanTiny : fontBase));
+    const cellFont = R===0 ? fontTitle : (R===1 ? fontHeader : fontBase);
     const style = {font:cellFont, alignment:{vertical:'center', horizontal:'center', wrapText:true, shrinkToFit:true}, border};
     if(R===0) style.fill = titleFill;
     else if(R===1) style.fill = headerFill;
@@ -6741,7 +6741,11 @@ function styleAllStudentPrintSheet(ws, aoa){
     // 模試イベント欄は、模試・イベントどちらも「書き込み空欄が残っている人」だけセル背景を赤くする。
     // 旧赤判定語はセル全体を赤くせず、後段で該当文字だけ赤字にする。
     const hasBlankWritingField = R>1 && C===eventCol && allListPrintHasBlankWritingField(text);
-    const style = {font:R===0?fontTitle:(R===1?fontHeader:fontBase), alignment:{vertical:'center', horizontal:'center', wrapText:true, shrinkToFit:true}, border};
+    const isPlanResultCol = C > eventCol;
+    const baseFont = isPlanResultCol
+      ? (R===1 ? fontPlanTinyHeader : fontPlanTiny)
+      : (R===0 ? fontTitle : (R===1 ? fontHeader : fontBase));
+    const style = {font:baseFont, alignment:{vertical:'center', horizontal:'center', wrapText:true, shrinkToFit:true}, border};
     if(R===0) style.fill = titleFill;
     else if(R===1) style.fill = headerFill;
     else if(C<=1) style.fill = nameFill;
