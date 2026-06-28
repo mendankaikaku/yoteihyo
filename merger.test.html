@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>予定統合アプリ</title>
+  <title>予定統合アプリｑ</title>　
   <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
   <script src="./libs/xlsx.bundle.js"></script>
   <script>
@@ -438,8 +438,8 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
         <div class="manualBox important">
           <h3>毎日更新</h3>
           <ol>
-            <li>毎日更新.xlsxの「モチベーション支援」「高速マスターデイリー」シートに前日の結果を貼り付ける。</li>
-            <li>ファイル名を必ず「毎日更新.xlsx」にして、上書き保存して閉じる。</li>
+            <li>毎日更新.xlsxに前日の結果を貼り付ける。</li>
+            <li>毎日更新.xlsxを上書き保存して閉じる。</li>
             <li>このアプリで①フォルダー読取 → ②統合 → ③結果履歴を保存。</li>
             <li>④毎日掲示を押して、出たExcelを開いて印刷。</li>
             <li>毎日掲示.xlsxは毎日掲示フォルダに保存</li>
@@ -625,17 +625,6 @@ function ymd(d){ return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.get
 function mmdd(d){ return `${d.getMonth()+1}/${d.getDate()}`; }
 function colName(n){ let s=""; while(n>0){ const m=(n-1)%26; s=String.fromCharCode(65+m)+s; n=Math.floor((n-1)/26); } return s; }
 const WEEK_JA = ["日","月","火","水","木","金","土"];
-
-// 毎日更新.xlsxで読み取る対象シート名。余計な作業シートの混入を防ぐ。
-const DAILY_UPDATE_TARGET_SHEETS = ['モチベーション支援', '高速マスターデイリー'];
-function normalizeSheetNameForMatch(name){
-  return String(name || '').replace(/[\s　]+/g, '').trim();
-}
-function isDailyUpdateTargetSheetName(sheetName){
-  const key = normalizeSheetNameForMatch(sheetName);
-  return DAILY_UPDATE_TARGET_SHEETS.some(n => normalizeSheetNameForMatch(n) === key);
-}
-
 
 document.addEventListener("DOMContentLoaded", () => {
   if($("centerDate") && !$("centerDate").value) $("centerDate").value = ymd(new Date());
@@ -1662,15 +1651,15 @@ function looksLikeResultHeader(row){
 
 function fixedResultHeaderMap(){
   // 列名なし毎日更新.xlsx用の固定レイアウト
-  // A:生徒番号 B:フルネーム C:学年 D:区分 E:学習内容 F:学習結果(旧:毎日更新) G:いいね H:予備 I:日時
-  return {studentNo:0, student:1, grade:2, type:3, study:4, result:5, like:6, datetime:8};
+  // A:生徒番号 B:フルネーム C:学年 D:区分 E:学習内容 F:学習結果(旧:毎日更新) G:いいね H:日時
+  return {studentNo:0, student:1, grade:2, type:3, study:4, result:5, like:6, datetime:7};
 }
 
 function fixedTwoRowResultMap(){
-  // 2行1セット形式も、列配置は A〜I 固定。
-  // 上の行: A:生徒番号 B:名前 C:学年 D:区分 E/F:空白 G:いいね H:予備 I:日時
-  // 下の行: A〜D:空白 E:学習内容 F:学習結果(旧:毎日更新) G:いいねなど H:予備 I:空白
-  return {studentNo:0, student:1, grade:2, type:3, study:4, result:5, like:6, datetime:8};
+  // 2行1セット形式も、列配置は従来形式と同じ A〜H 固定。
+  // 上の行: A:生徒番号 B:名前 C:学年 D:区分 E/F:空白 G:いいね H:日時
+  // 下の行: A〜D:空白 E:学習内容 F:学習結果(旧:毎日更新) G:いいねなど H:空白
+  return {studentNo:0, student:1, grade:2, type:3, study:4, result:5, like:6, datetime:7};
 }
 
 function fixedCell(row, idx){ return norm((row || [])[idx]); }
@@ -1693,7 +1682,7 @@ function looksLikeTwoRowMetaRow(row){
 
   // 2行形式の上段は、日時がある場合もあれば、日時欄が空のまま
   // A列の生徒番号だけで生徒情報行だと分かる場合もある。
-  // そのため「I列に日時がある」または「A列に生徒番号がある」のORで判定する。
+  // そのため「H列に日時がある」または「A列に生徒番号がある」のORで判定する。
   const hasDateTime = !!fixedDateTimeAt(row, map.datetime);
   const hasStudentNo = !!fixedCell(row, map.studentNo);
   if(!(hasDateTime || hasStudentNo)) return false;
@@ -1706,7 +1695,7 @@ function looksLikeTwoRowDetailRow(row){
   const map = fixedTwoRowResultMap();
 
   // 下の行は名前・番号などが空で、E/F に内容と結果が入る形式だけを採用。
-  // I列に日時が入っている場合もあるため、ここでは日時の有無で除外しない。
+  // H列に日時が入っている場合もあるため、ここでは日時の有無で除外しない。
   if(!isBlankFixedCells(row, [map.studentNo, map.student, map.grade, map.type])) return false;
 
   const study = fixedCell(row, map.study);
@@ -1754,12 +1743,12 @@ function parseTwoRowResultSheet(aoa, file, sheetName){
       student, rawName, studentNo, grade, type, study, result, like,
       dateObj: dateOnly, dateKey: ymd(dateOnly), dateLabel: `${mmdd(dateOnly)}(${WEEK_JA[dateOnly.getDay()]})`,
       datetime: dt, timeLabel: hm(dt), category: classifyResult(study, result),
-      summary: summarizeResult(study, result), sourceFile:file.name, sourceSheet:sheetName, sourceFormat:"2行形式（A〜I固定）"
+      summary: summarizeResult(study, result), sourceFile:file.name, sourceSheet:sheetName, sourceFormat:"2行形式（A〜H固定）"
     });
     r++;
   }
   if(records.length){
-    logRows.push([file.name, "成功", `結果 ${records.length}件読み込み（2行形式：1行目=A〜D生徒情報、日時は上下どちらのI列でも可、2行目=E学習内容/F毎日更新）`, sheetName]);
+    logRows.push([file.name, "成功", `結果 ${records.length}件読み込み（2行形式：1行目=A〜D生徒情報、日時は上下どちらのH列でも可、2行目=E学習内容/F毎日更新）`, sheetName]);
     if(skippedHeaders) logRows.push([file.name, "情報", `2行形式の見出し行を${skippedHeaders}行スキップしました`, sheetName]);
   }
   return {records, logRows};
@@ -1773,7 +1762,7 @@ function parseOneRowResultSheet(aoa, file, sheetName){
   const startRow = hasHeader ? 1 : 0;
 
   if(h.study < 0 || h.result < 0 || h.datetime < 0){
-    logRows.push([file.name, "注意", `結果データExcelの列不足のためスキップ: ${sheetName}`, "1行形式は A:生徒番号 B:名前 C:学年 D:区分 E:学習内容 F:学習結果(旧:毎日更新/結果) G:いいね H:予備 I:日時。2行形式は1行目=A〜D生徒情報/E-F空白、2行目=A〜D空白/E学習内容/F学習結果、日時は上下どちらかのI列が必要です"]);
+    logRows.push([file.name, "注意", `結果データExcelの列不足のためスキップ: ${sheetName}`, "1行形式は A:生徒番号 B:名前 C:学年 D:区分 E:学習内容 F:学習結果(旧:毎日更新/結果) G:いいね H:日時。2行形式は1行目=A〜D生徒情報/E-F空白、2行目=A〜D空白/E学習内容/F学習結果、日時は上下どちらかのH列が必要です"]);
     return {records, logRows};
   }
   let count = 0;
@@ -1805,11 +1794,11 @@ function parseOneRowResultSheet(aoa, file, sheetName){
       student, rawName, studentNo, grade, type, study, result, like,
       dateObj: dateOnly, dateKey: ymd(dateOnly), dateLabel: `${mmdd(dateOnly)}(${WEEK_JA[dateOnly.getDay()]})`,
       datetime: dt, timeLabel: hm(dt), category: classifyResult(study, result),
-      summary: summarizeResult(study, result), sourceFile:file.name, sourceSheet:sheetName, sourceFormat: hasHeader ? "見出し行あり" : "A〜I固定列"
+      summary: summarizeResult(study, result), sourceFile:file.name, sourceSheet:sheetName, sourceFormat: hasHeader ? "見出し行あり" : "A〜H固定列"
     });
     count++;
   }
-  logRows.push([file.name, "成功", `結果 ${count}件読み込み${hasHeader ? "（見出し行あり）" : "（A〜I固定列）"}`, sheetName]);
+  logRows.push([file.name, "成功", `結果 ${count}件読み込み${hasHeader ? "（見出し行あり）" : "（A〜H固定列）"}`, sheetName]);
   return {records, logRows};
 }
 
@@ -1914,10 +1903,6 @@ async function parseResultFile(file){
     const wb = XLSX.read(buf, {type:"array", cellDates:true});
     logRows.push([file.name, "情報", `結果Excelのシート一覧: ${wb.SheetNames.join(" / ")}`, "parseResultFile"]);
     for(const sheetName of wb.SheetNames){
-      if(!isDailyUpdateTargetSheetName(sheetName)){
-        logRows.push([file.name, "情報", `対象外シートをスキップ: ${sheetName}`, "毎日更新.xlsxは「モチベーション支援」「高速マスターデイリー」だけ読みます"]);
-        continue;
-      }
       const ws = wb.Sheets[sheetName];
       const rawAoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:"", raw:true});
       const aoa = rawAoa.filter(row => (row || []).some(v => norm(v)));
@@ -1991,7 +1976,6 @@ async function extractWorkbookSheetsForHistory(file){
     const buf = await file.arrayBuffer();
     const wb = XLSX.read(buf, {type:"array", cellDates:true});
     for(const sheetName of wb.SheetNames){
-      if(!isDailyUpdateTargetSheetName(sheetName)) continue;
       const ws = wb.Sheets[sheetName];
       const aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:"", raw:true});
       const rows = aoa
@@ -4566,17 +4550,11 @@ async function downloadMonthlyPosterResultWorkbook(){
     }
 
     const rawSheets = await loadRawResultSheetsDirectly();
-    let highSpeedTarget = yesterday;
-    let highSpeedRows = extractHighSpeedRowsFromSheets(rawSheets.sheets, highSpeedTarget.from, highSpeedTarget.to);
+    const highSpeedTarget = yesterday;
+    const highSpeedRows = extractHighSpeedRowsFromSheets(rawSheets.sheets, highSpeedTarget.from, highSpeedTarget.to);
     const highSpeedLatestInfo = latestHighSpeedDateRangeFromSheets(rawSheets.sheets);
-    let highSpeedFallbackMessage = '';
-    // 原則は前日1日分。ただし毎日更新.xlsx側に前日の高速マスターデータが0件で、
-    // 別日付の高速マスターデータが存在する場合は、空ランキング事故を避けるため最新日へ自動切替する。
-    if(!highSpeedRows.length && highSpeedLatestInfo){
-      highSpeedFallbackMessage = `高速基礎ランキングは対象日 ${ymd(yesterday.from)} が0件だったため、毎日更新.xlsx内の最新日 ${ymd(highSpeedLatestInfo.from)} に自動切替しました。`;
-      highSpeedTarget = highSpeedLatestInfo;
-      highSpeedRows = extractHighSpeedRowsFromSheets(rawSheets.sheets, highSpeedTarget.from, highSpeedTarget.to);
-    }
+    const highSpeedFallbackMessage = '';
+    // 高速基礎ランキングも、毎日更新.xlsx内の最新日へ逃がさず、必ずアプリを開いた日の前日だけで作る。
     const rankingAoa = buildHighSpeedRankingAoa(highSpeedRows, highSpeedTarget.label);
     // 高速基礎ランキングは毎回きれいな順位表にするため、過去Excelの手修正復元は使わない。
     const rankingWs = aoaToSheet(rankingAoa);
@@ -4596,7 +4574,7 @@ async function downloadMonthlyPosterResultWorkbook(){
     log(`毎日更新を作成しました
 毎日掲示基準日（アプリを開いた日）: ${ymd(dailyPosterBaseDate)}
 連続実施対象日: ${ymd(yesterday.from)}（アプリを開いた日の前日で固定）
-高速基礎ランキング対象日: ${ymd(highSpeedTarget.from)}${highSpeedFallbackMessage ? '（自動切替）' : ''}
+高速基礎ランキング対象日: ${ymd(highSpeedTarget.from)}（アプリを開いた日の前日で固定）
 修得系対象期間: ${ymd(month.from)}〜${ymd(month.to)}
 ${counts}
 高速基礎ランキング: ${highSpeedRows.length}件
@@ -4624,7 +4602,7 @@ ${formatLogRowsForDailyDiagnosis(directLoaded.logRows, 80)}
 元シート数: ${(rawSheets.sheets || []).length}
 高速基礎ランキング採用行: ${highSpeedRows.length}
 高速マスターデイリー日付分布: ${formatHighSpeedDistribution(highSpeedLatestInfo ? highSpeedLatestInfo.distribution : highSpeedDateDistributionFromSheets(rawSheets.sheets))}
-${highSpeedFallbackMessage ? highSpeedFallbackMessage + '\n' : ''}${diagnoseHighSpeedSheetsForDaily(rawSheets.sheets, highSpeedTarget.from, highSpeedTarget.to)}
+${diagnoseHighSpeedSheetsForDaily(rawSheets.sheets, highSpeedTarget.from, highSpeedTarget.to)}
 
 --- 元シート読取ログ ---
 ${formatLogRowsForDailyDiagnosis(rawSheets.logRows, 40)}
@@ -7024,7 +7002,13 @@ async function setBundleFolderFiles(fileList){
     // 現在の運用：
     // 保存復元フォルダ/毎日更新/毎日更新.xlsx は「結果データ」。
     // 掲示用Excelは毎日更新フォルダには入れない。
-    const isDailyResultWorkbook = isExcel && name === '毎日更新.xlsx' && filePathIncludes(f, '毎日更新') && !filePathIncludes(f, '毎日掲示');
+    const isDailyResultWorkbook = isExcel && (
+      name === '毎日更新.xlsx' ||
+      /^毎日更新\.(xlsx|xlsm|xls)$/i.test(name) ||
+      /毎日更新\.xlsx$/i.test(relLower) ||
+      /毎日更新[\/\\]+毎日更新\.(xlsx|xlsm|xls)$/i.test(relLower) ||
+      (filePathIncludes(f, '毎日更新') && !filePathIncludes(f, '毎日掲示'))
+    );
 
     if(isJson && (parts.some(p => p === 'json' || p.includes('json') || p.includes('履歴')) || /result[_-]?history|結果履歴/.test(relLower))) histories.push(f);
     // 毎日更新フォルダ内のExcelは、掲示用ではなく結果データとして読む。
@@ -7187,205 +7171,6 @@ document.addEventListener('DOMContentLoaded', function(){
   }else{
     setupTopReadBundleButton();
   }
-})();
-</script>
-
-<script>
-// ============================================================
-// 初期フォルダー一式ZIPダウンロード
-// 職場PCなど、最初のフォルダー作成を機械的に済ませるための補助機能。
-// 外部ライブラリなしで、無圧縮ZIPをブラウザ内で作成する。
-// ============================================================
-(function(){
-  const INITIAL_ZIP_BUTTON_ID = 'downloadInitialFolderZipBtn';
-
-  function zipCrc32Table(){
-    const table = new Uint32Array(256);
-    for(let n=0;n<256;n++){
-      let c = n;
-      for(let k=0;k<8;k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
-      table[n] = c >>> 0;
-    }
-    return table;
-  }
-  const ZIP_CRC_TABLE = zipCrc32Table();
-  function zipCrc32(bytes){
-    let c = 0xFFFFFFFF;
-    for(let i=0;i<bytes.length;i++) c = ZIP_CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
-    return (c ^ 0xFFFFFFFF) >>> 0;
-  }
-  function zipU16(n){ return [n & 255, (n >>> 8) & 255]; }
-  function zipU32(n){ return [n & 255, (n >>> 8) & 255, (n >>> 16) & 255, (n >>> 24) & 255]; }
-  function zipDosDateTime(date){
-    const y = Math.max(1980, date.getFullYear());
-    const dosTime = (date.getHours() << 11) | (date.getMinutes() << 5) | Math.floor(date.getSeconds() / 2);
-    const dosDate = ((y - 1980) << 9) | ((date.getMonth() + 1) << 5) | date.getDate();
-    return {dosTime, dosDate};
-  }
-  function zipMake(entries){
-    const enc = new TextEncoder();
-    const now = new Date();
-    const dt = zipDosDateTime(now);
-    const fileParts = [];
-    const centralParts = [];
-    let offset = 0;
-    for(const ent of entries){
-      const nameBytes = enc.encode(ent.name.replace(/\\/g, '/'));
-      const dataBytes = enc.encode(ent.data || '');
-      const crc = zipCrc32(dataBytes);
-      const localHeader = new Uint8Array([
-        ...zipU32(0x04034b50), ...zipU16(20), ...zipU16(0x0800), ...zipU16(0),
-        ...zipU16(dt.dosTime), ...zipU16(dt.dosDate), ...zipU32(crc),
-        ...zipU32(dataBytes.length), ...zipU32(dataBytes.length), ...zipU16(nameBytes.length), ...zipU16(0)
-      ]);
-      fileParts.push(localHeader, nameBytes, dataBytes);
-      const centralHeader = new Uint8Array([
-        ...zipU32(0x02014b50), ...zipU16(20), ...zipU16(20), ...zipU16(0x0800), ...zipU16(0),
-        ...zipU16(dt.dosTime), ...zipU16(dt.dosDate), ...zipU32(crc),
-        ...zipU32(dataBytes.length), ...zipU32(dataBytes.length), ...zipU16(nameBytes.length),
-        ...zipU16(0), ...zipU16(0), ...zipU16(0), ...zipU16(0), ...zipU32(ent.name.endsWith('/') ? 0x10 : 0), ...zipU32(offset)
-      ]);
-      centralParts.push(centralHeader, nameBytes);
-      offset += localHeader.length + nameBytes.length + dataBytes.length;
-    }
-    const centralSize = centralParts.reduce((sum, p) => sum + p.length, 0);
-    const centralOffset = offset;
-    const end = new Uint8Array([
-      ...zipU32(0x06054b50), ...zipU16(0), ...zipU16(0), ...zipU16(entries.length), ...zipU16(entries.length),
-      ...zipU32(centralSize), ...zipU32(centralOffset), ...zipU16(0)
-    ]);
-    return new Blob([...fileParts, ...centralParts, end], {type:'application/zip'});
-  }
-  function initialFolderEntries(){
-    const ASSISTANT_STUDENTS = {
-      '武内':['稲田','坂浦','平井瑛','青野','増永','石塚大','渡邊','岡崎','楠田','北野碧','末藤'],
-      '今道':['間嶋','谷崎','古町','前田','三島和','木下','三浦','丸尾','石塚隆'],
-      '佐藤':['信岡','藤田旺','田中','濱田','中村'],
-      '森':['松田','齋藤結','藤田沙','小坂','木村','寺松','山本啓','奥戸','中川','真名子'],
-      '稲垣':['表田','吉田照','藤原','中村彩','満田','山之内','東野','齋藤智','橘','藤田紘','越智','川畑'],
-      '藤原':['宮木','岡田','片岡','赤井','高木','藤森','今瀬','中山愛','川地'],
-      '源津':['坂上','大橋','山本綾','増尾','野田','古久保','桂田'],
-      '五島':['前川','小松原','池田','山本空','高岡','今西','音田','宮本','松浦','石川','舛中','青山'],
-      '齋藤':['遠藤','大谷','大津','笹本','北野綾','樋口','横田朋','金城','中井'],
-      '森永':['狩谷','齋藤健','村上','今村','横田悦','吉川','横田亮','戸上','丁','山本遥'],
-      '宮木':['川口','秦','角田','宮崎','谷','稲山'],
-      '今堀':['古津','西岡','小倉','岩部','石橋','山奥','杉本','清水','安藤'],
-      '上田':['三辻','池上','新居','神戸','渡辺','長谷川','三島偲','武藤','杉山','小林'],
-      '厚地':['山口歩','久保','大坂','大前','大蔵','加藤','舛田','勝亦','一ノ瀬','仲居','平井秀'],
-      '藤吉':['山下','平井駿','山口渉','牧田','志賀','三木','竹田','黒坂','濱西','岸川'],
-      '山際':['林','中山凛','吉田結','関本','立花','宮地','坂崎颯','福本'],
-      '安達':['竹内','藤本','稲垣','正木','森下','冨田','呉','池澤'],
-      '高岡':[],
-      '西賀':['吉永','森永','中','上野'],
-      '有田':['川村','上杉','土井','赤橋'],
-    };
-    const ASSISTANT_FOLDER_NAMES = Object.keys(ASSISTANT_STUDENTS);
-    function studentsForStaff(staff){
-      const list = ASSISTANT_STUDENTS[staff] || [];
-      return list.length ? list : ['生徒フォルダー例'];
-    }
-    const readme = [
-      '初期フォルダー一式です。',
-      '',
-      '使い方：',
-      '1. このZIPを職場PCで展開します。',
-      '2. 統合用アプリでは「保存復元フォルダー」を選びます。',
-      '3. 入力用アプリでは、「担任助手フォルダー」配下の各担任助手名フォルダーを使います。',
-      '4. 各担任助手名フォルダーの中に、生徒ごとのフォルダーを作ります。',
-      '',
-      '保存復元フォルダーの中身：',
-      '・打ち込み結果：入力用アプリから出した予定Excel',
-      '・毎日更新：毎日更新.xlsx',
-      '・対応表：対応表Excel/CSV',
-      '・全員分リスト：手修正版の全員分リスト',
-      '・全体予定表：手修正版の2週間/1か月/期間指定出力',
-      '・json：result_history.jsonなど',
-      '・Comiru：ComiruアンケートCSV',
-      '・科目リスト：手修正版の模試科目リスト',
-      '・毎日掲示：毎日掲示用Excelの保存先',
-      '',
-      '注意：',
-      '見出し行は消さないでください。列の追加・並び替えはOKです。',
-      'placeholder.txt は不要なら消してOKです。',
-      '',
-      '担任助手フォルダー：',
-      '各担任助手フォルダーの下に、下記の生徒フォルダーを最初から作っています。',
-      ...ASSISTANT_FOLDER_NAMES.map(staff => `・${staff}：${studentsForStaff(staff).join('、')}`)
-    ].join('\n');
-    const keep = 'このフォルダーに該当ファイルを入れてください。不要ならこのplaceholder.txtは消してOKです。\n';
-    const dirs = [
-      '保存復元フォルダー/',
-      '保存復元フォルダー/打ち込み結果/',
-      '保存復元フォルダー/毎日更新/',
-      '保存復元フォルダー/対応表/',
-      '保存復元フォルダー/全員分リスト/',
-      '保存復元フォルダー/全体予定表/',
-      '保存復元フォルダー/json/',
-      '保存復元フォルダー/Comiru/',
-      '保存復元フォルダー/科目リスト/',
-      '保存復元フォルダー/マスタ/',
-      '保存復元フォルダー/毎日掲示/',
-      '担任助手フォルダー/',
-      ...ASSISTANT_FOLDER_NAMES.flatMap(n => [
-        `担任助手フォルダー/${n}/`,
-        ...studentsForStaff(n).map(s => `担任助手フォルダー/${n}/${s}/`)
-      ])
-    ];
-    const entries = dirs.map(name => ({name, data:''}));
-    entries.push({name:'README_最初に読む.txt', data:readme});
-    entries.push({name:'保存復元フォルダー/打ち込み結果/placeholder.txt', data:keep});
-    entries.push({name:'保存復元フォルダー/毎日更新/ここに毎日更新.xlsxを入れる.txt', data:'ここに毎日更新.xlsxを入れます。シート名は「モチベーション支援」「高速マスターデイリー」を使います。\n'});
-    entries.push({name:'保存復元フォルダー/対応表/placeholder.txt', data:keep});
-    entries.push({name:'保存復元フォルダー/全員分リスト/placeholder.txt', data:keep});
-    entries.push({name:'保存復元フォルダー/全体予定表/placeholder.txt', data:keep});
-    entries.push({name:'保存復元フォルダー/json/placeholder.txt', data:keep});
-    entries.push({name:'保存復元フォルダー/Comiru/placeholder.txt', data:'ComiruアンケートCSVをここに入れます。\n'});
-    entries.push({name:'保存復元フォルダー/科目リスト/placeholder.txt', data:keep});
-    entries.push({name:'保存復元フォルダー/毎日掲示/placeholder.txt', data:keep});
-    for(const staff of ASSISTANT_FOLDER_NAMES){
-      for(const student of studentsForStaff(staff)){
-        entries.push({name:`担任助手フォルダー/${staff}/${student}/合格設計図はここに入れる.txt`, data:'生徒ごとのフォルダー直下に、合格設計図.xlsx または 合格設計図.pdf を入れます。\n'});
-      }
-    }
-    return entries;
-  }
-  function downloadInitialFolderZip(){
-    const blob = zipMake(initialFolderEntries());
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = '初期フォルダー一式.zip';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
-  }
-  function addInitialFolderZipButton(){
-    if(document.getElementById(INITIAL_ZIP_BUTTON_ID)) return;
-    const btn = document.createElement('button');
-    btn.id = INITIAL_ZIP_BUTTON_ID;
-    btn.type = 'button';
-    btn.textContent = '初期フォルダーZIP';
-    btn.title = '職場PC用に、保存復元フォルダー一式のZIPをダウンロードします';
-    btn.className = 'secondary';
-    btn.style.background = '#7c3aed';
-    btn.style.color = '#fff';
-    btn.addEventListener('click', downloadInitialFolderZip);
-
-    const headerActions = document.querySelector('.headerActions');
-    const topActions = document.querySelector('.topActions');
-    const workflow = document.querySelector('.workflowCard .actions, .workflowCard');
-    if(headerActions){
-      const clearBtn = document.getElementById('clearBtn');
-      headerActions.insertBefore(btn, clearBtn || null);
-    }else if(topActions){
-      topActions.appendChild(btn);
-    }else if(workflow){
-      workflow.appendChild(btn);
-    }else{
-      document.body.insertBefore(btn, document.body.firstChild);
-    }
-  }
-  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', addInitialFolderZipButton);
-  else addInitialFolderZipButton();
 })();
 </script>
 
