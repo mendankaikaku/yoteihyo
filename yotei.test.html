@@ -1083,7 +1083,7 @@ function cellRef(r,c){return colName(c)+r}
 function splitNames(){return ($('#studentNames').value||'').split(/[、，,]/).map(x=>x.trim()).filter(Boolean)}
 
 // 生徒名の下一文字つけ忘れ防止。例：平井 → 平井瑛 / 平井駿 / 平井秀 の候補を出して止める。
-// 初期フォルダーZIPに入れている担任助手→生徒リストを元に判定する。
+// 初期フォルダーZIPに入れている担任助手→生徒リストに加えて、実際に選んだ担任助手フォルダー配下の生徒フォルダー名も候補に混ぜて判定する。
 const KNOWN_STUDENT_NAME_CANDIDATES = [
   '稲田','坂浦','平井瑛','青野','増永','石塚大','渡邊','岡崎','楠田','北野碧','末藤',
   '間嶋','谷崎','古町','前田','三島和','木下','三浦','丸尾','石塚隆',
@@ -1105,11 +1105,68 @@ const KNOWN_STUDENT_NAME_CANDIDATES = [
   '吉永','森永','中','上野',
   '川村','上杉','土井','赤橋'
 ];
+const EXTRA_STUDENT_NAME_CANDIDATES = new Set();
+const KNOWN_ASSISTANT_FOLDER_NAMES_FOR_AMBIGUITY = ['武内','今道','佐藤','森','稲垣','藤原','源津','五島','齋藤','森永','宮木','今堀','上田','厚地','藤吉','山際','安達','高岡','西賀','有田'];
+const STUDENT_FOLDER_IGNORE_NAMES_FOR_AMBIGUITY = new Set([
+  '保存復元フォルダー','担任助手フォルダー','打ち込み結果','毎日更新','対応表','全員分リスト','全体予定表','json','Comiru','コミル','アンケート','科目リスト','マスタ','毎日掲示','生徒フォルダー例'
+]);
+let extraStudentCandidatesLoadedFromFolder = false;
 function normalizeStudentNameKeyForAmbiguity(name){
   return String(name||'').replace(/[\s\u3000]+/g,'').trim();
 }
+function allKnownStudentNameCandidatesForAmbiguity(){
+  return Array.from(new Set([
+    ...KNOWN_STUDENT_NAME_CANDIDATES,
+    ...Array.from(EXTRA_STUDENT_NAME_CANDIDATES)
+  ].map(normalizeStudentNameKeyForAmbiguity).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'ja'));
+}
+function shouldUseFolderNameAsStudentCandidateForAmbiguity(dirName, pathParts, rootName=''){
+  const name=normalizeStudentNameKeyForAmbiguity(dirName);
+  if(!name || STUDENT_FOLDER_IGNORE_NAMES_FOR_AMBIGUITY.has(name)) return false;
+  const path=(pathParts||[]).map(normalizeStudentNameKeyForAmbiguity).filter(Boolean);
+  const parent=path[path.length-1] || normalizeStudentNameKeyForAmbiguity(rootName);
+  const root=normalizeStudentNameKeyForAmbiguity(rootName);
+  if(KNOWN_ASSISTANT_FOLDER_NAMES_FOR_AMBIGUITY.includes(parent)) return true;
+  if(path.length>=1 && KNOWN_ASSISTANT_FOLDER_NAMES_FOR_AMBIGUITY.includes(path[path.length-1])) return true;
+  if(path.length===0 && KNOWN_ASSISTANT_FOLDER_NAMES_FOR_AMBIGUITY.includes(root)) return true;
+  return false;
+}
+async function collectStudentFolderNameCandidatesForAmbiguity(rootDir, maxDepth=5){
+  const found=[];
+  async function walk(dir, depth, pathParts){
+    if(!dir || depth<0 || !dir.values) return;
+    for await (const entry of dir.values()){
+      if(entry.kind!=='directory') continue;
+      const name=entry.name || '';
+      if(shouldUseFolderNameAsStudentCandidateForAmbiguity(name, pathParts, rootDir?.name || '')) found.push(name);
+      const key=normalizeStudentNameKeyForAmbiguity(name);
+      if(STUDENT_FOLDER_IGNORE_NAMES_FOR_AMBIGUITY.has(key) && key!=='担任助手フォルダー') continue;
+      try{ await walk(entry, depth-1, [...pathParts, name]); }catch(e){}
+    }
+  }
+  await walk(rootDir, maxDepth, []);
+  return Array.from(new Set(found.map(normalizeStudentNameKeyForAmbiguity).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'ja'));
+}
+async function refreshDynamicStudentNameCandidatesFromFolder(rootDir){
+  if(!rootDir) return {count:0};
+  try{
+    const names=await collectStudentFolderNameCandidatesForAmbiguity(rootDir,5);
+    names.forEach(n=>EXTRA_STUDENT_NAME_CANDIDATES.add(n));
+    extraStudentCandidatesLoadedFromFolder = true;
+    return {count:names.length, names};
+  }catch(e){
+    console.warn('生徒フォルダー名候補の取得に失敗', e);
+    return {count:0, error:e};
+  }
+}
+async function applyStudentsWithDynamicCandidates(){
+  if(sharedDirHandle && !extraStudentCandidatesLoadedFromFolder){
+    await refreshDynamicStudentNameCandidatesFromFolder(sharedDirHandle);
+  }
+  applyStudents();
+}
 function findAmbiguousStudentNameInputs(names){
-  const known = Array.from(new Set(KNOWN_STUDENT_NAME_CANDIDATES.map(normalizeStudentNameKeyForAmbiguity).filter(Boolean)));
+  const known = allKnownStudentNameCandidatesForAmbiguity();
   const issues=[];
   names.forEach(raw=>{
     const key=normalizeStudentNameKeyForAmbiguity(raw);
@@ -1125,7 +1182,7 @@ function findAmbiguousStudentNameInputs(names){
 }
 function warnAmbiguousStudentNames(issues){
   if(!issues.length) return false;
-  const lines=['生徒名が複数候補に当たっています。下一文字まで入れてから、もう一度「② 生徒欄を作る」を押してください。',''];
+  const lines=['生徒名が複数候補に当たっています。候補から正式名を選び、下一文字以上まで入れてから、もう一度「② 生徒欄を作る」を押してください。',''];
   issues.forEach(x=>lines.push(`「${x.input}」→ ${x.candidates.join(' / ')}`));
   alert(lines.join('\n'));
   const el=$('#studentNames');
@@ -2679,6 +2736,8 @@ async function pickSaveRootFolder(forcePick=false){
     // Excelはこの下の担任助手フォルダ→各生徒名フォルダへ保存する。
     sharedDirHandle = dir;
     excelOutputDirHandle = null;
+    extraStudentCandidatesLoadedFromFolder = false;
+    await refreshDynamicStudentNameCandidatesFromFolder(dir);
     return dir;
   }catch(e){
     return null;
@@ -5571,7 +5630,7 @@ function bindGlobalEvents(){
   const closeBtn=$('#closeGoukakuModal'); if(closeBtn) closeBtn.onclick=closeGoukakuModal;
   const modal=$('#goukakuModal'); if(modal) modal.addEventListener('click', e=>{ if(e.target===modal) closeGoukakuModal(); });
   document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeGoukakuModal(); });
-  $('#applyStudents').onclick=applyStudents;
+  $('#applyStudents').onclick=applyStudentsWithDynamicCandidates;
   $('#weekStart').onchange=()=>{syncFromDom(); const a=$('#weeklyAbsentTargetDate'); if(a && !a.value) a.value=$('#weekStart').value; renderStudents()};
   $('#saveGroupMemory').onclick=saveGroup;
   $('#loadGroupMemory').onclick=loadGroup;
