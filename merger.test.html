@@ -7257,13 +7257,41 @@ document.addEventListener('DOMContentLoaded', function(){
     return new Blob([...fileParts, ...centralParts, end], {type:'application/zip'});
   }
   function initialFolderEntries(){
+    const ASSISTANT_STUDENTS = {
+      '武内':['稲田','坂浦','平井瑛','青野','増永','石塚大','渡邊','岡崎','楠田','北野碧','末藤'],
+      '今道':['間嶋','谷崎','古町','前田','三島和','木下','三浦','丸尾','石塚隆'],
+      '佐藤':['信岡','藤田旺','田中','濱田','中村'],
+      '森':['松田','齋藤結','藤田沙','小坂','木村','寺松','山本啓','奥戸','中川','真名子'],
+      '稲垣':['表田','吉田照','藤原','中村彩','満田','山之内','東野','齋藤智','橘','藤田紘','越智','川畑'],
+      '藤原':['宮木','岡田','片岡','赤井','高木','藤森','今瀬','中山愛','川地'],
+      '源津':['坂上','大橋','山本綾','増尾','野田','古久保','桂田'],
+      '五島':['前川','小松原','池田','山本空','高岡','今西','音田','宮本','松浦','石川','舛中','青山'],
+      '齋藤':['遠藤','大谷','大津','笹本','北野綾','樋口','横田朋','金城','中井'],
+      '森永':['狩谷','齋藤健','村上','今村','横田悦','吉川','横田亮','戸上','丁','山本遥'],
+      '宮木':['川口','秦','角田','宮崎','谷','稲山'],
+      '今堀':['古津','西岡','小倉','岩部','石橋','山奥','杉本','清水','安藤'],
+      '上田':['三辻','池上','新居','神戸','渡辺','長谷川','三島偲','武藤','杉山','小林'],
+      '厚地':['山口歩','久保','大坂','大前','大蔵','加藤','舛田','勝亦','一ノ瀬','仲居','平井秀'],
+      '藤吉':['山下','平井駿','山口渉','牧田','志賀','三木','竹田','黒坂','濱西','岸川'],
+      '山際':['林','中山凛','吉田結','関本','立花','宮地','坂崎颯','福本'],
+      '安達':['竹内','藤本','稲垣','正木','森下','冨田','呉','池澤'],
+      '高岡':[],
+      '西賀':['吉永','森永','中','上野'],
+      '有田':['川村','上杉','土井','赤橋'],
+    };
+    const ASSISTANT_FOLDER_NAMES = Object.keys(ASSISTANT_STUDENTS);
+    function studentsForStaff(staff){
+      const list = ASSISTANT_STUDENTS[staff] || [];
+      return list.length ? list : ['生徒フォルダー例'];
+    }
     const readme = [
       '初期フォルダー一式です。',
       '',
       '使い方：',
       '1. このZIPを職場PCで展開します。',
       '2. 統合用アプリでは「保存復元フォルダー」を選びます。',
-      '3. 入力用アプリでは、必要に応じて「担任助手フォルダー」配下に生徒フォルダーを作ります。',
+      '3. 入力用アプリでは、「担任助手フォルダー」配下の各担任助手名フォルダーを使います。',
+      '4. 各担任助手名フォルダーの中に、生徒ごとのフォルダーを作ります。',
       '',
       '保存復元フォルダーの中身：',
       '・打ち込み結果：入力用アプリから出した予定Excel',
@@ -7278,7 +7306,11 @@ document.addEventListener('DOMContentLoaded', function(){
       '',
       '注意：',
       '見出し行は消さないでください。列の追加・並び替えはOKです。',
-      'placeholder.txt は不要なら消してOKです。'
+      'placeholder.txt は不要なら消してOKです。',
+      '',
+      '担任助手フォルダー：',
+      '各担任助手フォルダーの下に、下記の生徒フォルダーを最初から作っています。',
+      ...ASSISTANT_FOLDER_NAMES.map(staff => `・${staff}：${studentsForStaff(staff).join('、')}`)
     ].join('\n');
     const keep = 'このフォルダーに該当ファイルを入れてください。不要ならこのplaceholder.txtは消してOKです。\n';
     const dirs = [
@@ -7294,7 +7326,10 @@ document.addEventListener('DOMContentLoaded', function(){
       '保存復元フォルダー/マスタ/',
       '保存復元フォルダー/毎日掲示/',
       '担任助手フォルダー/',
-      '担任助手フォルダー/生徒フォルダー例/'
+      ...ASSISTANT_FOLDER_NAMES.flatMap(n => [
+        `担任助手フォルダー/${n}/`,
+        ...studentsForStaff(n).map(s => `担任助手フォルダー/${n}/${s}/`)
+      ])
     ];
     const entries = dirs.map(name => ({name, data:''}));
     entries.push({name:'README_最初に読む.txt', data:readme});
@@ -7307,7 +7342,11 @@ document.addEventListener('DOMContentLoaded', function(){
     entries.push({name:'保存復元フォルダー/Comiru/placeholder.txt', data:'ComiruアンケートCSVをここに入れます。\n'});
     entries.push({name:'保存復元フォルダー/科目リスト/placeholder.txt', data:keep});
     entries.push({name:'保存復元フォルダー/毎日掲示/placeholder.txt', data:keep});
-    entries.push({name:'担任助手フォルダー/生徒フォルダー例/合格設計図はここに入れる.txt', data:'生徒ごとのフォルダー直下に、合格設計図.xlsx または 合格設計図.pdf を入れます。\n'});
+    for(const staff of ASSISTANT_FOLDER_NAMES){
+      for(const student of studentsForStaff(staff)){
+        entries.push({name:`担任助手フォルダー/${staff}/${student}/合格設計図はここに入れる.txt`, data:'生徒ごとのフォルダー直下に、合格設計図.xlsx または 合格設計図.pdf を入れます。\n'});
+      }
+    }
     return entries;
   }
   function downloadInitialFolderZip(){
