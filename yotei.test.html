@@ -1081,6 +1081,58 @@ function showSaveInfo(text){$('#saveInfo').textContent=text||''}
 function colName(n){let s='';while(n>0){let m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=Math.floor((n-1)/26)}return s}
 function cellRef(r,c){return colName(c)+r}
 function splitNames(){return ($('#studentNames').value||'').split(/[、，,]/).map(x=>x.trim()).filter(Boolean)}
+
+// 生徒名の下一文字つけ忘れ防止。例：平井 → 平井瑛 / 平井駿 / 平井秀 の候補を出して止める。
+// 初期フォルダーZIPに入れている担任助手→生徒リストを元に判定する。
+const KNOWN_STUDENT_NAME_CANDIDATES = [
+  '稲田','坂浦','平井瑛','青野','増永','石塚大','渡邊','岡崎','楠田','北野碧','末藤',
+  '間嶋','谷崎','古町','前田','三島和','木下','三浦','丸尾','石塚隆',
+  '信岡','藤田旺','田中','濱田','中村',
+  '松田','齋藤結','藤田沙','小坂','木村','寺松','山本啓','奥戸','中川','真名子',
+  '表田','吉田照','藤原','中村彩','満田','山之内','東野','齋藤智','橘','藤田紘','越智','川畑',
+  '宮木','岡田','片岡','赤井','高木','藤森','今瀬','中山愛','川地',
+  '坂上','大橋','山本綾','増尾','野田','古久保','桂田',
+  '前川','小松原','池田','山本空','高岡','今西','音田','宮本','松浦','石川','舛中','青山',
+  '遠藤','大谷','大津','笹本','北野綾','樋口','横田朋','金城','中井',
+  '狩谷','齋藤健','村上','今村','横田悦','吉川','横田亮','戸上','丁','山本遥',
+  '川口','秦','角田','宮崎','谷','稲山',
+  '古津','西岡','小倉','岩部','石橋','山奥','杉本','清水','安藤',
+  '三辻','池上','新居','神戸','渡辺','長谷川','三島偲','武藤','杉山','小林',
+  '山口歩','久保','大坂','大前','大蔵','加藤','舛田','勝亦','一ノ瀬','仲居','平井秀',
+  '山下','平井駿','山口渉','牧田','志賀','三木','竹田','黒坂','濱西','岸川',
+  '林','中山凛','吉田結','関本','立花','宮地','坂崎颯','福本',
+  '竹内','藤本','稲垣','正木','森下','冨田','呉','池澤',
+  '吉永','森永','中','上野',
+  '川村','上杉','土井','赤橋'
+];
+function normalizeStudentNameKeyForAmbiguity(name){
+  return String(name||'').replace(/[\s\u3000]+/g,'').trim();
+}
+function findAmbiguousStudentNameInputs(names){
+  const known = Array.from(new Set(KNOWN_STUDENT_NAME_CANDIDATES.map(normalizeStudentNameKeyForAmbiguity).filter(Boolean)));
+  const issues=[];
+  names.forEach(raw=>{
+    const key=normalizeStudentNameKeyForAmbiguity(raw);
+    if(!key) return;
+    const exact=known.filter(n=>n===key);
+    if(exact.length===1) return; // 送ってくれた正式な生徒名そのものならOK
+    const prefix=known.filter(n=>n.startsWith(key));
+    if(prefix.length>=2){
+      issues.push({input:raw,candidates:prefix.slice(0,12)});
+    }
+  });
+  return issues;
+}
+function warnAmbiguousStudentNames(issues){
+  if(!issues.length) return false;
+  const lines=['生徒名が複数候補に当たっています。下一文字まで入れてから、もう一度「② 生徒欄を作る」を押してください。',''];
+  issues.forEach(x=>lines.push(`「${x.input}」→ ${x.candidates.join(' / ')}`));
+  alert(lines.join('\n'));
+  const el=$('#studentNames');
+  if(el){el.focus();el.select();}
+  showSaveInfo(lines.join('\n'));
+  return true;
+}
 function emptyStudentData(){return {studentNo:'',grade:'',weeklyMeetingAbsent:false,lessonCount:1,otherCount:1,schedule:Array.from({length:7},()=>Array(6).fill('')),materials:[{subject:'',book:'',content:''}],remarks:'',failureReason:'',exams:[],events:[],comments:[]}}
 function restoredDataBelongsToCurrentInputWeek(data){
   const restoredWeek=String(data?.weekStart||'').trim();
@@ -1142,6 +1194,8 @@ function init(){setDefaultDate(); if($('#weeklyAbsentTargetDate') && !$('#weekly
 function applyStudents(){
   syncFromDom();
   const names=splitNames();
+  const ambiguityIssues=findAmbiguousStudentNameInputs(names);
+  if(warnAmbiguousStudentNames(ambiguityIssues)) return;
   students=names.length?names:[];
   students.forEach(ensureStudent);
   renderStudents();
@@ -2806,10 +2860,12 @@ async function saveGroup(){
   syncFromDom();
   if(!students.length)return alert('先に生徒名を入力してください。');
 
+  const eventCleanup = cleanupOldEventMasterRows(1);
   const mem=buildGroupMemory();
   saveGroupToBrowser(mem);
   const status=[];
   status.push(`ブラウザ内保存：完了（${students.join('、')}）`);
+  status.push(eventCleanup.msg);
 
   const dir = await pickSaveRootFolder(true);
   if(!dir){
@@ -3099,6 +3155,32 @@ async function fileHandleLastModified(fileHandle){
     return 0;
   }
 }
+
+function cleanupCutoffByMonths(months){
+  const d=new Date();
+  d.setMonth(d.getMonth() - Number(months || 1));
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+}
+function cleanupOldEventMasterRows(months=1){
+  const cutoff=cleanupCutoffByMonths(months);
+  const rows=getEventMaster();
+  const kept=[];
+  const removed=[];
+  for(const ev of rows){
+    const dt=parseDateTimeLoose(ev && ev.datetime);
+    if(dt && dt < cutoff) removed.push(ev);
+    else kept.push(ev);
+  }
+  if(removed.length){
+    saveEventMasterData(kept);
+    const keepKeys=new Set(kept.map(ev=>normalizeExamNameForTarget(ev.name||'')));
+    saveEventTargetHistory(getEventTargetHistory().filter(ev=>keepKeys.has(normalizeExamNameForTarget(ev.name||''))));
+    renderEventMasterPanel();
+    renderStudents();
+  }
+  return {removed, kept, msg: removed.length ? `1か月以上前のイベントマスタを削除：${removed.length}件` : '1か月以上前のイベントマスタ：削除対象なし'};
+}
+
 async function cleanupOldGeneratedFiles(rootDir, options={}){
   const maxDepth = options.maxDepth ?? 5;
   const cutoff = cleanupCutoffDate(options.months ?? 2).getTime();
@@ -3540,6 +3622,7 @@ function currentHasMeaningfulData(names){
 }
 async function saveAllCurrentDataToShared(showAlert=false){
   if(!students.length) return false;
+  cleanupOldEventMasterRows(1);
   const mem=buildSharedGroupMemory();
   saveGroupToBrowser(mem);
   await writeJsonToShared(sharedGroupFileName(students), mem);
@@ -4406,6 +4489,109 @@ function prepResultSummary(study,result){
   return s || r;
 }
 
+function prepHeaderIndexIncludes(header, names){
+  const h=(header||[]).map(v=>norm(v));
+  for(let i=0;i<h.length;i++){
+    if(names.some(n=>h[i].includes(n))) return i;
+  }
+  return -1;
+}
+function prepFindHeaderRowIndexByKeywords(aoa, keywords){
+  const limit=Math.min(30, (aoa||[]).length);
+  for(let r=0;r<limit;r++){
+    const joined=(aoa[r]||[]).map(v=>norm(v)).join('|');
+    if((keywords||[]).every(k=>joined.includes(k))) return r;
+  }
+  return -1;
+}
+function prepNumberLoose(v){
+  if(typeof v==='number' && Number.isFinite(v)) return v;
+  const s=norm(v).replace(/[０-９]/g,ch=>String.fromCharCode(ch.charCodeAt(0)-0xFEE0)).replace(/,/g,'');
+  const m=s.match(/-?\d+(?:\.\d+)?/);
+  return m ? Number(m[0]) : 0;
+}
+function prepSheetObjectToAoa(sh){
+  if(!sh) return [];
+  if(Array.isArray(sh.aoa)) return sh.aoa;
+  if(Array.isArray(sh.rows)){
+    return sh.rows.map(r=>Array.isArray(r) ? r : (Array.isArray(r.values) ? r.values : []));
+  }
+  return [];
+}
+function prepHighSpeedSummary(course, stage, test, correct, pass){
+  const parts=[];
+  const c=norm(course), st=norm(stage), te=norm(test), ps=norm(pass);
+  if(c) parts.push(c);
+  if(st) parts.push(st);
+  if(te) parts.push(te);
+  const body=parts.join(' ');
+  const count=Number(correct||0);
+  const tail=count ? `合格数${count}` : (ps || '実施');
+  return `高マス${body ? '：'+body : ''} ${tail}`.trim();
+}
+function prepHighSpeedRecordFromRow(row, idx, fileName, sheetName, sourceRow){
+  const rawDate = idx.date>=0 ? row[idx.date] : '';
+  const dt = parseDateTimeLoose(rawDate) || parseDateLoose(rawDate);
+  if(!dt) return null;
+  const correct = idx.correct>=0 ? prepNumberLoose(row[idx.correct]) : 0;
+  const incorrect = idx.incorrect>=0 ? prepNumberLoose(row[idx.incorrect]) : 0;
+  const pass = idx.pass>=0 ? norm(row[idx.pass]) : '';
+  if(!correct && !incorrect && !pass) return null;
+  const student = idx.student>=0 ? norm(row[idx.student]) : '';
+  const studentNo = idx.studentNo>=0 ? norm(row[idx.studentNo]) : '';
+  if(!student && !studentNo) return null;
+  const course = idx.course>=0 ? norm(row[idx.course]) : '';
+  const stage = idx.stage>=0 ? norm(row[idx.stage]) : '';
+  const test = idx.test>=0 ? norm(row[idx.test]) : '';
+  const grade = idx.grade>=0 ? norm(row[idx.grade]) : '';
+  const dateOnly=new Date(dt.getFullYear(),dt.getMonth(),dt.getDate());
+  const summary=prepHighSpeedSummary(course, stage, test, correct, pass);
+  return {
+    student, rawName:student, studentNo, grade, type:'高速マスターデイリー',
+    study:['高速マスター', course, stage, test].filter(Boolean).join(' '),
+    result:summary,
+    dateObj:dateOnly, dateKey:ymd(dateOnly), timeLabel:hm(dt),
+    summary,
+    sourceFile:fileName || '毎日更新.xlsx',
+    sourceSheet:sheetName || '高速マスターデイリー',
+    sourceRow,
+    sourceFormat:'高速マスターデイリー短縮形'
+  };
+}
+function prepParseHighSpeedDailyAoa(aoa, fileName='毎日更新.xlsx', sheetName='高速マスターデイリー'){
+  const records=[];
+  const debug=[];
+  if(!/高速|マスター|デイリー|ランキング/i.test(String(sheetName||''))){
+    const joined=(aoa||[]).slice(0,10).map(r=>(r||[]).map(v=>norm(v)).join('|')).join('|');
+    if(!/正解数|不正解数|合格数/.test(joined)) return {records, debug};
+  }
+  let hr=prepFindHeaderRowIndexByKeywords(aoa, ['正解数']);
+  if(hr<0) hr=prepFindHeaderRowIndexByKeywords(aoa, ['合格数']);
+  if(hr<0) return {records, debug};
+  const header=aoa[hr]||[];
+  const idx={
+    date:prepHeaderIndexIncludes(header,['日付','日時','実施日','更新日時']),
+    studentNo:prepHeaderIndexIncludes(header,['生徒番号','番号','ID']),
+    student:prepHeaderIndexIncludes(header,['生徒名','氏名','名前']),
+    grade:prepHeaderIndexIncludes(header,['学年']),
+    course:prepHeaderIndexIncludes(header,['講座名','コンテンツ','学習内容','科目','教材']),
+    stage:prepHeaderIndexIncludes(header,['ステージ','ユニット','単元']),
+    test:prepHeaderIndexIncludes(header,['テスト','判定テスト']),
+    correct:prepHeaderIndexIncludes(header,['合格数','正解数']),
+    incorrect:prepHeaderIndexIncludes(header,['不正解数','不合格数']),
+    pass:prepHeaderIndexIncludes(header,['合否','合格','判定'])
+  };
+  if(idx.date<0 || idx.correct<0) return {records, debug};
+  let skipped=0;
+  for(let r=hr+1;r<(aoa||[]).length;r++){
+    const rec=prepHighSpeedRecordFromRow(aoa[r]||[], idx, fileName, sheetName, r+1);
+    if(rec) records.push(rec);
+    else skipped++;
+  }
+  if(records.length) debug.push(`${fileName}/${sheetName}: 高速マスターデイリー ${records.length}件を短縮形で読込`);
+  return {records, debug};
+}
+
 function prepHistoryItemToResultRecord(item){
   if(!item) return null;
   const dt=parseDateTimeLoose(item.datetime || item.dateKey || item.date || '');
@@ -4414,6 +4600,8 @@ function prepHistoryItemToResultRecord(item){
   const study=norm(item.study || item['学習内容'] || '');
   const result=norm(item.result || item['毎日更新'] || '');
   if(!study && !result) return null;
+  const highSpeed = /高速|高マス|マスター|正解数|合格数|高速マスターデイリー/.test([study,result,item.sourceSheet,item.type,item.category].map(norm).join(' '));
+  const summary = highSpeed ? (result.startsWith('高マス') ? result : prepHighSpeedSummary(study.replace(/^高速マスター\s*/,''), '', '', prepNumberLoose(result), result)) : prepResultSummary(study,result);
   return {
     student:norm(item.student || item.name || item['生徒名'] || ''),
     rawName:norm(item.rawName || item.student || item.name || item['名前'] || item['生徒名'] || ''),
@@ -4425,7 +4613,7 @@ function prepHistoryItemToResultRecord(item){
     dateObj:dateOnly,
     dateKey:ymd(dateOnly),
     timeLabel:hm(dt),
-    summary:prepResultSummary(study,result),
+    summary,
     sourceFile:item.sourceFile || 'result_history.json',
     sourceSheet:item.sourceSheet || '履歴JSON'
   };
@@ -4454,7 +4642,18 @@ async function readPrepResultHistoryFromShared(){
       const rec=prepHistoryItemToResultRecord(item);
       if(rec) records.push(rec);
     }
-    debug.push(`結果履歴JSON: ${records.length}件読込`);
+    let highSpeedFromSheets=0;
+    const sheets = Array.isArray(json?.sheets) ? json.sheets : [];
+    for(const sh of sheets){
+      const aoa=prepSheetObjectToAoa(sh).filter(row => (row || []).some(v => norm(v)));
+      const hs=prepParseHighSpeedDailyAoa(aoa, sh.sourceFile || 'result_history.json', sh.sheetName || '高速マスターデイリー');
+      if(hs.records.length){
+        records.push(...hs.records);
+        highSpeedFromSheets += hs.records.length;
+        debug.push(...hs.debug);
+      }
+    }
+    debug.push(`結果履歴JSON: ${records.length}件読込${highSpeedFromSheets?`（高速マスターデイリー短縮形 ${highSpeedFromSheets}件含む）`:''}`);
   }catch(e){
     debug.push(`結果履歴JSON: 読込失敗 ${e?.message || e}`);
   }
@@ -4569,13 +4768,19 @@ async function readPrepResultRecords(){
           debug.push(`${file.name}/${sheetName}: 対象外シートのためスキップ（毎日更新.xlsxは「モチベーション支援」「高速マスターデイリー」だけ対象）`);
           continue;
         }
-        if(!isPrepResultSheetName(sheetName)){
-          debug.push(`${file.name}/${sheetName}: 高速マスターデイリーはランキング用のため面談準備結果には使いません`);
-          continue;
-        }
         const ws=wb.Sheets[sheetName];
         const aoa=sheetToAoaRobust(ws,true);
         if(!aoa.length){debug.push(`${file.name}/${sheetName}: 空シート`); continue;}
+        if(!isPrepResultSheetName(sheetName)){
+          const hs=prepParseHighSpeedDailyAoa(aoa, file.name, sheetName);
+          if(hs.records.length){
+            records.push(...hs.records);
+            debug.push(...hs.debug);
+          }else{
+            debug.push(`${file.name}/${sheetName}: 高速マスターデイリーから結果行を読めませんでした`);
+          }
+          continue;
+        }
 
         // 2行形式を先に安全判定する。
         // 従来形式は同じ行のE/Fに内容・結果が入るため、2行形式とは判定しない。
