@@ -814,7 +814,7 @@ main.wrap{max-width:none!important;height:auto!important;min-height:0!important;
         <button class="secondary primaryBig" id="printWeeklyAbsentList" type="button">週面欠席者リスト印刷</button>
       </div>
       <div class="printDialogNote"><b>印刷設定：</b>印刷時は「システムダイアログを使用して印刷」を利用して、<b>用紙サイズ：A4／向き：縦／両面印刷：オン／長辺とじ</b>に設定してください。各生徒はA4両面2枚（1枚目：前週確認→今週記入、2枚目：週面シート→合格設計図）で印刷されます。</div>
-      <div id="meetingPrepFolderInfo" class="compactHint">復元した内容を先週分として使い、今週欄は印刷時だけ白紙にします。復元時に「まとめて復元」フォルダを選ぶと、json/result_history.json、毎日更新フォルダ内の毎日更新.xlsx、打ち込み結果/担任助手フォルダ内の週面シート、担任助手フォルダ/生徒名フォルダ内の合格設計図PDFまたはExcelを自動で読みます。</div>
+      <div id="meetingPrepFolderInfo" class="compactHint">復元した内容を先週分として使い、今週欄は印刷時だけ白紙にします。復元時に「まとめて復元」フォルダを選ぶと、json/result_history.json、毎日更新フォルダ内の毎日更新.xlsx（モチベーション支援／高速マスターデイリー）、打ち込み結果/担任助手フォルダ内の週面シート、担任助手フォルダ/生徒名フォルダ内の合格設計図PDFまたはExcelを自動で読みます。</div>
     </details>
   </section>
 
@@ -893,6 +893,20 @@ main.wrap{max-width:none!important;height:auto!important;min-height:0!important;
 const $=(s)=>document.querySelector(s);
 const $$=(s)=>Array.from(document.querySelectorAll(s));
 const DOW=['日','月','火','水','木','金','土'];
+
+// 毎日更新.xlsxで面談準備が読む対象シート名。
+const DAILY_UPDATE_TARGET_SHEETS = ['モチベーション支援', '高速マスターデイリー'];
+function normalizeSheetNameForMatch(name){return String(name || '').replace(/[\s　]+/g,'').trim();}
+function isDailyUpdateTargetSheetName(sheetName){
+  const key=normalizeSheetNameForMatch(sheetName);
+  return DAILY_UPDATE_TARGET_SHEETS.some(n=>normalizeSheetNameForMatch(n)===key);
+}
+function isPrepResultSheetName(sheetName){
+  // 面談準備の個別結果には「モチベーション支援」だけ使う。
+  // 「高速マスターデイリー」はランキング用なので、面談準備の個別結果には使わない。
+  return normalizeSheetNameForMatch(sheetName)===normalizeSheetNameForMatch('モチベーション支援');
+}
+
 const LIMITS=['受講①','受講②','受講③','その他①','その他②','その他③'];
 const MAX_SCHEDULE_ROWS=3;
 // 共テ型の初期科目は、模試マスタ画面の写真と同じ並び。
@@ -1609,11 +1623,18 @@ async function findGoukakuExcelInStudentFolder(studentDir){
   });
   return candidates[0] || null;
 }
+function pickGoukakuDesignSheetName(wb){
+  const names=(wb&&wb.SheetNames)?wb.SheetNames:[];
+  if(!names.length) return '';
+  // 合格設計図Excelは、ブック内の「合格設計図」を含むシートを優先して読む。
+  // 該当シートが複数ある場合は、先に並んでいるシートを採用する。
+  return names.find(n=>String(n||'').includes('合格設計図')) || names[0];
+}
 async function readGoukakuExcelFile(file){
   if(!window.XLSX) throw new Error('Excel読み取りライブラリ XLSX が読み込まれていません。');
   const buf=await file.arrayBuffer();
   const wb=XLSX.read(buf,{type:'array',cellDates:true,cellStyles:true,cellNF:true});
-  const sheetName=wb.SheetNames[0];
+  const sheetName=pickGoukakuDesignSheetName(wb);
   if(!sheetName) throw new Error('シートが見つかりません。');
   const ws=wb.Sheets[sheetName];
   const aoa=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
@@ -1851,8 +1872,48 @@ function examMasterNeedsDefaultRows(rows){
   const keys=new Set(rows.map(row=>`${row?.name||''}|${row?.date||''}`));
   return defaultToshinExamRows().some(row=>!keys.has(`${row.name}|${row.date}`));
 }
-function getExamMaster(){try{const saved=JSON.parse(localStorage.getItem(EXAM_MASTER_KEY)||'[]');const rows=Array.isArray(saved)?saved:[];if(localStorage.getItem(EXAM_MASTER_DEFAULT_VERSION_KEY)!==DEFAULT_TOSHIN_EXAM_VERSION || examMasterNeedsDefaultRows(rows)){const merged=mergeDefaultExamMaster(rows);localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(merged));localStorage.setItem(EXAM_MASTER_DEFAULT_VERSION_KEY,DEFAULT_TOSHIN_EXAM_VERSION);return merged}return rows}catch(e){return defaultToshinExamRows()}}
-function saveExamMasterData(rows){const merged=mergeDefaultExamMaster(Array.isArray(rows)?rows:[]);localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(merged));localStorage.setItem(EXAM_MASTER_DEFAULT_VERSION_KEY,DEFAULT_TOSHIN_EXAM_VERSION)}
+
+// 旧JSON復元対策：古い個人JSON/グループJSON/settingsに残った「対象生徒」を勝手に復活させない。
+// この版以降で保存したマスタだけ targetRestoreVersion=2 として、対象生徒の復元を信用する。
+const MASTER_TARGET_RESTORE_VERSION = 2;
+function masterTargetsTrusted(mem){
+  return Number(mem && mem.targetRestoreVersion) >= MASTER_TARGET_RESTORE_VERSION;
+}
+function stripLegacyExamTargetStudents(rows){
+  return (Array.isArray(rows) ? rows : []).map(row=>{
+    if(!row || typeof row !== 'object') return row;
+    const copy=Object.assign({}, row);
+    copy.students=[];
+    copy.studentNames='';
+    return copy;
+  });
+}
+function applyExamMasterFromRestoredMemory(mem, sourceLabel='復元JSON'){
+  if(!mem || !Array.isArray(mem.examMaster)) return false;
+  const trusted=masterTargetsTrusted(mem);
+  saveExamMasterData(trusted ? mem.examMaster : stripLegacyExamTargetStudents(mem.examMaster));
+  // 旧JSONの対象履歴は、似た模試へ対象生徒を再注入する原因になるので復元しない。
+  if(trusted && Array.isArray(mem.examTargetHistory)) saveExamTargetHistory(mem.examTargetHistory);
+  else saveExamTargetHistory([]);
+  return true;
+}
+function buildMasterSettingsPayload(savedAt=new Date().toISOString()){
+  return {
+    version:2,
+    type:'master-settings',
+    targetRestoreVersion:MASTER_TARGET_RESTORE_VERSION,
+    examMaster:getExamMaster(),
+    eventMaster:getEventMaster(),
+    examTargetHistory:getExamTargetHistory(),
+    eventTargetHistory:getEventTargetHistory(),
+    commentMaster:getCommentMaster(),
+    commentTargetHistory:getCommentTargetHistory(),
+    subjectTemplates:getSubjectTemplates(),
+    savedAt
+  };
+}
+function getExamMaster(){try{const saved=JSON.parse(localStorage.getItem(EXAM_MASTER_KEY)||'[]');let rows=Array.isArray(saved)?saved:[];if(localStorage.getItem(EXAM_MASTER_KEY+':targetVersion')!==String(MASTER_TARGET_RESTORE_VERSION)){rows=stripLegacyExamTargetStudents(rows);localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(rows));localStorage.setItem(EXAM_MASTER_KEY+':targetVersion',String(MASTER_TARGET_RESTORE_VERSION));}if(localStorage.getItem(EXAM_MASTER_DEFAULT_VERSION_KEY)!==DEFAULT_TOSHIN_EXAM_VERSION || examMasterNeedsDefaultRows(rows)){const merged=mergeDefaultExamMaster(rows);localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(merged));localStorage.setItem(EXAM_MASTER_DEFAULT_VERSION_KEY,DEFAULT_TOSHIN_EXAM_VERSION);return merged}return rows}catch(e){return defaultToshinExamRows()}}
+function saveExamMasterData(rows){const merged=mergeDefaultExamMaster(Array.isArray(rows)?rows:[]);localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(merged));localStorage.setItem(EXAM_MASTER_DEFAULT_VERSION_KEY,DEFAULT_TOSHIN_EXAM_VERSION);localStorage.setItem(EXAM_MASTER_KEY+':targetVersion',String(MASTER_TARGET_RESTORE_VERSION))}
 function visibleExamMasters(){const start=new Date($('#weekStart').value+'T00:00:00');return getExamMaster().filter(ex=>{if(!ex.date)return false;const d=new Date(ex.date+'T00:00:00');const diff=daysBetween(start,d);return diff>=0&&diff<=21})}
 function getSubjectTemplates(){
   try{
@@ -1887,8 +1948,8 @@ function saveSubjectTemplates(list){localStorage.setItem(SUBJECT_TEMPLATE_KEY,JS
 function findSubjectTemplate(name){return getSubjectTemplates().find(t=>t.name===name)||null}
 function defaultTemplateNameForType(type){return type==='crown'?'冠模試型':'共テ型'}
 function examSubjectsForType(type,templateName){const t=findSubjectTemplate(templateName||defaultTemplateNameForType(type));return t?t.subjects:(type==='crown'?CROWN_TEST_SUBJECTS:COMMON_TEST_SUBJECTS)}
-function getExamMaster(){try{const saved=JSON.parse(localStorage.getItem(EXAM_MASTER_KEY)||'[]');const rows=Array.isArray(saved)?saved:[];if(localStorage.getItem(EXAM_MASTER_DEFAULT_VERSION_KEY)!==DEFAULT_TOSHIN_EXAM_VERSION || examMasterNeedsDefaultRows(rows)){const merged=mergeDefaultExamMaster(rows);localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(merged));localStorage.setItem(EXAM_MASTER_DEFAULT_VERSION_KEY,DEFAULT_TOSHIN_EXAM_VERSION);return merged}return rows}catch(e){return defaultToshinExamRows()}}
-function saveExamMasterData(rows){const merged=mergeDefaultExamMaster(Array.isArray(rows)?rows:[]);localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(merged));localStorage.setItem(EXAM_MASTER_DEFAULT_VERSION_KEY,DEFAULT_TOSHIN_EXAM_VERSION)}
+function getExamMaster(){try{const saved=JSON.parse(localStorage.getItem(EXAM_MASTER_KEY)||'[]');let rows=Array.isArray(saved)?saved:[];if(localStorage.getItem(EXAM_MASTER_KEY+':targetVersion')!==String(MASTER_TARGET_RESTORE_VERSION)){rows=stripLegacyExamTargetStudents(rows);localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(rows));localStorage.setItem(EXAM_MASTER_KEY+':targetVersion',String(MASTER_TARGET_RESTORE_VERSION));}if(localStorage.getItem(EXAM_MASTER_DEFAULT_VERSION_KEY)!==DEFAULT_TOSHIN_EXAM_VERSION || examMasterNeedsDefaultRows(rows)){const merged=mergeDefaultExamMaster(rows);localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(merged));localStorage.setItem(EXAM_MASTER_DEFAULT_VERSION_KEY,DEFAULT_TOSHIN_EXAM_VERSION);return merged}return rows}catch(e){return defaultToshinExamRows()}}
+function saveExamMasterData(rows){const merged=mergeDefaultExamMaster(Array.isArray(rows)?rows:[]);localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(merged));localStorage.setItem(EXAM_MASTER_DEFAULT_VERSION_KEY,DEFAULT_TOSHIN_EXAM_VERSION);localStorage.setItem(EXAM_MASTER_KEY+':targetVersion',String(MASTER_TARGET_RESTORE_VERSION))}
 function visibleExamMasters(){const start=new Date($('#weekStart').value+'T00:00:00');return getExamMaster().filter(ex=>{if(!ex.date)return false;const d=new Date(ex.date+'T00:00:00');const diff=daysBetween(start,d);return diff>=0&&diff<=21})}
 function examId(ex){return `${ex.name||''}|${ex.date||''}|${ex.type||'common'}|${ex.subjectTemplate||defaultTemplateNameForType(ex.type)}`}
 function splitTargetNames(s){return String(s||'').split(/[、，,\n]+/).map(x=>x.trim()).filter(Boolean)}
@@ -2492,8 +2553,9 @@ function loadOneFromBrowser(name){
 function buildGroupMemory(savedAt=new Date().toISOString()){
   syncFromDom();
   return {
-    version:1,
+    version:2,
     type:'group',
+    targetRestoreVersion:MASTER_TARGET_RESTORE_VERSION,
     names:students,
     weekStart:$('#weekStart').value,
     studentData:Object.fromEntries(students.map(n=>[n,ensureStudent(n)])),
@@ -2516,7 +2578,7 @@ async function saveOne(name,showAlert=true){
   if(sharedDirHandle){
     try{
       await writeJsonToShared(sharedStudentFileName(name),mem);
-      await writeJsonToShared('settings_exam_master.json',{examMaster:getExamMaster(),eventMaster:getEventMaster(),examTargetHistory:getExamTargetHistory(),eventTargetHistory:getEventTargetHistory(),commentMaster:getCommentMaster(),commentTargetHistory:getCommentTargetHistory(),subjectTemplates:getSubjectTemplates(),savedAt});
+      await writeJsonToShared('settings_exam_master.json', buildMasterSettingsPayload(savedAt));
       place='保存用フォルダ＋ブラウザ内';
     }catch(e){
       if(showAlert)alert('保存用フォルダへの個人保存に失敗しました。ブラウザ内には保存しました。');
@@ -2890,9 +2952,8 @@ async function loadGroup(){
   students=mem.names||names;
   $('#studentNames').value=students.join(', ');
   Object.assign(studentData, applyRestoredStudentMapForInput(mem.studentData||{}));
-  if(Array.isArray(mem.examMaster)) saveExamMasterData(mem.examMaster);
+  applyExamMasterFromRestoredMemory(mem, '復元JSON');
   if(Array.isArray(mem.eventMaster)) saveEventMasterData(mem.eventMaster); if(Array.isArray(mem.commentMaster)) saveCommentMasterData(mem.commentMaster);
-  if(Array.isArray(mem.examTargetHistory)) saveExamTargetHistory(mem.examTargetHistory);
   if(Array.isArray(mem.eventTargetHistory)) saveEventTargetHistory(mem.eventTargetHistory); if(Array.isArray(mem.commentTargetHistory)) saveCommentTargetHistory(mem.commentTargetHistory);
   if(Array.isArray(mem.subjectTemplates)) saveSubjectTemplates(mem.subjectTemplates);
   renderExamMasterPanel();
@@ -3370,8 +3431,9 @@ async function readStudentJsonFromSharedByName(name){
 function buildSharedGroupMemory(){
   syncFromDom();
   return {
-    version:1,
+    version:2,
     type:'group',
+    targetRestoreVersion:MASTER_TARGET_RESTORE_VERSION,
     names:students,
     weekStart:$('#weekStart').value,
         studentData:Object.fromEntries(students.map(n=>[n,ensureStudent(n)])),
@@ -3389,7 +3451,7 @@ async function saveSharedFolder(){
       const mem=Object.assign({studentName:name,savedAt:groupMem.savedAt},ensureStudent(name));
       await writeJsonToShared(sharedStudentFileName(name), mem);
     }
-    await writeJsonToShared('settings_exam_master.json', {examMaster:getExamMaster(),eventMaster:getEventMaster(),examTargetHistory:getExamTargetHistory(),eventTargetHistory:getEventTargetHistory(), commentMaster:getCommentMaster(), commentTargetHistory:getCommentTargetHistory(), subjectTemplates:getSubjectTemplates(), savedAt:groupMem.savedAt});
+    await writeJsonToShared('settings_exam_master.json', buildMasterSettingsPayload(groupMem.savedAt));
     showSaveInfo(`保存用フォルダ/jsonに保存しました：${students.join('、')}（${new Date(groupMem.savedAt).toLocaleString('ja-JP')}）`);
     alert('保存用フォルダ直下の「json」フォルダに、グループ内容・個人内容・模試設定を保存しました。');
   }catch(e){
@@ -3397,16 +3459,20 @@ async function saveSharedFolder(){
   }
 }
 async function applySharedSettingsIfAny(){
-  const settings = await readJsonFromShared('settings_exam_master.json');
+  const settings=await readJsonFromShared('settings_exam_master.json');
   if(settings){
-    if(Array.isArray(settings.examMaster)) saveExamMasterData(settings.examMaster); if(Array.isArray(settings.eventMaster)) saveEventMasterData(settings.eventMaster);
-    if(Array.isArray(settings.commentMaster)) saveCommentMasterData(settings.commentMaster); if(Array.isArray(settings.examTargetHistory)) saveExamTargetHistory(settings.examTargetHistory);
+    applyExamMasterFromRestoredMemory(settings, 'settings_exam_master.json');
+    if(Array.isArray(settings.eventMaster)) saveEventMasterData(settings.eventMaster);
+    if(Array.isArray(settings.commentMaster)) saveCommentMasterData(settings.commentMaster);
+    if(Array.isArray(settings.eventTargetHistory)) saveEventTargetHistory(settings.eventTargetHistory);
+    if(Array.isArray(settings.commentTargetHistory)) saveCommentTargetHistory(settings.commentTargetHistory);
     if(Array.isArray(settings.subjectTemplates)) saveSubjectTemplates(settings.subjectTemplates);
     renderExamMasterPanel();
     renderEventMasterPanel();
     renderCommentMasterPanel();
   }
 }
+
 async function loadSharedGroup(){
   const names=splitNames();
   if(!names.length)return alert('先に生徒名を入力してください。');
@@ -3419,7 +3485,7 @@ async function loadSharedGroup(){
     if(mem.weekStart) meetingPrepRestoredWeekStart = mem.weekStart;
     Object.assign(studentData, applyRestoredStudentMapForInput(mem.studentData||{}));
     if(mem.lessonCount||mem.otherCount){students.forEach(n=>{const d=ensureStudent(n); if(mem.lessonCount)d.lessonCount=mem.lessonCount; if(mem.otherCount)d.otherCount=mem.otherCount;});}
-    if(Array.isArray(mem.examMaster)) saveExamMasterData(mem.examMaster); if(Array.isArray(mem.eventMaster)) saveEventMasterData(mem.eventMaster); if(Array.isArray(mem.commentMaster)) saveCommentMasterData(mem.commentMaster); if(Array.isArray(mem.examTargetHistory)) saveExamTargetHistory(mem.examTargetHistory); if(Array.isArray(mem.eventTargetHistory)) saveEventTargetHistory(mem.eventTargetHistory); if(Array.isArray(mem.commentTargetHistory)) saveCommentTargetHistory(mem.commentTargetHistory);
+    applyExamMasterFromRestoredMemory(mem, '復元JSON'); if(Array.isArray(mem.eventMaster)) saveEventMasterData(mem.eventMaster); if(Array.isArray(mem.commentMaster)) saveCommentMasterData(mem.commentMaster); if(Array.isArray(mem.eventTargetHistory)) saveEventTargetHistory(mem.eventTargetHistory); if(Array.isArray(mem.commentTargetHistory)) saveCommentTargetHistory(mem.commentTargetHistory);
     if(Array.isArray(mem.subjectTemplates)) saveSubjectTemplates(mem.subjectTemplates);
     renderExamMasterPanel(); renderEventMasterPanel(); renderCommentMasterPanel();
     renderStudents();
@@ -4042,7 +4108,7 @@ async function restoreInterviewDataFromShared(names){
     $('#studentNames').value=students.join(', ');
     if(groupMem.weekStart) meetingPrepRestoredWeekStart = groupMem.weekStart;
     Object.assign(studentData, applyRestoredStudentMapForInput(groupMem.studentData||{}));
-    if(Array.isArray(groupMem.examMaster)) saveExamMasterData(groupMem.examMaster); if(Array.isArray(groupMem.examTargetHistory)) saveExamTargetHistory(groupMem.examTargetHistory);
+    applyExamMasterFromRestoredMemory(groupMem, 'グループJSON');
     if(Array.isArray(groupMem.eventTargetHistory)) saveEventTargetHistory(groupMem.eventTargetHistory);
     if(Array.isArray(groupMem.commentTargetHistory)) saveCommentTargetHistory(groupMem.commentTargetHistory);
     if(Array.isArray(groupMem.eventMaster)) saveEventMasterData(groupMem.eventMaster);
@@ -4115,17 +4181,9 @@ async function syncAllSharedData(){
    10. 模試・イベント・コメントマスタ共有
 ========================================================= */
 function buildMasterSettingsMemory(){
-  return {
-    version:1,
-    type:'master-settings',
-    examMaster:getExamMaster(),
-    eventMaster:getEventMaster(),
-    examTargetHistory:getExamTargetHistory(),
-    eventTargetHistory:getEventTargetHistory(),commentMaster:getCommentMaster(),commentTargetHistory:getCommentTargetHistory(),
-    subjectTemplates:getSubjectTemplates(),
-    savedAt:new Date().toISOString()
-  };
+  return buildMasterSettingsPayload(new Date().toISOString());
 }
+
 async function saveMasterSettingsToShared(showAlert=true){
   try{
     const mem=buildMasterSettingsMemory();
@@ -4147,7 +4205,8 @@ async function loadMasterSettingsFromShared(showAlert=true){
       if(showAlert)alert('保存用フォルダにマスタ保存データが見つかりません。');
       return false;
     }
-    if(Array.isArray(settings.examMaster)) saveExamMasterData(settings.examMaster);
+    const trusted=masterTargetsTrusted(settings);
+    applyExamMasterFromRestoredMemory(settings, 'settings_exam_master.json');
     if(Array.isArray(settings.eventMaster)) saveEventMasterData(settings.eventMaster);
     if(Array.isArray(settings.commentMaster)) saveCommentMasterData(settings.commentMaster);
     if(Array.isArray(settings.eventTargetHistory)) saveEventTargetHistory(settings.eventTargetHistory);
@@ -4159,9 +4218,9 @@ async function loadMasterSettingsFromShared(showAlert=true){
     renderStudents();
     const savedAt=settings.savedAt?new Date(settings.savedAt).toLocaleString('ja-JP'):'保存日時不明';
     if(showAlert){
-      showSaveInfo(`保存用フォルダから模試・イベント・コメントマスタを反映しました（${savedAt}）`);
-      alert(`保存用フォルダから模試マスタ・イベントマスタ・コメントマスタを反映しました。
-保存日時：${savedAt}`);
+      const note=trusted?'':'\n※古い形式のマスタJSONだったため、模試の「対象生徒」は復元せず空欄扱いにしました。';
+      showSaveInfo(`保存用フォルダから模試・イベント・コメントマスタを反映しました（${savedAt}）${note}`);
+      alert(`保存用フォルダから模試マスタ・イベントマスタ・コメントマスタを反映しました。\n保存日時：${savedAt}${note}`);
     }
     return true;
   }catch(e){
@@ -4169,6 +4228,7 @@ async function loadMasterSettingsFromShared(showAlert=true){
     return false;
   }
 }
+
 async function pickMasterSharedFolderAndLoad(){
   const dir=await pickSharedFolder();
   if(dir) await loadMasterSettingsFromShared(true);
@@ -4233,8 +4293,8 @@ async function getPrepResultFilesFromShared(){
       return {files, debug};
     }
     const found=await listExcelFilesFromDirectoryRecursive(resultDir, 5, 0, ['毎日更新']);
-    files.push(...found);
-    debug.push(`毎日更新.xlsx: 毎日更新フォルダから${files.length}件自動読込`);
+    files.push(...found.filter(f => (f.name || '') === '毎日更新.xlsx'));
+    debug.push(`毎日更新.xlsx: 毎日更新フォルダから${files.length}件自動読込（ファイル名は毎日更新.xlsxのみ対象）`);
   }catch(e){
     debug.push(`毎日更新.xlsx: 自動読込失敗 ${e?.message || e}`);
   }
@@ -4271,7 +4331,7 @@ function prepHeaderMap(aoa){
   };
 }
 function prepLooksLikeHeader(row){return /生徒番号|名前|生徒名|学習内容|毎日更新|日時|区分/.test((row||[]).map(v=>norm(v)).join('|'));}
-function prepFixedResultMap(){return {studentNo:0,student:1,grade:2,type:3,study:4,result:5,datetime:7};}
+function prepFixedResultMap(){return {studentNo:0,student:1,grade:2,type:3,study:4,result:5,datetime:8};}
 
 function prepFixedResultCell(row, idx){return norm((row || [])[idx]);}
 function prepFixedLikeIndex(){return 6;}
@@ -4286,7 +4346,7 @@ function prepLooksLikeTwoRowMetaRow(row){
   const h=prepFixedResultMap();
   // 1行形式との誤結合防止：同じ行のE/Fに内容・結果が入っていれば2行形式ではない。
   if(prepFixedResultCell(row,h.study) || prepFixedResultCell(row,h.result)) return false;
-  // 2行形式の上段は、H列に日時がある場合、またはA列に生徒番号がある場合を許可する。
+  // 2行形式の上段は、I列に日時がある場合、またはA列に生徒番号がある場合を許可する。
   const hasDateTime=!!prepDateTimeAt(row,h.datetime);
   const hasStudentNo=!!prepFixedResultCell(row,h.studentNo);
   if(!(hasDateTime || hasStudentNo)) return false;
@@ -4296,7 +4356,7 @@ function prepLooksLikeTwoRowMetaRow(row){
 function prepLooksLikeTwoRowDetailRow(row){
   const h=prepFixedResultMap();
   // 下段はA〜Dが空白で、E/Fに学習内容・毎日更新が入る。
-  // H列に日時が入る場合もあるため、日時の有無では除外しない。
+  // I列に日時が入る場合もあるため、日時の有無では除外しない。
   if(!prepIsBlankFixedCells(row,[h.studentNo,h.student,h.grade,h.type])) return false;
   return !!(prepFixedResultCell(row,h.study) || prepFixedResultCell(row,h.result));
 }
@@ -4505,6 +4565,14 @@ async function readPrepResultRecords(){
     try{
       const wb=await readWorkbookFromFileRobust(file);
       for(const sheetName of wb.SheetNames){
+        if(!isDailyUpdateTargetSheetName(sheetName)){
+          debug.push(`${file.name}/${sheetName}: 対象外シートのためスキップ（毎日更新.xlsxは「モチベーション支援」「高速マスターデイリー」だけ対象）`);
+          continue;
+        }
+        if(!isPrepResultSheetName(sheetName)){
+          debug.push(`${file.name}/${sheetName}: 高速マスターデイリーはランキング用のため面談準備結果には使いません`);
+          continue;
+        }
         const ws=wb.Sheets[sheetName];
         const aoa=sheetToAoaRobust(ws,true);
         if(!aoa.length){debug.push(`${file.name}/${sheetName}: 空シート`); continue;}
@@ -4549,7 +4617,7 @@ async function readPrepResultRecords(){
           });
           sheetCount++;
         }
-        debug.push(`${file.name}/${sheetName}: ${sheetCount}件${hasHeader?`（見出し${headerRow+1}行目）`:'（A〜H固定）'}${skippedNoId?` / 生徒番号・名前空欄${skippedNoId}件除外`:''}${skippedDate?` / 日時読取不可${skippedDate}件`:''}`);
+        debug.push(`${file.name}/${sheetName}: ${sheetCount}件${hasHeader?`（見出し${headerRow+1}行目）`:'（A〜I固定）'}${skippedNoId?` / 生徒番号・名前空欄${skippedNoId}件除外`:''}${skippedDate?` / 日時読取不可${skippedDate}件`:''}`);
       }
     }catch(e){
       console.warn('毎日更新.xlsx読み取り失敗', file.name, e);
@@ -4928,10 +4996,10 @@ function meetingFlowFallbackHtml(reason){
 function loadWeeklySheetHtml(){
   const html = meetingPrepWeeklyHtmlCache || '';
   const text = String(html).replace(/<[^>]*>/g, '').trim();
-  // 週面シートが無い/読めない場合は、3ページ目に週面エラー文だけを出さず、必ず面談フローへ差し替える。
   const failed = !text
     || text.includes('週面シートをまだ自動読込できていません')
     || text.includes('週面シートを自動読込できませんでした')
+    || text.includes('復元フォルダから週面シートを自動読込できませんでした')
     || text.includes('週面シートの読み込みに失敗しました')
     || text.includes('週面シートExcelが見つかりませんでした')
     || text.includes('週面シートExcelが未選択')
@@ -5854,6 +5922,205 @@ init();
 initV32();
 initRealAppUX();
 initV30ClassicHorizontalUX();
+</script>
+
+<script>
+// ============================================================
+// 初期フォルダー一式ZIPダウンロード
+// 職場PCなど、最初のフォルダー作成を機械的に済ませるための補助機能。
+// 外部ライブラリなしで、無圧縮ZIPをブラウザ内で作成する。
+// ============================================================
+(function(){
+  const INITIAL_ZIP_BUTTON_ID = 'downloadInitialFolderZipBtn';
+
+  function zipCrc32Table(){
+    const table = new Uint32Array(256);
+    for(let n=0;n<256;n++){
+      let c = n;
+      for(let k=0;k<8;k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+      table[n] = c >>> 0;
+    }
+    return table;
+  }
+  const ZIP_CRC_TABLE = zipCrc32Table();
+  function zipCrc32(bytes){
+    let c = 0xFFFFFFFF;
+    for(let i=0;i<bytes.length;i++) c = ZIP_CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+    return (c ^ 0xFFFFFFFF) >>> 0;
+  }
+  function zipU16(n){ return [n & 255, (n >>> 8) & 255]; }
+  function zipU32(n){ return [n & 255, (n >>> 8) & 255, (n >>> 16) & 255, (n >>> 24) & 255]; }
+  function zipDosDateTime(date){
+    const y = Math.max(1980, date.getFullYear());
+    const dosTime = (date.getHours() << 11) | (date.getMinutes() << 5) | Math.floor(date.getSeconds() / 2);
+    const dosDate = ((y - 1980) << 9) | ((date.getMonth() + 1) << 5) | date.getDate();
+    return {dosTime, dosDate};
+  }
+  function zipMake(entries){
+    const enc = new TextEncoder();
+    const now = new Date();
+    const dt = zipDosDateTime(now);
+    const fileParts = [];
+    const centralParts = [];
+    let offset = 0;
+    for(const ent of entries){
+      const nameBytes = enc.encode(ent.name.replace(/\\/g, '/'));
+      const dataBytes = enc.encode(ent.data || '');
+      const crc = zipCrc32(dataBytes);
+      const localHeader = new Uint8Array([
+        ...zipU32(0x04034b50), ...zipU16(20), ...zipU16(0x0800), ...zipU16(0),
+        ...zipU16(dt.dosTime), ...zipU16(dt.dosDate), ...zipU32(crc),
+        ...zipU32(dataBytes.length), ...zipU32(dataBytes.length), ...zipU16(nameBytes.length), ...zipU16(0)
+      ]);
+      fileParts.push(localHeader, nameBytes, dataBytes);
+      const centralHeader = new Uint8Array([
+        ...zipU32(0x02014b50), ...zipU16(20), ...zipU16(20), ...zipU16(0x0800), ...zipU16(0),
+        ...zipU16(dt.dosTime), ...zipU16(dt.dosDate), ...zipU32(crc),
+        ...zipU32(dataBytes.length), ...zipU32(dataBytes.length), ...zipU16(nameBytes.length),
+        ...zipU16(0), ...zipU16(0), ...zipU16(0), ...zipU16(0), ...zipU32(ent.name.endsWith('/') ? 0x10 : 0), ...zipU32(offset)
+      ]);
+      centralParts.push(centralHeader, nameBytes);
+      offset += localHeader.length + nameBytes.length + dataBytes.length;
+    }
+    const centralSize = centralParts.reduce((sum, p) => sum + p.length, 0);
+    const centralOffset = offset;
+    const end = new Uint8Array([
+      ...zipU32(0x06054b50), ...zipU16(0), ...zipU16(0), ...zipU16(entries.length), ...zipU16(entries.length),
+      ...zipU32(centralSize), ...zipU32(centralOffset), ...zipU16(0)
+    ]);
+    return new Blob([...fileParts, ...centralParts, end], {type:'application/zip'});
+  }
+  function initialFolderEntries(){
+    const ASSISTANT_STUDENTS = {
+      '武内':['稲田','坂浦','平井瑛','青野','増永','石塚大','渡邊','岡崎','楠田','北野碧','末藤'],
+      '今道':['間嶋','谷崎','古町','前田','三島和','木下','三浦','丸尾','石塚隆'],
+      '佐藤':['信岡','藤田旺','田中','濱田','中村'],
+      '森':['松田','齋藤結','藤田沙','小坂','木村','寺松','山本啓','奥戸','中川','真名子'],
+      '稲垣':['表田','吉田照','藤原','中村彩','満田','山之内','東野','齋藤智','橘','藤田紘','越智','川畑'],
+      '藤原':['宮木','岡田','片岡','赤井','高木','藤森','今瀬','中山愛','川地'],
+      '源津':['坂上','大橋','山本綾','増尾','野田','古久保','桂田'],
+      '五島':['前川','小松原','池田','山本空','高岡','今西','音田','宮本','松浦','石川','舛中','青山'],
+      '齋藤':['遠藤','大谷','大津','笹本','北野綾','樋口','横田朋','金城','中井'],
+      '森永':['狩谷','齋藤健','村上','今村','横田悦','吉川','横田亮','戸上','丁','山本遥'],
+      '宮木':['川口','秦','角田','宮崎','谷','稲山'],
+      '今堀':['古津','西岡','小倉','岩部','石橋','山奥','杉本','清水','安藤'],
+      '上田':['三辻','池上','新居','神戸','渡辺','長谷川','三島偲','武藤','杉山','小林'],
+      '厚地':['山口歩','久保','大坂','大前','大蔵','加藤','舛田','勝亦','一ノ瀬','仲居','平井秀'],
+      '藤吉':['山下','平井駿','山口渉','牧田','志賀','三木','竹田','黒坂','濱西','岸川'],
+      '山際':['林','中山凛','吉田結','関本','立花','宮地','坂崎颯','福本'],
+      '安達':['竹内','藤本','稲垣','正木','森下','冨田','呉','池澤'],
+      '高岡':[],
+      '西賀':['吉永','森永','中','上野'],
+      '有田':['川村','上杉','土井','赤橋'],
+    };
+    const ASSISTANT_FOLDER_NAMES = Object.keys(ASSISTANT_STUDENTS);
+    function studentsForStaff(staff){
+      const list = ASSISTANT_STUDENTS[staff] || [];
+      return list.length ? list : ['生徒フォルダー例'];
+    }
+    const readme = [
+      '初期フォルダー一式です。',
+      '',
+      '使い方：',
+      '1. このZIPを職場PCで展開します。',
+      '2. 統合用アプリでは「保存復元フォルダー」を選びます。',
+      '3. 入力用アプリでは、「担任助手フォルダー」配下の各担任助手名フォルダーを使います。',
+      '4. 各担任助手名フォルダーの中に、生徒ごとのフォルダーを作ります。',
+      '',
+      '保存復元フォルダーの中身：',
+      '・打ち込み結果：入力用アプリから出した予定Excel',
+      '・毎日更新：毎日更新.xlsx',
+      '・対応表：対応表Excel/CSV',
+      '・全員分リスト：手修正版の全員分リスト',
+      '・全体予定表：手修正版の2週間/1か月/期間指定出力',
+      '・json：result_history.jsonなど',
+      '・Comiru：ComiruアンケートCSV',
+      '・科目リスト：手修正版の模試科目リスト',
+      '・毎日掲示：毎日掲示用Excelの保存先',
+      '',
+      '注意：',
+      '見出し行は消さないでください。列の追加・並び替えはOKです。',
+      'placeholder.txt は不要なら消してOKです。',
+      '',
+      '担任助手フォルダー：',
+      '各担任助手フォルダーの下に、下記の生徒フォルダーを最初から作っています。',
+      ...ASSISTANT_FOLDER_NAMES.map(staff => `・${staff}：${studentsForStaff(staff).join('、')}`)
+    ].join('\n');
+    const keep = 'このフォルダーに該当ファイルを入れてください。不要ならこのplaceholder.txtは消してOKです。\n';
+    const dirs = [
+      '保存復元フォルダー/',
+      '保存復元フォルダー/打ち込み結果/',
+      '保存復元フォルダー/毎日更新/',
+      '保存復元フォルダー/対応表/',
+      '保存復元フォルダー/全員分リスト/',
+      '保存復元フォルダー/全体予定表/',
+      '保存復元フォルダー/json/',
+      '保存復元フォルダー/Comiru/',
+      '保存復元フォルダー/科目リスト/',
+      '保存復元フォルダー/マスタ/',
+      '保存復元フォルダー/毎日掲示/',
+      '担任助手フォルダー/',
+      ...ASSISTANT_FOLDER_NAMES.flatMap(n => [
+        `担任助手フォルダー/${n}/`,
+        ...studentsForStaff(n).map(st => `担任助手フォルダー/${n}/${st}/`)
+      ])
+    ];
+    const entries = dirs.map(name => ({name, data:''}));
+    entries.push({name:'README_最初に読む.txt', data:readme});
+    entries.push({name:'保存復元フォルダー/打ち込み結果/placeholder.txt', data:keep});
+    entries.push({name:'保存復元フォルダー/毎日更新/ここに毎日更新.xlsxを入れる.txt', data:'ここに毎日更新.xlsxを入れます。シート名は「モチベーション支援」「高速マスターデイリー」を使います。\n'});
+    entries.push({name:'保存復元フォルダー/対応表/placeholder.txt', data:keep});
+    entries.push({name:'保存復元フォルダー/全員分リスト/placeholder.txt', data:keep});
+    entries.push({name:'保存復元フォルダー/全体予定表/placeholder.txt', data:keep});
+    entries.push({name:'保存復元フォルダー/json/placeholder.txt', data:keep});
+    entries.push({name:'保存復元フォルダー/Comiru/placeholder.txt', data:'ComiruアンケートCSVをここに入れます。\n'});
+    entries.push({name:'保存復元フォルダー/科目リスト/placeholder.txt', data:keep});
+    entries.push({name:'保存復元フォルダー/毎日掲示/placeholder.txt', data:keep});
+    for(const staff of ASSISTANT_FOLDER_NAMES){
+      for(const student of studentsForStaff(staff)){
+        entries.push({name:`担任助手フォルダー/${staff}/${student}/合格設計図はここに入れる.txt`, data:'生徒ごとのフォルダー直下に、合格設計図.xlsx または 合格設計図.pdf を入れます。\n'});
+      }
+    }
+    return entries;
+  }
+  function downloadInitialFolderZip(){
+    const blob = zipMake(initialFolderEntries());
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = '初期フォルダー一式.zip';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  }
+  function addInitialFolderZipButton(){
+    if(document.getElementById(INITIAL_ZIP_BUTTON_ID)) return;
+    const btn = document.createElement('button');
+    btn.id = INITIAL_ZIP_BUTTON_ID;
+    btn.type = 'button';
+    btn.textContent = '初期フォルダーZIP';
+    btn.title = '職場PC用に、保存復元フォルダー一式のZIPをダウンロードします';
+    btn.className = 'secondary';
+    btn.style.background = '#7c3aed';
+    btn.style.color = '#fff';
+    btn.addEventListener('click', downloadInitialFolderZip);
+
+    const headerActions = document.querySelector('.headerActions');
+    const topActions = document.querySelector('.topActions');
+    const workflow = document.querySelector('.workflowCard .actions, .workflowCard');
+    if(headerActions){
+      const clearBtn = document.getElementById('clearBtn');
+      headerActions.insertBefore(btn, clearBtn || null);
+    }else if(topActions){
+      topActions.appendChild(btn);
+    }else if(workflow){
+      workflow.appendChild(btn);
+    }else{
+      document.body.insertBefore(btn, document.body.firstChild);
+    }
+  }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', addInitialFolderZipButton);
+  else addInitialFolderZipButton();
+})();
 </script>
 </body>
 </html>
