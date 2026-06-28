@@ -4364,7 +4364,7 @@ function buildHighSpeedRankingAoa(rows, label){
   let ranked = [...map.values()]
     .filter(r=>r.passCount>0)
     .sort((a,b)=> b.passCount - a.passCount || String(a.grade).localeCompare(String(b.grade),'ja') || String(a.kana || a.student).localeCompare(String(b.kana || b.student),'ja'));
-  if(settings.limitTop10) ranked = ranked.slice(0,10);
+  // データ自体は切らない。Excel上では11位以降も残し、印刷範囲だけ10位までにする。
   const aoa = [[title], ['順位','学年','氏名','合格数']];
   ranked.forEach((r,i)=> aoa.push([i+1, r.grade, r.student, r.passCount]));
   if(!ranked.length) aoa.push(['','','','該当なし']);
@@ -4559,7 +4559,9 @@ async function downloadMonthlyPosterResultWorkbook(){
     // 高速基礎ランキングは毎回きれいな順位表にするため、過去Excelの手修正復元は使わない。
     const rankingWs = aoaToSheet(rankingAoa);
     styleHighSpeedRankingSheet(rankingWs, rankingAoa);
-    XLSX.utils.book_append_sheet(wb, rankingWs, uniqueSheetName('高速基礎ランキング', used));
+    const rankingSheetName = uniqueSheetName('高速基礎ランキング', used);
+    XLSX.utils.book_append_sheet(wb, rankingWs, rankingSheetName);
+    setHighSpeedRankingPrintAreaTop10(wb, rankingSheetName);
 
     XLSX.writeFile(wb, `校舎掲示用_毎日更新_${ymd(month.from)}-${ymd(month.to)}.xlsx`);
 
@@ -6485,6 +6487,22 @@ function allListSetPrintAreaToUsedRange(wb, sheetName, ws){
   wb.Workbook.Names.push({Name:'_xlnm.Print_Area', Sheet:sheetIndex, Ref:ref});
 }
 
+
+
+function setWorkbookPrintArea(wb, sheetName, refA1){
+  if(!wb || !sheetName || !refA1) return;
+  wb.Workbook = wb.Workbook || {};
+  wb.Workbook.Names = wb.Workbook.Names || [];
+  const sheetIndex = (wb.SheetNames || []).indexOf(sheetName);
+  const ref = `${allListSheetQuotedName(sheetName)}!${refA1}`;
+  wb.Workbook.Names = wb.Workbook.Names.filter(n => !(n && n.Name === '_xlnm.Print_Area' && n.Sheet === sheetIndex));
+  wb.Workbook.Names.push({Name:'_xlnm.Print_Area', Sheet:sheetIndex, Ref:ref});
+}
+function setHighSpeedRankingPrintAreaTop10(wb, sheetName){
+  // タイトル1行 + 見出し1行 + 1〜10位 = A1:D12だけ印刷。
+  // 11位以降のデータはシート上に残す。
+  setWorkbookPrintArea(wb, sheetName, '$A$1:$D$12');
+}
 
 function allListApplyB4LandscapeOnePagePrintSettings(ws){
   if(!ws) return;
