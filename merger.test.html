@@ -7190,5 +7190,165 @@ document.addEventListener('DOMContentLoaded', function(){
 })();
 </script>
 
+<script>
+// ============================================================
+// 初期フォルダー一式ZIPダウンロード
+// 職場PCなど、最初のフォルダー作成を機械的に済ませるための補助機能。
+// 外部ライブラリなしで、無圧縮ZIPをブラウザ内で作成する。
+// ============================================================
+(function(){
+  const INITIAL_ZIP_BUTTON_ID = 'downloadInitialFolderZipBtn';
+
+  function zipCrc32Table(){
+    const table = new Uint32Array(256);
+    for(let n=0;n<256;n++){
+      let c = n;
+      for(let k=0;k<8;k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+      table[n] = c >>> 0;
+    }
+    return table;
+  }
+  const ZIP_CRC_TABLE = zipCrc32Table();
+  function zipCrc32(bytes){
+    let c = 0xFFFFFFFF;
+    for(let i=0;i<bytes.length;i++) c = ZIP_CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+    return (c ^ 0xFFFFFFFF) >>> 0;
+  }
+  function zipU16(n){ return [n & 255, (n >>> 8) & 255]; }
+  function zipU32(n){ return [n & 255, (n >>> 8) & 255, (n >>> 16) & 255, (n >>> 24) & 255]; }
+  function zipDosDateTime(date){
+    const y = Math.max(1980, date.getFullYear());
+    const dosTime = (date.getHours() << 11) | (date.getMinutes() << 5) | Math.floor(date.getSeconds() / 2);
+    const dosDate = ((y - 1980) << 9) | ((date.getMonth() + 1) << 5) | date.getDate();
+    return {dosTime, dosDate};
+  }
+  function zipMake(entries){
+    const enc = new TextEncoder();
+    const now = new Date();
+    const dt = zipDosDateTime(now);
+    const fileParts = [];
+    const centralParts = [];
+    let offset = 0;
+    for(const ent of entries){
+      const nameBytes = enc.encode(ent.name.replace(/\\/g, '/'));
+      const dataBytes = enc.encode(ent.data || '');
+      const crc = zipCrc32(dataBytes);
+      const localHeader = new Uint8Array([
+        ...zipU32(0x04034b50), ...zipU16(20), ...zipU16(0x0800), ...zipU16(0),
+        ...zipU16(dt.dosTime), ...zipU16(dt.dosDate), ...zipU32(crc),
+        ...zipU32(dataBytes.length), ...zipU32(dataBytes.length), ...zipU16(nameBytes.length), ...zipU16(0)
+      ]);
+      fileParts.push(localHeader, nameBytes, dataBytes);
+      const centralHeader = new Uint8Array([
+        ...zipU32(0x02014b50), ...zipU16(20), ...zipU16(20), ...zipU16(0x0800), ...zipU16(0),
+        ...zipU16(dt.dosTime), ...zipU16(dt.dosDate), ...zipU32(crc),
+        ...zipU32(dataBytes.length), ...zipU32(dataBytes.length), ...zipU16(nameBytes.length),
+        ...zipU16(0), ...zipU16(0), ...zipU16(0), ...zipU16(0), ...zipU32(ent.name.endsWith('/') ? 0x10 : 0), ...zipU32(offset)
+      ]);
+      centralParts.push(centralHeader, nameBytes);
+      offset += localHeader.length + nameBytes.length + dataBytes.length;
+    }
+    const centralSize = centralParts.reduce((sum, p) => sum + p.length, 0);
+    const centralOffset = offset;
+    const end = new Uint8Array([
+      ...zipU32(0x06054b50), ...zipU16(0), ...zipU16(0), ...zipU16(entries.length), ...zipU16(entries.length),
+      ...zipU32(centralSize), ...zipU32(centralOffset), ...zipU16(0)
+    ]);
+    return new Blob([...fileParts, ...centralParts, end], {type:'application/zip'});
+  }
+  function initialFolderEntries(){
+    const readme = [
+      '初期フォルダー一式です。',
+      '',
+      '使い方：',
+      '1. このZIPを職場PCで展開します。',
+      '2. 統合用アプリでは「保存復元フォルダー」を選びます。',
+      '3. 入力用アプリでは、必要に応じて「担任助手フォルダー」配下に生徒フォルダーを作ります。',
+      '',
+      '保存復元フォルダーの中身：',
+      '・打ち込み結果：入力用アプリから出した予定Excel',
+      '・毎日更新：毎日更新.xlsx',
+      '・対応表：対応表Excel/CSV',
+      '・全員分リスト：手修正版の全員分リスト',
+      '・全体予定表：手修正版の2週間/1か月/期間指定出力',
+      '・json：result_history.jsonなど',
+      '・Comiru：ComiruアンケートCSV',
+      '・科目リスト：手修正版の模試科目リスト',
+      '・毎日掲示：毎日掲示用Excelの保存先',
+      '',
+      '注意：',
+      '見出し行は消さないでください。列の追加・並び替えはOKです。',
+      'placeholder.txt は不要なら消してOKです。'
+    ].join('\n');
+    const keep = 'このフォルダーに該当ファイルを入れてください。不要ならこのplaceholder.txtは消してOKです。\n';
+    const dirs = [
+      '保存復元フォルダー/',
+      '保存復元フォルダー/打ち込み結果/',
+      '保存復元フォルダー/毎日更新/',
+      '保存復元フォルダー/対応表/',
+      '保存復元フォルダー/全員分リスト/',
+      '保存復元フォルダー/全体予定表/',
+      '保存復元フォルダー/json/',
+      '保存復元フォルダー/Comiru/',
+      '保存復元フォルダー/科目リスト/',
+      '保存復元フォルダー/マスタ/',
+      '保存復元フォルダー/毎日掲示/',
+      '担任助手フォルダー/',
+      '担任助手フォルダー/生徒フォルダー例/'
+    ];
+    const entries = dirs.map(name => ({name, data:''}));
+    entries.push({name:'README_最初に読む.txt', data:readme});
+    entries.push({name:'保存復元フォルダー/打ち込み結果/placeholder.txt', data:keep});
+    entries.push({name:'保存復元フォルダー/毎日更新/ここに毎日更新.xlsxを入れる.txt', data:'ここに毎日更新.xlsxを入れます。シート名は「モチベーション支援」「高速マスターデイリー」を使います。\n'});
+    entries.push({name:'保存復元フォルダー/対応表/placeholder.txt', data:keep});
+    entries.push({name:'保存復元フォルダー/全員分リスト/placeholder.txt', data:keep});
+    entries.push({name:'保存復元フォルダー/全体予定表/placeholder.txt', data:keep});
+    entries.push({name:'保存復元フォルダー/json/placeholder.txt', data:keep});
+    entries.push({name:'保存復元フォルダー/Comiru/placeholder.txt', data:'ComiruアンケートCSVをここに入れます。\n'});
+    entries.push({name:'保存復元フォルダー/科目リスト/placeholder.txt', data:keep});
+    entries.push({name:'保存復元フォルダー/毎日掲示/placeholder.txt', data:keep});
+    entries.push({name:'担任助手フォルダー/生徒フォルダー例/合格設計図はここに入れる.txt', data:'生徒ごとのフォルダー直下に、合格設計図.xlsx または 合格設計図.pdf を入れます。\n'});
+    return entries;
+  }
+  function downloadInitialFolderZip(){
+    const blob = zipMake(initialFolderEntries());
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = '初期フォルダー一式.zip';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  }
+  function addInitialFolderZipButton(){
+    if(document.getElementById(INITIAL_ZIP_BUTTON_ID)) return;
+    const btn = document.createElement('button');
+    btn.id = INITIAL_ZIP_BUTTON_ID;
+    btn.type = 'button';
+    btn.textContent = '初期フォルダーZIP';
+    btn.title = '職場PC用に、保存復元フォルダー一式のZIPをダウンロードします';
+    btn.className = 'secondary';
+    btn.style.background = '#7c3aed';
+    btn.style.color = '#fff';
+    btn.addEventListener('click', downloadInitialFolderZip);
+
+    const headerActions = document.querySelector('.headerActions');
+    const topActions = document.querySelector('.topActions');
+    const workflow = document.querySelector('.workflowCard .actions, .workflowCard');
+    if(headerActions){
+      const clearBtn = document.getElementById('clearBtn');
+      headerActions.insertBefore(btn, clearBtn || null);
+    }else if(topActions){
+      topActions.appendChild(btn);
+    }else if(workflow){
+      workflow.appendChild(btn);
+    }else{
+      document.body.insertBefore(btn, document.body.firstChild);
+    }
+  }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', addInitialFolderZipButton);
+  else addInitialFolderZipButton();
+})();
+</script>
+
 </body>
 </html>
