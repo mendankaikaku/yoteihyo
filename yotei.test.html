@@ -902,8 +902,8 @@ function isDailyUpdateTargetSheetName(sheetName){
   return DAILY_UPDATE_TARGET_SHEETS.some(n=>normalizeSheetNameForMatch(n)===key);
 }
 function isPrepResultSheetName(sheetName){
-  // 面談準備の個別結果には「モチベーション支援」だけ使う。
-  // 「高速マスターデイリー」はランキング用なので、面談準備の個別結果には使わない。
+  // 通常結果としては「モチベーション支援」だけ使う。
+  // 「高速マスターデイリー」は別処理で短縮形にして面談準備へ反映する。
   return normalizeSheetNameForMatch(sheetName)===normalizeSheetNameForMatch('モチベーション支援');
 }
 
