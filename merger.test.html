@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>予定統合アプリｑ</title>　
+  <title>予定統合アプリ</title>
   <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
   <script src="./libs/xlsx.bundle.js"></script>
   <script>
@@ -625,6 +625,17 @@ function ymd(d){ return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.get
 function mmdd(d){ return `${d.getMonth()+1}/${d.getDate()}`; }
 function colName(n){ let s=""; while(n>0){ const m=(n-1)%26; s=String.fromCharCode(65+m)+s; n=Math.floor((n-1)/26); } return s; }
 const WEEK_JA = ["日","月","火","水","木","金","土"];
+
+// 毎日更新.xlsxで読み取る対象シート名。余計な作業シートの混入を防ぐ。
+const DAILY_UPDATE_TARGET_SHEETS = ['モチベーション支援', '高速マスターデイリー'];
+function normalizeSheetNameForMatch(name){
+  return String(name || '').replace(/[\s　]+/g, '').trim();
+}
+function isDailyUpdateTargetSheetName(sheetName){
+  const key = normalizeSheetNameForMatch(sheetName);
+  return DAILY_UPDATE_TARGET_SHEETS.some(n => normalizeSheetNameForMatch(n) === key);
+}
+
 
 document.addEventListener("DOMContentLoaded", () => {
   if($("centerDate") && !$("centerDate").value) $("centerDate").value = ymd(new Date());
@@ -1651,15 +1662,15 @@ function looksLikeResultHeader(row){
 
 function fixedResultHeaderMap(){
   // 列名なし毎日更新.xlsx用の固定レイアウト
-  // A:生徒番号 B:フルネーム C:学年 D:区分 E:学習内容 F:学習結果(旧:毎日更新) G:いいね H:日時
-  return {studentNo:0, student:1, grade:2, type:3, study:4, result:5, like:6, datetime:7};
+  // A:生徒番号 B:フルネーム C:学年 D:区分 E:学習内容 F:学習結果(旧:毎日更新) G:いいね H:予備 I:日時
+  return {studentNo:0, student:1, grade:2, type:3, study:4, result:5, like:6, datetime:8};
 }
 
 function fixedTwoRowResultMap(){
-  // 2行1セット形式も、列配置は従来形式と同じ A〜H 固定。
-  // 上の行: A:生徒番号 B:名前 C:学年 D:区分 E/F:空白 G:いいね H:日時
-  // 下の行: A〜D:空白 E:学習内容 F:学習結果(旧:毎日更新) G:いいねなど H:空白
-  return {studentNo:0, student:1, grade:2, type:3, study:4, result:5, like:6, datetime:7};
+  // 2行1セット形式も、列配置は A〜I 固定。
+  // 上の行: A:生徒番号 B:名前 C:学年 D:区分 E/F:空白 G:いいね H:予備 I:日時
+  // 下の行: A〜D:空白 E:学習内容 F:学習結果(旧:毎日更新) G:いいねなど H:予備 I:空白
+  return {studentNo:0, student:1, grade:2, type:3, study:4, result:5, like:6, datetime:8};
 }
 
 function fixedCell(row, idx){ return norm((row || [])[idx]); }
@@ -1682,7 +1693,7 @@ function looksLikeTwoRowMetaRow(row){
 
   // 2行形式の上段は、日時がある場合もあれば、日時欄が空のまま
   // A列の生徒番号だけで生徒情報行だと分かる場合もある。
-  // そのため「H列に日時がある」または「A列に生徒番号がある」のORで判定する。
+  // そのため「I列に日時がある」または「A列に生徒番号がある」のORで判定する。
   const hasDateTime = !!fixedDateTimeAt(row, map.datetime);
   const hasStudentNo = !!fixedCell(row, map.studentNo);
   if(!(hasDateTime || hasStudentNo)) return false;
@@ -1695,7 +1706,7 @@ function looksLikeTwoRowDetailRow(row){
   const map = fixedTwoRowResultMap();
 
   // 下の行は名前・番号などが空で、E/F に内容と結果が入る形式だけを採用。
-  // H列に日時が入っている場合もあるため、ここでは日時の有無で除外しない。
+  // I列に日時が入っている場合もあるため、ここでは日時の有無で除外しない。
   if(!isBlankFixedCells(row, [map.studentNo, map.student, map.grade, map.type])) return false;
 
   const study = fixedCell(row, map.study);
@@ -1743,12 +1754,12 @@ function parseTwoRowResultSheet(aoa, file, sheetName){
       student, rawName, studentNo, grade, type, study, result, like,
       dateObj: dateOnly, dateKey: ymd(dateOnly), dateLabel: `${mmdd(dateOnly)}(${WEEK_JA[dateOnly.getDay()]})`,
       datetime: dt, timeLabel: hm(dt), category: classifyResult(study, result),
-      summary: summarizeResult(study, result), sourceFile:file.name, sourceSheet:sheetName, sourceFormat:"2行形式（A〜H固定）"
+      summary: summarizeResult(study, result), sourceFile:file.name, sourceSheet:sheetName, sourceFormat:"2行形式（A〜I固定）"
     });
     r++;
   }
   if(records.length){
-    logRows.push([file.name, "成功", `結果 ${records.length}件読み込み（2行形式：1行目=A〜D生徒情報、日時は上下どちらのH列でも可、2行目=E学習内容/F毎日更新）`, sheetName]);
+    logRows.push([file.name, "成功", `結果 ${records.length}件読み込み（2行形式：1行目=A〜D生徒情報、日時は上下どちらのI列でも可、2行目=E学習内容/F毎日更新）`, sheetName]);
     if(skippedHeaders) logRows.push([file.name, "情報", `2行形式の見出し行を${skippedHeaders}行スキップしました`, sheetName]);
   }
   return {records, logRows};
@@ -1762,7 +1773,7 @@ function parseOneRowResultSheet(aoa, file, sheetName){
   const startRow = hasHeader ? 1 : 0;
 
   if(h.study < 0 || h.result < 0 || h.datetime < 0){
-    logRows.push([file.name, "注意", `結果データExcelの列不足のためスキップ: ${sheetName}`, "1行形式は A:生徒番号 B:名前 C:学年 D:区分 E:学習内容 F:学習結果(旧:毎日更新/結果) G:いいね H:日時。2行形式は1行目=A〜D生徒情報/E-F空白、2行目=A〜D空白/E学習内容/F学習結果、日時は上下どちらかのH列が必要です"]);
+    logRows.push([file.name, "注意", `結果データExcelの列不足のためスキップ: ${sheetName}`, "1行形式は A:生徒番号 B:名前 C:学年 D:区分 E:学習内容 F:学習結果(旧:毎日更新/結果) G:いいね H:予備 I:日時。2行形式は1行目=A〜D生徒情報/E-F空白、2行目=A〜D空白/E学習内容/F学習結果、日時は上下どちらかのI列が必要です"]);
     return {records, logRows};
   }
   let count = 0;
@@ -1794,11 +1805,11 @@ function parseOneRowResultSheet(aoa, file, sheetName){
       student, rawName, studentNo, grade, type, study, result, like,
       dateObj: dateOnly, dateKey: ymd(dateOnly), dateLabel: `${mmdd(dateOnly)}(${WEEK_JA[dateOnly.getDay()]})`,
       datetime: dt, timeLabel: hm(dt), category: classifyResult(study, result),
-      summary: summarizeResult(study, result), sourceFile:file.name, sourceSheet:sheetName, sourceFormat: hasHeader ? "見出し行あり" : "A〜H固定列"
+      summary: summarizeResult(study, result), sourceFile:file.name, sourceSheet:sheetName, sourceFormat: hasHeader ? "見出し行あり" : "A〜I固定列"
     });
     count++;
   }
-  logRows.push([file.name, "成功", `結果 ${count}件読み込み${hasHeader ? "（見出し行あり）" : "（A〜H固定列）"}`, sheetName]);
+  logRows.push([file.name, "成功", `結果 ${count}件読み込み${hasHeader ? "（見出し行あり）" : "（A〜I固定列）"}`, sheetName]);
   return {records, logRows};
 }
 
@@ -1903,6 +1914,10 @@ async function parseResultFile(file){
     const wb = XLSX.read(buf, {type:"array", cellDates:true});
     logRows.push([file.name, "情報", `結果Excelのシート一覧: ${wb.SheetNames.join(" / ")}`, "parseResultFile"]);
     for(const sheetName of wb.SheetNames){
+      if(!isDailyUpdateTargetSheetName(sheetName)){
+        logRows.push([file.name, "情報", `対象外シートをスキップ: ${sheetName}`, "毎日更新.xlsxは「モチベーション支援」「高速マスターデイリー」だけ読みます"]);
+        continue;
+      }
       const ws = wb.Sheets[sheetName];
       const rawAoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:"", raw:true});
       const aoa = rawAoa.filter(row => (row || []).some(v => norm(v)));
@@ -1976,6 +1991,7 @@ async function extractWorkbookSheetsForHistory(file){
     const buf = await file.arrayBuffer();
     const wb = XLSX.read(buf, {type:"array", cellDates:true});
     for(const sheetName of wb.SheetNames){
+      if(!isDailyUpdateTargetSheetName(sheetName)) continue;
       const ws = wb.Sheets[sheetName];
       const aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:"", raw:true});
       const rows = aoa
@@ -7020,13 +7036,7 @@ async function setBundleFolderFiles(fileList){
     // 現在の運用：
     // 保存復元フォルダ/毎日更新/毎日更新.xlsx は「結果データ」。
     // 掲示用Excelは毎日更新フォルダには入れない。
-    const isDailyResultWorkbook = isExcel && (
-      name === '毎日更新.xlsx' ||
-      /^毎日更新\.(xlsx|xlsm|xls)$/i.test(name) ||
-      /毎日更新\.xlsx$/i.test(relLower) ||
-      /毎日更新[\/\\]+毎日更新\.(xlsx|xlsm|xls)$/i.test(relLower) ||
-      (filePathIncludes(f, '毎日更新') && !filePathIncludes(f, '毎日掲示'))
-    );
+    const isDailyResultWorkbook = isExcel && name === '毎日更新.xlsx' && filePathIncludes(f, '毎日更新') && !filePathIncludes(f, '毎日掲示');
 
     if(isJson && (parts.some(p => p === 'json' || p.includes('json') || p.includes('履歴')) || /result[_-]?history|結果履歴/.test(relLower))) histories.push(f);
     // 毎日更新フォルダ内のExcelは、掲示用ではなく結果データとして読む。
