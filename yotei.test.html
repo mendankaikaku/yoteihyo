@@ -734,7 +734,7 @@ main.wrap{max-width:none!important;height:auto!important;min-height:0!important;
         <li>入力用の保存・復元では、この保存復元フォルダーを選びます。</li>
         <li>統合用も、この保存復元フォルダーを選ぶだけで自動振り分けします。</li>
         <li>Comiru CSVは「Comiru」フォルダーに入れます。</li>
-        <li>毎日更新用のExcelは「毎日更新エクセル」フォルダーに入れ、ファイル名は「毎日更新.xlsx」にします。</li>
+        <li>毎日更新用のExcelは「毎日更新」フォルダーに入れ、ファイル名は必ず「毎日更新.xlsx」にします。シート名は「モチベーション支援」と「高速マスターデイリー」を使います。</li>
         <li>手修正した全員分リストは「全員分リスト」フォルダーへ戻します。手修正した模試科目リストは「科目リスト」フォルダーへ戻すと、次回復元で入力欄の科目にも反映します。</li>
         <li>「マスタ」フォルダーは今の運用では不要です。</li>
       </ul>
@@ -814,7 +814,7 @@ main.wrap{max-width:none!important;height:auto!important;min-height:0!important;
         <button class="secondary primaryBig" id="printWeeklyAbsentList" type="button">週面欠席者リスト印刷</button>
       </div>
       <div class="printDialogNote"><b>印刷設定：</b>印刷時は「システムダイアログを使用して印刷」を利用して、<b>用紙サイズ：A4／向き：縦／両面印刷：オン／長辺とじ</b>に設定してください。各生徒はA4両面2枚（1枚目：前週確認→今週記入、2枚目：週面シート→合格設計図）で印刷されます。</div>
-      <div id="meetingPrepFolderInfo" class="compactHint">復元した内容を先週分として使い、今週欄は印刷時だけ白紙にします。復元時に「まとめて復元」フォルダを選ぶと、json/result_history.json、毎日更新フォルダ内の毎日更新.xlsx、打ち込み結果/担任助手フォルダ内の週面シート、担任助手フォルダ/生徒名フォルダ内の合格設計図PDFまたはExcelを自動で読みます。</div>
+      <div id="meetingPrepFolderInfo" class="compactHint">復元した内容を先週分として使い、今週欄は印刷時だけ白紙にします。復元時に「まとめて復元」フォルダを選ぶと、json/result_history.json、毎日更新フォルダ内の毎日更新.xlsx（モチベーション支援／高速マスターデイリー）、打ち込み結果/担任助手フォルダ内の週面シート、担任助手フォルダ/生徒名フォルダ内の合格設計図PDFまたはExcelを自動で読みます。</div>
     </details>
   </section>
 
@@ -893,6 +893,18 @@ main.wrap{max-width:none!important;height:auto!important;min-height:0!important;
 const $=(s)=>document.querySelector(s);
 const $$=(s)=>Array.from(document.querySelectorAll(s));
 const DOW=['日','月','火','水','木','金','土'];
+
+// 毎日更新.xlsxで面談準備が読む対象シート名。高速マスター側は面談結果には使わず診断対象として扱う。
+const DAILY_UPDATE_TARGET_SHEETS = ['モチベーション支援', '高速マスターデイリー'];
+function normalizeSheetNameForMatch(name){return String(name || '').replace(/[\s　]+/g,'').trim();}
+function isDailyUpdateTargetSheetName(sheetName){
+  const key=normalizeSheetNameForMatch(sheetName);
+  return DAILY_UPDATE_TARGET_SHEETS.some(n=>normalizeSheetNameForMatch(n)===key);
+}
+function isPrepResultSheetName(sheetName){
+  return normalizeSheetNameForMatch(sheetName)===normalizeSheetNameForMatch('モチベーション支援');
+}
+
 const LIMITS=['受講①','受講②','受講③','その他①','その他②','その他③'];
 const MAX_SCHEDULE_ROWS=3;
 // 共テ型の初期科目は、模試マスタ画面の写真と同じ並び。
@@ -1609,11 +1621,18 @@ async function findGoukakuExcelInStudentFolder(studentDir){
   });
   return candidates[0] || null;
 }
+function pickGoukakuDesignSheetName(wb){
+  const names = (wb && wb.SheetNames) ? wb.SheetNames : [];
+  if(!names.length) return '';
+  // 合格設計図Excelは、ブック内の「合格設計図」を含むシートを優先して読む。
+  // 該当シートが複数ある場合は、先に並んでいるシートを採用する。
+  return names.find(n => String(n || '').includes('合格設計図')) || names[0];
+}
 async function readGoukakuExcelFile(file){
   if(!window.XLSX) throw new Error('Excel読み取りライブラリ XLSX が読み込まれていません。');
   const buf=await file.arrayBuffer();
   const wb=XLSX.read(buf,{type:'array',cellDates:true,cellStyles:true,cellNF:true});
-  const sheetName=wb.SheetNames[0];
+  const sheetName=pickGoukakuDesignSheetName(wb);
   if(!sheetName) throw new Error('シートが見つかりません。');
   const ws=wb.Sheets[sheetName];
   const aoa=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
@@ -4233,8 +4252,8 @@ async function getPrepResultFilesFromShared(){
       return {files, debug};
     }
     const found=await listExcelFilesFromDirectoryRecursive(resultDir, 5, 0, ['毎日更新']);
-    files.push(...found);
-    debug.push(`毎日更新.xlsx: 毎日更新フォルダから${files.length}件自動読込`);
+    files.push(...found.filter(f => (f.name || '') === '毎日更新.xlsx'));
+    debug.push(`毎日更新.xlsx: 毎日更新フォルダから${files.length}件自動読込（ファイル名は毎日更新.xlsxのみ対象）`);
   }catch(e){
     debug.push(`毎日更新.xlsx: 自動読込失敗 ${e?.message || e}`);
   }
@@ -4271,7 +4290,7 @@ function prepHeaderMap(aoa){
   };
 }
 function prepLooksLikeHeader(row){return /生徒番号|名前|生徒名|学習内容|毎日更新|日時|区分/.test((row||[]).map(v=>norm(v)).join('|'));}
-function prepFixedResultMap(){return {studentNo:0,student:1,grade:2,type:3,study:4,result:5,datetime:7};}
+function prepFixedResultMap(){return {studentNo:0,student:1,grade:2,type:3,study:4,result:5,datetime:8};}
 
 function prepFixedResultCell(row, idx){return norm((row || [])[idx]);}
 function prepFixedLikeIndex(){return 6;}
@@ -4286,7 +4305,7 @@ function prepLooksLikeTwoRowMetaRow(row){
   const h=prepFixedResultMap();
   // 1行形式との誤結合防止：同じ行のE/Fに内容・結果が入っていれば2行形式ではない。
   if(prepFixedResultCell(row,h.study) || prepFixedResultCell(row,h.result)) return false;
-  // 2行形式の上段は、H列に日時がある場合、またはA列に生徒番号がある場合を許可する。
+  // 2行形式の上段は、I列に日時がある場合、またはA列に生徒番号がある場合を許可する。
   const hasDateTime=!!prepDateTimeAt(row,h.datetime);
   const hasStudentNo=!!prepFixedResultCell(row,h.studentNo);
   if(!(hasDateTime || hasStudentNo)) return false;
@@ -4296,7 +4315,7 @@ function prepLooksLikeTwoRowMetaRow(row){
 function prepLooksLikeTwoRowDetailRow(row){
   const h=prepFixedResultMap();
   // 下段はA〜Dが空白で、E/Fに学習内容・毎日更新が入る。
-  // H列に日時が入る場合もあるため、日時の有無では除外しない。
+  // I列に日時が入る場合もあるため、日時の有無では除外しない。
   if(!prepIsBlankFixedCells(row,[h.studentNo,h.student,h.grade,h.type])) return false;
   return !!(prepFixedResultCell(row,h.study) || prepFixedResultCell(row,h.result));
 }
@@ -4505,6 +4524,14 @@ async function readPrepResultRecords(){
     try{
       const wb=await readWorkbookFromFileRobust(file);
       for(const sheetName of wb.SheetNames){
+        if(!isDailyUpdateTargetSheetName(sheetName)){
+          debug.push(`${file.name}/${sheetName}: 対象外シートのためスキップ（毎日更新.xlsxは「モチベーション支援」「高速マスターデイリー」だけ対象）`);
+          continue;
+        }
+        if(!isPrepResultSheetName(sheetName)){
+          debug.push(`${file.name}/${sheetName}: 高速マスターデイリーはランキング用のため面談準備結果には使いません`);
+          continue;
+        }
         const ws=wb.Sheets[sheetName];
         const aoa=sheetToAoaRobust(ws,true);
         if(!aoa.length){debug.push(`${file.name}/${sheetName}: 空シート`); continue;}
@@ -4549,7 +4576,7 @@ async function readPrepResultRecords(){
           });
           sheetCount++;
         }
-        debug.push(`${file.name}/${sheetName}: ${sheetCount}件${hasHeader?`（見出し${headerRow+1}行目）`:'（A〜H固定）'}${skippedNoId?` / 生徒番号・名前空欄${skippedNoId}件除外`:''}${skippedDate?` / 日時読取不可${skippedDate}件`:''}`);
+        debug.push(`${file.name}/${sheetName}: ${sheetCount}件${hasHeader?`（見出し${headerRow+1}行目）`:'（A〜I固定）'}${skippedNoId?` / 生徒番号・名前空欄${skippedNoId}件除外`:''}${skippedDate?` / 日時読取不可${skippedDate}件`:''}`);
       }
     }catch(e){
       console.warn('毎日更新.xlsx読み取り失敗', file.name, e);
