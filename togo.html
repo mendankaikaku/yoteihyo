@@ -3900,6 +3900,38 @@ function sortDailyPosterAoaIfDateColumn(aoa){
   return [title, header, ...real, ...nohit];
 }
 
+function dailyPosterTargetMonthFromGeneratedAoa(generatedAoa){
+  const titleText = (generatedAoa && generatedAoa[0] ? generatedAoa[0] : []).map(v => norm(v)).join(' ');
+  const m = titleText.match(/(\d{4})\s*年\s*(\d{1,2})\s*月/);
+  if(m) return {year:Number(m[1]), month:Number(m[2])};
+  return null;
+}
+function parseDailyPosterDateCellForTargetMonth(value, targetMonth){
+  if(value == null || value === '') return null;
+  if(value instanceof Date && !isNaN(value)) return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+  let s = String(value).trim();
+  if(!s) return null;
+  s = s.replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0)-0xFEE0));
+  s = s.replace(/[－ー―]/g, '-').replace(/[年月]/g,'/').replace(/日/g,' ');
+  s = s.replace(/\(.+?\)|（.+?）/g,' ').replace(/\s+/g,' ').trim();
+  let m = s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})(?:\s+.*)?$/);
+  if(m) return new Date(Number(m[1]), Number(m[2])-1, Number(m[3]));
+  m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})(?:\s+.*)?$/);
+  if(m && targetMonth) return new Date(targetMonth.year, Number(m[1])-1, Number(m[2]));
+  const parsed = parseDateLoose(value, targetMonth ? targetMonth.year : new Date().getFullYear());
+  return parsed ? new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate()) : null;
+}
+function dailyPosterRowIsInGeneratedMonth(row, header, generatedAoa){
+  const targetMonth = dailyPosterTargetMonthFromGeneratedAoa(generatedAoa);
+  if(!targetMonth) return true;
+  const h = (header || []).map(v => norm(v));
+  const dateCol = h.findIndex(x => /日付/.test(x));
+  if(dateCol < 0) return false;
+  const d = parseDailyPosterDateCellForTargetMonth(row ? row[dateCol] : '', targetMonth);
+  if(!d) return false;
+  return d.getFullYear() === targetMonth.year && (d.getMonth() + 1) === targetMonth.month;
+}
+
 function mergeRestoredDailyPosterAoa(sheetName, generatedAoa){
   const restore = findDailyPosterRestore(sheetName);
   if(!restore || !generatedAoa || generatedAoa.length < 2) return sortDailyPosterAoaIfDateColumn(generatedAoa);
@@ -3915,7 +3947,10 @@ function mergeRestoredDailyPosterAoa(sheetName, generatedAoa){
   // どちらにも実データがない場合だけ「該当なし」を残す。
   const generatedBody = generatedAoa.slice(2).filter(row => (row || []).some(v => norm(v)));
   const generatedRealRows = generatedBody.filter(row => !posterIsNoHitRow(row));
-  const restoredBodyAll = restoredAoa.slice(2).filter(row => (row || []).some(v => norm(v)));
+  const restoredBodyAllRaw = restoredAoa.slice(2).filter(row => (row || []).some(v => norm(v)));
+  // 修得系の手修正復元は、生成対象月と同じ月の行だけ引き継ぐ。
+  // これにより、前月以前/翌月以降のデータが毎日掲示に混ざる事故を防ぐ。
+  const restoredBodyAll = restoredBodyAllRaw.filter(row => posterIsNoHitRow(row) || dailyPosterRowIsInGeneratedMonth(row, restoreHeader, generatedAoa));
   const restoredRealRows = restoredBodyAll.filter(row => !posterIsNoHitRow(row));
   const hasAnyRealRows = generatedRealRows.length > 0 || restoredRealRows.length > 0;
 
