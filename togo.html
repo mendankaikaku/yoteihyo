@@ -2322,6 +2322,11 @@ function resultKeywordMatches(r, keyword){
 function isAchievementResultRecord(r){
   return /講座を?(完全)?(修得|習得)|完全(修得|習得)|修得|習得/.test(resultFullText(r));
 }
+function isFixedPatternPracticeRecord(r){
+  // 毎日掲示の講座修得・完全修得には「定石問題演習」を載せない。
+  // study/result/summary/category のどこに入っていても除外する。
+  return /定石問題演習/.test(resultFullText(r));
+}
 function resultDebugLine(r){
   return `${r.dateKey || ''} ${r.timeLabel || ''} ${r.student || r.rawName || ''} / ${r.study || ''} / ${r.result || ''} / ${r.sourceFile || ''} / ${r.sourceFormat || ''}`;
 }
@@ -3931,6 +3936,13 @@ function dailyPosterRowIsInGeneratedMonth(row, header, generatedAoa){
   if(!d) return false;
   return d.getFullYear() === targetMonth.year && (d.getMonth() + 1) === targetMonth.month;
 }
+function dailyPosterRestoreRowShouldBeExcluded(sheetName, row){
+  const key = normalizeDailyPosterSheetKey(sheetName);
+  const rowText = (row || []).map(v => norm(v)).join(' ');
+  // 講座修得・完全修得では、前回手修正Excelに残っている定石問題演習も引き継がない。
+  if((key.includes('講座修得') || key.includes('完全修得') || key.includes('修得')) && /定石問題演習/.test(rowText)) return true;
+  return false;
+}
 
 function mergeRestoredDailyPosterAoa(sheetName, generatedAoa){
   const restore = findDailyPosterRestore(sheetName);
@@ -3950,12 +3962,13 @@ function mergeRestoredDailyPosterAoa(sheetName, generatedAoa){
   const restoredBodyAllRaw = restoredAoa.slice(2).filter(row => (row || []).some(v => norm(v)));
   // 修得系の手修正復元は、生成対象月と同じ月の行だけ引き継ぐ。
   // これにより、前月以前/翌月以降のデータが毎日掲示に混ざる事故を防ぐ。
-  const restoredBodyAll = restoredBodyAllRaw.filter(row => posterIsNoHitRow(row) || dailyPosterRowIsInGeneratedMonth(row, restoreHeader, generatedAoa));
+  const restoredBodyAll = restoredBodyAllRaw.filter(row => !dailyPosterRestoreRowShouldBeExcluded(sheetName, row) && (posterIsNoHitRow(row) || dailyPosterRowIsInGeneratedMonth(row, restoreHeader, generatedAoa)));
   const restoredRealRows = restoredBodyAll.filter(row => !posterIsNoHitRow(row));
   const hasAnyRealRows = generatedRealRows.length > 0 || restoredRealRows.length > 0;
 
-  // タイトルは手修正版Excelの1行目を優先。これにより「分」などの細かい表記もExcel側の手修正を正とする。
-  const titleRow = (restoredAoa[0] || []).some(v => norm(v)) ? restoredAoa[0] : generatedAoa[0];
+  // タイトルは必ず今回生成した対象月を使う。
+  // 前回の毎日掲示Excelのタイトルを引き継ぐと、完全修得などで前月タイトルが残るため。
+  const titleRow = generatedAoa[0];
   const header = restoreHeader.length >= genHeader.length ? restoreHeader : genHeader;
   const out = [titleRow, header];
   const used = new Set();
@@ -4240,7 +4253,9 @@ function buildMonthlyPosterResultAoa(records, rule, label){
   const matchedRecords = (records || [])
     // 以前は r.result だけを見ていたため、「講座を修得」が学習内容/summary側に入った行を落とす可能性があった。
     // ここでは study + result + summary + category 全体を見て判定する。
-    .filter(r => resultKeywordMatches(r, rule.keyword));
+    .filter(r => resultKeywordMatches(r, rule.keyword))
+    // 定石問題演習は、講座修得・完全修得の掲示には載せない。
+    .filter(r => !isFixedPatternPracticeRecord(r));
 
   // 同じ生徒・同じ修得講座が複数件一致した場合は、一番日付が古いものだけを採用する。
   const dedupedRecords = dedupeAchievementRecordsByOldestDate(matchedRecords);
@@ -4267,9 +4282,10 @@ function buildMonthlyPosterResultAoa(records, rule, label){
   return posterMoveNoHitRowsToBottom(aoa);
 }
 function styleMonthlyPosterSheet(ws, aoa){
-  const widths = [10, 22, 82];
+  const widths = [10, 22, 82, 16];
   const range = applyNiceSheetSettings(ws, aoa, widths, {rows:{min:30,max:160,header:34,pxPerLine:20}});
-  ws['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:2}}];
+  const colCount = Math.max(3, (aoa && aoa[1] ? aoa[1].length : 3));
+  ws['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:colCount-1}}];
   ws['!freeze'] = {xSplit:0, ySplit:2};
   ws['!pageSetup'] = {orientation:'portrait', fitToWidth:1, fitToHeight:0};
   ws['!margins'] = {left:0.28, right:0.28, top:0.35, bottom:0.35, header:0.15, footer:0.15};
