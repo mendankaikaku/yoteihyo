@@ -2396,7 +2396,15 @@ function collectExamMasterFromPanel(){return $$('.examMasterRow').map(row=>{
     subjects:[]
   };
 }).filter(x=>x.name||x.date||x.grades.length||x.students.length||x.subjectTemplate)}
-function addExamMasterRow(){const arr=collectExamMasterFromPanel();arr.push({name:'',date:'',type:'common',subjectTemplate:'',grades:[],students:[]});saveExamMasterData(arr);renderExamMasterPanel()}
+function addExamMasterRow(){
+  const arr=collectExamMasterFromPanel();
+  // 空の模試名だと mergeDefaultExamMaster() 側で保存対象から落ちるため、
+  // 追加直後に消えないよう仮名を入れてから編集できる状態にする。
+  arr.push({name:'新規模試',date:'',type:'common',subjectTemplate:'',grades:[],students:[]});
+  saveExamMasterData(arr);
+  renderExamMasterPanel();
+  renderStudents();
+}
 function saveExamMasterFromPanel(){
   const mergedRows=mergeVisibleExamMasterRowsForSave(collectExamMasterFromPanel());
   const rows=applyPreviousExamTargetsWithConfirm(mergedRows);
