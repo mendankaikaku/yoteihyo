@@ -2302,6 +2302,12 @@ function resultKeywordMatches(r, keyword){
   const text = resultFullText(r);
   if(!k) return true;
 
+  // 連続実施は「9日連続で実施！」「9日連続実施」「連続して実施」など、
+  // result欄以外の study / summary / category 側に入っている場合も拾う。
+  if(/連続/.test(k) && /実施/.test(k)){
+    return /連続.{0,8}実施|実施.{0,8}連続/.test(text);
+  }
+
   const isCompleteKeyword = /完全(修得|習得)|講座を?完全(修得|習得)/.test(k);
   const isNormalKeyword = /講座を?(修得|習得)|\b修得\b|\b習得\b|修得|習得/.test(k) && !isCompleteKeyword;
 
@@ -4190,6 +4196,17 @@ function monthlyPosterAchievementContent(rec){
   const course = posterShortCourseName(rec.study) || posterShortCourseName(rec.result) || norm(rec.study) || norm(rec.result);
   return [dateText, course].filter(Boolean).join('　');
 }
+function monthlyPosterContinuousContent(rec){
+  // 「9日連続で実施！」のような元の表記を、そのまま連続実施シートに出す。
+  // 以前は日付 + posterShortCourseName(result) で作っていたため「8/3(月)　9日」のように崩れていた。
+  const fields = [rec.result, rec.study, rec.summary, rec.category].map(norm).filter(Boolean);
+  const direct = fields.find(v => /連続.{0,8}実施|実施.{0,8}連続/.test(v));
+  if(direct) return direct;
+  const full = norm(resultFullText(rec));
+  const m = full.match(/[^。\n\r]*連続.{0,8}実施[^。\n\r]*/);
+  if(m) return norm(m[0]);
+  return fields[0] || monthlyPosterAchievementContent(rec);
+}
 
 function posterIsNoHitRow(row){
   return (row || []).some(v => /該当なし|該当結果なし/.test(String(v || '')));
@@ -4209,8 +4226,8 @@ function buildMonthlyPosterContinuousAoa(records, rule, label){
   // 連続実施は「掲示を作る日の前日1日分」だけを表示する。
   // 月間日数カウントにはしない。
   const rows = (records || [])
-    .filter(r => norm(r.result).includes(rule.keyword))
-    .map(r => ({...resultPosterStudentMeta(r), content:monthlyPosterAchievementContent(r), dateKey:r.dateKey || '', timeLabel:r.timeLabel || ''}))
+    .filter(r => resultKeywordMatches(r, rule.keyword))
+    .map(r => ({...resultPosterStudentMeta(r), content:monthlyPosterContinuousContent(r), dateKey:r.dateKey || '', timeLabel:r.timeLabel || ''}))
     .sort((a,b)=> String(a.grade||'').localeCompare(String(b.grade||''),'ja') || String(a.kana || a.student).localeCompare(String(b.kana || b.student),'ja') || String(a.timeLabel).localeCompare(String(b.timeLabel)));
   const aoa = [[`${label}　${rule.keyword}`], ['学年','氏名','内容']];
   for(const r of rows) aoa.push([r.grade, r.student, r.content]);
