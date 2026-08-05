@@ -3528,6 +3528,31 @@ function findExamSubjectListRestore(sheetName){
   }
   return null;
 }
+
+function subjectListEnsureUpdateLog(){
+  if(!state.examSubjectListUpdateLog || !Array.isArray(state.examSubjectListUpdateLog)){
+    state.examSubjectListUpdateLog = [["日時","区分","シート","生徒キー","生徒名","列名","科目リスト手修正値","自動生成値","採用値","理由"]];
+  }
+  return state.examSubjectListUpdateLog;
+}
+function subjectListNowText(){
+  const d = new Date();
+  const p = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+function subjectListLogConflict(sheetName, row, header, colName, restoredValue, generatedValue, adoptedValue, reason){
+  const rv=norm(restoredValue), gv=norm(generatedValue), av=norm(adoptedValue);
+  if(rv===gv && gv===av) return;
+  if(!rv && !gv && !av) return;
+  const nameIdx=examSubjectListHeaderIndex(header,['生徒名','氏名','名前']);
+  const noIdx=examSubjectListHeaderIndex(header,['生徒番号','番号','ID']);
+  const studentName=nameIdx>=0 ? norm(row[nameIdx]) : '';
+  const studentKey=noIdx>=0 ? norm(row[noIdx]) : (studentName || examSubjectListRowKey(row, header));
+  subjectListEnsureUpdateLog().push([subjectListNowText(),'科目リスト',sheetName || '',studentKey || '',studentName || '',colName || '',rv,gv,av,reason || '科目リスト手修正を優先']);
+}
+function subjectListIsIdentityHeader(h){
+  return /^(学年|生徒番号|番号|ID|生徒名|氏名|名前|担当|高校)$/.test(norm(h));
+}
 function examSubjectListHeaderIndex(header, names){
   const h = (header || []).map(x => norm(x));
   for(const name of names){
@@ -3580,7 +3605,13 @@ function mergeRestoredExamSubjectListAoa(sheetName, generatedAoa){
       if(gi >= 0) newRow[c] = grow[gi] ?? '';
       if(restored){
         const ri = restoreHeader.findIndex(h => h === gh);
-        if(ri >= 0 && norm(restored[ri]) !== '') newRow[c] = restored[ri];
+        if(ri >= 0 && norm(restored[ri]) !== ''){
+          const before = newRow[c];
+          newRow[c] = restored[ri];
+          if(!subjectListIsIdentityHeader(gh) && norm(before) && norm(before) !== norm(restored[ri])){
+            subjectListLogConflict(sheetName, newRow, header, gh, restored[ri], before, newRow[c], '科目リストExcelの手修正を優先');
+          }
+        }
       }
     }
     if(restored) used.add(key);
@@ -3598,6 +3629,7 @@ function mergeRestoredExamSubjectListAoa(sheetName, generatedAoa){
       else if(c < row.length) newRow[c] = row[c] ?? '';
     }
     out.push(newRow);
+    subjectListLogConflict(sheetName, newRow, header, '追加行', '手修正追加行', '', '手修正追加行', '科目リストExcelにだけある行を残す');
   }
   return out;
 }
@@ -3617,6 +3649,7 @@ function eventKeyOf(r){ return `${r.datetime || ''}\t${r.eventName || ''}`; }
 
 async function downloadExamSubjectListWorkbook(){
   if(!(await ensureWorkbookReadyForOutput())) return;
+  state.examSubjectListUpdateLog = [["日時","区分","シート","生徒キー","生徒名","列名","科目リスト手修正値","自動生成値","採用値","理由"]];
 
   // 科目リストは「2週間出力」と違い、読み込んだ打ち込み結果内の模試確認を全件対象にする。
   // 入力用アプリは週開始日から3週間以内の模試を表示・保存するため、
