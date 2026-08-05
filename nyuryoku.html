@@ -2838,10 +2838,24 @@ async function applySubjectListOverridesToInput(names){
   let count=0;
   for(const name of names || []){
     const data=ensureStudent(name);
+    if(!Array.isArray(data.exams)) data.exams=[];
     const no=String(data.studentNo||'').trim();
-    const visible=visibleExamMastersForStudent(name);
-    for(const ex of visible){
-      const id=examId(ex);
+    // 科目リストExcelは、模試マスタに出ている模試だけでなく、
+    // 全員分リスト復元で先に追加された個人側の模試にも反映する。
+    const candidates=[];
+    const seen=new Set();
+    const addCandidate=(ex)=>{
+      if(!ex) return;
+      const id=(typeof examId === 'function' && !ex.id) ? examId(ex) : (ex.id || examId(ex));
+      const key=subjectListNorm([id, ex.name || '', ex.date || ''].join('|'));
+      if(seen.has(key)) return;
+      seen.add(key);
+      candidates.push(Object.assign({}, ex, {id}));
+    };
+    visibleExamMastersForStudent(name).forEach(addCandidate);
+    (data.exams || []).forEach(addCandidate);
+    for(const ex of candidates){
+      const id=ex.id || examId(ex);
       const hit=overrides.find(o=>{
         const sameStudent = (no && o.studentNo && String(o.studentNo).trim()===no) || (o.student && examTargetNameMatch(name,[o.student]));
         if(!sameStudent) return false;
@@ -2851,11 +2865,13 @@ async function applySubjectListOverridesToInput(names){
       });
       if(!hit) continue;
       let row=(data.exams||[]).find(e=>(e.id||'')===id);
+      if(!row) row=(data.exams||[]).find(e=>subjectListExamNameMatches(e.name || '', ex.name || '') && (!hit.examDate || !e.date || e.date===hit.examDate));
       if(!row){
-        row={id,name:ex.name||'',date:ex.date||'',type:ex.type||'common',subjectTemplate:ex.subjectTemplate||'',status:'',comiruAnswered:false,subjects:[],subjectChanged:false,note:''};
+        row={id,name:ex.name||hit.examName||'',date:ex.date||hit.examDate||'',type:ex.type||'common',subjectTemplate:ex.subjectTemplate||'',status:'',comiruAnswered:false,subjects:[],subjectChanged:false,note:''};
         data.exams.push(row);
       }
-      if(hit.status) row.status=hit.status;
+      const st=allListStatusFromValue(hit.status, ['当日','後日','不受験']);
+      if(st) row.status=st;
       if(hit.subjects && hit.subjects.length) row.subjects=hit.subjects;
       count++;
     }
@@ -3714,13 +3730,24 @@ function allListIsChecked(v){
 function allListStatusFromValue(v, allowed){
   const s=allListCellText(v).replace(/\s/g,'');
   if(!s) return '';
-  if((allowed||[]).includes('当日') && (s==='当' || s==='当日')) return '当日';
-  if((allowed||[]).includes('後日') && (s==='後' || s==='後日')) return '後日';
-  if((allowed||[]).includes('不受験') && (s==='不' || s==='不受験')) return '不受験';
-  if((allowed||[]).includes('参加') && /^(〇|○|◯|参加)$/.test(s)) return '参加';
-  if((allowed||[]).includes('不参加') && /^(×|✕|✖|不参加)$/.test(s)) return '不参加';
-  if(s==='未' || s==='未聞き取り') return '未聞き取り';
+  if((allowed||[]).includes('当日') && (s==='当' || s==='当日' || s==='当日受験')) return '当日';
+  if((allowed||[]).includes('後日') && (s==='後' || s==='後日' || s==='後日受験')) return '後日';
+  if((allowed||[]).includes('不受験') && (s==='不' || s==='不受験' || s==='受験しない')) return '不受験';
+  if((allowed||[]).includes('参加') && /^(〇|○|◯|参加|参加する)$/.test(s)) return '参加';
+  if((allowed||[]).includes('不参加') && /^(×|✕|✖|不参加|参加しない)$/.test(s)) return '不参加';
+  if(s==='未' || s==='未聞き取り' || s==='未確認') return '未聞き取り';
   return (allowed||[]).find(x=>s===x || s.includes(x)) || '';
+}
+function allListSubjectListStatusFromValue(v){
+  const s=allListCellText(v).replace(/\s/g,'');
+  if(!s) return '';
+  if(/^(入力済|入力済み|済|済み|〇|○|◯|true|yes|y|1)$/i.test(s)) return '入力済';
+  if(/^(未入力|未|未確認|未記入|×|✕|✖|false|no|n|0)$/i.test(s)) return '未入力';
+  if(/^(不受験|受験しない)$/.test(s)) return '不受験';
+  return '';
+}
+function allListSubjectListIsInputDone(v){
+  return allListSubjectListStatusFromValue(v) === '入力済';
 }
 function allListSplitSubjects(v){
   return allListCellText(v).split(/[、,，\n／\/・･]/).map(x=>x.trim()).filter(Boolean);
@@ -3875,6 +3902,18 @@ function allListMergeExamPatch(data, patch){
   // 科目変更も、ありを優先。ありを空/なしで消さない。
   if(patch.subjectChanged===true && ex.subjectChanged!==true){ex.subjectChanged=true; changed=true;}
   else if(patch.subjectChanged===false && ex.subjectChanged!==true && ex.subjectChanged!==false){ex.subjectChanged=false; changed=true;}
+  const subjectListStatus=allListSubjectListStatusFromValue(patch.subjectList || '');
+  // 全員分リストの「科目リスト」は、入力済/未入力/不受験の確認欄。
+  // 入力済だけでは科目名までは分からないため、実科目は後段の「科目リスト」Excelから反映する。
+  // ただし不受験は受験方法として確定できるので反映する。
+  if(subjectListStatus === '不受験' && ex.status !== '不受験'){
+    ex.status='不受験'; changed=true;
+  }
+  if(Array.isArray(patch.subjects) && patch.subjects.length){
+    const old=(ex.subjects||[]).join('|');
+    ex.subjects=patch.subjects.slice();
+    if(old!==ex.subjects.join('|')) changed=true;
+  }
   if(allListCellText(patch.note)){ex.note=allListCellText(patch.note); changed=true;}
   return changed;
 }
@@ -3917,13 +3956,14 @@ function allListParseSmallSlotsFromHeaderRow(headers, row, matched){
   const slots=new Map();
   headers.forEach((h,i)=>{
     const t=String(h || '').replace(/\r\n/g,'\n').replace(/\r/g,'\n');
-    const m=t.match(/(?:小規模\s*)?([0-9０-９]+)[\s\S]*(種別|日付|日時|名称|回答|科目変更|科変|Comiru|コミル|備考)/);
+    const m=t.match(/(?:小規模\s*)?([0-9０-９]+)[\s\S]*(種別|日付|日時|名称|回答|科目リスト|科目確認|科目変更|科変|Comiru|コミル|備考)/);
     if(!m) return;
     const no=String(m[1]).replace(/[０-９]/g,ch=>String.fromCharCode(ch.charCodeAt(0)-0xFEE0));
     const field=m[2].includes('日') || m[2].includes('時') ? 'date' :
       m[2].includes('種別') ? 'kind' :
       m[2].includes('名称') ? 'name' :
       m[2].includes('回答') ? 'answer' :
+      /科目リスト|科目確認/.test(m[2]) ? 'subjectList' :
       /科目変更|科変/.test(m[2]) ? 'subject' :
       /Comiru|コミル/i.test(m[2]) ? 'comiru' :
       m[2].includes('備考') ? 'note' : '';
@@ -3938,6 +3978,7 @@ function allListParseSmallSlotsFromHeaderRow(headers, row, matched){
     const date=slot.date!=null ? allListSlotDateClean(row[slot.date]) : '';
     const answer=slot.answer!=null ? allListCellText(row[slot.answer]) : '';
     const subject=slot.subject!=null ? allListCellText(row[slot.subject]) : '';
+    const subjectList=slot.subjectList!=null ? allListCellText(row[slot.subjectList]) : '';
     const comiru=slot.comiru!=null ? allListCellText(row[slot.comiru]) : '';
     const note=slot.note!=null ? allListCellText(row[slot.note]) : '';
     if(!nameRaw && !kindRaw && !answer && !subject && !comiru && !note) continue;
@@ -3947,7 +3988,8 @@ function allListParseSmallSlotsFromHeaderRow(headers, row, matched){
     const comiruBool=allListMarkToBool(comiru);
     const subjectBool=allListMarkToBool(subject);
     if(kind==='模試'){
-      out.push({kind:'模試', patch:{id:['模試',name,date].join('|'), name, date, status:allListStatusFromValue(answer,['当日','後日','不受験']), comiruAnswered:comiruBool, subjectChanged:subjectBool, note}});
+      const st=allListStatusFromValue(answer,['当日','後日','不受験']) || (allListSubjectListStatusFromValue(subjectList)==='不受験' ? '不受験' : '');
+      out.push({kind:'模試', patch:{id:['模試',name,date].join('|'), name, date, status:st, subjectList:allListSubjectListStatusFromValue(subjectList) || subjectList, comiruAnswered:comiruBool, subjectChanged:subjectBool, note}});
     }else{
       out.push({kind:'イベント', patch:{id:['イベント',name,date].join('|'), name, datetime:date, status:allListStatusFromValue(answer,['参加','不参加']), comiruAnswered:comiruBool, note}});
     }
@@ -3989,6 +4031,7 @@ function parseAllListOverridesFromRows(aoa, targetNames){
     const examStatusIdx=allListFindHeaderIndex(headers,['受験方法','受験区分','当日後日','当日/後日','受験']);
     const examComiruIdx=allListFindHeaderIndex(headers,['Comiru回答','コミル回答','Comiru','コミル']);
     const examSubjectChangedIdx=allListFindHeaderIndex(headers,['科目変更あり','科目変更','科変']);
+    const examSubjectListIdx=allListFindHeaderIndex(headers,['科目リスト','科目確認','受験科目入力']);
     // 「入力用備考」は入力用アプリの remarks に戻す。
     // 「全員分リスト備考」はここでは読まない。
     const inputNoteIdx=allListFindInputNoteIndex(rawHeaders, headers);
@@ -4052,7 +4095,8 @@ function parseAllListOverridesFromRows(aoa, targetNames){
           date:examDateIdx>=0?allListCellText(row[examDateIdx]):'',
           status:examStatusIdx>=0?allListStatusFromValue(row[examStatusIdx],['当日','後日','不受験']):'',
           comiruAnswered:examComiruIdx>=0?allListIsChecked(row[examComiruIdx]):undefined,
-          subjectChanged:examSubjectChangedIdx>=0?allListIsChecked(row[examSubjectChangedIdx]):undefined
+          subjectChanged:examSubjectChangedIdx>=0?allListIsChecked(row[examSubjectChangedIdx]):undefined,
+          subjectList:examSubjectListIdx>=0?allListCellText(row[examSubjectListIdx]):''
         });
       }
       if(eventNameIdx>=0 && allListCellText(row[eventNameIdx])){
@@ -4075,9 +4119,10 @@ function parseAllListOverridesFromRows(aoa, targetNames){
           if(/当日|後日|不受験/.test(h) && allListIsChecked(v)) p.status=(h.match(/当日|後日|不受験/)||[''])[0];
           const st=allListStatusFromValue(v,['当日','後日','不受験']); if(st) p.status=st;
           if(/Comiru|コミル/.test(h)) p.comiruAnswered=allListIsChecked(v);
+          if(/科目リスト|科目確認/.test(h)) p.subjectList=allListCellText(v);
           if(/科目変更|科変/.test(h)) p.subjectChanged=allListIsChecked(v);
         });
-        if(p.status || p.comiruAnswered!==undefined || p.subjectChanged!==undefined) allListAddPatchWithPriority(bucket,'exam',p);
+        if(p.status || p.comiruAnswered!==undefined || p.subjectChanged!==undefined || allListCellText(p.subjectList)) allListAddPatchWithPriority(bucket,'exam',p);
       });
       getEventMaster().forEach(master=>{
         const evName=master.name||''; if(!evName) return;
@@ -4126,6 +4171,8 @@ function allListPreferPatch(oldPatch, newPatch, kind){
   if(newPatch.comiruAnswered === true || (oldPatch.comiruAnswered !== true && typeof newPatch.comiruAnswered === 'boolean')) out.comiruAnswered = newPatch.comiruAnswered;
   if(kind==='exam'){
     if(newPatch.subjectChanged === true || (oldPatch.subjectChanged !== true && typeof newPatch.subjectChanged === 'boolean')) out.subjectChanged = newPatch.subjectChanged;
+    if(allListCellText(newPatch.subjectList)) out.subjectList = allListSubjectListStatusFromValue(newPatch.subjectList) || allListCellText(newPatch.subjectList);
+    if(Array.isArray(newPatch.subjects) && newPatch.subjects.length) out.subjects = newPatch.subjects.slice();
     ['id','name','date','type','subjectTemplate'].forEach(k=>{ if(allListCellText(newPatch[k]) && !allListCellText(out[k])) out[k]=newPatch[k]; });
   }else{
     if(allListCellText(newPatch.note)) out.note = newPatch.note;
@@ -4160,6 +4207,7 @@ function parseSmallAllListOverridesFromRows(aoa, targetNames){
     const studentIdx=allListSmallHeaderIndex(headers,['生徒名']);
     const statusIdx=allListSmallHeaderIndex(headers,['受験方法/参加','受験方法','参加']);
     const subjectIdx=allListSmallHeaderIndex(headers,['科目変更']);
+    const subjectListIdx=allListSmallHeaderIndex(headers,['科目リスト','科目確認']);
     const comiruIdx=allListSmallHeaderIndex(headers,['Comiru回答','コミル回答','Comiru','コミル']);
     const noteIdx=allListSmallHeaderIndex(headers,['備考']);
     const machineKeyIdx=allListSmallHeaderIndex(headers,['機械キー']);
@@ -4184,6 +4232,7 @@ function parseSmallAllListOverridesFromRows(aoa, targetNames){
           status:allListStatusFromValue(statusText,['当日','後日','不受験']) || (statusText.includes('未') ? '未聞き取り' : ''),
           comiruAnswered:comiruValue,
           subjectChanged:subjectIdx>=0 ? allListIsChecked(row[subjectIdx]) : undefined,
+          subjectList:subjectListIdx>=0 ? allListCellText(row[subjectListIdx]) : '',
           note:noteText
         });
       }else if(kind.includes('イベント')){
