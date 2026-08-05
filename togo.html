@@ -53,6 +53,8 @@ button.ok{background:var(--ok);}
 button.saveImportant{background:#dc2626;color:#fff;box-shadow:0 0 0 3px rgba(220,38,38,.14);}
 button.saveImportant:hover{background:#b91c1c;}
 button:disabled{opacity:.45;cursor:not-allowed;}
+.outputBlockerNote{margin:8px auto 0;max-width:1200px;white-space:pre-wrap;font-size:12px;line-height:1.45;color:#92400E;background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:8px 12px;}
+.outputBlockerNote.ok{color:#166534;background:#F0FDF4;border-color:#BBF7D0;}
 .btnRow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;}
 .primaryAction{font-size:14px;padding:11px 14px;}
 .bundleActionGrid{display:grid;grid-template-columns:1fr;gap:10px;margin-top:0;width:100%;}
@@ -392,6 +394,7 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
       <button id="clearBtn" class="secondary">リセット</button>
     </div>
   </div>
+  <div id="outputButtonReason" class="outputBlockerNote">まだ保存復元フォルダーを読み込んでいません。</div>
 </header>
 
 <div class="wrap">
@@ -602,19 +605,60 @@ function setDownloadButtonsDisabled(disabled){
     if(el) el.disabled = disabled;
   });
 }
+function hasPlanOutputSource(){
+  return Array.isArray(state.files) && state.files.length > 0;
+}
+function hasDailyPosterSource(){
+  return (Array.isArray(state.resultFiles) && state.resultFiles.length > 0) ||
+    (Array.isArray(state.resultHistoryFiles) && state.resultHistoryFiles.length > 0) ||
+    (Array.isArray(state.resultRecords) && state.resultRecords.length > 0) ||
+    (Array.isArray(state.resultHistoryRecords) && state.resultHistoryRecords.length > 0);
+}
+function buildOutputButtonReasonText(){
+  const lines = [];
+  const hasPlanFiles = hasPlanOutputSource();
+  const hasPosterFiles = hasDailyPosterSource();
+  if(hasPlanFiles){
+    lines.push(`✅ 2週間・1か月・期間指定・全員分リスト・科目リスト：出力できます（打ち込み結果 ${state.files.length}件）`);
+  }else{
+    lines.push('⚠ 2週間・1か月・期間指定・全員分リスト・科目リスト：保存復元フォルダー/打ち込み結果/ に入力用で出した予定Excelがないため押せません。');
+  }
+  if(hasPosterFiles){
+    const daily = Array.isArray(state.resultFiles) ? state.resultFiles.length : 0;
+    const hist = Array.isArray(state.resultHistoryFiles) ? state.resultHistoryFiles.length : 0;
+    const memory = (Array.isArray(state.resultRecords) ? state.resultRecords.length : 0) + (Array.isArray(state.resultHistoryRecords) ? state.resultHistoryRecords.length : 0);
+    lines.push(`✅ 毎日掲示：出力できます（毎日更新.xlsx ${daily}件 / result_history.json ${hist}件 / 画面内履歴 ${memory}件）`);
+  }else{
+    lines.push('⚠ 毎日掲示：保存復元フォルダー/毎日更新/毎日更新.xlsx または 保存復元フォルダー/json/result_history.json がないため押せません。');
+  }
+  return lines.join('\n');
+}
+function refreshOutputButtonReason(){
+  const note = $('outputButtonReason');
+  if(note){
+    note.textContent = buildOutputButtonReasonText();
+    note.classList.toggle('ok', hasPlanOutputSource() && hasDailyPosterSource());
+  }
+  const monthlyBtn = $('downloadMonthlyPosterBtn');
+  if(monthlyBtn) monthlyBtn.disabled = !hasDailyPosterSource();
+}
 function updateMainOutputButtons(){
   // まとめて復元フォルダーを読んだ時点で、上部の出力ボタンを押せるようにする。
   // まだ統合プレビューを押していない場合は、出力ボタン側で自動的にプレビューを作成してから出力する。
-  const hasPlanFiles = Array.isArray(state.files) && state.files.length > 0;
+  const hasPlanFiles = hasPlanOutputSource();
   setDownloadButtonsDisabled(!hasPlanFiles);
+  refreshOutputButtonReason();
 }
 async function ensureWorkbookReadyForOutput(){
   if(state.workbookReady) return true;
-  if(Array.isArray(state.files) && state.files.length > 0){
+  if(hasPlanOutputSource()){
     await merge();
     return !!state.workbookReady;
   }
-  alert("先にまとめて復元フォルダーを読み取ってください");
+  const reason = '出力できません。\n保存復元フォルダー/打ち込み結果/ に入力用で出した予定Excelがありません。\n入力用で対象生徒を保存してから、統合用で①フォルダーを読み直してください。';
+  alert(reason);
+  log(reason);
+  refreshOutputButtonReason();
   return false;
 }
 function log(msg){ $("status").textContent = msg; }
@@ -3663,8 +3707,8 @@ async function downloadExamSubjectListWorkbook(){
   examSheets = examSheets.map(x => ({...x, aoa:mergeRestoredExamSubjectListAoa(x.sheetName, x.aoa)}));
   examSheets.push(...examSubjectListRestoreOnlySheets(generatedSheetNames));
   if(!examSheets.length){
-    alert('科目リスト出力対象の模試がありません。入力用で対象生徒のExcelを保存し、保存復元フォルダー/打ち込み結果 を読み直してください。');
-    log('科目リスト出力：対象の模試科目データがありません。state.examRecords=0 または模試名が空です。');
+    alert('科目リスト出力対象の模試がありません。\n原因候補：\n・保存復元フォルダー/打ち込み結果/ に対象生徒の予定Excelがない\n・入力用で模試登録後、統合用で①フォルダーを読み直していない\n・対象生徒のExcel内に模試確認データが入っていない');
+    log('科目リスト出力不可：対象の模試科目データがありません。\n確認：保存復元フォルダー/打ち込み結果/ に入力用で保存したExcelがあるか、統合用で①フォルダーを読み直したか、入力用で対象生徒に模試登録して保存したか。\nstate.examRecords=' + ((state.examRecords||[]).length));
     return;
   }
 
@@ -7311,6 +7355,7 @@ $("downloadAllListBtn").addEventListener("click", async () => {
   }
 });
 $("downloadMonthlyPosterBtn").addEventListener("click", downloadMonthlyPosterResultWorkbook);
+refreshOutputButtonReason();
 $("clearBtn").addEventListener("click", () => {
   state.files=[]; state.resultFiles=[]; state.resultHistoryFiles=[]; state.posterSettingsFiles=[]; state.allListFiles=[]; state.allListRestores=new Map(); state.dailyPosterFiles=[]; state.dailyPosterRestores=new Map(); state.wholeScheduleFiles=[]; state.wholeScheduleRestores=new Map(); state.resultHistoryRecords=[]; state.records=[]; state.resultRecords=[]; state.examRecords=[]; state.eventRecords=[]; state.calendarAoa=[]; state.listAoa=[]; state.resultAoa=[]; state.logAoa=[]; state.rosterAoa=[]; state.rosterMap=new Map(); state.rosterNoMap=new Map(); state.workbookReady=false;
   $("bundleFolderInput").value="";
@@ -7322,6 +7367,7 @@ $("clearBtn").addEventListener("click", () => {
   updateStats([],[],[],[],[]);
   ["calendarPane","listPane","resultPane","rosterPane","logPane"].forEach(id => $(id).innerHTML = `<div class="hint" style="padding:14px;">リセットしました。</div>`);
   setDownloadButtonsDisabled(true);
+  refreshOutputButtonReason();
   log("待機中");
 });
 
