@@ -7119,6 +7119,38 @@ function pathPartsOfFile(file){
 function filePathIncludes(file, keyword){
   return pathPartsOfFile(file).some(p => p.includes(keyword));
 }
+
+function latestFileLabel(files){
+  const arr=[...(files||[])].sort((a,b)=>(b.lastModified-a.lastModified)||String(a.name).localeCompare(String(b.name),'ja'));
+  return arr[0] ? arr[0].name : '';
+}
+function bundleCheckLine(label, files, required=false){
+  const count=(files||[]).length;
+  const icon=count ? '✅' : (required ? '❌' : '⚠');
+  const latest=latestFileLabel(files);
+  return `${icon} ${label}: ${count}件${latest ? '（採用候補: '+latest+'）' : ''}`;
+}
+function buildBundleDiagnostics({planned,results,histories,allLists,dailyPosters,wholeSchedules,examSubjectLists,comiruCsvs,rosters,rosterMsg,restoreLogs}){
+  const lines=[];
+  lines.push('--- 読み取り診断 ---');
+  lines.push(bundleCheckLine('打ち込み結果', planned, true));
+  lines.push(bundleCheckLine('毎日更新.xlsx', results, false));
+  lines.push(bundleCheckLine('result_history.json', histories, false));
+  lines.push(bundleCheckLine('対応表', rosters, false));
+  lines.push(bundleCheckLine('Comiru CSV', comiruCsvs, false));
+  lines.push(bundleCheckLine('全員分リスト手修正', allLists, false));
+  lines.push(bundleCheckLine('科目リスト手修正', examSubjectLists, false));
+  lines.push(bundleCheckLine('全体予定表手修正', wholeSchedules, false));
+  lines.push(bundleCheckLine('毎日掲示手修正', dailyPosters, false));
+  if(rosterMsg) lines.push(rosterMsg);
+  const logs=[];
+  Object.entries(restoreLogs || {}).forEach(([label,arr])=>{ if(arr && arr.length) logs.push(`${label}: ${arr.join(' / ')}`); });
+  if(logs.length) lines.push('復元読取詳細: '+logs.join(' / '));
+  if(!planned.length) lines.push('⚠ 出力ボタンが押せない場合は、保存復元フォルダー/打ち込み結果/ に入力用で出した予定Excelがあるか確認してください。');
+  if(!results.length && !histories.length) lines.push('⚠ 毎日掲示は、毎日更新.xlsx または result_history.json がないと作れません。');
+  return lines.join('\n');
+}
+
 async function setBundleFolderFiles(fileList){
   const files = [...fileList].filter(f => !shouldSkipBundleFile(f));
   const planned = [];
@@ -7182,15 +7214,15 @@ async function setBundleFolderFiles(fileList){
   }
   updateStats(state.files, [], [], [], state.resultRecords);
   const summary = `読み取り完了
-予定Excel（打ち込み結果）: ${planned.length}件
-毎日更新.xlsx（結果データ）: ${results.length}件
-結果履歴JSON（json）: ${histories.length}件
-全員分リスト復元Excel（全員分リスト）: ${allLists.length}件${allListRestoreLogs.length ? '（' + allListRestoreLogs.join(' / ') + '）' : ''}
-掲示用手修正Excel（毎日掲示）: ${dailyPosters.length}件${dailyPosterRestoreLogs.length ? '（' + dailyPosterRestoreLogs.join(' / ') + '）' : ''}
-全体予定表手修正Excel（全体予定表）: ${wholeSchedules.length}件${wholeScheduleRestoreLogs.length ? '（' + wholeScheduleRestoreLogs.join(' / ') + '）' : ''}
-科目リスト手修正Excel（科目リスト）: ${examSubjectLists.length}件${examSubjectListRestoreLogs.length ? '（' + examSubjectListRestoreLogs.join(' / ') + '）' : ''}
-Comiru CSV（Comiru）: ${comiruCsvs.length}件
-${rosterMsg}`;
+${buildBundleDiagnostics({
+    planned, results, histories, allLists, dailyPosters, wholeSchedules, examSubjectLists, comiruCsvs, rosters, rosterMsg,
+    restoreLogs:{
+      '全員分リスト': allListRestoreLogs,
+      '毎日掲示': dailyPosterRestoreLogs,
+      '全体予定表': wholeScheduleRestoreLogs,
+      '科目リスト': examSubjectListRestoreLogs
+    }
+  })}`;
   if($("bundleReadSummary")) $("bundleReadSummary").textContent = summary;
   log(`${summary}
 
