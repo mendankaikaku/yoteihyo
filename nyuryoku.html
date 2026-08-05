@@ -2929,8 +2929,17 @@ async function applySubjectListOverridesToInput(names){
         data.exams.push(row);
       }
       const st=allListStatusFromValue(hit.status, ['当日','後日','不受験']);
-      if(st) row.status=st;
-      if(hit.subjects && hit.subjects.length) row.subjects=hit.subjects;
+      if(st && row.status!==st){
+        inputLogConflict('科目リスト', name, row.name || ex.name || hit.examName, '受験方法', row.status, st, st, '科目リストExcelの受験方法を優先');
+        row.status=st;
+      }
+      if(hit.subjects && hit.subjects.length){
+        const oldSubjects=(row.subjects||[]).slice();
+        if(!inputSubjectArraySame(oldSubjects, hit.subjects)){
+          inputLogConflict('科目リスト', name, row.name || ex.name || hit.examName, '受験科目', oldSubjects, hit.subjects, hit.subjects, '科目リストExcelの具体科目を優先');
+        }
+        row.subjects=hit.subjects;
+      }
       count++;
     }
   }
@@ -3056,6 +3065,7 @@ async function loadGroup(){
   let mem=null;
   let place='未取得';
   const details=[];
+  inputRestoreConflictLog=[];
 
   // 復元は「保存用フォルダのJSON」を最優先。
   // 1) group_*.json を完全一致・名前集合一致で探す
@@ -3154,6 +3164,7 @@ async function loadGroup(){
     if(allListResult && allListResult.msg) details.push(allListResult.msg);
     const subjectListResult=await applySubjectListOverridesToInput(students);
     if(subjectListResult) details.push(`科目リスト反映: ${subjectListResult.count || 0}件`);
+    details.push(inputRestoreConflictSummaryLines().join('\n'));
   }
   renderStudents();
   if(dir){
@@ -3779,6 +3790,34 @@ function allListNormKey(s){
 function allListCellText(v){
   return String(v ?? '').replace(/\r\n/g,'\n').replace(/\r/g,'\n').trim();
 }
+
+let inputRestoreConflictLog = [];
+function inputConflictNormValue(v){
+  if(Array.isArray(v)) return v.map(x=>String(x||'').trim()).filter(Boolean).join(', ');
+  if(typeof v === 'boolean') return v ? '〇' : '×';
+  return String(v ?? '').trim();
+}
+function inputLogConflict(source, studentName, targetName, fieldName, currentValue, incomingValue, adoptedValue, reason){
+  const cur=inputConflictNormValue(currentValue);
+  const inc=inputConflictNormValue(incomingValue);
+  const ad=inputConflictNormValue(adoptedValue);
+  if(cur===inc && inc===ad) return;
+  if(!cur && !inc && !ad) return;
+  inputRestoreConflictLog.push(`⚠ ${studentName || ''} / ${targetName || ''} / ${fieldName}: 個人入力=${cur || '空'} / ${source}=${inc || '空'} → 採用=${ad || '空'}（${reason || source + 'を優先'}）`);
+}
+function inputSubjectArraySame(a,b){
+  const aa=(Array.isArray(a)?a:[]).map(x=>String(x||'').trim()).filter(Boolean).sort().join('|');
+  const bb=(Array.isArray(b)?b:[]).map(x=>String(x||'').trim()).filter(Boolean).sort().join('|');
+  return aa===bb;
+}
+function inputRestoreConflictSummaryLines(limit=30){
+  const total=inputRestoreConflictLog.length;
+  if(!total) return ['データ衝突ログ: 0件'];
+  const lines=[`データ衝突ログ: ${total}件`];
+  inputRestoreConflictLog.slice(0,limit).forEach(x=>lines.push(x));
+  if(total>limit) lines.push(`…ほか ${total-limit}件`);
+  return lines;
+}
 function allListHeaderText(row, idx){
   return allListCellText(row?.[idx] || '');
 }
@@ -3947,7 +3986,7 @@ function allListParseSmallBlock(text, studentName='', studentNo=''){
   return out;
 }
 
-function allListMergeExamPatch(data, patch){
+function allListMergeExamPatch(data, patch, studentName){
   if(!patch || !patch.name) return false;
   if(!Array.isArray(data.exams)) data.exams=[];
   const key=allListNormKey(patch.name);
@@ -3955,29 +3994,52 @@ function allListMergeExamPatch(data, patch){
   if(!ex) ex=data.exams.find(x=>allListNormKey(x.name)===key && (!patch.date || !x.date || String(x.date)===String(patch.date)));
   if(!ex){ ex={id:patch.id||'',name:patch.name||'',date:patch.date||'',type:patch.type||'common',subjectTemplate:patch.subjectTemplate||'',status:'',comiruAnswered:false,subjects:[],subjectChanged:false,note:''}; data.exams.push(ex); }
   let changed=false;
-  if(['当日','後日','不受験'].includes(patch.status) && ex.status!==patch.status){ex.status=patch.status; changed=true;}
+  if(['当日','後日','不受験'].includes(patch.status) && ex.status!==patch.status){
+    inputLogConflict('全員分リスト', studentName, ex.name || patch.name, '受験方法', ex.status, patch.status, patch.status, '全員分リストの手修正を優先');
+    ex.status=patch.status; changed=true;
+  }
   // Comiruは「未」より「済」を優先。済みを未に戻さない。
-  if(patch.comiruAnswered===true && ex.comiruAnswered!==true){ex.comiruAnswered=true; changed=true;}
-  else if(patch.comiruAnswered===false && ex.comiruAnswered!==true && ex.comiruAnswered!==false){ex.comiruAnswered=false; changed=true;}
+  if(patch.comiruAnswered===true && ex.comiruAnswered!==true){
+    inputLogConflict('全員分リスト', studentName, ex.name || patch.name, 'Comiru回答', ex.comiruAnswered, patch.comiruAnswered, true, '済/〇を優先');
+    ex.comiruAnswered=true; changed=true;
+  }
+  else if(patch.comiruAnswered===false && ex.comiruAnswered!==true && ex.comiruAnswered!==false){
+    inputLogConflict('全員分リスト', studentName, ex.name || patch.name, 'Comiru回答', ex.comiruAnswered, patch.comiruAnswered, false, '個人側が未設定なので×を反映');
+    ex.comiruAnswered=false; changed=true;
+  }
   // 科目変更も、ありを優先。ありを空/なしで消さない。
-  if(patch.subjectChanged===true && ex.subjectChanged!==true){ex.subjectChanged=true; changed=true;}
-  else if(patch.subjectChanged===false && ex.subjectChanged!==true && ex.subjectChanged!==false){ex.subjectChanged=false; changed=true;}
+  if(patch.subjectChanged===true && ex.subjectChanged!==true){
+    inputLogConflict('全員分リスト', studentName, ex.name || patch.name, '科目変更', ex.subjectChanged, patch.subjectChanged, true, 'あり/〇を優先');
+    ex.subjectChanged=true; changed=true;
+  }
+  else if(patch.subjectChanged===false && ex.subjectChanged!==true && ex.subjectChanged!==false){
+    inputLogConflict('全員分リスト', studentName, ex.name || patch.name, '科目変更', ex.subjectChanged, patch.subjectChanged, false, '個人側が未設定なので×を反映');
+    ex.subjectChanged=false; changed=true;
+  }
   const subjectListStatus=allListSubjectListStatusFromValue(patch.subjectList || '');
   // 全員分リストの「科目リスト」は、入力済/未入力/不受験の確認欄。
   // 入力済だけでは科目名までは分からないため、実科目は後段の「科目リスト」Excelから反映する。
   // ただし不受験は受験方法として確定できるので反映する。
   if(subjectListStatus === '不受験' && ex.status !== '不受験'){
+    inputLogConflict('全員分リスト', studentName, ex.name || patch.name, '科目リスト確認', ex.status, '不受験', '不受験', '科目リスト欄の不受験を受験方法へ反映');
     ex.status='不受験'; changed=true;
   }
   if(Array.isArray(patch.subjects) && patch.subjects.length){
-    const old=(ex.subjects||[]).join('|');
+    const oldSubjects=(ex.subjects||[]).slice();
+    const old=oldSubjects.join('|');
+    if(!inputSubjectArraySame(oldSubjects, patch.subjects)){
+      inputLogConflict('全員分リスト', studentName, ex.name || patch.name, '受験科目', oldSubjects, patch.subjects, patch.subjects, '全員分リストの科目情報を優先');
+    }
     ex.subjects=patch.subjects.slice();
     if(old!==ex.subjects.join('|')) changed=true;
   }
-  if(allListCellText(patch.note)){ex.note=allListCellText(patch.note); changed=true;}
+  if(allListCellText(patch.note)){
+    if(allListCellText(ex.note) && allListCellText(ex.note)!==allListCellText(patch.note)) inputLogConflict('全員分リスト', studentName, ex.name || patch.name, '備考', ex.note, patch.note, patch.note, '全員分リストの備考を優先');
+    ex.note=allListCellText(patch.note); changed=true;
+  }
   return changed;
 }
-function allListMergeEventPatch(data, patch){
+function allListMergeEventPatch(data, patch, studentName){
   if(!patch || !patch.name) return false;
   if(!Array.isArray(data.events)) data.events=[];
   const key=allListNormKey(patch.name);
@@ -3985,12 +4047,24 @@ function allListMergeEventPatch(data, patch){
   if(!ev) ev=data.events.find(x=>allListNormKey(x.name)===key && (!patch.datetime || !x.datetime || toDateTimeLocalValue(x.datetime)===toDateTimeLocalValue(patch.datetime)));
   if(!ev){ ev={id:patch.id||'',name:patch.name||'',datetime:patch.datetime||'',status:'',comiruAnswered:false,note:''}; data.events.push(ev); }
   let changed=false;
-  if(['参加','不参加'].includes(patch.status) && ev.status!==patch.status){ev.status=patch.status; changed=true;}
+  if(['参加','不参加'].includes(patch.status) && ev.status!==patch.status){
+    inputLogConflict('全員分リスト', studentName, ev.name || patch.name, '参加状況', ev.status, patch.status, patch.status, '全員分リストの手修正を優先');
+    ev.status=patch.status; changed=true;
+  }
   // Comiruは「未」より「済」を優先。済みを未に戻さない。
-  if(patch.comiruAnswered===true && ev.comiruAnswered!==true){ev.comiruAnswered=true; changed=true;}
-  else if(patch.comiruAnswered===false && ev.comiruAnswered!==true && ev.comiruAnswered!==false){ev.comiruAnswered=false; changed=true;}
+  if(patch.comiruAnswered===true && ev.comiruAnswered!==true){
+    inputLogConflict('全員分リスト', studentName, ev.name || patch.name, 'Comiru回答', ev.comiruAnswered, patch.comiruAnswered, true, '済/〇を優先');
+    ev.comiruAnswered=true; changed=true;
+  }
+  else if(patch.comiruAnswered===false && ev.comiruAnswered!==true && ev.comiruAnswered!==false){
+    inputLogConflict('全員分リスト', studentName, ev.name || patch.name, 'Comiru回答', ev.comiruAnswered, patch.comiruAnswered, false, '個人側が未設定なので×を反映');
+    ev.comiruAnswered=false; changed=true;
+  }
   // イベントは備考も重要なので、復元用シート/全員分リストの備考を反映する。
-  if(allListCellText(patch.note)){ev.note=allListCellText(patch.note); changed=true;}
+  if(allListCellText(patch.note)){
+    if(allListCellText(ev.note) && allListCellText(ev.note)!==allListCellText(patch.note)) inputLogConflict('全員分リスト', studentName, ev.name || patch.name, '備考', ev.note, patch.note, patch.note, '全員分リストの備考を優先');
+    ev.note=allListCellText(patch.note); changed=true;
+  }
   return changed;
 }
 
@@ -4336,8 +4410,8 @@ async function applyAllStudentListOverridesToInput(names){
         data.remarks=allListCellText(p.remarks);
         applied++;
       }
-      (p.exams||[]).forEach(ex=>{ if(allListMergeExamPatch(data,ex)) applied++; });
-      (p.events||[]).forEach(ev=>{ if(allListMergeEventPatch(data,ev)) applied++; });
+      (p.exams||[]).forEach(ex=>{ if(allListMergeExamPatch(data,ex,name)) applied++; });
+      (p.events||[]).forEach(ev=>{ if(allListMergeEventPatch(data,ev,name)) applied++; });
     });
     return {applied,msg:`全員分リスト反映: ${hit.fileName} / ${applied}件`};
   }catch(e){
