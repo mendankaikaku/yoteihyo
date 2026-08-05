@@ -3617,15 +3617,21 @@ function eventKeyOf(r){ return `${r.datetime || ''}\t${r.eventName || ''}`; }
 
 async function downloadExamSubjectListWorkbook(){
   if(!(await ensureWorkbookReadyForOutput())) return;
-  const {from,to,label} = dateRangeForOutput('2w');
-  const exams = state.examRecords.filter(r => (!from || r.examDateObj >= from) && (!to || r.examDateObj <= to));
+
+  // 科目リストは「2週間出力」と違い、読み込んだ打ち込み結果内の模試確認を全件対象にする。
+  // 入力用アプリは週開始日から3週間以内の模試を表示・保存するため、
+  // ここで基準日の±14日で絞ると、新しく登録した模試シートが作られないことがある。
+  const center = getCenterDate();
+  const label = `${ymd(center)}_全対象模試`;
+  const exams = (state.examRecords || []).filter(r => norm(r.examName));
+
   let examSheets = buildExamSubjectSheets(exams || []);
   const generatedSheetNames = new Set(examSheets.map(x => x.sheetName));
   examSheets = examSheets.map(x => ({...x, aoa:mergeRestoredExamSubjectListAoa(x.sheetName, x.aoa)}));
   examSheets.push(...examSubjectListRestoreOnlySheets(generatedSheetNames));
   if(!examSheets.length){
-    alert('2週間範囲内に科目リスト出力対象の模試がありません。入力用の「模試確認」シートに科目列があるか確認してください。');
-    log('科目リスト出力：対象の模試科目データがありません。');
+    alert('科目リスト出力対象の模試がありません。入力用で対象生徒のExcelを保存し、保存復元フォルダー/打ち込み結果 を読み直してください。');
+    log('科目リスト出力：対象の模試科目データがありません。state.examRecords=0 または模試名が空です。');
     return;
   }
 
@@ -3656,7 +3662,7 @@ async function downloadExamSubjectListWorkbook(){
   }
 
   XLSX.writeFile(wb, `模試科目リスト_${label}.xlsx`);
-  log(`科目リストを出力しました\n対象期間: ${ymd(from)}〜${ymd(to)}\nシート数: ${examSheets.length}`);
+  log(`科目リストを出力しました\n対象: 打ち込み結果内の全模試確認\n読み込み模試レコード: ${exams.length}件\nシート数: ${examSheets.length}`);
 }
 
 function buildEventSheetAoa(records, grade, eventKey){
