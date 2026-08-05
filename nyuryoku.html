@@ -2762,6 +2762,64 @@ async function listExcelFilesInDirectory(dir){
   }
   return files;
 }
+
+async function listFilesInDirectoryByRegex(dir, regex){
+  const files=[];
+  if(!dir || !dir.values) return files;
+  for await (const entry of dir.values()){
+    if(entry.kind !== 'file') continue;
+    if(/^~\$/i.test(entry.name)) continue;
+    if(regex && !regex.test(entry.name)) continue;
+    try{ files.push(await entry.getFile()); }catch(e){}
+  }
+  files.sort((a,b)=>(b.lastModified-a.lastModified)||String(a.name).localeCompare(String(b.name),'ja'));
+  return files;
+}
+async function countChildDirectories(dir){
+  let count=0;
+  if(!dir || !dir.values) return 0;
+  for await (const entry of dir.values()) if(entry.kind === 'directory') count++;
+  return count;
+}
+async function buildInputRestoreDiagnostics(rootDir, names=[]){
+  const lines=[];
+  if(!rootDir) return lines;
+  lines.push('--- 読み取り診断 ---');
+  lines.push(`選択フォルダー: ${rootDir.name || '選択フォルダー'}`);
+  const jsonDir=await getDirectoryIfExists(rootDir,'json');
+  const jsonFiles=jsonDir ? await listFilesInDirectoryByRegex(jsonDir,/\.json$/i) : [];
+  const rootJsonFiles=await listFilesInDirectoryByRegex(rootDir,/\.json$/i);
+  const groupJsonCount=[...jsonFiles,...rootJsonFiles].filter(f=>/^group_/i.test(f.name)).length;
+  const studentJsonCount=[...jsonFiles,...rootJsonFiles].filter(f=>/^student_/i.test(f.name)).length;
+  lines.push(`${jsonDir ? '✅' : '⚠'} json: ${jsonDir ? jsonFiles.length + '件' : 'フォルダーなし'}（group ${groupJsonCount}件 / student ${studentJsonCount}件）`);
+
+  const allDir=await getDirectoryIfExists(rootDir,'全員分リスト');
+  const allFiles=allDir ? await listFilesInDirectoryByRegex(allDir,/\.(xlsx|xlsm|xls)$/i) : [];
+  lines.push(`${allDir ? '✅' : '⚠'} 全員分リスト: ${allDir ? allFiles.length + '件' : 'フォルダーなし'}${allFiles[0] ? '（採用候補: '+allFiles[0].name+'）' : ''}`);
+
+  const subjectDir=await getDirectoryIfExists(rootDir,'科目リスト');
+  const subjectFiles=subjectDir ? await listFilesInDirectoryByRegex(subjectDir,/\.(xlsx|xlsm|xls)$/i) : [];
+  lines.push(`${subjectDir ? '✅' : '⚠'} 科目リスト: ${subjectDir ? subjectFiles.length + '件' : 'フォルダーなし'}${subjectFiles[0] ? '（採用候補: '+subjectFiles[0].name+'）' : ''}`);
+
+  const dailyDir=await getDirectoryIfExists(rootDir,'毎日更新');
+  const dailyFiles=dailyDir ? await listFilesInDirectoryByRegex(dailyDir,/\.(xlsx|xlsm|xls)$/i) : [];
+  lines.push(`${dailyDir ? '✅' : '⚠'} 毎日更新: ${dailyDir ? dailyFiles.length + '件' : 'フォルダーなし'}${dailyFiles.some(f=>f.name==='毎日更新.xlsx') ? '（毎日更新.xlsxあり）' : ''}`);
+
+  const rosterDir=await getDirectoryIfExists(rootDir,'対応表');
+  const rosterFiles=rosterDir ? await listFilesInDirectoryByRegex(rosterDir,/\.(xlsx|xlsm|xls|csv)$/i) : [];
+  lines.push(`${rosterDir ? '✅' : '⚠'} 対応表: ${rosterDir ? rosterFiles.length + '件' : 'フォルダーなし'}`);
+
+  const planDir=await getDirectoryIfExists(rootDir,'打ち込み結果');
+  const planFiles=planDir ? await listFilesInDirectoryByRegex(planDir,/\.(xlsx|xlsm|xls)$/i) : [];
+  lines.push(`${planDir ? '✅' : '⚠'} 打ち込み結果: ${planDir ? planFiles.length + '件' : 'フォルダーなし'}`);
+
+  const assistantDir=await getDirectoryIfExists(rootDir,'担任助手フォルダー');
+  const assistantChildCount=assistantDir ? await countChildDirectories(assistantDir) : 0;
+  lines.push(`${assistantDir ? '✅' : '⚠'} 担任助手フォルダー: ${assistantDir ? assistantChildCount + 'フォルダー' : 'フォルダーなし'}`);
+
+  if(names && names.length) lines.push(`復元対象生徒: ${names.join('、')}`);
+  return lines;
+}
 function subjectListNorm(s){
   return String(s||'').replace(/[\s\u3000_\-・･\.．]+/g,'').toLowerCase();
 }
@@ -3090,10 +3148,12 @@ async function loadGroup(){
   renderExamMasterPanel();
   renderEventMasterPanel();
   if(dir){
+    const diagLines=await buildInputRestoreDiagnostics(dir, students);
+    if(diagLines.length) details.push(diagLines.join('\n'));
     const allListResult=await applyAllStudentListOverridesToInput(students);
     if(allListResult && allListResult.msg) details.push(allListResult.msg);
     const subjectListResult=await applySubjectListOverridesToInput(students);
-    if(subjectListResult && subjectListResult.count) details.push(`科目リスト反映: ${subjectListResult.count}件`);
+    if(subjectListResult) details.push(`科目リスト反映: ${subjectListResult.count || 0}件`);
   }
   renderStudents();
   if(dir){
