@@ -5348,24 +5348,37 @@ function buildSmallExamEventColumnMaps(examRecords=[], eventRecords=[]){
 }
 function allListApplyDropdowns(ws, aoa){
   const header = aoa[1] || [];
-  const lastRow = Math.max(aoa.length, 3);
+  // 手入力やコピー貼り付けが増えても入力規則が途中で切れないよう、実データ行より少し長めにかける。
+  const lastRow = Math.max(aoa.length + 20, 80);
   const validations = [];
-  for(let c=0;c<header.length;c++){
-    const h=String(header[c] || '');
-    let formula=null;
-    if(/(?:小規模\s*)?\d+\n回答$/.test(h)) formula='"〇,×,当日,後日,不受験,未"';
-    else if(/(?:小規模\s*)?\d+\n科目変更$/.test(h)) formula='"〇,×"';
-    else if(/(?:小規模\s*)?\d+\nComiru$/.test(h)) formula='"〇,×"';
-    else if(/\n受験$/.test(h)) formula='"当日,後日,不受験,未"';
-    else if(/\n(参加)$/.test(h)) formula='"〇,×,未"';
-    else if(/\n(Comiru|科目変更)$/.test(h)) formula='"〇,×"';
-    else if(/\n科目リスト$/.test(h)) formula='"入力済,未入力,不受験"';
-    if(!formula) continue;
+  const addValidation=(c, formula)=>{
+    if(!formula) return;
     const col=XLSX.utils.encode_col(c);
     validations.push({sqref:`${col}3:${col}${lastRow}`, type:'list', allowBlank:true, formulae:[formula], showErrorMessage:true, errorTitle:'入力候補', error:'プルダウンから選んでください。'});
+  };
+  for(let c=0;c<header.length;c++){
+    const h=String(header[c] || '').replace(/\r\n/g,'\n').replace(/\r/g,'\n').trim();
+    let formula=null;
+    if(/(?:小規模\s*)?\d+\s*\n回答$/.test(h)) formula='"当日,後日,不受験,未,〇,×"';
+    else if(/(?:小規模\s*)?\d+\s*\nComiru$/.test(h)) formula='"〇,×"';
+    else if(/(?:小規模\s*)?\d+\s*\n科目リスト$/.test(h)) formula='"入力済,未入力,不受験"';
+    else if(/(?:小規模\s*)?\d+\s*\n科目変更$/.test(h)) formula='"〇,×"';
+    else if(/\n受験$/.test(h)) formula='"当日,後日,不受験,未"';
+    else if(/\n参加$/.test(h)) formula='"〇,×,未"';
+    else if(/\nComiru$/.test(h)) formula='"〇,×"';
+    else if(/\n科目変更$/.test(h)) formula='"〇,×"';
+    else if(/\n科目リスト$/.test(h)) formula='"入力済,未入力,不受験"';
+    addValidation(c, formula);
   }
   if(validations.length){
-    ws['!dataValidations'] = (ws['!dataValidations'] || []).concat(validations);
+    try{
+      // xlsx-js-style / SheetJS互換のため、代表的なプロパティ名を両方入れておく。
+      ws['!dataValidations'] = (ws['!dataValidations'] || []).concat(validations);
+      ws['!dataValidation'] = (ws['!dataValidation'] || []).concat(validations);
+      ws['!allListDropdownsApplied'] = validations.length;
+    }catch(e){
+      console.warn('全員分リストのプルダウン設定をスキップしました', e);
+    }
   }
 }
 
@@ -6144,24 +6157,34 @@ function buildSmallSlotObjectsByStudent(examRecords=[], eventRecords=[]){
 }
 function allListApplyDropdowns(ws, aoa){
   const header = aoa[1] || [];
-  const lastRow = Math.max(aoa.length, 3);
+  // 手入力やコピー貼り付けが増えても入力規則が途中で切れないよう、実データ行より少し長めにかける。
+  const lastRow = Math.max(aoa.length + 20, 80);
   const validations = [];
-  for(let c=0;c<header.length;c++){
-    const h=String(header[c] || '');
-    let formula=null;
-    if(/(?:小規模\s*)?\d+\n回答$/.test(h)) formula='"〇,×,当日,後日,不受験,未"';
-    else if(/(?:小規模\s*)?\d+\nComiru$/.test(h)) formula='"〇,×"';
-    else if(/\n受験$/.test(h)) formula='"当日,後日,不受験,未"';
-    else if(/\n(参加)$/.test(h)) formula='"〇,×,未"';
-    else if(/\n(Comiru|科目変更)$/.test(h)) formula='"〇,×"';
-    else if(/\n科目リスト$/.test(h)) formula='"入力済,未入力,不受験"';
-    if(!formula) continue;
+  const addValidation=(c, formula)=>{
+    if(!formula) return;
     const col=XLSX.utils.encode_col(c);
     validations.push({sqref:`${col}3:${col}${lastRow}`, type:'list', allowBlank:true, formulae:[formula], showErrorMessage:true, errorTitle:'入力候補', error:'プルダウンから選んでください。'});
+  };
+  for(let c=0;c<header.length;c++){
+    const h=String(header[c] || '').replace(/\r\n/g,'\n').replace(/\r/g,'\n').trim();
+    let formula=null;
+    if(/(?:小規模\s*)?\d+\s*\n回答$/.test(h)) formula='"当日,後日,不受験,未,〇,×"';
+    else if(/(?:小規模\s*)?\d+\s*\nComiru$/.test(h)) formula='"〇,×"';
+    else if(/(?:小規模\s*)?\d+\s*\n科目リスト$/.test(h)) formula='"入力済,未入力,不受験"';
+    else if(/(?:小規模\s*)?\d+\s*\n科目変更$/.test(h)) formula='"〇,×"';
+    else if(/\n受験$/.test(h)) formula='"当日,後日,不受験,未"';
+    else if(/\n参加$/.test(h)) formula='"〇,×,未"';
+    else if(/\nComiru$/.test(h)) formula='"〇,×"';
+    else if(/\n科目変更$/.test(h)) formula='"〇,×"';
+    else if(/\n科目リスト$/.test(h)) formula='"入力済,未入力,不受験"';
+    addValidation(c, formula);
   }
   if(validations.length){
     try{
+      // xlsx-js-style / SheetJS互換のため、代表的なプロパティ名を両方入れておく。
       ws['!dataValidations'] = (ws['!dataValidations'] || []).concat(validations);
+      ws['!dataValidation'] = (ws['!dataValidation'] || []).concat(validations);
+      ws['!allListDropdownsApplied'] = validations.length;
     }catch(e){
       console.warn('全員分リストのプルダウン設定をスキップしました', e);
     }
@@ -6926,7 +6949,7 @@ async function downloadAllStudentList(){
     XLSX.writeFile(wb, `全員分リスト_学年別_B4横_${ymd(base)}基準.xlsx`);
     if(typeof log === 'function'){
       const count = Math.max(0, (state.allListUpdateLog?.length || 1) - 1);
-      log(`全員分リストを出力しました。\n対象人数が少ない模試・イベントは、各生徒ごとの追加スロット列にまとめました。列数は学年内の最大対象数に合わせて自動で増えます。回答・Comiru・科目変更はプルダウンで更新できます。\n手修正・自動データの衝突ログ: ${count}件${count ? '\nExcel内の「更新ログ」シートを確認してください。' : ''}`);
+      log(`全員分リストを出力しました。\n対象人数が少ない模試・イベントは、各生徒ごとの追加スロット列にまとめました。列数は学年内の最大対象数に合わせて自動で増えます。回答・Comiru・科目リスト・科目変更はプルダウンで更新できます。\n手修正・自動データの衝突ログ: ${count}件${count ? '\nExcel内の「更新ログ」シートを確認してください。' : ''}`);
     }
   }catch(e){
     console.error('全員分リスト出力エラー', e);
