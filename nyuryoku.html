@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>面談予定入力・準備資料アプリ v34（合格設計図Excel A列固定・印刷PDF優先版）</title>
+<title>面談予定入力・準備資料アプリ v35（面談準備3ページ目フロー固定版）</title>
 <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
 <script src="./libs/xlsx.bundle.js"></script>
 <script>if(!window.XLSX){document.write('<script src="./libs/xlsx.full.min.js"><\/script>');}</script>
@@ -662,7 +662,7 @@ main.wrap{max-width:none!important;height:auto!important;min-height:0!important;
         <li>面談準備印刷を押します。</li>
         <li>印刷設定は A4縦・両面・長辺とじ です。</li>
       </ol>
-      <div class="usageHelpSmall">各生徒A4 2枚想定です。1枚目表に先週の予定と結果、裏に今週の計画表(生徒が記入)、2枚目表に週面シート、2枚目裏に合格設計図を入れます。1枚目は面談時に生徒に記入させ、2枚目は面談時助手が持っておきます。</div>
+      <div class="usageHelpSmall">各生徒A4 2枚想定です。1枚目表に先週の予定と結果、裏に今週の計画表(生徒が記入)、2枚目表（3ページ目）は必ず面談フロー、2枚目裏は合格設計図を入れます。週面シートExcelは読み取りません。1枚目は面談時に生徒に記入させ、2枚目は面談時助手が持っておきます。</div>
     </div>
 
     <div class="usageHelpBox">
@@ -743,7 +743,6 @@ main.wrap{max-width:none!important;height:auto!important;min-height:0!important;
     <div class="folderStructureBox">
       <h3>担任助手フォルダー</h3>
       <div class="folderTree">担任助手フォルダー
-├─ 週面シート.xlsx
 ├─ 山田太郎
 │  ├─ 合格設計図.pdf
 │  ├─ 合格設計図.xlsx
@@ -756,7 +755,7 @@ main.wrap{max-width:none!important;height:auto!important;min-height:0!important;
       <ul>
         <li>生徒フォルダー名は、アプリに入力する生徒名と合わせます。</li>
         <li>合格設計図はPDF優先、なければExcelを使います。</li>
-        <li>週面シートExcelは担任助手フォルダー直下に置きます。</li>
+        <li>週面シートExcelは不要です。面談準備印刷の3ページ目は常に面談フローを印刷します。</li>
       </ul>
     </div>
 
@@ -764,7 +763,7 @@ main.wrap{max-width:none!important;height:auto!important;min-height:0!important;
       <h3>迷ったら守ること</h3>
       <ul>
         <li>保存・復元では「保存復元フォルダー」を選びます。</li>
-        <li>印刷では「担任助手フォルダー」内の週面シート・生徒フォルダーを使います。</li>
+        <li>印刷では「担任助手フォルダー」内の生徒フォルダーを使い、合格設計図を自動で探します。週面シートは使いません。</li>
         <li>Excelを手修正したら、対応するフォルダーへ戻します。</li>
         <li>太字のフォルダー名は変更しないでください。</li>
       </ul>
@@ -808,13 +807,13 @@ main.wrap{max-width:none!important;height:auto!important;min-height:0!important;
     <details id="meetingPrepDetails" class="prepDetails">
       <summary>印刷メニューを開く</summary>
       <div class="printActions prepInside" style="grid-template-columns:minmax(260px,1fr) 170px auto auto;">
-        <div class="compactHint" style="margin-top:0">復元ボタンで読み込んだ「まとめて復元」フォルダから、結果履歴JSON・毎日更新Excel・週面シート・合格設計図を自動で使います。週面欠席チェックを付けた生徒だけの電話確認リストも印刷できます。</div>
+        <div class="compactHint" style="margin-top:0">復元ボタンで読み込んだ「まとめて復元」フォルダから、結果履歴JSON・毎日更新Excel・合格設計図を自動で使います。面談準備印刷の3ページ目は常に面談フローです。週面欠席チェックを付けた生徒だけの電話確認リストも印刷できます。</div>
         <div class="field"><label>週面欠席リスト対象日</label><input id="weeklyAbsentTargetDate" type="date"></div>
         <button class="secondary primaryBig" id="printMeetingPrep" type="button">面談準備を印刷</button>
         <button class="secondary primaryBig" id="printWeeklyAbsentList" type="button">週面欠席者リスト印刷</button>
       </div>
-      <div class="printDialogNote"><b>印刷設定：</b>印刷時は「システムダイアログを使用して印刷」を利用して、<b>用紙サイズ：A4／向き：縦／両面印刷：オン／長辺とじ</b>に設定してください。各生徒はA4両面2枚（1枚目：前週確認→今週記入、2枚目：週面シート→合格設計図）で印刷されます。</div>
-      <div id="meetingPrepFolderInfo" class="compactHint">復元した内容を先週分として使い、今週欄は印刷時だけ白紙にします。復元時に「まとめて復元」フォルダを選ぶと、json/result_history.json、毎日更新フォルダ内の毎日更新.xlsx（モチベーション支援／高速マスターデイリー）、打ち込み結果/担任助手フォルダ内の週面シート、担任助手フォルダ/生徒名フォルダ内の合格設計図PDFまたはExcelを自動で読みます。</div>
+      <div class="printDialogNote"><b>印刷設定：</b>印刷時は「システムダイアログを使用して印刷」を利用して、<b>用紙サイズ：A4／向き：縦／両面印刷：オン／長辺とじ</b>に設定してください。各生徒はA4両面2枚（1枚目：前週確認→今週記入、2枚目：面談フロー→合格設計図）で印刷されます。</div>
+      <div id="meetingPrepFolderInfo" class="compactHint">復元した内容を先週分として使い、今週欄は印刷時だけ白紙にします。復元時に「まとめて復元」フォルダを選ぶと、json/result_history.json、毎日更新フォルダ内の毎日更新.xlsx（モチベーション支援／高速マスターデイリー）、担任助手フォルダ/生徒名フォルダ内の合格設計図PDFまたはExcelを自動で読みます。週面シートは読み取らず、3ページ目は常に面談フローです。</div>
     </details>
   </section>
 
@@ -1887,18 +1886,11 @@ async function findWeeklySheetExcelInAssistantFolder(assistantDir){
   return candidates[0];
 }
 async function loadWeeklySheetFromAssistantFolder(assistantDir){
-  const hit=await findWeeklySheetExcelInAssistantFolder(assistantDir);
-  if(!hit){
-    meetingPrepWeeklyFileName='';
-    meetingPrepWeeklyHtmlCache='<p class="muted">担任助手フォルダ直下に週面シートExcelが見つかりませんでした。</p>';
-    return {loaded:false,msg:'週面シート: 担任助手フォルダ直下にExcelなし'};
-  }
-  const file=hit.file || await hit.handle.getFile();
-  meetingPrepWeeklyHtmlCache=await loadWeeklySheetHtmlFromFile(file);
-  if(meetingPrepWeeklyFileName){
-    return {loaded:true,msg:`週面シート: ${hit.name} を自動読込`};
-  }
-  return {loaded:false,msg:`週面シート: ${hit.name} の読込に失敗`};
+  // 週面シートの自動読込は廃止。
+  // 面談準備印刷の3ページ目は、週面シートの有無に関係なく常に面談フローを使う。
+  meetingPrepWeeklyFileName='';
+  meetingPrepWeeklyHtmlCache=meetingFlowFallbackHtml('');
+  return {loaded:false,msg:'週面シート: 読み取り廃止（3ページ目は常に面談フロー）'};
 }
 
 function updateScheduleHeaders(){const dates=getDates();$$('[data-day-head]').forEach(th=>{const d=dates[Number(th.dataset.dayHead)];th.innerHTML=`<div>${jpDate(d)}</div><div style="font-size:12px;color:#667085">${DOW[d.getDay()]}曜日</div>`})}
@@ -3095,13 +3087,8 @@ async function loadGroup(){
       const studentParent=await findStudentFolderParentFromSaveRoot(dir, students);
       if(studentParent && studentParent.label) details.push(`担任助手フォルダ: ${studentParent.label}`);
 
-      // 週面シートは各担任助手ごとに違うため、担任助手フォルダ直下のExcelから自動読込する。
-      try{
-        const weekly=await loadWeeklySheetFromAssistantFolder(studentParent.dir);
-        if(weekly && weekly.msg) details.push(weekly.msg);
-      }catch(we){
-        details.push(`週面シート自動読込エラー: ${we?.message || we}`);
-      }
+      // 週面シートの自動読込は廃止。面談準備印刷の3ページ目は常に面談フローを使う。
+      details.push('週面シート: 読み取り廃止（3ページ目は常に面談フロー）');
 
       // 合格設計図は 担任助手フォルダ / 生徒名フォルダ / 合格設計図PDFまたはExcel を読む。
       const goukakuResult=await loadGoukakuDesignsFromStudentParent(studentParent.dir, students);
@@ -4389,7 +4376,7 @@ async function pickMasterSharedFolderAndLoad(){
 /* =========================================================
    10.5 面談準備資料の印刷
 ========================================================= */
-let meetingPrepWeeklyHtmlCache = '<p class="muted">復元フォルダから週面シートをまだ自動読込できていません。</p>';
+let meetingPrepWeeklyHtmlCache = meetingFlowFallbackHtml('');
 let meetingPrepWeeklyFileName = '';
 // 面談準備資料では、復元した週を「先週」として使う。
 // 画面の週開始日を今週用に変更しても、印刷時の先週日付がずれないように保持する。
@@ -5166,76 +5153,24 @@ function readFileAsArrayBufferCompat(file){
   });
 }
 async function loadWeeklySheetHtmlFromFile(file){
-  if(!file) return '<p class="muted">復元フォルダから週面シートを自動読込できませんでした。</p>';
-  try{
-    if(/^~\$/i.test(file.name)) throw new Error('Excelの一時ファイル（~$で始まるファイル）を選んでいます。元のExcelファイルを選んでください。');
-    if(!/\.(xlsx|xlsm|xls)$/i.test(file.name)) throw new Error('xlsx / xlsm / xls 形式のExcelファイルを選んでください。');
-    if(!window.XLSX) throw new Error('XLSXライブラリが読み込まれていません。ネット接続またはブラウザのブロックを確認してください。');
-    const buf=await readFileAsArrayBufferCompat(file);
-    let wb;
-    try{
-      wb=XLSX.read(buf,{type:'array',cellDates:true});
-    }catch(firstErr){
-      // 古いxls等でarray読み込みが失敗した場合の保険
-      const text=await new Promise((resolve,reject)=>{
-        const reader=new FileReader();
-        reader.onload=()=>resolve(reader.result);
-        reader.onerror=()=>reject(reader.error || firstErr);
-        reader.readAsBinaryString(file);
-      });
-      wb=XLSX.read(text,{type:'binary',cellDates:true});
-    }
-    if(!wb || !wb.SheetNames || !wb.SheetNames.length) throw new Error('シートが見つかりません。');
-    const sheetName=wb.SheetNames[0];
-    const ws=wb.Sheets[sheetName];
-    const aoa=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
-    if(!aoa.some(row=>(row||[]).some(v=>norm(v)))) throw new Error('1枚目のシートに表示できる内容がありません。');
-    let html=`<h2>週面シート</h2><div class="muted">${esc(file.name)} / ${esc(sheetName)}</div><table class="prepTable weekly">`;
-    aoa.forEach((row,ri)=>{
-      if(!(row||[]).some(v=>norm(v))) return;
-      html+='<tr>';
-      const max=Math.max(row.length,1);
-      for(let c=0;c<max;c++){
-        const tag=ri===0?'th':'td';
-        html+=`<${tag}>${esc(row[c]||'').replace(/\n/g,'<br>')}</${tag}>`;
-      }
-      html+='</tr>';
-    });
-    html+='</table>';
-    meetingPrepWeeklyFileName = file.name;
-    return html;
-  }catch(e){
-    console.warn('週面シート読み込み失敗', e);
-    meetingPrepWeeklyFileName = '';
-    const msg=e?.message || String(e);
-    setMeetingPrepFolderInfo(`週面シートExcelの読み込みに失敗しました：${msg}`);
-    return `<p class="muted">週面シートの読み込みに失敗しました。<br>${esc(msg)}</p>`;
-  }
+  // 週面シート読み取りは廃止。
+  meetingPrepWeeklyFileName = '';
+  meetingPrepWeeklyHtmlCache = meetingFlowFallbackHtml('');
+  setMeetingPrepFolderInfo('週面シートは読み取らず、3ページ目は常に面談フローを印刷します。');
+  return meetingPrepWeeklyHtmlCache;
 }
 
 async function handleMeetingPrepWeeklyFileChange(){
-  if(!window.XLSX) return alert('Excel読み取りライブラリの読み込みに失敗しました。HTMLと同じ場所に libs フォルダを作り、libs/xlsx.bundle.js または libs/xlsx.full.min.js を置いてください。');
-  const input = $('#meetingPrepWeeklyInput');
-  const file = input && input.files && input.files[0];
-  if(!file){
-    meetingPrepWeeklyFileName = '';
-    meetingPrepWeeklyHtmlCache = '<p class="muted">復元フォルダから週面シートを自動読込できませんでした。</p>';
-    setMeetingPrepFolderInfo('復元フォルダから週面シートを自動読込できませんでした。');
-    return;
-  }
-  meetingPrepWeeklyHtmlCache = await loadWeeklySheetHtmlFromFile(file);
-  if(meetingPrepWeeklyFileName){
-    setMeetingPrepFolderInfo(`週面シートExcelを選択しました：${meetingPrepWeeklyFileName}`);
-  }else{
-    setMeetingPrepFolderInfo('週面シートExcelの読み込みに失敗しました。');
-  }
+  // 週面シート選択・読取は廃止。
+  meetingPrepWeeklyFileName = '';
+  meetingPrepWeeklyHtmlCache = meetingFlowFallbackHtml('');
+  setMeetingPrepFolderInfo('週面シートは読み取らず、3ページ目は常に面談フローを印刷します。');
 }
 
 function meetingFlowFallbackHtml(reason){
-  const msg = reason ? `<div class="muted">週面シートExcelを読み取れなかったため、代わりに面談フローを印刷しています。<br>${esc(reason)}</div>` : '<div class="muted">週面シートExcelを読み取れなかったため、代わりに面談フローを印刷しています。</div>';
   return `
     <div class="meetingFlowFallback">
-      ${msg}
+      <div class="muted">週面シートは読み取らず、3ページ目は常に面談フローを印刷します。</div>
       <h2>3. 面談フロー</h2>
       <table class="prepTable flowTable">
         <tr><th>順番</th><th>内容</th><th>目安</th><th>やること</th></tr>
@@ -5266,18 +5201,7 @@ function meetingFlowFallbackHtml(reason){
     </div>`;
 }
 function loadWeeklySheetHtml(){
-  const html = meetingPrepWeeklyHtmlCache || '';
-  const text = String(html).replace(/<[^>]*>/g, '').trim();
-  const failed = !text
-    || text.includes('週面シートをまだ自動読込できていません')
-    || text.includes('週面シートを自動読込できませんでした')
-    || text.includes('復元フォルダから週面シートを自動読込できませんでした')
-    || text.includes('週面シートの読み込みに失敗しました')
-    || text.includes('週面シートExcelが見つかりませんでした')
-    || text.includes('週面シートExcelが未選択')
-    || text.includes('週面シートは未読込')
-    || text.includes('週面シート: 担任助手フォルダ直下にExcelなし');
-  return failed ? meetingFlowFallbackHtml(text) : html;
+  return meetingFlowFallbackHtml('');
 }
 function buildMeetingPrepPrintHtml(resultRecords, weeklyHtml){
   const now=new Date();
@@ -5290,10 +5214,10 @@ function buildMeetingPrepPrintHtml(resultRecords, weeklyHtml){
   names.forEach((name,idx)=>{
     const isLastStudent = idx === names.length - 1;
     // 印刷順は各生徒A4両面2枚に固定する。
-    // 1枚目 表: 前週確認 / 1枚目 裏: 今週記入 / 2枚目 表: 週面シート / 2枚目 裏: 合格設計図
+    // 1枚目 表: 前週確認 / 1枚目 裏: 今週記入 / 2枚目 表（3ページ目）: 面談フロー / 2枚目 裏: 合格設計図
     body+=`<section class="page prevResultPage sheetFront"><div class="sheetMark">1枚目 表</div><div class="fitPageShell"><div class="fitPageInner"><h1>面談準備資料：${esc(name)}</h1><div class="subline">対象日までの一週間：${esc(prevPeriod)} / 作成：${now.toLocaleString('ja-JP')}</div><h2>1. 予定・結果カレンダー</h2>${meetingPrepScheduleTableHtml(name,resultRecords)}</div></div></section>`;
     body+=`<section class="page sheetBack"><div class="sheetMark">1枚目 裏</div><h1>面談準備資料：${esc(name)}</h1><div class="subline">今週：${esc(currentPeriod)}</div><h2>2. 今週の記入用予定表・模試・イベント</h2>${meetingPrepCurrentPlanHtml(name)}</section>`;
-    body+=`<section class="page weeklyPage sheetFront"><div class="sheetMark">2枚目 表</div><h1>面談準備資料：${esc(name)}</h1><h2>3. 週面シート</h2>${weeklyHtml}</section>`;
+    body+=`<section class="page weeklyPage sheetFront"><div class="sheetMark">2枚目 表</div><h1>面談準備資料：${esc(name)}</h1><h2>3. 面談フロー</h2>${weeklyHtml}</section>`;
     body+=`<section class="page goukakuPrintPage sheetBack${isLastStudent ? ' isLastPrintPage' : ''}"><div class="sheetMark">2枚目 裏</div><h1>面談準備資料：${esc(name)}</h1><h2>4. 合格設計図</h2>${meetingPrepGoukakuDesignHtml(name)}</section>`;
   });
   return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>面談準備資料</title><style>
@@ -5312,7 +5236,7 @@ function buildMeetingPrepPrintHtml(resultRecords, weeklyHtml){
     .weeklyPage{padding:5mm;}
     .goukakuPrintPage{padding:5mm;overflow:hidden;display:flex;flex-direction:column;height:282mm!important;max-height:282mm!important}.goukakuPrintPage h1{font-size:13px;margin:0 0 .8mm;flex:0 0 auto}.goukakuPrintPage h2{font-size:10px;margin:0 0 .8mm;flex:0 0 auto}.goukakuPrintPage .muted{font-size:8px;margin-top:1mm;flex:0 0 auto}.goukakuPrintPdf{height:auto;width:100%;flex:1 1 auto;min-height:0;border:1px solid #9ca3af;background:#f8fafc;overflow:hidden;position:relative;display:flex;align-items:center;justify-content:center}.goukakuPrintPdf iframe{width:100%;height:100%;border:0;background:#fff}.goukakuPrintPdf canvas.goukakuAllPagesCanvas{max-width:100%;max-height:100%;width:auto;height:auto;display:block;background:#fff}.goukakuPdfRenderStatus{position:absolute;left:4mm;right:4mm;bottom:4mm;padding:2mm;background:rgba(255,255,255,.92);border:1px solid #d1d5db;border-radius:4px;font-size:9px;color:#475569;text-align:center}.goukakuPrintPdf.rendered .goukakuFallbackPdf,.goukakuPrintPdf.rendered .goukakuPdfRenderStatus{display:none}.goukakuPrintPdf.fallback .goukakuPdfRenderStatus{background:#fff7ed;color:#9a3412;border-color:#fed7aa}.goukakuStyledSheetTable{border-collapse:collapse;width:max-content;min-width:100%;font-size:10px;line-height:1.2;table-layout:auto}.goukakuStyledSheetTable th,.goukakuStyledSheetTable td{border:1px solid #d0d5dd;padding:2px 4px;min-width:26px;max-width:180px;white-space:pre-wrap;word-break:break-word;vertical-align:middle}.goukakuStyledSheetTable .goukakuColHeader th,.goukakuStyledSheetTable .goukakuRowHeader{background:#f2f4f7;color:#475569;font-weight:800;text-align:center}.goukakuPrintExcelWrap{flex:1 1 auto;min-height:0;overflow:hidden;border:1px solid #9ca3af;background:#fff}.goukakuPrintExcelWrap .goukakuStyledSheetTable{width:100%;font-size:6px;line-height:1.03;table-layout:fixed}.goukakuPrintExcelWrap .goukakuStyledSheetTable th,.goukakuPrintExcelWrap .goukakuStyledSheetTable td{padding:.35mm .55mm;max-width:none;min-width:0}.goukakuPrintTable{font-size:6.8px;table-layout:fixed;width:100%;line-height:1.12}.goukakuPrintTable th,.goukakuPrintTable td{padding:1px 2px;min-width:0;max-width:none;white-space:normal;word-break:break-word;}
     @media print{.printGuide{display:none!important}.page{break-after:auto!important;page-break-after:auto!important;}.page + .page{break-before:page!important;page-break-before:always!important;}}
-  </style><script src="./libs/pdf.min.js"><\/script></head><body><div class="printGuide">印刷設定：A4／縦／両面印刷オン／長辺とじ。各生徒はA4両面2枚：1枚目 表=前週確認、裏=今週記入、2枚目 表=週面シート、裏=合格設計図。</div>${body}<script>
+  </style><script src="./libs/pdf.min.js"><\/script></head><body><div class="printGuide">印刷設定：A4／縦／両面印刷オン／長辺とじ。各生徒はA4両面2枚：1枚目 表=前週確認、裏=今週記入、2枚目 表=面談フロー、裏=合格設計図。</div>${body}<script>
     function base64ToUint8Array(base64){
       var binary=atob(base64 || '');
       var len=binary.length;
@@ -5615,17 +5539,11 @@ async function printWeeklyAbsentList(){
 async function printMeetingPrep(){
   syncFromDom();
   if(!students.length) return alert('先に生徒名を入力して「② 生徒欄を作る」を押してください。');
-  if(!window.XLSX) return alert('Excel読み取りライブラリの読み込みに失敗しました。\nこの機能は毎日更新.xlsx・週面シートを読むために xlsx ライブラリが必要です。\nインターネット接続がある状態で開くか、職場PCのセキュリティで CDN がブロックされていないか確認してください。');
+  if(!window.XLSX) return alert('Excel読み取りライブラリの読み込みに失敗しました。\nこの機能は毎日更新.xlsx・合格設計図Excelを読むために xlsx ライブラリが必要です。\nインターネット接続がある状態で開くか、職場PCのセキュリティで CDN がブロックされていないか確認してください。');
   const empty=students.filter(n=>!studentHasMeaningfulInputData(n));
   if(empty.length && !confirm(`入力内容が空の生徒がいます：${empty.join('、')}\nこのまま印刷しますか？`)) return;
   const resultRecords=await readPrepResultRecords();
-  // 復元後に週面シートがまだ未読込の場合、印刷直前にも担任助手フォルダから自動読込を試す。
-  if(sharedDirHandle && (!meetingPrepWeeklyFileName || /未選択|未読込/.test(String(meetingPrepWeeklyHtmlCache||'')))){
-    try{
-      const studentParent=await findStudentFolderParentFromSaveRoot(sharedDirHandle, students);
-      await loadWeeklySheetFromAssistantFolder(studentParent.dir);
-    }catch(e){}
-  }
+  // 週面シートは読み取らない。3ページ目は常に面談フローを印刷する。
   const weeklyHtml=loadWeeklySheetHtml();
   const html=buildMeetingPrepPrintHtml(resultRecords, weeklyHtml);
   printHtmlInHiddenIframe(html);
