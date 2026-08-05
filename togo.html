@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>予定統合アプリ16:24</title>
+  <title>予定統合アプリ</title>
   <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
   <script src="./libs/xlsx.bundle.js"></script>
   <script>
@@ -2308,17 +2308,15 @@ function resultKeywordMatches(r, keyword){
     return /連続.{0,8}実施|実施.{0,8}連続/.test(text);
   }
 
-  const isCompleteKeyword = /完全(修得|習得)|講座を?完全(修得|習得)/.test(k);
-  const isNormalKeyword = /講座を?(修得|習得)|\b修得\b|\b習得\b|修得|習得/.test(k) && !isCompleteKeyword;
-
-  // 完全修得は普通の「修得」と混ざらないように先に判定する。
-  if(isCompleteKeyword){
-    return /講座を?完全(修得|習得)|完全(修得|習得)/.test(text);
+  // 毎日掲示の修得系は誤検出を避けるため、検索条件を厳密化する。
+  // 講座修得： 「講座を修得」だけ
+  // 完全修得： 「講座を完全修得」だけ
+  // 「習得」「修得」「完全修得」だけの広い一致では載せない。
+  if(k === '講座を完全修得'){
+    return /講座を完全修得/.test(text);
   }
-
-  // 修得は「完全修得」も広義には修得だが、通常シートを分けたい場合は完全を除外する。
-  if(isNormalKeyword){
-    return /講座を?(修得|習得)|修得|習得/.test(text) && !/講座を?完全(修得|習得)|完全(修得|習得)/.test(text);
+  if(k === '講座を修得'){
+    return /講座を修得/.test(text) && !/講座を完全修得/.test(text);
   }
 
   if(text.includes(k)) return true;
@@ -2326,7 +2324,8 @@ function resultKeywordMatches(r, keyword){
 }
 
 function isAchievementResultRecord(r){
-  return /講座を?(完全)?(修得|習得)|完全(修得|習得)|修得|習得/.test(resultFullText(r));
+  const text = resultFullText(r);
+  return /講座を修得|講座を完全修得/.test(text);
 }
 function isFixedPatternPracticeRecord(r){
   // 毎日掲示の講座修得・完全修得には「定石問題演習」を載せない。
