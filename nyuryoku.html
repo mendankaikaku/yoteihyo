@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>面談予定入力・準備資料アプリ v35（面談準備3ページ目フロー固定版）</title>
+<title>面談予定入力・準備資料アプリ v35（安全な最新更新優先版）</title>
 <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
 <script src="./libs/xlsx.bundle.js">
 // ============================================================
@@ -1224,6 +1224,7 @@ function makeCurrentInputDataFromRestored(data){
 }
 function applyRestoredStudentForInput(name, rawData){
   const restored=normalizeStudentData(rawData);
+  restored._sourceUpdatedAtMillis = inputTimeMillis(rawData?._sourceUpdatedAtMillis) || inputTimeMillis(rawData?.savedAt) || inputTimeMillis(rawData?._savedAt);
   if(!meetingPrepRestoredStudentData) meetingPrepRestoredStudentData={};
   if(restored.weekStart){
     meetingPrepRestoredWeekStart = restored.weekStart;
@@ -2895,7 +2896,7 @@ async function readSubjectListOverridesFromShared(){
           const status=idxStatus>=0?String(row[idxStatus]??'').trim():'';
           const subjects=subjectCols.filter(c=>String(row[c.idx]??'').trim()).map(c=>c.name);
           if(!student && !studentNo && !subjects.length && !status) continue;
-          out.push({student,studentNo,status,subjects,examName:titleInfo.examName,examDate:titleInfo.examDate,sourceFile:file.name,sheetName});
+          out.push({student,studentNo,status,subjects,examName:titleInfo.examName,examDate:titleInfo.examDate,sourceFile:file.name,sheetName,sourceModified:file.lastModified||0});
         }
       }
     }catch(e){}
@@ -2943,15 +2944,17 @@ async function applySubjectListOverridesToInput(names){
       }
       const st=allListStatusFromValue(hit.status, ['当日','後日','不受験']);
       if(st && row.status!==st){
-        inputLogConflict('科目リスト', name, row.name || ex.name || hit.examName, '受験方法', row.status, st, st, '科目リストExcelの受験方法を優先');
-        row.status=st;
+        const dcn=inputLatestDecision(data,row,'status',row.status,st,'科目リストExcel',hit.sourceModified);
+        inputLogConflict('科目リストExcel', name, row.name || ex.name || hit.examName, '受験方法', row.status, st, dcn.adopt ? st : row.status, dcn.reason);
+        if(dcn.adopt){ row.status=st; inputSetFieldUpdatedMillis(row,'status',hit.sourceModified); }
       }
       if(hit.subjects && hit.subjects.length){
         const oldSubjects=(row.subjects||[]).slice();
         if(!inputSubjectArraySame(oldSubjects, hit.subjects)){
-          inputLogConflict('科目リスト', name, row.name || ex.name || hit.examName, '受験科目', oldSubjects, hit.subjects, hit.subjects, '科目リストExcelの具体科目を優先');
+          const dcn=inputLatestDecision(data,row,'subjects',oldSubjects,hit.subjects,'科目リストExcel',hit.sourceModified);
+          inputLogConflict('科目リストExcel', name, row.name || ex.name || hit.examName, '受験科目', oldSubjects, hit.subjects, dcn.adopt ? hit.subjects : oldSubjects, dcn.reason);
+          if(dcn.adopt){ row.subjects=hit.subjects; inputSetFieldUpdatedMillis(row,'subjects',hit.sourceModified); }
         }
-        row.subjects=hit.subjects;
       }
       count++;
     }
@@ -3122,8 +3125,10 @@ async function loadGroup(){
       const groupHit=await readGroupJsonFromSharedByNames(names);
       if(groupHit.mem){
         mem=groupHit.mem;
+        mem._sourceUpdatedAtMillis=groupHit.sourceModified || inputTimeMillis(mem.savedAt);
+        Object.values(mem.studentData||{}).forEach(d=>{ if(d && typeof d==='object' && !d._sourceUpdatedAtMillis) d._sourceUpdatedAtMillis=mem._sourceUpdatedAtMillis; });
         place='保存用フォルダJSON';
-        details.push(`グループJSON: ${groupHit.source}`);
+        details.push(`グループJSON: ${groupHit.source} / 個人JSON更新日時=${inputFormatTimeLabel(mem._sourceUpdatedAtMillis)}`);
       }
       if(!mem){
         const collected={};
@@ -3131,9 +3136,10 @@ async function loadGroup(){
         for(const name of names){
           const oneHit=await readStudentJsonFromSharedByName(name);
           if(oneHit.mem){
+            oneHit.mem._sourceUpdatedAtMillis=oneHit.sourceModified || inputTimeMillis(oneHit.mem.savedAt);
             collected[name]=oneHit.mem;
             if(oneHit.mem && oneHit.mem.weekStart && !meetingPrepRestoredWeekStart) meetingPrepRestoredWeekStart = oneHit.mem.weekStart;
-            details.push(`${name}: ${oneHit.source}`);
+            details.push(`${name}: ${oneHit.source} / 個人JSON更新日時=${inputFormatTimeLabel(oneHit.mem._sourceUpdatedAtMillis)}`);
           }else{
             missing.push(name);
           }
@@ -3661,7 +3667,7 @@ function sameNameSet(a,b){
 async function readGroupJsonFromSharedByNames(names){
   // 1. まず従来の完全一致ファイル名を探す
   const exact=await readJsonFromShared(sharedGroupFileName(names));
-  if(exact) return {mem:exact, source:`${sharedGroupFileName(names)}（完全一致）`};
+  if(exact) return {mem:exact, source:`${sharedGroupFileName(names)}（完全一致）`, sourceModified:inputTimeMillis(exact.savedAt)};
 
   // 2. 名前順が違っても拾えるよう、group_*.json を全部見て中身の names で照合する
   const files=await listJsonFilesFromShared();
@@ -3670,7 +3676,7 @@ async function readGroupJsonFromSharedByNames(names){
     try{
       const file=await handle.getFile();
       const mem=JSON.parse(await file.text());
-      if(sameNameSet(mem.names || [], names)) return {mem, source:`${handle.name}（名前集合一致）`};
+      if(sameNameSet(mem.names || [], names)) return {mem, source:`${handle.name}（名前集合一致）`, sourceModified:file.lastModified||inputTimeMillis(mem.savedAt)};
     }catch(e){}
   }
   return {mem:null, source:''};
@@ -3678,7 +3684,7 @@ async function readGroupJsonFromSharedByNames(names){
 async function readStudentJsonFromSharedByName(name){
   // 1. まず従来の student_名前.json を探す
   const exact=await readJsonFromShared(sharedStudentFileName(name));
-  if(exact) return {mem:exact, source:`${sharedStudentFileName(name)}（完全一致）`};
+  if(exact) return {mem:exact, source:`${sharedStudentFileName(name)}（完全一致）`, sourceModified:inputTimeMillis(exact.savedAt)};
 
   // 2. 念のため student_*.json を全部見て studentName またはファイル名で照合する
   const files=await listJsonFilesFromShared();
@@ -3690,7 +3696,7 @@ async function readStudentJsonFromSharedByName(name){
       const fileBase=handle.name.replace(/^student_/,'').replace(/\.json$/i,'').replace(/_/g,'');
       const key=String(name||'').replace(/[\s\u3000_]+/g,'');
       const memName=String(mem.studentName||'').replace(/[\s\u3000_]+/g,'');
-      if(memName===key || fileBase===key) return {mem, source:`${handle.name}（個人JSON）`};
+      if(memName===key || fileBase===key) return {mem, source:`${handle.name}（個人JSON）`, sourceModified:file.lastModified||inputTimeMillis(mem.savedAt)};
     }catch(e){}
   }
   return {mem:null, source:''};
@@ -3841,6 +3847,49 @@ function inputConflictNormValue(v){
   if(typeof v === 'boolean') return v ? '〇' : '×';
   return String(v ?? '').trim();
 }
+function inputTimeMillis(v){
+  if(!v) return 0;
+  if(typeof v === 'number' && Number.isFinite(v)) return v;
+  const t=Date.parse(String(v));
+  return Number.isFinite(t) ? t : 0;
+}
+function inputFormatTimeLabel(ms){
+  const t=Number(ms||0);
+  if(!t) return '不明';
+  try{return new Date(t).toLocaleString('ja-JP');}catch(e){return '不明';}
+}
+function inputStudentBaseUpdatedMillis(data){
+  return inputTimeMillis(data?._sourceUpdatedAtMillis) || inputTimeMillis(data?.savedAt) || inputTimeMillis(data?._savedAt);
+}
+function inputFieldUpdatedMillis(row, data, field){
+  const m=row && row._sourceFieldTimes && row._sourceFieldTimes[field];
+  return inputTimeMillis(m) || inputStudentBaseUpdatedMillis(data);
+}
+function inputSetFieldUpdatedMillis(row, field, ms){
+  if(!row || !field || !ms) return;
+  if(!row._sourceFieldTimes) row._sourceFieldTimes={};
+  row._sourceFieldTimes[field]=Number(ms||0);
+}
+function inputSourceLabelWithTime(source, sourceModified){
+  return `${source}更新日時=${inputFormatTimeLabel(sourceModified)}`;
+}
+function inputJsonLabelWithTime(currentModified){
+  return `個人JSON更新日時=${inputFormatTimeLabel(currentModified)}`;
+}
+function inputLatestDecision(data, row, field, currentValue, incomingValue, source, sourceModified){
+  const cur=inputConflictNormValue(currentValue);
+  const inc=inputConflictNormValue(incomingValue);
+  const curMs=inputFieldUpdatedMillis(row, data, field);
+  const incMs=inputTimeMillis(sourceModified);
+  if(!inc) return {adopt:false, reason:`採用理由：${source}側が空欄のため既存値を維持（${inputJsonLabelWithTime(curMs)} / ${inputSourceLabelWithTime(source,incMs)}）`, currentModified:curMs, sourceModified:incMs};
+  if(!cur) return {adopt:true, reason:`採用理由：個人側が空欄のため${source}を採用（${inputJsonLabelWithTime(curMs)} / ${inputSourceLabelWithTime(source,incMs)}）`, currentModified:curMs, sourceModified:incMs};
+  if(cur===inc) return {adopt:false, same:true, reason:`採用理由：値が同じため変更なし（${inputJsonLabelWithTime(curMs)} / ${inputSourceLabelWithTime(source,incMs)}）`, currentModified:curMs, sourceModified:incMs};
+  if(incMs && curMs){
+    if(incMs >= curMs) return {adopt:true, reason:`採用理由：更新日時が新しいため（${inputJsonLabelWithTime(curMs)} / ${inputSourceLabelWithTime(source,incMs)}）`, currentModified:curMs, sourceModified:incMs};
+    return {adopt:false, reason:`採用理由：個人JSONの方が新しいため既存値を維持（${inputJsonLabelWithTime(curMs)} / ${inputSourceLabelWithTime(source,incMs)}）`, currentModified:curMs, sourceModified:incMs};
+  }
+  return {adopt:true, reason:`採用理由：更新日時不明のため従来優先元として${source}を採用（${inputJsonLabelWithTime(curMs)} / ${inputSourceLabelWithTime(source,incMs)}）`, currentModified:curMs, sourceModified:incMs};
+}
 function inputLogConflict(source, studentName, targetName, fieldName, currentValue, incomingValue, adoptedValue, reason){
   const cur=inputConflictNormValue(currentValue);
   const inc=inputConflictNormValue(incomingValue);
@@ -3918,7 +3967,7 @@ async function readAllStudentListWorkbookFromShared(){
   const file=await handle.getFile();
   const buf=await file.arrayBuffer();
   const wb=XLSX.read(buf,{type:'array',cellDates:true,cellNF:false,cellText:false,WTF:false});
-  return {workbook:wb, fileName:handle.name};
+  return {workbook:wb, fileName:handle.name, sourceModified:file.lastModified||0};
 }
 function studentNameAliasesForAllList(name){
   const d=ensureStudent(name);
@@ -4039,47 +4088,53 @@ function allListMergeExamPatch(data, patch, studentName){
   if(!ex){ ex={id:patch.id||'',name:patch.name||'',date:patch.date||'',type:patch.type||'common',subjectTemplate:patch.subjectTemplate||'',status:'',comiruAnswered:false,subjects:[],subjectChanged:false,note:''}; data.exams.push(ex); }
   let changed=false;
   if(['当日','後日','不受験'].includes(patch.status) && ex.status!==patch.status){
-    inputLogConflict('全員分リスト', studentName, ex.name || patch.name, '受験方法', ex.status, patch.status, patch.status, '全員分リストの手修正を優先');
-    ex.status=patch.status; changed=true;
+    const dcn=inputLatestDecision(data,ex,'status',ex.status,patch.status,'全員分リストExcel',patch.sourceModified);
+    inputLogConflict('全員分リストExcel', studentName, ex.name || patch.name, '受験方法', ex.status, patch.status, dcn.adopt ? patch.status : ex.status, dcn.reason);
+    if(dcn.adopt){ ex.status=patch.status; inputSetFieldUpdatedMillis(ex,'status',patch.sourceModified); changed=true; }
   }
   // Comiruは「未」より「済」を優先。済みを未に戻さない。
   if(patch.comiruAnswered===true && ex.comiruAnswered!==true){
-    inputLogConflict('全員分リスト', studentName, ex.name || patch.name, 'Comiru回答', ex.comiruAnswered, patch.comiruAnswered, true, '済/〇を優先');
-    ex.comiruAnswered=true; changed=true;
+    const dcn=inputLatestDecision(data,ex,'comiruAnswered',ex.comiruAnswered,patch.comiruAnswered,'全員分リストExcel',patch.sourceModified);
+    inputLogConflict('全員分リストExcel', studentName, ex.name || patch.name, 'Comiru回答', ex.comiruAnswered, patch.comiruAnswered, dcn.adopt ? true : ex.comiruAnswered, dcn.reason);
+    if(dcn.adopt){ ex.comiruAnswered=true; inputSetFieldUpdatedMillis(ex,'comiruAnswered',patch.sourceModified); changed=true; }
   }
   else if(patch.comiruAnswered===false && ex.comiruAnswered!==true && ex.comiruAnswered!==false){
-    inputLogConflict('全員分リスト', studentName, ex.name || patch.name, 'Comiru回答', ex.comiruAnswered, patch.comiruAnswered, false, '個人側が未設定なので×を反映');
-    ex.comiruAnswered=false; changed=true;
+    const dcn=inputLatestDecision(data,ex,'comiruAnswered',ex.comiruAnswered,patch.comiruAnswered,'全員分リストExcel',patch.sourceModified);
+    inputLogConflict('全員分リストExcel', studentName, ex.name || patch.name, 'Comiru回答', ex.comiruAnswered, patch.comiruAnswered, dcn.adopt ? false : ex.comiruAnswered, dcn.reason);
+    if(dcn.adopt){ ex.comiruAnswered=false; inputSetFieldUpdatedMillis(ex,'comiruAnswered',patch.sourceModified); changed=true; }
   }
   // 科目変更も、ありを優先。ありを空/なしで消さない。
   if(patch.subjectChanged===true && ex.subjectChanged!==true){
-    inputLogConflict('全員分リスト', studentName, ex.name || patch.name, '科目変更', ex.subjectChanged, patch.subjectChanged, true, 'あり/〇を優先');
-    ex.subjectChanged=true; changed=true;
+    const dcn=inputLatestDecision(data,ex,'subjectChanged',ex.subjectChanged,patch.subjectChanged,'全員分リストExcel',patch.sourceModified);
+    inputLogConflict('全員分リストExcel', studentName, ex.name || patch.name, '科目変更', ex.subjectChanged, patch.subjectChanged, dcn.adopt ? true : ex.subjectChanged, dcn.reason);
+    if(dcn.adopt){ ex.subjectChanged=true; inputSetFieldUpdatedMillis(ex,'subjectChanged',patch.sourceModified); changed=true; }
   }
   else if(patch.subjectChanged===false && ex.subjectChanged!==true && ex.subjectChanged!==false){
-    inputLogConflict('全員分リスト', studentName, ex.name || patch.name, '科目変更', ex.subjectChanged, patch.subjectChanged, false, '個人側が未設定なので×を反映');
-    ex.subjectChanged=false; changed=true;
+    const dcn=inputLatestDecision(data,ex,'subjectChanged',ex.subjectChanged,patch.subjectChanged,'全員分リストExcel',patch.sourceModified);
+    inputLogConflict('全員分リストExcel', studentName, ex.name || patch.name, '科目変更', ex.subjectChanged, patch.subjectChanged, dcn.adopt ? false : ex.subjectChanged, dcn.reason);
+    if(dcn.adopt){ ex.subjectChanged=false; inputSetFieldUpdatedMillis(ex,'subjectChanged',patch.sourceModified); changed=true; }
   }
   const subjectListStatus=allListSubjectListStatusFromValue(patch.subjectList || '');
   // 全員分リストの「科目リスト」は、入力済/未入力/不受験の確認欄。
   // 入力済だけでは科目名までは分からないため、実科目は後段の「科目リスト」Excelから反映する。
   // ただし不受験は受験方法として確定できるので反映する。
   if(subjectListStatus === '不受験' && ex.status !== '不受験'){
-    inputLogConflict('全員分リスト', studentName, ex.name || patch.name, '科目リスト確認', ex.status, '不受験', '不受験', '科目リスト欄の不受験を受験方法へ反映');
-    ex.status='不受験'; changed=true;
+    const dcn=inputLatestDecision(data,ex,'status',ex.status,'不受験','全員分リストExcel',patch.sourceModified);
+    inputLogConflict('全員分リストExcel', studentName, ex.name || patch.name, '科目リスト確認', ex.status, '不受験', dcn.adopt ? '不受験' : ex.status, dcn.reason);
+    if(dcn.adopt){ ex.status='不受験'; inputSetFieldUpdatedMillis(ex,'status',patch.sourceModified); changed=true; }
   }
   if(Array.isArray(patch.subjects) && patch.subjects.length){
     const oldSubjects=(ex.subjects||[]).slice();
-    const old=oldSubjects.join('|');
     if(!inputSubjectArraySame(oldSubjects, patch.subjects)){
-      inputLogConflict('全員分リスト', studentName, ex.name || patch.name, '受験科目', oldSubjects, patch.subjects, patch.subjects, '全員分リストの科目情報を優先');
+      const dcn=inputLatestDecision(data,ex,'subjects',oldSubjects,patch.subjects,'全員分リストExcel',patch.sourceModified);
+      inputLogConflict('全員分リストExcel', studentName, ex.name || patch.name, '受験科目', oldSubjects, patch.subjects, dcn.adopt ? patch.subjects : oldSubjects, dcn.reason);
+      if(dcn.adopt){ ex.subjects=patch.subjects.slice(); inputSetFieldUpdatedMillis(ex,'subjects',patch.sourceModified); changed=true; }
     }
-    ex.subjects=patch.subjects.slice();
-    if(old!==ex.subjects.join('|')) changed=true;
   }
   if(allListCellText(patch.note)){
-    if(allListCellText(ex.note) && allListCellText(ex.note)!==allListCellText(patch.note)) inputLogConflict('全員分リスト', studentName, ex.name || patch.name, '備考', ex.note, patch.note, patch.note, '全員分リストの備考を優先');
-    ex.note=allListCellText(patch.note); changed=true;
+    const dcn=inputLatestDecision(data,ex,'note',ex.note,patch.note,'全員分リストExcel',patch.sourceModified);
+    if(allListCellText(ex.note) && allListCellText(ex.note)!==allListCellText(patch.note)) inputLogConflict('全員分リストExcel', studentName, ex.name || patch.name, '備考', ex.note, patch.note, dcn.adopt ? patch.note : ex.note, dcn.reason);
+    if(dcn.adopt){ ex.note=allListCellText(patch.note); inputSetFieldUpdatedMillis(ex,'note',patch.sourceModified); changed=true; }
   }
   return changed;
 }
@@ -4092,22 +4147,26 @@ function allListMergeEventPatch(data, patch, studentName){
   if(!ev){ ev={id:patch.id||'',name:patch.name||'',datetime:patch.datetime||'',status:'',comiruAnswered:false,note:''}; data.events.push(ev); }
   let changed=false;
   if(['参加','不参加'].includes(patch.status) && ev.status!==patch.status){
-    inputLogConflict('全員分リスト', studentName, ev.name || patch.name, '参加状況', ev.status, patch.status, patch.status, '全員分リストの手修正を優先');
-    ev.status=patch.status; changed=true;
+    const dcn=inputLatestDecision(data,ev,'status',ev.status,patch.status,'全員分リストExcel',patch.sourceModified);
+    inputLogConflict('全員分リストExcel', studentName, ev.name || patch.name, '参加状況', ev.status, patch.status, dcn.adopt ? patch.status : ev.status, dcn.reason);
+    if(dcn.adopt){ ev.status=patch.status; inputSetFieldUpdatedMillis(ev,'status',patch.sourceModified); changed=true; }
   }
   // Comiruは「未」より「済」を優先。済みを未に戻さない。
   if(patch.comiruAnswered===true && ev.comiruAnswered!==true){
-    inputLogConflict('全員分リスト', studentName, ev.name || patch.name, 'Comiru回答', ev.comiruAnswered, patch.comiruAnswered, true, '済/〇を優先');
-    ev.comiruAnswered=true; changed=true;
+    const dcn=inputLatestDecision(data,ev,'comiruAnswered',ev.comiruAnswered,patch.comiruAnswered,'全員分リストExcel',patch.sourceModified);
+    inputLogConflict('全員分リストExcel', studentName, ev.name || patch.name, 'Comiru回答', ev.comiruAnswered, patch.comiruAnswered, dcn.adopt ? true : ev.comiruAnswered, dcn.reason);
+    if(dcn.adopt){ ev.comiruAnswered=true; inputSetFieldUpdatedMillis(ev,'comiruAnswered',patch.sourceModified); changed=true; }
   }
   else if(patch.comiruAnswered===false && ev.comiruAnswered!==true && ev.comiruAnswered!==false){
-    inputLogConflict('全員分リスト', studentName, ev.name || patch.name, 'Comiru回答', ev.comiruAnswered, patch.comiruAnswered, false, '個人側が未設定なので×を反映');
-    ev.comiruAnswered=false; changed=true;
+    const dcn=inputLatestDecision(data,ev,'comiruAnswered',ev.comiruAnswered,patch.comiruAnswered,'全員分リストExcel',patch.sourceModified);
+    inputLogConflict('全員分リストExcel', studentName, ev.name || patch.name, 'Comiru回答', ev.comiruAnswered, patch.comiruAnswered, dcn.adopt ? false : ev.comiruAnswered, dcn.reason);
+    if(dcn.adopt){ ev.comiruAnswered=false; inputSetFieldUpdatedMillis(ev,'comiruAnswered',patch.sourceModified); changed=true; }
   }
   // イベントは備考も重要なので、復元用シート/全員分リストの備考を反映する。
   if(allListCellText(patch.note)){
-    if(allListCellText(ev.note) && allListCellText(ev.note)!==allListCellText(patch.note)) inputLogConflict('全員分リスト', studentName, ev.name || patch.name, '備考', ev.note, patch.note, patch.note, '全員分リストの備考を優先');
-    ev.note=allListCellText(patch.note); changed=true;
+    const dcn=inputLatestDecision(data,ev,'note',ev.note,patch.note,'全員分リストExcel',patch.sourceModified);
+    if(allListCellText(ev.note) && allListCellText(ev.note)!==allListCellText(patch.note)) inputLogConflict('全員分リストExcel', studentName, ev.name || patch.name, '備考', ev.note, patch.note, dcn.adopt ? patch.note : ev.note, dcn.reason);
+    if(dcn.adopt){ ev.note=allListCellText(patch.note); inputSetFieldUpdatedMillis(ev,'note',patch.sourceModified); changed=true; }
   }
   return changed;
 }
@@ -4347,6 +4406,7 @@ function allListPreferPatch(oldPatch, newPatch, kind){
   const newRank=allListPatchStatusRank(newPatch.status, kind);
   if(newRank > oldRank || (newRank === oldRank && allListCellText(newPatch.status))) out.status = newPatch.status;
   if(newPatch.comiruAnswered === true || (oldPatch.comiruAnswered !== true && typeof newPatch.comiruAnswered === 'boolean')) out.comiruAnswered = newPatch.comiruAnswered;
+  if(Number(newPatch.sourceModified||0) > Number(out.sourceModified||0)) out.sourceModified = newPatch.sourceModified;
   if(kind==='exam'){
     if(newPatch.subjectChanged === true || (oldPatch.subjectChanged !== true && typeof newPatch.subjectChanged === 'boolean')) out.subjectChanged = newPatch.subjectChanged;
     if(allListCellText(newPatch.subjectList)) out.subjectList = allListSubjectListStatusFromValue(newPatch.subjectList) || allListCellText(newPatch.subjectList);
@@ -4444,8 +4504,8 @@ async function applyAllStudentListOverridesToInput(names){
       Object.entries(patches).forEach(([name,p])=>{
         const b=allPatches[name]||(allPatches[name]={exams:[],events:[],remarks:''});
         if(allListCellText(p.remarks)) b.remarks=allListCellText(p.remarks);
-        (p.exams||[]).forEach(ex=>allListAddPatchWithPriority(b,'exam',ex));
-        (p.events||[]).forEach(ev=>allListAddPatchWithPriority(b,'event',ev));
+        (p.exams||[]).forEach(ex=>{ ex.sourceModified=hit.sourceModified||0; allListAddPatchWithPriority(b,'exam',ex); });
+        (p.events||[]).forEach(ev=>{ ev.sourceModified=hit.sourceModified||0; allListAddPatchWithPriority(b,'event',ev); });
       });
     });
     Object.entries(allPatches).forEach(([name,p])=>{
