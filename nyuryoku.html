@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>面談予定入力・準備資料アプリ v35（安全な最新更新優先版）</title>
+<title>面談予定入力・準備資料アプリ v36（重複Excel安全最新優先版）</title>
 <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
 <script src="./libs/xlsx.bundle.js">
 // ============================================================
@@ -2774,6 +2774,10 @@ async function listExcelFilesInDirectory(dir){
       try{ files.push(await entry.getFile()); }catch(e){}
     }
   }
+  // 複数Excelがある場合は更新日時が新しい順に読む。
+  // ただし、後段の反映では「空欄では上書きしない」ので、
+  // 新しいExcelにデータがない項目は古いExcelの具体値を拾える。
+  files.sort((a,b)=>(b.lastModified-a.lastModified)||String(a.name).localeCompare(String(b.name),'ja'));
   return files;
 }
 
@@ -2928,35 +2932,41 @@ async function applySubjectListOverridesToInput(names){
     (data.exams || []).forEach(addCandidate);
     for(const ex of candidates){
       const id=ex.id || examId(ex);
-      const hit=overrides.find(o=>{
+      const hits=overrides.filter(o=>{
         const sameStudent = (no && o.studentNo && String(o.studentNo).trim()===no) || (o.student && examTargetNameMatch(name,[o.student]));
         if(!sameStudent) return false;
         const sameExam = subjectListExamNameMatches(o.examName, ex.name || '');
         const sameDate = !o.examDate || !ex.date || o.examDate===ex.date;
         return sameExam && sameDate;
-      });
-      if(!hit) continue;
+      }).sort((a,b)=>Number(b.sourceModified||0)-Number(a.sourceModified||0));
+      if(!hits.length) continue;
       let row=(data.exams||[]).find(e=>(e.id||'')===id);
-      if(!row) row=(data.exams||[]).find(e=>subjectListExamNameMatches(e.name || '', ex.name || '') && (!hit.examDate || !e.date || e.date===hit.examDate));
+      if(!row) row=(data.exams||[]).find(e=>subjectListExamNameMatches(e.name || '', ex.name || '') && hits.some(h=>!h.examDate || !e.date || e.date===h.examDate));
       if(!row){
-        row={id,name:ex.name||hit.examName||'',date:ex.date||hit.examDate||'',type:ex.type||'common',subjectTemplate:ex.subjectTemplate||'',status:'',comiruAnswered:false,subjects:[],subjectChanged:false,note:''};
+        const first=hits[0];
+        row={id,name:ex.name||first.examName||'',date:ex.date||first.examDate||'',type:ex.type||'common',subjectTemplate:ex.subjectTemplate||'',status:'',comiruAnswered:false,subjects:[],subjectChanged:false,note:''};
         data.exams.push(row);
       }
-      const st=allListStatusFromValue(hit.status, ['当日','後日','不受験']);
-      if(st && row.status!==st){
-        const dcn=inputLatestDecision(data,row,'status',row.status,st,'科目リストExcel',hit.sourceModified);
-        inputLogConflict('科目リストExcel', name, row.name || ex.name || hit.examName, '受験方法', row.status, st, dcn.adopt ? st : row.status, dcn.reason);
-        if(dcn.adopt){ row.status=st; inputSetFieldUpdatedMillis(row,'status',hit.sourceModified); }
-      }
-      if(hit.subjects && hit.subjects.length){
-        const oldSubjects=(row.subjects||[]).slice();
-        if(!inputSubjectArraySame(oldSubjects, hit.subjects)){
-          const dcn=inputLatestDecision(data,row,'subjects',oldSubjects,hit.subjects,'科目リストExcel',hit.sourceModified);
-          inputLogConflict('科目リストExcel', name, row.name || ex.name || hit.examName, '受験科目', oldSubjects, hit.subjects, dcn.adopt ? hit.subjects : oldSubjects, dcn.reason);
-          if(dcn.adopt){ row.subjects=hit.subjects; inputSetFieldUpdatedMillis(row,'subjects',hit.sourceModified); }
+      let touched=false;
+      // 同一生徒・同一模試の科目リストExcelが複数ある場合は、新しい順に確認する。
+      // 新しいExcelの該当項目が空なら、古いExcelの具体値を拾う。
+      for(const hit of hits){
+        const st=allListStatusFromValue(hit.status, ['当日','後日','不受験']);
+        if(st && row.status!==st){
+          const dcn=inputLatestDecision(data,row,'status',row.status,st,'科目リストExcel',hit.sourceModified);
+          inputLogConflict('科目リストExcel', name, row.name || ex.name || hit.examName, '受験方法', row.status, st, dcn.adopt ? st : row.status, dcn.reason);
+          if(dcn.adopt){ row.status=st; inputSetFieldUpdatedMillis(row,'status',hit.sourceModified); touched=true; }
+        }
+        if(hit.subjects && hit.subjects.length){
+          const oldSubjects=(row.subjects||[]).slice();
+          if(!inputSubjectArraySame(oldSubjects, hit.subjects)){
+            const dcn=inputLatestDecision(data,row,'subjects',oldSubjects,hit.subjects,'科目リストExcel',hit.sourceModified);
+            inputLogConflict('科目リストExcel', name, row.name || ex.name || hit.examName, '受験科目', oldSubjects, hit.subjects, dcn.adopt ? hit.subjects : oldSubjects, dcn.reason);
+            if(dcn.adopt){ row.subjects=hit.subjects; inputSetFieldUpdatedMillis(row,'subjects',hit.sourceModified); touched=true; }
+          }
         }
       }
-      count++;
+      if(touched) count++;
     }
   }
   return {count};
@@ -3958,16 +3968,24 @@ async function findLatestExcelFileInDir(dir){
   files.sort((a,b)=>(b.lastModified-a.lastModified)||String(b.name).localeCompare(String(a.name),'ja'));
   return files[0]?.handle || null;
 }
-async function readAllStudentListWorkbookFromShared(){
-  if(!window.XLSX || !sharedDirHandle) return null;
+async function readAllStudentListWorkbooksFromShared(){
+  if(!window.XLSX || !sharedDirHandle) return [];
   const allDir=await findDirectoryByNameRecursive(sharedDirHandle,'全員分リスト',5);
-  if(!allDir) return null;
-  const handle=await findLatestExcelFileInDir(allDir);
-  if(!handle) return null;
-  const file=await handle.getFile();
-  const buf=await file.arrayBuffer();
-  const wb=XLSX.read(buf,{type:'array',cellDates:true,cellNF:false,cellText:false,WTF:false});
-  return {workbook:wb, fileName:handle.name, sourceModified:file.lastModified||0};
+  if(!allDir) return [];
+  const files=await listExcelFilesInDirectory(allDir);
+  const hits=[];
+  for(const file of files){
+    try{
+      const buf=await file.arrayBuffer();
+      const wb=XLSX.read(buf,{type:'array',cellDates:true,cellNF:false,cellText:false,WTF:false});
+      hits.push({workbook:wb, fileName:file.name, sourceModified:file.lastModified||0});
+    }catch(e){}
+  }
+  return hits;
+}
+async function readAllStudentListWorkbookFromShared(){
+  const hits=await readAllStudentListWorkbooksFromShared();
+  return hits[0] || null;
 }
 function studentNameAliasesForAllList(name){
   const d=ensureStudent(name);
@@ -4400,20 +4418,43 @@ function allListPatchKey(patch, kind){
   return allListNormKey([patch.id||'', patch.name||'', patch.datetime||''].join('|'));
 }
 function allListPreferPatch(oldPatch, newPatch, kind){
-  if(!oldPatch) return newPatch;
+  if(!oldPatch) return Object.assign({}, newPatch);
   const out=Object.assign({}, oldPatch);
-  const oldRank=allListPatchStatusRank(oldPatch.status, kind);
-  const newRank=allListPatchStatusRank(newPatch.status, kind);
-  if(newRank > oldRank || (newRank === oldRank && allListCellText(newPatch.status))) out.status = newPatch.status;
-  if(newPatch.comiruAnswered === true || (oldPatch.comiruAnswered !== true && typeof newPatch.comiruAnswered === 'boolean')) out.comiruAnswered = newPatch.comiruAnswered;
-  if(Number(newPatch.sourceModified||0) > Number(out.sourceModified||0)) out.sourceModified = newPatch.sourceModified;
+  const oldMs=Number(oldPatch.sourceModified||0);
+  const newMs=Number(newPatch.sourceModified||0);
+  const preferIncomingValue=(oldVal,newVal)=>{
+    const oldText=allListCellText(oldVal);
+    const newText=allListCellText(newVal);
+    if(!newText) return false;       // データがないときは、あるものを優先
+    if(!oldText) return true;
+    if(oldText===newText) return false;
+    if(newMs && oldMs) return newMs >= oldMs;
+    if(newMs && !oldMs) return true;
+    return false;
+  };
+  const preferIncomingBool=(oldVal,newVal)=>{
+    if(typeof newVal !== 'boolean') return false; // データなし
+    if(typeof oldVal !== 'boolean') return true;
+    if(oldVal===newVal) return false;
+    if(newMs && oldMs) return newMs >= oldMs;
+    if(newMs && !oldMs) return true;
+    return false;
+  };
+
+  if(preferIncomingValue(oldPatch.status,newPatch.status)) out.status = newPatch.status;
+  if(preferIncomingBool(oldPatch.comiruAnswered,newPatch.comiruAnswered)) out.comiruAnswered = newPatch.comiruAnswered;
+  if(newMs > oldMs) out.sourceModified = newMs;
+
   if(kind==='exam'){
-    if(newPatch.subjectChanged === true || (oldPatch.subjectChanged !== true && typeof newPatch.subjectChanged === 'boolean')) out.subjectChanged = newPatch.subjectChanged;
-    if(allListCellText(newPatch.subjectList)) out.subjectList = allListSubjectListStatusFromValue(newPatch.subjectList) || allListCellText(newPatch.subjectList);
-    if(Array.isArray(newPatch.subjects) && newPatch.subjects.length) out.subjects = newPatch.subjects.slice();
+    if(preferIncomingBool(oldPatch.subjectChanged,newPatch.subjectChanged)) out.subjectChanged = newPatch.subjectChanged;
+    if(preferIncomingValue(oldPatch.subjectList,newPatch.subjectList)) out.subjectList = allListSubjectListStatusFromValue(newPatch.subjectList) || allListCellText(newPatch.subjectList);
+    if(Array.isArray(newPatch.subjects) && newPatch.subjects.length){
+      const oldHas=Array.isArray(oldPatch.subjects) && oldPatch.subjects.length;
+      if(!oldHas || (newMs && (!oldMs || newMs>=oldMs))) out.subjects = newPatch.subjects.slice();
+    }
     ['id','name','date','type','subjectTemplate'].forEach(k=>{ if(allListCellText(newPatch[k]) && !allListCellText(out[k])) out[k]=newPatch[k]; });
   }else{
-    if(allListCellText(newPatch.note)) out.note = newPatch.note;
+    if(preferIncomingValue(oldPatch.note,newPatch.note)) out.note = newPatch.note;
     ['id','name','datetime'].forEach(k=>{ if(allListCellText(newPatch[k]) && !allListCellText(out[k])) out[k]=newPatch[k]; });
   }
   return out;
@@ -4491,23 +4532,32 @@ function parseSmallAllListOverridesFromRows(aoa, targetNames){
 
 async function applyAllStudentListOverridesToInput(names){
   try{
-    const hit=await readAllStudentListWorkbookFromShared();
-    if(!hit) return {applied:0,msg:'全員分リストExcelなし'};
+    const hits=await readAllStudentListWorkbooksFromShared();
+    if(!hits.length) return {applied:0,msg:'全員分リストExcelなし'};
     let applied=0;
-    const wb=hit.workbook;
     const allPatches={};
-    (wb.SheetNames||[]).forEach(sheetName=>{
-      const ws=wb.Sheets[sheetName];
-      const aoa=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false,blankrows:false});
-      const isSmallSheet=String(sheetName||'').includes('小規模模試イベント');
-      const patches=isSmallSheet ? parseSmallAllListOverridesFromRows(aoa,names) : parseAllListOverridesFromRows(aoa,names);
-      Object.entries(patches).forEach(([name,p])=>{
-        const b=allPatches[name]||(allPatches[name]={exams:[],events:[],remarks:''});
-        if(allListCellText(p.remarks)) b.remarks=allListCellText(p.remarks);
-        (p.exams||[]).forEach(ex=>{ ex.sourceModified=hit.sourceModified||0; allListAddPatchWithPriority(b,'exam',ex); });
-        (p.events||[]).forEach(ev=>{ ev.sourceModified=hit.sourceModified||0; allListAddPatchWithPriority(b,'event',ev); });
+    const usedFiles=[];
+    for(const hit of hits){
+      const wb=hit.workbook;
+      usedFiles.push(`${hit.fileName}(${inputFormatTimeLabel(hit.sourceModified)})`);
+      (wb.SheetNames||[]).forEach(sheetName=>{
+        const ws=wb.Sheets[sheetName];
+        const aoa=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false,blankrows:false});
+        const isSmallSheet=String(sheetName||'').includes('小規模模試イベント');
+        const patches=isSmallSheet ? parseSmallAllListOverridesFromRows(aoa,names) : parseAllListOverridesFromRows(aoa,names);
+        Object.entries(patches).forEach(([name,p])=>{
+          const b=allPatches[name]||(allPatches[name]={exams:[],events:[],remarks:'',_remarksSourceModified:0});
+          if(allListCellText(p.remarks)){
+            if(!allListCellText(b.remarks) || Number(hit.sourceModified||0) >= Number(b._remarksSourceModified||0)){
+              b.remarks=allListCellText(p.remarks);
+              b._remarksSourceModified=hit.sourceModified||0;
+            }
+          }
+          (p.exams||[]).forEach(ex=>{ ex.sourceModified=hit.sourceModified||0; allListAddPatchWithPriority(b,'exam',ex); });
+          (p.events||[]).forEach(ev=>{ ev.sourceModified=hit.sourceModified||0; allListAddPatchWithPriority(b,'event',ev); });
+        });
       });
-    });
+    }
     Object.entries(allPatches).forEach(([name,p])=>{
       const data=ensureStudent(name);
       if(allListCellText(p.remarks) && data.remarks !== allListCellText(p.remarks)){
@@ -4517,7 +4567,7 @@ async function applyAllStudentListOverridesToInput(names){
       (p.exams||[]).forEach(ex=>{ if(allListMergeExamPatch(data,ex,name)) applied++; });
       (p.events||[]).forEach(ev=>{ if(allListMergeEventPatch(data,ev,name)) applied++; });
     });
-    return {applied,msg:`全員分リスト反映: ${hit.fileName} / ${applied}件`};
+    return {applied,msg:`全員分リスト反映: ${hits.length}ファイル / ${applied}件（最新優先・空欄は無視）\n読込: ${usedFiles.slice(0,5).join(' / ')}${usedFiles.length>5 ? ' / …' : ''}`};
   }catch(e){
     return {applied:0,msg:`全員分リスト反映エラー: ${e?.message || e}`};
   }
