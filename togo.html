@@ -391,6 +391,7 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
       <button id="downloadAllListBtn" class="outputAction" disabled>④ 全員分リスト</button>
       <button id="downloadExamSubjectListBtn" class="outputAction" disabled>④ 科目リスト出力</button>
       <button id="downloadMonthlyPosterBtn" class="outputAction">④ 毎日掲示</button>
+      <div id="dailyPosterTargetPreview" class="hint" style="margin-top:6px;line-height:1.55;white-space:pre-wrap;"></div>
       <button id="clearBtn" class="secondary">リセット</button>
     </div>
   </div>
@@ -3689,6 +3690,63 @@ function examSubjectListRestoreOnlySheets(usedSheetNames){
   return out;
 }
 
+
+function examSubjectListUniqueRestoreSources(){
+  const set = new Set();
+  for(const [, data] of (state.examSubjectListRestores || new Map()).entries()){
+    if(data && data.sourceFile) set.add(data.sourceFile);
+  }
+  return [...set];
+}
+function examSubjectListStudentCountFromAoa(aoa){
+  return Math.max(0, (aoa || []).slice(2).filter(row => (row || []).some(v => norm(v))).length);
+}
+function examSubjectListTitleText(item){
+  const aoa = item?.aoa || [];
+  const titleRow = aoa[0] || [];
+  const title = titleRow.map(v => norm(v)).filter(Boolean).join(' ');
+  if(title) return title;
+  const exam = item?.exam || {};
+  return [exam.examDate, exam.examName].map(norm).filter(Boolean).join(' ') || item?.sheetName || '';
+}
+function buildExamSubjectListOutputLogRows(exams, generatedSheets, restoreOnlySheets, finalSheets){
+  const rows = [["区分","模試/シート","学年","日付","対象人数","シート作成","備考"]];
+  const restoreSources = examSubjectListUniqueRestoreSources();
+  rows.push(['概要','読み込み模試レコード','','', (exams || []).length, '', '打ち込み結果フォルダー内の模試確認を全件対象']);
+  rows.push(['概要','生成シート数','','', (generatedSheets || []).length, '', '新規に作成した模試科目シート']);
+  rows.push(['概要','復元のみシート数','','', (restoreOnlySheets || []).length, '', '前回科目リストExcelにだけ存在したシートを残した数']);
+  rows.push(['概要','前回科目リスト復元元','','', restoreSources.length, '', restoreSources.join(' / ') || 'なし']);
+  rows.push(['概要','手修正衝突ログ','','', Math.max(0, (state.examSubjectListUpdateLog || []).length - 1), '', '衝突がある場合は更新ログシートを確認']);
+  for(const item of generatedSheets || []){
+    const exam = item.exam || {};
+    const count = examSubjectListStudentCountFromAoa(item.aoa);
+    rows.push(['作成', examSubjectListTitleText(item), exam.grade || '', exam.examDate || '', count, '作成', item.sheetName || '']);
+  }
+  for(const item of restoreOnlySheets || []){
+    const count = examSubjectListStudentCountFromAoa(item.aoa);
+    rows.push(['復元のみ', examSubjectListTitleText(item), '', '', count, '作成', '今回の打ち込み結果にはないが、前回科目リストExcelの手修正シートを保持']);
+  }
+  if(!(finalSheets || []).length){
+    rows.push(['警告','出力対象なし','','',0,'未作成','打ち込み結果に模試確認データがない可能性があります']);
+  }
+  return rows;
+}
+function logExamSubjectListOutput(exams, generatedSheets, restoreOnlySheets, finalSheets){
+  const lines = [];
+  const restoreSources = examSubjectListUniqueRestoreSources();
+  lines.push('--- 科目リスト出力ログ ---');
+  lines.push(`読み込み模試レコード: ${(exams || []).length}件`);
+  lines.push(`生成シート: ${(generatedSheets || []).length}件 / 復元のみシート: ${(restoreOnlySheets || []).length}件 / 最終シート: ${(finalSheets || []).length}件`);
+  lines.push(`前回科目リスト復元元: ${restoreSources.length ? restoreSources.join(' / ') : 'なし'}`);
+  for(const item of finalSheets || []){
+    lines.push(`✅ ${item.sheetName}: ${examSubjectListStudentCountFromAoa(item.aoa)}名（${examSubjectListTitleText(item)}）`);
+  }
+  const conflicts = Math.max(0, (state.examSubjectListUpdateLog || []).length - 1);
+  if(conflicts) lines.push(`⚠ 科目リスト手修正との衝突: ${conflicts}件（Excel内の「更新ログ」シートを確認）`);
+  if(!(finalSheets || []).length) lines.push('⚠ 出力対象0件：入力用で模試登録後に保存し、統合用で①フォルダーを読み直してください。');
+  log(lines.join('\n'));
+}
+
 function eventKeyOf(r){ return `${r.datetime || ''}\t${r.eventName || ''}`; }
 
 async function downloadExamSubjectListWorkbook(){
@@ -3702,15 +3760,18 @@ async function downloadExamSubjectListWorkbook(){
   const label = `${ymd(center)}_全対象模試`;
   const exams = (state.examRecords || []).filter(r => norm(r.examName));
 
-  let examSheets = buildExamSubjectSheets(exams || []);
-  const generatedSheetNames = new Set(examSheets.map(x => x.sheetName));
-  examSheets = examSheets.map(x => ({...x, aoa:mergeRestoredExamSubjectListAoa(x.sheetName, x.aoa)}));
-  examSheets.push(...examSubjectListRestoreOnlySheets(generatedSheetNames));
+  const generatedExamSheetsRaw = buildExamSubjectSheets(exams || []);
+  const generatedSheetNames = new Set(generatedExamSheetsRaw.map(x => x.sheetName));
+  const generatedExamSheets = generatedExamSheetsRaw.map(x => ({...x, aoa:mergeRestoredExamSubjectListAoa(x.sheetName, x.aoa)}));
+  const restoreOnlySheets = examSubjectListRestoreOnlySheets(generatedSheetNames);
+  let examSheets = [...generatedExamSheets, ...restoreOnlySheets];
+  logExamSubjectListOutput(exams, generatedExamSheets, restoreOnlySheets, examSheets);
   if(!examSheets.length){
     alert('科目リスト出力対象の模試がありません。\n原因候補：\n・保存復元フォルダー/打ち込み結果/ に対象生徒の予定Excelがない\n・入力用で模試登録後、統合用で①フォルダーを読み直していない\n・対象生徒のExcel内に模試確認データが入っていない');
     log('科目リスト出力不可：対象の模試科目データがありません。\n確認：保存復元フォルダー/打ち込み結果/ に入力用で保存したExcelがあるか、統合用で①フォルダーを読み直したか、入力用で対象生徒に模試登録して保存したか。\nstate.examRecords=' + ((state.examRecords||[]).length));
     return;
   }
+  const outputLogRows = buildExamSubjectListOutputLogRows(exams, generatedExamSheets, restoreOnlySheets, examSheets);
 
   const wb = XLSX.utils.book_new();
   const used = new Set();
@@ -3738,8 +3799,27 @@ async function downloadExamSubjectListWorkbook(){
     XLSX.utils.book_append_sheet(wb, ws, uniqueSheetName(item.sheetName, used));
   }
 
+  if(outputLogRows && outputLogRows.length){
+    const logWs = aoaToSheet(outputLogRows);
+    applyNiceSheetSettings(logWs, outputLogRows, [12,42,10,14,12,12,58], {rows:{min:22,max:72,header:28,pxPerLine:18}});
+    XLSX.utils.book_append_sheet(wb, logWs, uniqueSheetName('出力ログ', used));
+  }
+  if(state.examSubjectListUpdateLog && state.examSubjectListUpdateLog.length > 1){
+    const updateWs = aoaToSheet(state.examSubjectListUpdateLog);
+    applyNiceSheetSettings(updateWs, state.examSubjectListUpdateLog, [18,14,24,18,18,18,24,24,24,36], {rows:{min:22,max:90,header:28,pxPerLine:18}});
+    XLSX.utils.book_append_sheet(wb, updateWs, uniqueSheetName('更新ログ', used));
+  }
+
+  appendCommonUpdateLogSheet(wb, '科目リスト', [
+    ['対象', '打ち込み結果内の全模試確認', '基準日±14日では絞らない'],
+    ['読み込み模試レコード', String(exams.length), '入力用で保存された模試確認データ'],
+    ['生成シート数', String(generatedExamSheets.length), '今回の打ち込み結果から作成'],
+    ['復元のみシート数', String(restoreOnlySheets.length), '前回科目リストExcelにだけあるシートを保持'],
+    ['手修正衝突ログ', String(Math.max(0, (state.examSubjectListUpdateLog || []).length - 1)), '更新ログシートを確認']
+  ], used);
+  appendHiddenManagementIdSheet(wb, '科目リスト');
   XLSX.writeFile(wb, `模試科目リスト_${label}.xlsx`);
-  log(`科目リストを出力しました\n対象: 打ち込み結果内の全模試確認\n読み込み模試レコード: ${exams.length}件\nシート数: ${examSheets.length}`);
+  log(`科目リストを出力しました\n対象: 打ち込み結果内の全模試確認\n読み込み模試レコード: ${exams.length}件\n生成シート数: ${generatedExamSheets.length}\n復元のみシート数: ${restoreOnlySheets.length}\n最終シート数: ${examSheets.length}\n手修正衝突ログ: ${Math.max(0, (state.examSubjectListUpdateLog || []).length - 1)}件${(state.examSubjectListUpdateLog || []).length > 1 ? '\nExcel内の「更新ログ」シートを確認してください。' : ''}`);
 }
 
 function buildEventSheetAoa(records, grade, eventKey){
@@ -4675,6 +4755,81 @@ function diagnoseHighSpeedSheetsForDaily(sheets, from, to){
   return lines.join('\n') || 'シートなし';
 }
 
+
+// ============================================================
+// 追加改善 5/10/11: 対象日固定表示・管理ID・更新ログ共通ヘルパー
+// ============================================================
+function dailyPosterTargetSummaryLinesForUi(){
+  const base = (typeof APP_OPENED_AT !== 'undefined' && APP_OPENED_AT) ? APP_OPENED_AT : new Date();
+  const y = new Date(base.getFullYear(), base.getMonth(), base.getDate()-1);
+  const m1 = new Date(base.getFullYear(), base.getMonth(), 1);
+  const m2 = new Date(base.getFullYear(), base.getMonth()+1, 0);
+  const ymdSafe = (typeof ymd === 'function') ? ymd : (d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+  return [
+    `毎日掲示の対象`,
+    `連続実施：${ymdSafe(y)}（アプリを開いた日の前日）`,
+    `高速ランキング：${ymdSafe(y)}（アプリを開いた日の前日）`,
+    `講座修得：${ymdSafe(m1)}〜${ymdSafe(m2)}（アプリを開いた月）`,
+    `完全修得：${ymdSafe(m1)}〜${ymdSafe(m2)}（アプリを開いた月）`
+  ];
+}
+function updateDailyPosterTargetPreview(){
+  try{
+    const el = document.getElementById('dailyPosterTargetPreview');
+    if(el) el.textContent = dailyPosterTargetSummaryLinesForUi().join('\n');
+  }catch(e){ console.warn('毎日掲示対象表示の更新をスキップしました', e); }
+}
+if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', updateDailyPosterTargetPreview);
+else setTimeout(updateDailyPosterTargetPreview, 0);
+
+function managementIdValue(prefix, parts){
+  const body = (parts||[]).map(v=>String(v||'').trim()).filter(Boolean).join('|');
+  return `${prefix}:${body}`;
+}
+function buildManagementIdSheetAoa(context='出力'){ 
+  const rows = [['区分','管理ID','生徒番号','生徒名','対象ID','対象名','日付','補足']];
+  try{
+    (state.examRecords||[]).forEach(r=>{
+      rows.push(['模試', managementIdValue('exam',[r.studentNo||r.student,r.examName,r.examDate||r.datetime]), r.studentNo||'', r.student||'', managementIdValue('exam',[r.examName,r.examDate||r.datetime]), r.examName||'', r.examDate||r.datetime||'', context]);
+    });
+    (state.eventRecords||[]).forEach(r=>{
+      rows.push(['イベント', managementIdValue('event',[r.studentNo||r.student,r.eventName,r.datetime]), r.studentNo||'', r.student||'', managementIdValue('event',[r.eventName,r.datetime]), r.eventName||'', r.datetime||'', context]);
+    });
+    (state.resultRecords||[]).slice(0,2000).forEach(r=>{
+      rows.push(['結果', managementIdValue('result',[r.studentNo||r.student,r.dateKey||r.datetime,r.study,r.result]), r.studentNo||'', r.student||'', managementIdValue('result',[r.dateKey||r.datetime,r.study,r.result]), r.study||r.category||'', r.dateKey||r.datetime||'', context]);
+    });
+  }catch(e){ rows.push(['エラー','','','','','','',String(e&&e.message||e)]); }
+  return rows;
+}
+function appendHiddenManagementIdSheet(wb, context){
+  try{
+    if(!wb || !window.XLSX) return;
+    const aoa = buildManagementIdSheetAoa(context);
+    const ws = aoaToSheet ? aoaToSheet(aoa) : XLSX.utils.aoa_to_sheet(aoa);
+    XLSX.utils.book_append_sheet(wb, ws, '管理ID');
+    wb.Workbook = wb.Workbook || {};
+    wb.Workbook.Sheets = wb.Workbook.Sheets || [];
+    const idx = (wb.SheetNames || []).indexOf('管理ID');
+    if(idx >= 0){ wb.Workbook.Sheets[idx] = wb.Workbook.Sheets[idx] || {}; wb.Workbook.Sheets[idx].Hidden = 1; }
+  }catch(e){ console.warn('管理IDシート追加をスキップしました', e); }
+}
+function buildCommonOutputUpdateLogAoa(kind, rows){
+  const ymdSafe = (typeof ymd === 'function') ? ymd : (d=>new Date(d).toLocaleDateString('ja-JP'));
+  const now = new Date().toLocaleString('ja-JP');
+  const out = [['日時','出力種別','対象','件数/値','採用理由・確認ポイント']];
+  out.push([now, kind, '作成日時', now, '出力時点の診断用']);
+  (rows||[]).forEach(r=>out.push([now, kind, r[0]||'', r[1]||'', r[2]||'']));
+  return out;
+}
+function appendCommonUpdateLogSheet(wb, kind, rows, usedSet){
+  try{
+    const aoa = buildCommonOutputUpdateLogAoa(kind, rows);
+    const ws = aoaToSheet ? aoaToSheet(aoa) : XLSX.utils.aoa_to_sheet(aoa);
+    const name = (typeof uniqueSheetName === 'function') ? uniqueSheetName('更新ログ', usedSet || new Set(wb.SheetNames||[])) : '更新ログ';
+    XLSX.utils.book_append_sheet(wb, ws, name);
+  }catch(e){ console.warn('更新ログシート追加をスキップしました', e); }
+}
+
 async function downloadMonthlyPosterResultWorkbook(){
   if(!state.resultFiles.length && !state.resultHistoryFiles.length && !state.resultRecords.length){
     alert('毎日更新.xlsxまたは結果履歴JSONを選択してください。');
@@ -4737,6 +4892,15 @@ async function downloadMonthlyPosterResultWorkbook(){
     XLSX.utils.book_append_sheet(wb, rankingWs, rankingSheetName);
     setHighSpeedRankingPrintAreaTop10(wb, rankingSheetName);
 
+    appendCommonUpdateLogSheet(wb, '毎日掲示', [
+      ['連続実施対象日', ymd(yesterday.from), 'アプリを開いた日の前日だけを採用'],
+      ['高速ランキング対象日', ymd(highSpeedTarget.from), 'アプリを開いた日の前日だけを採用'],
+      ['講座修得・完全修得対象月', `${ymd(month.from)}〜${ymd(month.to)}`, 'アプリを開いた月だけを採用'],
+      ['直接読込records', String((directLoaded.records || []).length), 'result_history.json + 毎日更新.xlsx'],
+      ['画面上records', String((state.resultRecords || []).length), '過去分落ち対策として保険合流'],
+      ['重複整理後records', String(allResults.length), 'mergeResultRecordsUnique後']
+    ], used);
+    appendHiddenManagementIdSheet(wb, '毎日掲示');
     XLSX.writeFile(wb, `校舎掲示用_毎日更新_${ymd(month.from)}-${ymd(month.to)}.xlsx`);
 
     const counts = MONTHLY_POSTER_RESULT_RULES.map(rule => {
@@ -7023,6 +7187,14 @@ async function downloadAllStudentList(){
     }
 
     const base = allListBaseDate();
+    appendCommonUpdateLogSheet(wb, '全員分リスト', [
+      ['基準日', ymd(base), '基準日の2日前・1日前・当日を出力'],
+      ['模試レコード', String(exams.length), '期間指定がある場合はその期間で抽出'],
+      ['イベントレコード', String(events.length), '期間指定がある場合はその期間で抽出'],
+      ['学年別シート数', String(gradeAoas.length), '各学年の更新入力・印刷シートを作成'],
+      ['手修正衝突ログ', String(Math.max(0, (state.allListUpdateLog?.length || 1) - 1)), '更新ログシートを確認']
+    ]);
+    appendHiddenManagementIdSheet(wb, '全員分リスト');
     XLSX.writeFile(wb, `全員分リスト_学年別_B4横_${ymd(base)}基準.xlsx`);
     if(typeof log === 'function'){
       const count = Math.max(0, (state.allListUpdateLog?.length || 1) - 1);
@@ -7183,6 +7355,13 @@ function downloadWorkbookFromAoa(calendarAoa, listAoa, resultAoa, rosterAoa, log
   examSheetObjects.forEach(s => XLSX.utils.book_append_sheet(wb, s.ws, s.sheetName));
   eventSheetObjects.forEach(s => XLSX.utils.book_append_sheet(wb, s.ws, s.sheetName));
   XLSX.utils.book_append_sheet(wb, wsLog, "ログ");
+  appendCommonUpdateLogSheet(wb, '全体予定表', [
+    ['ラベル', label, '2週間・1か月・期間指定出力'],
+    ['予定データ行', String(Math.max(0,(listAoa||[]).length-1)), '入力用の打ち込み結果から作成'],
+    ['結果データ行', String(Math.max(0,(resultAoa||[]).length-1)), '毎日更新.xlsx/result_history.jsonから作成'],
+    ['対応表行', String(Math.max(0,(rosterAoa||[]).length-1)), '対応表から作成']
+  ], new Set(wb.SheetNames||[]));
+  appendHiddenManagementIdSheet(wb, '全体予定表');
   XLSX.writeFile(wb, `全体予定表_${label}.xlsx`);
 }
 
