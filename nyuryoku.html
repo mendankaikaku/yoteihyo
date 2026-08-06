@@ -5,7 +5,20 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>面談予定入力・準備資料アプリ v35（面談準備3ページ目フロー固定版）</title>
 <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
-<script src="./libs/xlsx.bundle.js"></script>
+<script src="./libs/xlsx.bundle.js">
+// ============================================================
+// 追加改善 4: 個人別復元結果表示の補助
+// 既存の復元詳細ログに加えて、保存前チェック・衝突ログ・科目リスト反映件数を
+// showSaveInfo欄に残すための補助。既存処理を壊さないように表示専用にしている。
+// ============================================================
+function appendInputRestoreVisibilityNote(text){
+  try{
+    const el = document.getElementById('saveInfo');
+    if(el && text){ el.textContent = (el.textContent ? el.textContent + '\n\n' : '') + text; }
+  }catch(e){}
+}
+
+</script>
 <script>if(!window.XLSX){document.write('<script src="./libs/xlsx.full.min.js"><\/script>');}</script>
 <!-- PDF全ページを1枚に縮小印刷するための任意ライブラリ。libsに置いてある場合だけ使います。 -->
 <script src="./libs/pdf.min.js"></script>
@@ -2998,15 +3011,46 @@ async function findStudentFolderParentFromSaveRoot(root, names){
   return {dir:root, label:root.name || '選択フォルダ'};
 }
 
+
+// ============================================================
+// 追加改善 6: 保存前チェック
+// ============================================================
+function normalizePrecheckText(v){ return String(v ?? '').replace(/[\s　]+/g,'').trim(); }
+function inputAppSavePrecheckSummary(){
+  const warnings=[];
+  try{
+    syncFromDom();
+    (students||[]).forEach(name=>{
+      const data = ensureStudent(name);
+      (data.exams||[]).forEach(ex=>{
+        const label = `${name} / ${ex.name || '模試名未入力'}`;
+        const hasExam = normalizePrecheckText(ex.name || ex.date || ex.status || ex.note || (ex.subjects||[]).join(','));
+        if(hasExam && !normalizePrecheckText(ex.status)) warnings.push(`⚠ ${label}: 模試があるのに回答（当日/後日/不受験）が未入力`);
+        const subjectListStatus = normalizePrecheckText(ex.subjectListStatus || ex.subjectList || ex.subjectListInput || '');
+        if(/入力済|済|〇|○|◯/.test(subjectListStatus) && !(ex.subjects||[]).length) warnings.push(`⚠ ${label}: 科目リスト入力済なのに、個人側の科目チェックが空`);
+        if(/不受験/.test(normalizePrecheckText(ex.status)) && (ex.subjects||[]).length) warnings.push(`⚠ ${label}: 不受験なのに科目が入っています`);
+      });
+      (data.events||[]).forEach(ev=>{
+        const hasEvent = normalizePrecheckText(ev.name || ev.datetime || ev.status || ev.note);
+        if(hasEvent && !normalizePrecheckText(ev.status)) warnings.push(`⚠ ${name} / ${ev.name || 'イベント名未入力'}: 参加/不参加が未入力`);
+      });
+    });
+  }catch(e){ warnings.push('⚠ 保存前チェック中にエラー: '+(e&&e.message||e)); }
+  if(!warnings.length) return '保存前チェック：警告なし';
+  return '--- 保存前チェック ---\n' + warnings.slice(0,80).join('\n') + (warnings.length>80 ? `\nほか ${warnings.length-80}件` : '');
+}
+
 async function saveGroup(){
   syncFromDom();
   if(!students.length)return alert('先に生徒名を入力してください。');
+  const savePrecheck = inputAppSavePrecheckSummary();
 
   const eventCleanup = cleanupOldEventMasterRows(1);
   const mem=buildGroupMemory();
   saveGroupToBrowser(mem);
   const status=[];
   status.push(`ブラウザ内保存：完了（${students.join('、')}）`);
+  status.push(savePrecheck);
   status.push(eventCleanup.msg);
 
   const dir = await pickSaveRootFolder(true);
