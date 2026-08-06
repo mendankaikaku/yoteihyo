@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ja">　
+<html lang="ja">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -1265,6 +1265,7 @@ function parseYoteiInputSheet(aoa, file, actualSheetName){
             outFile:file.name,
             sourcePath:file.webkitRelativePath || file.name,
             weekStart: ymd(weekStartObj),
+            sourceModified:file.lastModified || 0,
             rowNo:String(i+1),
             colNo:String(c)
           });
@@ -1295,6 +1296,7 @@ function parseYoteiInputSheet(aoa, file, actualSheetName){
           outFile:file.name,
           sourcePath:file.webkitRelativePath || file.name,
           weekStart: ymd(weekStartObj),
+          sourceModified:file.lastModified || 0,
           rowNo:String(r+1),
           colNo:""
         });
@@ -1315,6 +1317,7 @@ function parseYoteiInputSheet(aoa, file, actualSheetName){
           outFile:file.name,
           sourcePath:file.webkitRelativePath || file.name,
           weekStart: ymd(weekStartObj),
+          sourceModified:file.lastModified || 0,
           rowNo:String(remarksRow+1),
           colNo:""
         });
@@ -1372,7 +1375,7 @@ function parseLegacyIntegratedSheet(aoa, file, actualSheetName){
       records.push({
         student, dateKey:ymd(dateObj), dateObj, dateLabel:`${mmdd(dateObj)}(${WEEK_JA[dateObj.getDay()]})`, weekday,
         rowName, content:item, sourceCell, outFile, sourcePath:file.webkitRelativePath || file.name,
-        weekStart, rowNo, colNo
+        weekStart, rowNo, colNo, sourceModified:file.lastModified || 0
       });
       count++;
     }
@@ -1512,6 +1515,7 @@ async function parseExamFile(file){
         type:'',
         sourceFile: file.name,
         sourcePath: file.webkitRelativePath || file.name,
+        sourceModified:file.lastModified || 0,
         savedAt: h.savedAt >= 0 ? norm(row[h.savedAt]) : ''
       });
       count++;
@@ -1613,6 +1617,7 @@ async function parseEventFile(file){
         weekStart,
         sourceFile: file.name,
         sourcePath: file.webkitRelativePath || file.name,
+        sourceModified:file.lastModified || 0,
         savedAt: h.savedAt >= 0 ? norm(row[h.savedAt]) : ''
       });
       count++;
@@ -2619,6 +2624,97 @@ function updateStats(files, records, students, dateKeys, resultRecords=[]){
   $("statDates").textContent = dateKeys.length;
 }
 
+
+// ============================================================
+// 4.5 個人Excel同士の重複・衝突解決
+// ============================================================
+function mergeExcelTimeLabel(ms){
+  const t=Number(ms||0);
+  if(!t) return '不明';
+  try{return new Date(t).toLocaleString('ja-JP');}catch(e){return '不明';}
+}
+function mergeValueText(v){
+  if(Array.isArray(v)) return v.map(x=>norm(x)).filter(Boolean).join(', ');
+  if(typeof v==='boolean') return v ? '〇' : '×';
+  return norm(v);
+}
+function mergeSubjectsSame(a,b){
+  const aa=(Array.isArray(a)?a:[]).map(norm).filter(Boolean).sort().join('|');
+  const bb=(Array.isArray(b)?b:[]).map(norm).filter(Boolean).sort().join('|');
+  return aa===bb;
+}
+function mergeAddExcelConflictLog(logRows, kind, rec, field, currentValue, incomingValue, adoptedValue, reason, currentSource, incomingSource){
+  const cur=mergeValueText(currentValue), inc=mergeValueText(incomingValue), ad=mergeValueText(adoptedValue);
+  if(cur===inc && inc===ad) return;
+  if(!cur && !inc && !ad) return;
+  const target=[rec.student||'', rec.examName||rec.eventName||rec.rowName||'', rec.dateKey||rec.examDate||rec.datetime||''].filter(Boolean).join(' / ');
+  const curFile=currentSource?.sourcePath || currentSource?.outFile || currentSource?.sourceFile || currentSource?.fileName || '';
+  const incFile=incomingSource?.sourcePath || incomingSource?.outFile || incomingSource?.sourceFile || incomingSource?.fileName || '';
+  const curTime=mergeExcelTimeLabel(currentSource?.sourceModified);
+  const incTime=mergeExcelTimeLabel(incomingSource?.sourceModified);
+  logRows.push(['個人Excel衝突', '注意', `${kind} / ${target} / ${field}: 既存=${cur||'空'} / 追加=${inc||'空'} → 採用=${ad||'空'}`, `${reason} / 既存=${curFile} (${curTime}) / 追加=${incFile} (${incTime})`]);
+}
+function mergeShouldAdoptLatest(currentValue, incomingValue, currentMs, incomingMs){
+  const cur=mergeValueText(currentValue);
+  const inc=mergeValueText(incomingValue);
+  if(!inc) return {adopt:false, reason:'追加側が空欄のため既存値を維持'};
+  if(!cur) return {adopt:true, reason:'既存側が空欄のため追加側を採用'};
+  if(cur===inc) return {adopt:false, same:true, reason:'値が同じため変更なし'};
+  if(Number(incomingMs||0) && Number(currentMs||0)){
+    if(Number(incomingMs||0) >= Number(currentMs||0)) return {adopt:true, reason:'更新日時が新しいため追加側を採用'};
+    return {adopt:false, reason:'既存側の更新日時が新しいため維持'};
+  }
+  return {adopt:true, reason:'更新日時不明のため後から読んだ具体値を採用'};
+}
+function dedupePlanRecordsByLatest(records, logRows){
+  const map=new Map();
+  for(const r of records||[]){
+    const key=[norm(r.student), r.dateKey||'', norm(r.rowName), r.rowNo||'', r.colNo||''].join('|');
+    if(!map.has(key)){ map.set(key,Object.assign({},r)); continue; }
+    const cur=map.get(key);
+    const d=mergeShouldAdoptLatest(cur.content, r.content, cur.sourceModified, r.sourceModified);
+    mergeAddExcelConflictLog(logRows, '予定入力', r, '内容', cur.content, r.content, d.adopt?r.content:cur.content, d.reason, cur, r);
+    if(d.adopt){
+      map.set(key,Object.assign({},cur,r,{content:r.content || cur.content}));
+    }
+  }
+  return [...map.values()];
+}
+function recordConflictFieldLatest(cur, inc, field, logRows, kind, label){
+  const curVal=cur[field];
+  const incVal=inc[field];
+  const same=Array.isArray(curVal)||Array.isArray(incVal) ? mergeSubjectsSame(curVal, incVal) : mergeValueText(curVal)===mergeValueText(incVal);
+  if(same) return;
+  const d=mergeShouldAdoptLatest(curVal, incVal, cur.sourceModified, inc.sourceModified);
+  mergeAddExcelConflictLog(logRows, kind, inc, label || field, curVal, incVal, d.adopt?incVal:curVal, d.reason, cur, inc);
+  if(d.adopt){ cur[field]=Array.isArray(incVal) ? incVal.slice() : incVal; cur.sourceModified=Math.max(Number(cur.sourceModified||0), Number(inc.sourceModified||0)); cur.sourceFile=inc.sourceFile||cur.sourceFile; cur.sourcePath=inc.sourcePath||cur.sourcePath; }
+}
+function dedupeExamRecordsByLatest(records, logRows){
+  const map=new Map();
+  for(const r of records||[]){
+    const key=[norm(r.student), norm(r.examName).replace(/\s/g,''), r.examDate||''].join('|');
+    if(!map.has(key)){ map.set(key,Object.assign({},r, {subjects:Array.isArray(r.subjects)?r.subjects.slice():[]})); continue; }
+    const cur=map.get(key);
+    recordConflictFieldLatest(cur,r,'status',logRows,'模試確認','受験方法');
+    recordConflictFieldLatest(cur,r,'comiruAnswered',logRows,'模試確認','Comiru回答');
+    recordConflictFieldLatest(cur,r,'subjectChanged',logRows,'模試確認','科目変更');
+    recordConflictFieldLatest(cur,r,'subjects',logRows,'模試確認','受験科目');
+  }
+  return [...map.values()];
+}
+function dedupeEventRecordsByLatest(records, logRows){
+  const map=new Map();
+  for(const r of records||[]){
+    const key=[norm(r.student), norm(r.eventName).replace(/\s/g,''), r.datetime||''].join('|');
+    if(!map.has(key)){ map.set(key,Object.assign({},r)); continue; }
+    const cur=map.get(key);
+    recordConflictFieldLatest(cur,r,'status',logRows,'イベント確認','参加状況');
+    recordConflictFieldLatest(cur,r,'comiruAnswered',logRows,'イベント確認','Comiru回答');
+    recordConflictFieldLatest(cur,r,'note',logRows,'イベント確認','備考');
+  }
+  return [...map.values()];
+}
+
 async function merge(){
   const files = state.files.filter(f => !shouldSkipFile(f));
   if(!files.length){ alert("Excelファイルを選択してください"); return; }
@@ -2642,6 +2738,14 @@ async function merge(){
     allEventRecords.push(...eventParsed.records);
     allLogs.push(...eventParsed.logRows);
   }
+  const planRecordCountBeforeDedupe = allRecords.length;
+  const examRecordCountBeforeDedupe = allExamRecords.length;
+  const eventRecordCountBeforeDedupe = allEventRecords.length;
+  allRecords = dedupePlanRecordsByLatest(allRecords, allLogs);
+  allExamRecords = dedupeExamRecordsByLatest(allExamRecords, allLogs);
+  allEventRecords = dedupeEventRecordsByLatest(allEventRecords, allLogs);
+  allLogs.push(['個人Excel重複解決','情報',`予定 ${planRecordCountBeforeDedupe}→${allRecords.length}件 / 模試 ${examRecordCountBeforeDedupe}→${allExamRecords.length}件 / イベント ${eventRecordCountBeforeDedupe}→${allEventRecords.length}件`,'同じ生徒・同じ日付/模試/イベントは、空欄では消さず、具体値どうしの衝突は更新日時が新しい個人Excelを採用']);
+
   let comiruCsvInfo = {records:[], logs:[]};
   if(state.comiruCsvFiles && state.comiruCsvFiles.length){
     log(`Comiru CSV照合中...\nCSV: ${state.comiruCsvFiles.length}件`);
