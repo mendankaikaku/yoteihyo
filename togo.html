@@ -7702,5 +7702,128 @@ document.addEventListener('DOMContentLoaded', function(){
 })();
 </script>
 
+
+<!-- ============================================================
+  初見用・左側収納取説（統合用）
+  普段は左下の「取説」ボタンだけ。必要時だけ開いて、出力条件・読取元・優先順位・エラー原因を確認できます。
+============================================================ -->
+<style id="appManualDrawerStyle">
+  .manualDockBtn{position:fixed;left:14px;bottom:14px;z-index:70;border:1px solid #bfdbfe!important;background:#eff6ff!important;color:#1e40af!important;border-radius:999px!important;box-shadow:0 10px 26px rgba(15,23,42,.18)!important;min-height:38px!important;padding:8px 13px!important;font-size:13px!important;font-weight:900!important}
+  .manualDockBtn:hover{filter:none!important;background:#dbeafe!important}.manualBackdrop{position:fixed;inset:0;background:rgba(15,23,42,.28);z-index:1998;display:none}.manualBackdrop.open{display:block}.manualDrawer{position:fixed;left:0;top:0;bottom:0;width:min(540px,92vw);background:#fff;z-index:1999;box-shadow:20px 0 60px rgba(15,23,42,.25);transform:translateX(-105%);transition:transform .18s ease;display:flex;flex-direction:column;border-right:1px solid #dbe4ef}.manualDrawer.open{transform:translateX(0)}.manualDrawerHead{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px;border-bottom:1px solid #e5e7eb;background:#f8fafc}.manualDrawerTitle{font-size:17px;font-weight:900;margin:0}.manualDrawerClose{background:#e5e7eb!important;color:#111827!important;box-shadow:none!important;min-height:34px!important;padding:6px 10px!important}.manualDrawerBody{padding:14px 16px 24px;overflow:auto;line-height:1.65}.manualDigest{border:1px solid #bbf7d0;background:#f0fdf4;color:#166534;border-radius:12px;padding:10px 12px;font-size:13px;margin-bottom:12px}.manualToc{border:1px solid #e5e7eb;background:#f8fafc;border-radius:12px;padding:10px 12px;margin-bottom:12px}.manualToc b{display:block;margin-bottom:6px}.manualToc a{display:block;color:#1d4ed8;text-decoration:none;font-weight:800;font-size:13px;padding:3px 0}.manualToc a:hover{text-decoration:underline}.manualDrawer h3{font-size:15px;margin:18px 0 8px;padding-top:8px;border-top:1px solid #e5e7eb}.manualDrawer h4{font-size:13px;margin:10px 0 4px;color:#334155}.manualDrawer p,.manualDrawer li{font-size:13px}.manualDrawer ul,.manualDrawer ol{padding-left:20px;margin:6px 0}.manualSpecBox{border:1px solid #e5e7eb;border-radius:12px;background:#fff;padding:10px 12px;margin:8px 0}.manualSpecBox.warn{background:#fff7ed;border-color:#fed7aa;color:#9a3412}.manualMiniLabel{display:inline-block;border-radius:999px;background:#eef2ff;color:#1e40af;font-size:11px;font-weight:900;padding:2px 7px;margin-right:4px}.manualDrawer code{background:#f1f5f9;border-radius:6px;padding:1px 4px;font-size:12px}.manualDrawer .manualSmall{font-size:12px;color:#64748b}.manualDrawer table{width:100%;border-collapse:collapse;margin:6px 0;background:#fff}.manualDrawer th,.manualDrawer td{border:1px solid #d0d5dd;padding:6px;vertical-align:top;font-size:12px;white-space:normal}.manualDrawer th{background:#f8fafc;text-align:left}.manualDrawer #manualIntegrationDiag{white-space:pre-wrap;border:1px dashed #cbd5e1;background:#f8fafc;border-radius:10px;padding:8px;font-size:12px;color:#475569}@media(max-width:720px){.manualDockBtn{left:10px;bottom:10px}.manualDrawer{width:94vw}.manualDrawerBody{padding:12px}}
+</style>
+<div id="appManualBackdrop" class="manualBackdrop" aria-hidden="true"></div>
+<aside id="appManualDrawer" class="manualDrawer" aria-hidden="true" aria-label="統合用アプリの取説">
+  <div class="manualDrawerHead">
+    <p class="manualDrawerTitle">統合用アプリ 取説</p>
+    <button id="appManualClose" class="manualDrawerClose" type="button">閉じる</button>
+  </div>
+  <div class="manualDrawerBody">
+    <div class="manualDigest">
+      <b>最初に覚えることはこれだけ。</b><br>
+      ① フォルダーを読み取る → ② 統合する → ③ 結果履歴を保存 → ④ 必要なExcelを出力。<br>
+      迷ったら、出力ボタン下の理由表示とログを見る。
+    </div>
+    <nav class="manualToc">
+      <b>目次</b>
+      <a href="#manual-int-quick">1. 初見用ダイジェスト</a>
+      <a href="#manual-int-flow">2. 普段の操作手順</a>
+      <a href="#manual-int-read">3. 何を読み取っているか</a>
+      <a href="#manual-int-priority">4. 優先順位・上書きルール</a>
+      <a href="#manual-int-output">5. 各出力の目的</a>
+      <a href="#manual-int-error">6. エラー・困ったとき</a>
+      <a href="#manual-int-check">7. 開く前チェック</a>
+    </nav>
+
+    <h3 id="manual-int-quick">1. 初見用ダイジェスト</h3>
+    <div class="manualSpecBox">
+      <span class="manualMiniLabel">目的</span> 入力用で作った個人予定、毎日更新、全員分リスト、科目リスト、Comiruをまとめて、掲示・印刷用Excelを出す。<br>
+      <span class="manualMiniLabel">基本</span> 画面上部の番号順に押す。<br>
+      <span class="manualMiniLabel">重要</span> 毎日更新を使う日は、統合後に「③結果履歴を保存」を押す。
+    </div>
+    <ol>
+      <li><b>①フォルダーを読み取る</b>で保存復元フォルダーを選ぶ。</li>
+      <li><b>②統合する</b>を押す。</li>
+      <li><b>③結果履歴を保存</b>を押す。</li>
+      <li><b>④出力</b>から必要なExcelを出す。</li>
+    </ol>
+
+    <h3 id="manual-int-flow">2. 普段の操作手順</h3>
+    <div class="manualSpecBox"><h4>2週間予定表</h4>①→②→③→④2週間出力。手修正したExcelは全体予定表フォルダーへ戻す。</div>
+    <div class="manualSpecBox"><h4>全員分リスト</h4>①→②→④全員分リスト。フロント確認結果を手入力し、全員分リストフォルダーへ戻す。</div>
+    <div class="manualSpecBox"><h4>毎日掲示</h4>毎日更新.xlsxへ前日結果を貼る → ①→②→③→④毎日掲示。出たExcelを毎日掲示フォルダーへ保存。</div>
+
+    <h3 id="manual-int-read">3. 何を読み取っているか</h3>
+    <table><thead><tr><th>フォルダー</th><th>読む内容</th><th>使い道</th></tr></thead><tbody>
+      <tr><td>打ち込み結果</td><td>入力用が出した個人Excel</td><td>2週間/1か月/期間指定の予定表</td></tr>
+      <tr><td>毎日更新</td><td>毎日更新.xlsx、過去の掲示手修正版</td><td>毎日掲示、結果履歴保存、手修正復元</td></tr>
+      <tr><td>json</td><td>result_history.json</td><td>過去結果の保持・復元</td></tr>
+      <tr><td>対応表</td><td>生徒番号・氏名・学年・高校・担当</td><td>名寄せ、学年別出力、掲示の名前補正</td></tr>
+      <tr><td>全員分リスト</td><td>手修正された回答・状態</td><td>全員分リストの前回修正維持</td></tr>
+      <tr><td>科目リスト</td><td>模試科目の手修正</td><td>科目リスト出力の復元</td></tr>
+      <tr><td>Comiru</td><td>CSV回答</td><td>模試・イベント回答の反映</td></tr>
+    </tbody></table>
+
+    <h3 id="manual-int-priority">4. 優先順位・上書きルール</h3>
+    <div class="manualSpecBox">
+      <b>基本：</b> 最新ファイルの具体値が勝つ。空欄は具体値を消さない。<br>
+      <b>個人Excel重複：</b> 同じ生徒・同じ予定なら更新日時が新しいものを優先。ただし空欄で上書きしない。<br>
+      <b>全員分リスト：</b> 手修正を維持する。回答・状態・Comiru・科目変更は消えにくい設計。<br>
+      <b>科目リスト：</b> 手修正された科目詳細を復元する。<br>
+      <b>毎日掲示：</b> 当月・前日など、出力ごとの日付ルールを優先する。
+    </div>
+
+    <h3 id="manual-int-output">5. 各出力の目的</h3>
+    <div class="manualSpecBox"><b>2週間出力</b><br>基準日の前後2週間を掲示・確認用に出す。</div>
+    <div class="manualSpecBox"><b>1か月出力</b><br>基準日の前後1か月を見る。長めの予定確認用。</div>
+    <div class="manualSpecBox"><b>期間指定出力</b><br>開始日〜終了日を自分で決めて出す。</div>
+    <div class="manualSpecBox"><b>全員分リスト</b><br>模試・イベントの当日/後日/不受験、Comiru回答、科目変更を一覧で確認する。</div>
+    <div class="manualSpecBox"><b>科目リスト出力</b><br>模試の受験科目を別Excelで管理する。</div>
+    <div class="manualSpecBox"><b>毎日掲示</b><br>連続実施・高速基礎ランキング・講座修得・完全修得を掲示用に出す。</div>
+
+    <h3 id="manual-int-error">6. エラー・困ったとき</h3>
+    <div class="manualSpecBox warn">
+      <ul>
+        <li><b>出力ボタンが押せない：</b> まだ①フォルダー読取か②統合が終わっていない。理由表示を見る。</li>
+        <li><b>毎日掲示が出ない：</b> 毎日更新.xlsxがない、result_history.jsonがない、③保存忘れの可能性。</li>
+        <li><b>予定が抜ける：</b> 入力用の保存忘れ、打ち込み結果フォルダーに戻していない、シート名違い。</li>
+        <li><b>名前が合わない：</b> 対応表の氏名・生徒番号・フォルダー名の表記ズレ。</li>
+        <li><b>手修正が戻らない：</b> 保存先フォルダー違い、見出し行削除、列名変更、ファイル名変更が原因になりやすい。</li>
+      </ul>
+    </div>
+
+    <h3 id="manual-int-check">7. 開く前チェック</h3>
+    <div id="manualIntegrationDiag">診断中...</div>
+    <p class="manualSmall">ここは画面上の部品が存在しているかだけを見る簡易診断。データの正しさは統合ログを見る。</p>
+  </div>
+</aside>
+<button id="appManualOpen" class="manualDockBtn" type="button">取説</button>
+<script id="appManualDrawerScript">
+(function(){
+  function $(id){return document.getElementById(id);}
+  function setOpen(open){
+    var drawer=$('appManualDrawer'), back=$('appManualBackdrop');
+    if(!drawer||!back) return;
+    drawer.classList.toggle('open',open); back.classList.toggle('open',open);
+    drawer.setAttribute('aria-hidden',open?'false':'true'); back.setAttribute('aria-hidden',open?'false':'true');
+    if(open) setTimeout(updateDiag,50);
+  }
+  function exists(id){return !!document.getElementById(id);}
+  function updateDiag(){
+    var el=$('manualIntegrationDiag'); if(!el) return;
+    var rows=[['フォルダー読取','readBundleTopBtn'],['統合','mergeBtn'],['結果履歴保存','saveResultHistoryBtn'],['2週間出力','download2wBtn'],['科目リスト','downloadExamSubjectListBtn'],['ログ','status']];
+    el.textContent=rows.map(function(r){return (exists(r[1])?'OK  ':'注意 ') + r[0] + '：' + r[1];}).join('\n') + '\n\n注意が出ても、該当出力を使わないならそのまま進められる場合があります。';
+  }
+  function bind(){
+    var open=$('appManualOpen'), close=$('appManualClose'), back=$('appManualBackdrop');
+    if(open && open.dataset.bound!=='1'){open.dataset.bound='1';open.addEventListener('click',function(){setOpen(true);});}
+    if(close && close.dataset.bound!=='1'){close.dataset.bound='1';close.addEventListener('click',function(){setOpen(false);});}
+    if(back && back.dataset.bound!=='1'){back.dataset.bound='1';back.addEventListener('click',function(){setOpen(false);});}
+    document.addEventListener('keydown',function(e){if(e.key==='Escape') setOpen(false);},{once:false});
+    updateDiag();
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',bind); else bind();
+})();
+</script>
+
 </body>
 </html>
