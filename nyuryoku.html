@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ja">
-<head>　
+<head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>面談予定入力・準備資料アプリ v36（重複Excel安全最新優先版）</title>
@@ -661,7 +661,7 @@ main.wrap{max-width:none!important;height:auto!important;min-height:0!important;
   </div>
   <div class="usageHelpBody">
     <div class="usageHelpFlow">
-      <div class="usageHelpStep"><span class="num">①</span><div><b>生徒名</b>複数人ならカンマ区切りで入力します。苗字が同じ生徒は区別できるところまで入力します。</div></div>
+      <div class="usageHelpStep"><span class="num">①</span><div><b>生徒名</b>助手名欄に担任助手名を入れて「生徒一覧」を押すと担当生徒をまとめて生徒名欄へ反映できます。生徒名欄には生徒名だけを入れます。</div></div>
       <div class="usageHelpStep"><span class="num">②</span><div><b>前回復元</b>保存復元フォルダーを選んで、前回の予定・備考・模試・イベント・コメントを戻します。</div></div>
       <div class="usageHelpStep"><span class="num">③</span><div><b>入力</b>受講、高マス、問題集、模試、イベント、今週の方針、達成できなかった理由を入力します。</div></div>
       <div class="usageHelpStep"><span class="num">④</span><div><b>保存</b>席を外す前に必ず保存します。画面上で入力編集した人全員が保存されます。</div></div>
@@ -670,7 +670,7 @@ main.wrap{max-width:none!important;height:auto!important;min-height:0!important;
     <div class="usageHelpBox warn">
       <h3>面談準備印刷</h3>
       <ol>
-        <li>今日面談する生徒名を入力します。(複数人可)</li>
+        <li>助手名欄に担任助手名を入れて「生徒一覧」を押すか、今日面談する生徒名を入力します。(複数人可)</li>
         <li>前回復元を押します。</li>
         <li>面談準備印刷を押します。</li>
         <li>印刷設定は A4縦・両面・長辺とじ です。</li>
@@ -796,15 +796,17 @@ main.wrap{max-width:none!important;height:auto!important;min-height:0!important;
   <section class="card workflowCard" id="uxWorkflowCard">
     <p class="sectionTitle">今日の操作</p>
     <div class="topActions">
-      <div class="field wide"><label>① 生徒名（複数はカンマ区切り）</label><input id="studentNames" placeholder="例：佐藤, 鈴木, 高橋, ×横田→〇横田朋, ×平井→〇平井瑛,   ※生徒フォルダ名と同じにする" /></div>
+      <div class="field"><label>① 助手名（任意・複数可）</label><input id="assistantNames" placeholder="例：武内, 今道" /></div>
+      <button id="expandAssistantStudents" class="secondary primaryBig" type="button">生徒一覧</button>
+      <div class="field wide"><label>② 生徒名（複数はカンマ区切り）</label><input id="studentNames" placeholder="例：佐藤, 鈴木, 高橋, ×横田→〇横田朋, ×平井→〇平井瑛,   ※生徒フォルダ名と同じにする" /></div>
       <div class="field"><label>開始日</label><input id="weekStart" type="date" /></div>
-      <button id="applyStudents" class="primaryBig">② 生徒欄を作る</button>
-      <button class="secondary primaryBig" id="loadGroupMemory">③ 前回を復元</button>
-      <button class="ok primaryBig" id="saveGroupMemory">④ 保存</button>
+      <button id="applyStudents" class="primaryBig">③ 生徒欄を作る</button>
+      <button class="secondary primaryBig" id="loadGroupMemory">④ 前回を復元</button>
+      <button class="ok primaryBig" id="saveGroupMemory">⑤ 保存</button>
       <button class="secondary" id="exportXlsx">予備ZIP出力</button>
     </div>
     <div class="quickGuide appSteps">
-      <div class="quickStep"><b>1. 生徒を入力</b>複数人はカンマ区切り。ここが印刷対象になります。</div>
+      <div class="quickStep"><b>1. 生徒を入力</b>助手名欄から生徒一覧を展開するか、生徒名をカンマ区切りで入力します。ここが印刷対象になります。</div>
       <div class="quickStep"><b>2. 前回を復元</b>保存用フォルダのJSONを優先して読み込みます。</div>
       <div class="quickStep"><b>3. 入力・確認</b>予定、教材、模試、イベント、未達理由を確認します。</div>
       <div class="quickStep"><b>4. 保存して印刷</b>席を外す前に保存。必要に応じて面談資料を印刷します。</div>
@@ -1092,7 +1094,71 @@ function daysBetween(a,b){const aa=new Date(a.getFullYear(),a.getMonth(),a.getDa
 function showSaveInfo(text){$('#saveInfo').textContent=text||''}
 function colName(n){let s='';while(n>0){let m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=Math.floor((n-1)/26)}return s}
 function cellRef(r,c){return colName(c)+r}
-function splitNames(){return ($('#studentNames').value||'').split(/[、，,]/).map(x=>x.trim()).filter(Boolean)}
+const ASSISTANT_STUDENT_MAP_FOR_INPUT = {
+  '武内':['稲田','坂浦','平井瑛','青野','増永','石塚大','渡邊','岡崎','楠田','北野碧','末藤'],
+  '今道':['間嶋','谷崎','古町','前田','三島和','木下','三浦','丸尾','石塚隆'],
+  '佐藤':['信岡','藤田旺','田中','濱田','中村'],
+  '森':['松田','齋藤結','藤田沙','小坂','木村','寺松','山本啓','奥戸','中川','真名子'],
+  '稲垣':['表田','吉田照','藤原','中村彩','満田','山之内','東野','齋藤智','橘','藤田紘','越智','川畑'],
+  '藤原':['宮木','岡田','片岡','赤井','高木','藤森','今瀬','中山愛','川地'],
+  '源津':['坂上','大橋','山本綾','増尾','野田','古久保','桂田'],
+  '五島':['前川','小松原','池田','山本空','高岡','今西','音田','宮本','松浦','石川','舛中','青山'],
+  '齋藤':['遠藤','大谷','大津','笹本','北野綾','樋口','横田朋','金城','中井'],
+  '森永':['狩谷','齋藤健','村上','今村','横田悦','吉川','横田亮','戸上','丁','山本遥'],
+  '宮木':['川口','秦','角田','宮崎','谷','稲山'],
+  '今堀':['古津','西岡','小倉','岩部','石橋','山奥','杉本','清水','安藤'],
+  '上田':['三辻','池上','新居','神戸','渡辺','長谷川','三島偲','武藤','杉山','小林'],
+  '厚地':['山口歩','久保','大坂','大前','大蔵','加藤','舛田','勝亦','一ノ瀬','仲居','平井秀'],
+  '藤吉':['山下','平井駿','山口渉','牧田','志賀','三木','竹田','黒坂','濱西','岸川'],
+  '山際':['林','中山凛','吉田結','関本','立花','宮地','坂崎颯','福本'],
+  '安達':['竹内','藤本','稲垣','正木','森下','冨田','呉','池澤'],
+  '高岡':[],
+  '西賀':['吉永','森永','中','上野'],
+  '有田':['川村','上杉','土井','赤橋']
+};
+function normalizeAssistantInputKey(s){return String(s||'').replace(/[\s　]+/g,'').trim()}
+function splitStudentNameTokensRaw(){return ($('#studentNames').value||'').split(/[、，,]/).map(x=>x.trim()).filter(Boolean)}
+function splitAssistantNameTokensRaw(){return ($('#assistantNames')?.value||'').split(/[、，,]/).map(x=>x.trim()).filter(Boolean)}
+function splitNames(){return splitStudentNameTokensRaw()}
+function expandAssistantNamesToStudents(tokens){
+  const out=[];
+  const seen=new Set();
+  const logs=[];
+  const missing=[];
+  tokens.forEach(token=>{
+    const key=normalizeAssistantInputKey(token);
+    if(!key) return;
+    const list=Object.prototype.hasOwnProperty.call(ASSISTANT_STUDENT_MAP_FOR_INPUT,key) ? ASSISTANT_STUDENT_MAP_FOR_INPUT[key] : null;
+    if(!list){ missing.push(key); return; }
+    if(!list.length){ logs.push(`${key} → 生徒リスト未登録のため展開なし`); return; }
+    logs.push(`${key} → ${list.length}名（${list.join('、')}）`);
+    list.forEach(name=>{
+      const k=normalizeStudentNameKeyForAmbiguity(name);
+      if(k && !seen.has(k)){seen.add(k); out.push(name);}
+    });
+  });
+  return {names:out, logs, missing};
+}
+async function expandAssistantStudentsToStudentField(){
+  const tokens=splitAssistantNameTokensRaw();
+  if(!tokens.length){
+    alert('助手名欄に担任助手名を入力してください。例：武内, 今道');
+    const el=$('#assistantNames'); if(el) el.focus();
+    return;
+  }
+  const result=expandAssistantNamesToStudents(tokens);
+  const lines=[];
+  if(result.logs.length) lines.push(...result.logs);
+  if(result.missing.length) lines.push(`未登録の助手名: ${result.missing.join('、')}`);
+  if(!result.names.length){
+    showSaveInfo(`生徒一覧を展開できませんでした。\n${lines.join('\n')}`);
+    alert(`生徒一覧を展開できませんでした。\n${lines.join('\n')}`);
+    return;
+  }
+  $('#studentNames').value=result.names.join(', ');
+  showSaveInfo(`助手名から生徒一覧を反映しました。\n${lines.join('\n')}`);
+  await applyStudentsWithDynamicCandidates();
+}
 
 // 生徒名の下一文字つけ忘れ防止。例：平井 → 平井瑛 / 平井駿 / 平井秀 の候補を出して止める。
 // 初期フォルダーZIPに入れている担任助手→生徒リストに加えて、実際に選んだ担任助手フォルダー配下の生徒フォルダー名も候補に混ぜて判定する。
@@ -1260,7 +1326,7 @@ function currentScheduleRowIndexes(name){const data=ensureStudent(name);return [
 /* =========================================================
    2. 画面構築
 ========================================================= */
-function init(){setDefaultDate(); if($('#weeklyAbsentTargetDate') && !$('#weeklyAbsentTargetDate').value) $('#weeklyAbsentTargetDate').value=$('#weekStart').value||ymd(new Date()); if(!$('#studentNames').value) $('#studentNames').value=''; renderExamMasterPanel(); renderEventMasterPanel(); renderCommentMasterPanel(); bindGlobalEvents(); applyStudents();}
+function init(){setDefaultDate(); if($('#weeklyAbsentTargetDate') && !$('#weeklyAbsentTargetDate').value) $('#weeklyAbsentTargetDate').value=$('#weekStart').value||ymd(new Date()); if(!$('#assistantNames')?.value && $('#assistantNames')) $('#assistantNames').value=''; if(!$('#studentNames').value) $('#studentNames').value=''; renderExamMasterPanel(); renderEventMasterPanel(); renderCommentMasterPanel(); bindGlobalEvents(); applyStudents();}
 function applyStudents(){
   syncFromDom();
   const names=splitNames();
@@ -5893,7 +5959,7 @@ function bindGlobalEvents(){
   const closeBtn=$('#closeGoukakuModal'); if(closeBtn) closeBtn.onclick=closeGoukakuModal;
   const modal=$('#goukakuModal'); if(modal) modal.addEventListener('click', e=>{ if(e.target===modal) closeGoukakuModal(); });
   document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeGoukakuModal(); });
-  $('#applyStudents').onclick=applyStudentsWithDynamicCandidates;
+  $('#applyStudents').onclick=applyStudentsWithDynamicCandidates; const eas=$('#expandAssistantStudents'); if(eas)eas.onclick=expandAssistantStudentsToStudentField;
   $('#weekStart').onchange=()=>{syncFromDom(); const a=$('#weeklyAbsentTargetDate'); if(a && !a.value) a.value=$('#weekStart').value; renderStudents()};
   $('#saveGroupMemory').onclick=saveGroup;
   $('#loadGroupMemory').onclick=loadGroup;
