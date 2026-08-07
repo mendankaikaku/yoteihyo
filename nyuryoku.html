@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>面談予定入力・準備資料アプリ v36（重複Excel安全最新優先版）</title>
+<title>面談予定入力・準備資料アプリ v36（上部ボタン折り返し版）</title>
 <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
 <script src="./libs/xlsx.bundle.js">
 // ============================================================
@@ -844,7 +844,7 @@ main.wrap{max-width:none!important;height:auto!important;min-height:0!important;
       <div class="field assistantNameField"><label>① 助手名（任意・複数可）</label><input id="assistantNames" placeholder="例：武内, 今道" /></div>
       <button id="expandAssistantStudents" class="secondary primaryBig assistantListBtn" type="button">生徒一覧</button>
       <div class="field wide studentNameField"><label>② 生徒名（複数はカンマ区切り）</label><input id="studentNames" placeholder="例：佐藤, 鈴木, 高橋, ×横田→〇横田朋, ×平井→〇平井瑛,   ※生徒フォルダ名と同じにする" /></div>
-      <div class="field"><label>開始日</label><input id="weekStart" type="date" /></div>
+      <div class="field startDateField"><label>開始日</label><input id="weekStart" type="date" /></div>
       <button id="applyStudents" class="primaryBig">③ 生徒欄を作る</button>
       <button class="secondary primaryBig" id="loadGroupMemory">④ 前回を復元</button>
       <button class="ok primaryBig" id="saveGroupMemory">⑤ 保存</button>
@@ -6386,6 +6386,64 @@ h1{font-size:18px;margin:0 0 2px;line-height:1.15}.subline{font-size:10px;color:
 table{border-collapse:collapse;width:100%;font-size:10.5px}th,td{border:1px solid #6b7280;padding:4px 4px;vertical-align:middle}th{background:#f3f4f6;text-align:center;font-weight:800}.center{text-align:center}.nameCell{font-size:12px;font-weight:800}.checkCell{text-align:center;font-size:16px;width:14mm}.memoCell{height:7mm;width:38mm}.mainRow td{height:8mm}.detailRow td{background:#fff;padding:4px 5px;vertical-align:top}.absentDetailTitle{font-weight:800;margin:0 0 3px;color:#1e40af;font-size:10.5px}.detailTable{font-size:8.6px;margin:0 0 4px;line-height:1.22}.detailTable th,.detailTable td{padding:2px 3px;border:1px solid #cbd5e1;vertical-align:top}.detailTable th{background:#eef2ff;width:15mm}.detailTable ul{margin:0;padding-left:11px}.detailTable li{margin:0 0 1px}.listenBox{border:1px solid #c7d2fe;background:#eef2ff;border-radius:5px;padding:3px 5px;font-size:9.5px;line-height:1.3}.muted{color:#667085}.note{margin-top:5px;font-size:9.5px;color:#667085;line-height:1.35}.footerLine{margin-top:4px;display:grid;grid-template-columns:1fr 1fr;gap:8mm;font-size:10.5px;break-inside:avoid;page-break-inside:avoid}.footerLine div{border-bottom:1px solid #9ca3af;height:7mm;padding-top:1mm}
 @page{size:A4 portrait;margin:0}
 @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.page{page-break-after:auto;break-after:auto}}
+
+
+/* ============================================================
+   追加修正: 上部操作ボタンを画面内に収める
+   - 1段目: 助手名 / 生徒一覧 / 生徒名 / 開始日
+   - 2段目: 生徒欄作成 / 前回復元 / 保存 / 予備ZIP
+   - 生徒名欄を広く、助手名欄は小さく固定
+   ============================================================ */
+.topActions{
+  display:grid!important;
+  grid-template-columns: 210px 112px minmax(360px, 1fr) 150px!important;
+  grid-template-areas:
+    "assistant list students start"
+    "apply restore save export"!important;
+  gap:8px!important;
+  align-items:end!important;
+  overflow:visible!important;
+}
+.topActions .assistantNameField{grid-area:assistant!important;min-width:0!important;}
+.topActions .assistantListBtn{grid-area:list!important;min-width:0!important;width:100%!important;}
+.topActions .studentNameField{grid-area:students!important;min-width:0!important;}
+.topActions .startDateField{grid-area:start!important;min-width:0!important;}
+.topActions #applyStudents{grid-area:apply!important;}
+.topActions #loadGroupMemory{grid-area:restore!important;}
+.topActions #saveGroupMemory{grid-area:save!important;}
+.topActions #exportXlsx{grid-area:export!important;}
+.topActions button{
+  min-width:0!important;
+  width:100%!important;
+  white-space:normal!important;
+  line-height:1.2!important;
+  padding:9px 10px!important;
+  min-height:40px!important;
+  height:auto!important;
+}
+.topActions input{width:100%!important;min-width:0!important;}
+.topActions .field label{white-space:nowrap!important;}
+@media(max-width:980px){
+  .topActions{
+    grid-template-columns: 170px 108px minmax(260px,1fr)!important;
+    grid-template-areas:
+      "assistant list start"
+      "students students students"
+      "apply restore save"
+      "export export export"!important;
+  }
+}
+@media(max-width:640px){
+  .topActions{
+    grid-template-columns:1fr 1fr!important;
+    grid-template-areas:
+      "assistant list"
+      "students students"
+      "start start"
+      "apply restore"
+      "save export"!important;
+  }
+}
 </style></head><body><section class="page"><h1>週面欠席者 電話確認リスト</h1><div class="subline">対象日：${esc(todayLabel)} / 週開始：${esc(weekStart)} / 作成：${esc(now.toLocaleString('ja-JP'))}</div><div class="summary">週面欠席にチェックが入っている生徒：<b>${absentRows.length}名</b>　※電話後に「電話済み」欄へチェックしてください。</div><table><thead><tr><th>No.</th><th>学年</th><th>生徒番号</th><th>生徒名</th><th>未電話</th><th>電話済み</th><th>電話メモ</th></tr></thead><tbody>${rows}</tbody></table><div class="note">使い方：欠席確認前は「未電話」、電話完了後は「電話済み」にチェック。つながらなかった場合や保護者対応などは電話メモへ記入してください。</div><div class="footerLine"><div>担当者：</div><div>確認完了時刻：</div></div></section></body></html>`;
 }
 async function printWeeklyAbsentList(){
