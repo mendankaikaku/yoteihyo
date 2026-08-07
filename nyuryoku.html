@@ -1104,7 +1104,7 @@ function currentWeekStartDateOnly(){return localDateOnlyValue($('#weekStart')?.v
 function isWeekStartInsideDisplayRange(item){const start=currentWeekStartDateOnly();const from=localDateOnlyValue(item&&item.displayStart);const to=localDateOnlyValue(item&&item.displayEnd);if(from && daysBetween(from,start)<0)return false;if(to && daysBetween(start,to)<0)return false;return true}
 function displayRangeHint(item){const from=(item&&item.displayStart)||'';const to=(item&&item.displayEnd)||'';if(from&&to)return `表示期間：${from}〜${to}`;if(from)return `表示開始：${from}〜`;if(to)return `表示終了：〜${to}`;return ''}
 
-const ROSTER_PROFILE_CACHE = {loaded:false, loading:null, profiles:[], byName:new Map(), byNo:new Map(), source:''};
+const ROSTER_PROFILE_CACHE = {loaded:false, loading:null, profiles:[], byName:new Map(), byNo:new Map(), source:'', diagnostics:[]};
 function profileKey(s){return String(s||'').replace(/[\s\u3000]+/g,'').trim();}
 
 // 高校名は対応表と手入力で表記ゆれが出やすいので、かなり強めに正規化する。
@@ -1214,7 +1214,7 @@ function parseRosterAoa(aoa, source=''){
     studentNo:rosterHeaderIndex(header,['生徒番号','生徒No','番号','ID']),
     name:rosterHeaderIndex(header,['生徒名','氏名','名前','フルネーム']),
     grade:rosterHeaderIndex(header,['学年']),
-    school:rosterHeaderIndex(header,['高校','高校名','学校','学校名','在籍校']),
+    school:rosterHeaderIndex(header,['高校','高校名','学校','学校名','在籍校','所属校','在学校']),
     assistant:rosterHeaderIndex(header,['担当','担任助手','助手','担任','担当者'])
   };
   const out=[];
@@ -1233,11 +1233,91 @@ function parseRosterAoa(aoa, source=''){
   }
   return out;
 }
+
+function diagnoseRosterAoa(aoa, source=''){
+  const info={source, rowCount:(aoa||[]).length, headerRow:-1, header:[], idx:{}, profileCount:0, schoolCount:0, assistantCount:0, schoolExamples:[], assistantExamples:[], nameExamples:[], warning:''};
+  if(!aoa||!aoa.length){ info.warning='行データなし'; return info; }
+  let headerRow=-1,best=-1;
+  for(let r=0;r<Math.min(20,aoa.length);r++){
+    const joined=(aoa[r]||[]).map(x=>String(x??'').trim()).join('|');
+    let score=0; if(/生徒名|氏名|名前/.test(joined))score+=2; if(/生徒番号|番号|ID/.test(joined))score++; if(/学年/.test(joined))score++; if(/高校|学校|在籍校|所属校|在学校/.test(joined))score++; if(/担当|担任|助手/.test(joined))score++;
+    if(score>best){best=score;headerRow=r;}
+  }
+  info.headerRow=headerRow;
+  if(best<2){ info.warning='見出し行を特定できませんでした'; return info; }
+  const header=(aoa[headerRow]||[]).map(x=>String(x??'').trim());
+  info.header=header;
+  const idx={
+    studentNo:rosterHeaderIndex(header,['生徒番号','生徒No','番号','ID']),
+    name:rosterHeaderIndex(header,['生徒名','氏名','名前','フルネーム']),
+    grade:rosterHeaderIndex(header,['学年']),
+    school:rosterHeaderIndex(header,['高校','高校名','学校','学校名','在籍校','所属校','在学校']),
+    assistant:rosterHeaderIndex(header,['担当','担任助手','助手','担任','担当者'])
+  };
+  info.idx=idx;
+  const schools=[], assistants=[], names=[];
+  for(let r=headerRow+1;r<aoa.length;r++){
+    const row=aoa[r]||[];
+    if(!row.some(v=>String(v??'').trim()))continue;
+    const nm=idx.name>=0?String(row[idx.name]??'').trim():'';
+    const sc=idx.school>=0?String(row[idx.school]??'').trim():'';
+    const as=idx.assistant>=0?String(row[idx.assistant]??'').trim():'';
+    if(nm||String(idx.studentNo>=0?row[idx.studentNo]??'':'').trim()) info.profileCount++;
+    if(sc){ info.schoolCount++; schools.push(sc); }
+    if(as){ info.assistantCount++; assistants.push(as); }
+    if(nm) names.push(nm);
+  }
+  info.schoolExamples=Array.from(new Set(schools)).slice(0,12);
+  info.assistantExamples=Array.from(new Set(assistants)).slice(0,12);
+  info.nameExamples=Array.from(new Set(names)).slice(0,12);
+  if(idx.school<0) info.warning='高校列を見つけられませんでした';
+  else if(!info.schoolCount) info.warning='高校列は見つかりましたが、高校名が入っている行がありません';
+  return info;
+}
+function rosterDiagnosticsText(inputSchools=[], inputAssistants=[]){
+  const lines=[];
+  const diags=ROSTER_PROFILE_CACHE.diagnostics||[];
+  lines.push('--- 対応表・高校/助手 展開診断 ---');
+  lines.push(`対応表ファイル: ${ROSTER_PROFILE_CACHE.source||'なし'}`);
+  lines.push(`対応表生徒情報: ${(ROSTER_PROFILE_CACHE.profiles||[]).length}件`);
+  if(!diags.length){
+    lines.push('⚠ 対応表診断: なし（対応表フォルダー未読込、または対応表ファイルなし）');
+  }else{
+    diags.forEach(d=>{
+      const schoolCol=d.idx?.school>=0?`${d.header[d.idx.school]} (${colName(d.idx.school+1)}列)`:'なし';
+      const nameCol=d.idx?.name>=0?`${d.header[d.idx.name]} (${colName(d.idx.name+1)}列)`:'なし';
+      const assistantCol=d.idx?.assistant>=0?`${d.header[d.idx.assistant]} (${colName(d.idx.assistant+1)}列)`:'なし';
+      lines.push(`・${d.source}: 見出し行=${d.headerRow>=0?d.headerRow+1:'不明'} / 氏名列=${nameCol} / 高校列=${schoolCol} / 担当列=${assistantCol} / 生徒=${d.profileCount}件 / 高校入り=${d.schoolCount}件 / 担当入り=${d.assistantCount}件${d.warning?` / ⚠ ${d.warning}`:''}`);
+    });
+  }
+  const knownSchools=Array.from(new Set((ROSTER_PROFILE_CACHE.profiles||[]).map(p=>String(p.school||'').trim()).filter(Boolean))).slice(0,20);
+  const knownAssistants=Array.from(new Set((ROSTER_PROFILE_CACHE.profiles||[]).map(p=>String(p.assistant||'').trim()).filter(Boolean))).slice(0,20);
+  if(inputSchools.length){
+    lines.push(`指定高校: ${inputSchools.join('、')}`);
+    lines.push(`指定高校の照合キー: ${inputSchools.map(s=>`${s}→${schoolKeyCandidates(s).join('/')||'空'}`).join(' / ')}`);
+    const matched=[];
+    (ROSTER_PROFILE_CACHE.profiles||[]).forEach(p=>{
+      if(p.name && inputSchools.some(s=>schoolNameMatches(s,p.school))) matched.push(`${inputTargetDisplayName(p.name)||p.name}（対応表:${p.name} / 高校:${p.school||'空'}）`);
+    });
+    lines.push(`高校一致: ${matched.length}名${matched.length?` → ${matched.slice(0,30).join('、')}${matched.length>30?' 他'+(matched.length-30)+'名':''}`:''}`);
+    lines.push(`対応表から読めた高校例: ${knownSchools.join('、')||'なし'}`);
+  }
+  if(inputAssistants.length){
+    lines.push(`指定担任助手: ${inputAssistants.join('、')}`);
+    const matched=[];
+    (ROSTER_PROFILE_CACHE.profiles||[]).forEach(p=>{
+      if(p.name && inputAssistants.some(a=>profileKey(a)===profileKey(p.assistant))) matched.push(`${inputTargetDisplayName(p.name)||p.name}（対応表:${p.name} / 担当:${p.assistant||'空'}）`);
+    });
+    lines.push(`対応表の助手一致: ${matched.length}名${matched.length?` → ${matched.slice(0,30).join('、')}${matched.length>30?' 他'+(matched.length-30)+'名':''}`:''}`);
+    lines.push(`対応表から読めた担当例: ${knownAssistants.join('、')||'なし'}`);
+  }
+  return lines.join('\n');
+}
 async function refreshRosterProfilesFromShared(force=false){
   if(!force && ROSTER_PROFILE_CACHE.loaded) return ROSTER_PROFILE_CACHE;
   if(ROSTER_PROFILE_CACHE.loading) return ROSTER_PROFILE_CACHE.loading;
   ROSTER_PROFILE_CACHE.loading=(async()=>{
-    ROSTER_PROFILE_CACHE.loaded=false; ROSTER_PROFILE_CACHE.profiles=[]; ROSTER_PROFILE_CACHE.byName=new Map(); ROSTER_PROFILE_CACHE.byNo=new Map(); ROSTER_PROFILE_CACHE.source='';
+    ROSTER_PROFILE_CACHE.loaded=false; ROSTER_PROFILE_CACHE.profiles=[]; ROSTER_PROFILE_CACHE.byName=new Map(); ROSTER_PROFILE_CACHE.byNo=new Map(); ROSTER_PROFILE_CACHE.source=''; ROSTER_PROFILE_CACHE.diagnostics=[];
     if(!sharedDirHandle){ROSTER_PROFILE_CACHE.loaded=true; return ROSTER_PROFILE_CACHE;}
     const dir=await getDirectoryIfExists(sharedDirHandle,'対応表');
     if(!dir){ROSTER_PROFILE_CACHE.loaded=true; return ROSTER_PROFILE_CACHE;}
@@ -1247,6 +1327,7 @@ async function refreshRosterProfilesFromShared(force=false){
         let rows=[];
         if(/\.csv$/i.test(file.name)) rows=simpleCsvRows(await file.text());
         else if(window.XLSX){ const wb=await readWorkbookFromFileRobust(file); for(const sh of wb.SheetNames||[]){ rows.push(...sheetToAoaRobust(wb.Sheets[sh],false)); } }
+        ROSTER_PROFILE_CACHE.diagnostics.push(diagnoseRosterAoa(rows,file.name));
         const profs=parseRosterAoa(rows,file.name);
         profs.forEach(addRosterProfile);
         ROSTER_PROFILE_CACHE.profiles.push(...profs);
@@ -1316,12 +1397,11 @@ async function expandMasterTargetStudents(row, kind){
   const add=[...schoolAdds,...assistantAdds];
   const expanded=appendUniqueTargetStudents(studentsEl?.value||'', add);
   if(studentsEl) studentsEl.value=expanded.join('、');
-  const knownSchools=Array.from(new Set((ROSTER_PROFILE_CACHE.profiles||[]).map(p=>String(p.school||'').trim()).filter(Boolean))).slice(0,12);
-  const unmatchedSchools=schools.filter(s=>!schoolAdds.length || !schoolAdds.some(Boolean)).filter(Boolean);
+  const diag=rosterDiagnosticsText(schools, assistants);
   showSaveInfo(`対象生徒を自動追加しました：高校 ${schools.length}件 / 担任助手 ${assistants.length}件 / 高校から ${schoolAdds.length}名 / 助手から ${assistantAdds.length}名 / 対象生徒 ${expanded.length}名
 ※高校名は「高等学校/高校」「府立/県立/市立/私立」などの表記ゆれを吸収して照合します。
-※フルネームは入力用表示名（苗字だけ/同姓は下一文字つき）へ寄せて重複を除外します。${schools.length&&!schoolAdds.length?`
-⚠ 高校から追加できませんでした。対応表の高校列名・高校名を確認してください。対応表から読めた高校例：${knownSchools.join('、')||'なし'}`:''}`);
+※フルネームは入力用表示名（苗字だけ/同姓は下一文字つき）へ寄せて重複を除外します。
+${diag}`);
 }
 function studentMatchesTargetProfile(name, item){
   const schools=Array.isArray(item?.schools)?item.schools.filter(Boolean):splitTargetText(item?.schoolNames||'');
