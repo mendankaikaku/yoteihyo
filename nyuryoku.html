@@ -1122,15 +1122,45 @@ function simpleCsvRows(text){
   }
   row.push(cell); if(row.some(v=>String(v).trim())) rows.push(row); return rows;
 }
+
+// 対応表などでフルネームが来ても、入力用の表示名（苗字だけ/同姓は下一文字つき）へ寄せる。
+// 例：北野碧人 → 北野碧、平井瑛太 → 平井瑛。候補がなければ元の名前を維持する。
+function inputTargetDisplayName(name){
+  const raw=String(name||'').trim();
+  const key=profileKey(raw);
+  if(!key) return '';
+  let known=[];
+  try{ known=allKnownStudentNameCandidatesForAmbiguity(); }catch(e){ known=[]; }
+  if(known.includes(key)) return key;
+  const prefix=known.filter(n=>key.startsWith(n)).sort((a,b)=>b.length-a.length || a.localeCompare(b,'ja'));
+  if(prefix.length) return prefix[0];
+  return raw;
+}
+function targetStudentCanonicalKey(name){
+  return profileKey(inputTargetDisplayName(name) || name);
+}
+function addTargetStudentNameOnce(out, seen, name){
+  const display=inputTargetDisplayName(name);
+  const k=targetStudentCanonicalKey(display||name);
+  if(k && !seen.has(k)){
+    seen.add(k);
+    out.push(display||String(name||'').trim());
+    return true;
+  }
+  return false;
+}
 function addRosterProfile(p){
   const name=String(p.name||'').trim();
   const no=String(p.studentNo||'').trim();
   if(!name && !no) return;
   const item={name, studentNo:no, grade:String(p.grade||'').trim(), school:String(p.school||'').trim(), assistant:String(p.assistant||'').trim(), source:p.source||''};
   const nk=profileKey(name); const pk=no?`no:${no}`:'';
-  const existing=nk?ROSTER_PROFILE_CACHE.byName.get(nk):null;
-  const merged=Object.assign({}, existing||{}, item);
+  const displayName=inputTargetDisplayName(name);
+  const dk=profileKey(displayName);
+  const existing=(nk?ROSTER_PROFILE_CACHE.byName.get(nk):null) || (dk?ROSTER_PROFILE_CACHE.byName.get(dk):null);
+  const merged=Object.assign({}, existing||{}, item, {fullName:name, inputName:displayName||name});
   if(nk) ROSTER_PROFILE_CACHE.byName.set(nk, merged);
+  if(dk) ROSTER_PROFILE_CACHE.byName.set(dk, Object.assign({}, merged, {name:displayName||name, fullName:name}));
   if(pk) ROSTER_PROFILE_CACHE.byNo.set(pk, merged);
 }
 function parseRosterAoa(aoa, source=''){
@@ -1203,22 +1233,37 @@ function studentsForSchools(schools){
   const keys=new Set((schools||[]).map(normSchoolKey).filter(Boolean));
   if(!keys.size)return [];
   const out=[]; const seen=new Set();
-  (ROSTER_PROFILE_CACHE.profiles||[]).forEach(p=>{if(keys.has(normSchoolKey(p.school))&&p.name&&!seen.has(profileKey(p.name))){seen.add(profileKey(p.name));out.push(p.name);}});
-  Object.keys(studentData||{}).forEach(name=>{const p=getKnownStudentProfile(name);if(keys.has(normSchoolKey(p.school))&&!seen.has(profileKey(name))){seen.add(profileKey(name));out.push(name);}});
+  (ROSTER_PROFILE_CACHE.profiles||[]).forEach(p=>{
+    if(keys.has(normSchoolKey(p.school)) && p.name) addTargetStudentNameOnce(out, seen, p.name);
+  });
+  Object.keys(studentData||{}).forEach(name=>{
+    const p=getKnownStudentProfile(name);
+    if(keys.has(normSchoolKey(p.school))) addTargetStudentNameOnce(out, seen, name);
+  });
   return out;
 }
 function studentsForAssistants(assistants){
   const keys=new Set((assistants||[]).map(profileKey).filter(Boolean));
   if(!keys.size)return [];
   const out=[]; const seen=new Set();
-  keys.forEach(k=>{const hitKey=Object.keys(ASSISTANT_STUDENT_MAP_FOR_INPUT||{}).find(a=>profileKey(a)===k); if(hitKey)(ASSISTANT_STUDENT_MAP_FOR_INPUT[hitKey]||[]).forEach(n=>{if(!seen.has(profileKey(n))){seen.add(profileKey(n));out.push(n);}});});
-  (ROSTER_PROFILE_CACHE.profiles||[]).forEach(p=>{if(keys.has(profileKey(p.assistant))&&p.name&&!seen.has(profileKey(p.name))){seen.add(profileKey(p.name));out.push(p.name);}});
-  Object.keys(studentData||{}).forEach(name=>{const p=getKnownStudentProfile(name);if(keys.has(profileKey(p.assistant))&&!seen.has(profileKey(name))){seen.add(profileKey(name));out.push(name);}});
+  // まずアプリ内の正式な入力用表示名リスト（苗字だけ/同姓は下一文字つき）を優先する。
+  keys.forEach(k=>{
+    const hitKey=Object.keys(ASSISTANT_STUDENT_MAP_FOR_INPUT||{}).find(a=>profileKey(a)===k);
+    if(hitKey)(ASSISTANT_STUDENT_MAP_FOR_INPUT[hitKey]||[]).forEach(n=>addTargetStudentNameOnce(out, seen, n));
+  });
+  // 対応表がフルネームでも、inputTargetDisplayName で入力用表示名へ寄せて重複を消す。
+  (ROSTER_PROFILE_CACHE.profiles||[]).forEach(p=>{
+    if(keys.has(profileKey(p.assistant)) && p.name) addTargetStudentNameOnce(out, seen, p.name);
+  });
+  Object.keys(studentData||{}).forEach(name=>{
+    const p=getKnownStudentProfile(name);
+    if(keys.has(profileKey(p.assistant))) addTargetStudentNameOnce(out, seen, name);
+  });
   return out;
 }
 function appendUniqueTargetStudents(current, additions){
   const out=[]; const seen=new Set();
-  [...splitTargetText(current),...(additions||[])].forEach(n=>{const k=profileKey(n); if(k&&!seen.has(k)){seen.add(k);out.push(n);}});
+  [...splitTargetText(current),...(additions||[])].forEach(n=>addTargetStudentNameOnce(out, seen, n));
   return out;
 }
 async function expandMasterTargetStudents(row, kind){
@@ -1232,7 +1277,8 @@ async function expandMasterTargetStudents(row, kind){
   const add=[...studentsForSchools(schools),...studentsForAssistants(assistants)];
   const expanded=appendUniqueTargetStudents(studentsEl?.value||'', add);
   if(studentsEl) studentsEl.value=expanded.join('、');
-  showSaveInfo(`対象生徒を自動追加しました：高校 ${schools.length}件 / 担任助手 ${assistants.length}件 / 追加候補 ${add.length}名 / 対象生徒 ${expanded.length}名`);
+  showSaveInfo(`対象生徒を自動追加しました：高校 ${schools.length}件 / 担任助手 ${assistants.length}件 / 追加候補 ${add.length}名 / 対象生徒 ${expanded.length}名
+※フルネームは入力用表示名（苗字だけ/同姓は下一文字つき）へ寄せて重複を除外します。`);
 }
 function studentMatchesTargetProfile(name, item){
   const schools=Array.isArray(item?.schools)?item.schools.filter(Boolean):splitTargetText(item?.schoolNames||'');
@@ -2361,9 +2407,9 @@ function examId(ex){return `${ex.name||''}|${ex.date||''}|${ex.type||'common'}|$
 function splitTargetNames(s){return String(s||'').split(/[、，,\n]+/).map(x=>x.trim()).filter(Boolean)}
 function examTargetNameMatch(studentName, targetNames){
   if(!targetNames || !targetNames.length) return true;
-  const stu=String(studentName||'').replace(/[\s　]+/g,'');
+  const stu=targetStudentCanonicalKey(studentName) || String(studentName||'').replace(/[\s　]+/g,'');
   return targetNames.some(n=>{
-    const key=String(n||'').replace(/[\s　]+/g,'');
+    const key=targetStudentCanonicalKey(n) || String(n||'').replace(/[\s　]+/g,'');
     return key && (stu===key || stu.startsWith(key) || key.startsWith(stu));
   });
 }
