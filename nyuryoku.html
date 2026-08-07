@@ -3576,9 +3576,51 @@ function inputAppSavePrecheckSummary(){
   return '--- 保存前チェック ---\n' + warnings.slice(0,80).join('\n') + (warnings.length>80 ? `\nほか ${warnings.length-80}件` : '');
 }
 
+function syncVisibleMasterPanelsForGroupSave(){
+  const msgs=[];
+  try{
+    if(document.querySelector('#examMasterPanel .examMasterRow')){
+      const examRows=mergeVisibleExamMasterRowsForSave(collectExamMasterFromPanel());
+      saveExamMasterData(examRows);
+      updateExamTargetHistoryFromMasters(examRows);
+      msgs.push(`模試マスタ：画面入力 ${examRows.length}件を④保存に反映`);
+    }else{
+      msgs.push(`模試マスタ：画面行なし（保存済み ${getExamMaster().length}件）`);
+    }
+  }catch(e){
+    msgs.push(`模試マスタ：④保存時の画面反映に失敗 ${e?.message||e}`);
+  }
+  try{
+    if(document.querySelector('#eventMasterPanel .eventMasterRow')){
+      const eventRows=collectEventMasterFromPanel();
+      saveEventMasterData(eventRows);
+      updateEventTargetHistoryFromMasters(eventRows);
+      msgs.push(`イベントマスタ：画面入力 ${eventRows.length}件を④保存に反映`);
+    }else{
+      msgs.push(`イベントマスタ：画面行なし（保存済み ${getEventMaster().length}件）`);
+    }
+  }catch(e){
+    msgs.push(`イベントマスタ：④保存時の画面反映に失敗 ${e?.message||e}`);
+  }
+  try{
+    if(document.querySelector('#commentMasterPanel .commentMasterRow')){
+      const commentRows=collectCommentMasterFromPanel();
+      saveCommentMasterData(commentRows);
+      updateCommentTargetHistoryFromMasters(commentRows);
+      msgs.push(`今週の方針/コメント：画面入力 ${commentRows.length}件を④保存に反映`);
+    }else{
+      msgs.push(`今週の方針/コメント：画面行なし（保存済み ${getCommentMaster().length}件）`);
+    }
+  }catch(e){
+    msgs.push(`今週の方針/コメント：④保存時の画面反映に失敗 ${e?.message||e}`);
+  }
+  return {msg:'--- ④保存時マスタ画面反映 ---\n'+msgs.join('\n')};
+}
+
 async function saveGroup(){
   syncFromDom();
   if(!students.length)return alert('先に生徒名を入力してください。');
+  const masterPanelSync = syncVisibleMasterPanelsForGroupSave();
   const savePrecheck = inputAppSavePrecheckSummary();
 
   const eventCleanup = cleanupOldEventMasterRows(1);
@@ -3586,6 +3628,7 @@ async function saveGroup(){
   saveGroupToBrowser(mem);
   const status=[];
   status.push(`ブラウザ内保存：完了（${students.join('、')}）`);
+  status.push(masterPanelSync.msg);
   status.push(savePrecheck);
   status.push(eventCleanup.msg);
 
@@ -6463,6 +6506,21 @@ showSaveInfo=function(text){
   else if(/復元しました|読み込みました|反映しました|選択しました|自動追加しました/.test(t)) uxSetSaved('loaded');
   uxUpdateSummary();
 };
+
+// ログ/操作結果ポップアップが邪魔なときは Enter で閉じる。
+// 入力中のIME確定などを邪魔しないよう、文字変換中は無視する。
+(function setupSaveToastEnterDismiss(){
+  if(window.__SAVE_TOAST_ENTER_DISMISS__) return;
+  window.__SAVE_TOAST_ENTER_DISMISS__=true;
+  document.addEventListener('keydown', function(e){
+    if(e.isComposing) return;
+    if(e.key!=='Enter' && e.key!=='NumpadEnter') return;
+    const box=document.getElementById('uxSaveToast');
+    if(!box || !box.classList.contains('show')) return;
+    box.classList.remove('show');
+    clearTimeout(uxShowSaveToast._timer);
+  }, true);
+})();
 function uxEnsureDock(){
   if(document.getElementById('uxActionDock')) return;
   const dock=document.createElement('div');
