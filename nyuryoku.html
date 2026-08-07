@@ -1106,7 +1106,44 @@ function displayRangeHint(item){const from=(item&&item.displayStart)||'';const t
 
 const ROSTER_PROFILE_CACHE = {loaded:false, loading:null, profiles:[], byName:new Map(), byNo:new Map(), source:''};
 function profileKey(s){return String(s||'').replace(/[\s\u3000]+/g,'').trim();}
-function normSchoolKey(s){return profileKey(s);}
+
+// 高校名は対応表と手入力で表記ゆれが出やすいので、かなり強めに正規化する。
+// 例：大阪府立〇〇高等学校 / 〇〇高校 / 〇〇 → 同じ候補として扱う。
+function normSchoolKey(s){
+  return String(s||'')
+    .replace(/[\s\u3000]+/g,'')
+    .replace(/[()（）［］\[\]「」『』]/g,'')
+    .replace(/大阪府立|兵庫県立|京都府立|奈良県立|和歌山県立|滋賀県立|県立|府立|市立|私立|国立/g,'')
+    .replace(/高等学校/g,'高校')
+    .replace(/中等教育学校/g,'中等')
+    .replace(/附属/g,'付属')
+    .trim();
+}
+function schoolLooseBaseKey(s){
+  return normSchoolKey(s)
+    .replace(/高校$/g,'')
+    .replace(/高$/g,'')
+    .replace(/学校$/g,'')
+    .trim();
+}
+function schoolKeyCandidates(s){
+  const raw=String(s||'').trim();
+  const a=normSchoolKey(raw);
+  const b=schoolLooseBaseKey(raw);
+  return Array.from(new Set([a,b].filter(Boolean)));
+}
+function schoolNameMatches(a,b){
+  const ac=schoolKeyCandidates(a), bc=schoolKeyCandidates(b);
+  if(!ac.length||!bc.length) return false;
+  for(const x of ac){
+    for(const y of bc){
+      if(x===y) return true;
+      // 片方が「〇〇」、片方が「〇〇高校」などのケースを拾う。
+      if(x.length>=2 && y.length>=2 && (x.includes(y) || y.includes(x))) return true;
+    }
+  }
+  return false;
+}
 function splitTargetText(s){return splitTargetNames(s||'');}
 function rosterHeaderIndex(header, names){
   const h=(header||[]).map(x=>String(x??'').trim());
@@ -1230,15 +1267,15 @@ function getKnownStudentProfile(name){
   return Object.assign({}, byName||{}, byNo||{}, {name, studentNo:no||byNo?.studentNo||byName?.studentNo||'', grade:data?.grade||byNo?.grade||byName?.grade||'', school:data?.school||byNo?.school||byName?.school||'', assistant:data?.assistant||byNo?.assistant||byName?.assistant||mapAssistant});
 }
 function studentsForSchools(schools){
-  const keys=new Set((schools||[]).map(normSchoolKey).filter(Boolean));
-  if(!keys.size)return [];
+  const inputSchools=(schools||[]).map(s=>String(s||'').trim()).filter(Boolean);
+  if(!inputSchools.length)return [];
   const out=[]; const seen=new Set();
   (ROSTER_PROFILE_CACHE.profiles||[]).forEach(p=>{
-    if(keys.has(normSchoolKey(p.school)) && p.name) addTargetStudentNameOnce(out, seen, p.name);
+    if(p.name && inputSchools.some(s=>schoolNameMatches(s,p.school))) addTargetStudentNameOnce(out, seen, p.name);
   });
   Object.keys(studentData||{}).forEach(name=>{
     const p=getKnownStudentProfile(name);
-    if(keys.has(normSchoolKey(p.school))) addTargetStudentNameOnce(out, seen, name);
+    if(inputSchools.some(s=>schoolNameMatches(s,p.school))) addTargetStudentNameOnce(out, seen, name);
   });
   return out;
 }
@@ -1274,18 +1311,24 @@ async function expandMasterTargetStudents(row, kind){
   const studentsEl=row.querySelector(`[data-${prefix}-master-students]`);
   const schools=splitTargetText(schoolEl?.value||'');
   const assistants=splitTargetText(assistantEl?.value||'');
-  const add=[...studentsForSchools(schools),...studentsForAssistants(assistants)];
+  const schoolAdds=studentsForSchools(schools);
+  const assistantAdds=studentsForAssistants(assistants);
+  const add=[...schoolAdds,...assistantAdds];
   const expanded=appendUniqueTargetStudents(studentsEl?.value||'', add);
   if(studentsEl) studentsEl.value=expanded.join('、');
-  showSaveInfo(`対象生徒を自動追加しました：高校 ${schools.length}件 / 担任助手 ${assistants.length}件 / 追加候補 ${add.length}名 / 対象生徒 ${expanded.length}名
-※フルネームは入力用表示名（苗字だけ/同姓は下一文字つき）へ寄せて重複を除外します。`);
+  const knownSchools=Array.from(new Set((ROSTER_PROFILE_CACHE.profiles||[]).map(p=>String(p.school||'').trim()).filter(Boolean))).slice(0,12);
+  const unmatchedSchools=schools.filter(s=>!schoolAdds.length || !schoolAdds.some(Boolean)).filter(Boolean);
+  showSaveInfo(`対象生徒を自動追加しました：高校 ${schools.length}件 / 担任助手 ${assistants.length}件 / 高校から ${schoolAdds.length}名 / 助手から ${assistantAdds.length}名 / 対象生徒 ${expanded.length}名
+※高校名は「高等学校/高校」「府立/県立/市立/私立」などの表記ゆれを吸収して照合します。
+※フルネームは入力用表示名（苗字だけ/同姓は下一文字つき）へ寄せて重複を除外します。${schools.length&&!schoolAdds.length?`
+⚠ 高校から追加できませんでした。対応表の高校列名・高校名を確認してください。対応表から読めた高校例：${knownSchools.join('、')||'なし'}`:''}`);
 }
 function studentMatchesTargetProfile(name, item){
   const schools=Array.isArray(item?.schools)?item.schools.filter(Boolean):splitTargetText(item?.schoolNames||'');
   const assistants=Array.isArray(item?.assistants)?item.assistants.filter(Boolean):splitTargetText(item?.assistantNames||'');
   if(!schools.length&&!assistants.length)return true;
   const p=getKnownStudentProfile(name);
-  if(schools.length && schools.some(s=>normSchoolKey(s)===normSchoolKey(p.school))) return true;
+  if(schools.length && schools.some(s=>schoolNameMatches(s,p.school))) return true;
   if(assistants.length && assistants.some(a=>profileKey(a)===profileKey(p.assistant))) return true;
   return false;
 }
