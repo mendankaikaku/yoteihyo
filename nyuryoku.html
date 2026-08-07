@@ -36,7 +36,7 @@ table{width:100%;border-collapse:collapse;background:#fff}th,td{border:1px solid
 .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.notice{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:12px;padding:10px;font-size:13px;line-height:1.6}.empty{color:#98a2b3}.pill{display:inline-block;background:var(--accent2);color:#1d4ed8;border-radius:999px;padding:2px 8px;font-size:12px;font-weight:700;margin-right:4px}
 .studentGrid{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(560px,1fr);gap:16px;overflow-x:auto;padding-bottom:8px}.studentCard{min-width:560px}.studentHead{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:12px}.studentNameTitle{font-size:20px;font-weight:900}.miniBar{display:flex;gap:8px;flex-wrap:wrap}
 .examItem,.eventItem,.commentItem{border:1px solid var(--line);border-radius:12px;padding:10px;background:#fff;margin:10px 0}.examHead{display:flex;justify-content:space-between;gap:8px;align-items:center;font-weight:800}.examDate{font-size:12px;color:var(--muted);font-weight:700}.checkRow{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}.checkRow label{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--text);background:#f8fafc;border:1px solid var(--line);border-radius:999px;padding:4px 8px;cursor:pointer}.checkRow input{width:auto;margin:0}
-.eventItem input,.eventItem textarea,.commentItem input,.commentItem textarea,.examMasterRow input,.examMasterRow select,.examMasterRow textarea,.eventMasterRow input,.eventMasterRow select,.eventMasterRow textarea,.commentMasterRow input,.commentMasterRow select,.commentMasterRow textarea{width:100%;border:1px solid var(--line);border-radius:10px;padding:8px;background:#fff;font:inherit}.examMasterRow{display:grid;grid-template-columns:1.4fr 130px 1.1fr 1.2fr auto;gap:8px;align-items:end;margin:8px 0}.eventMasterRow{display:grid;grid-template-columns:1.4fr 160px 1.1fr 1.2fr auto;gap:8px;align-items:end;margin:8px 0}.commentMasterRow{display:grid;grid-template-columns:1.1fr 1.5fr 1.1fr 1.2fr auto;gap:8px;align-items:end;margin:8px 0}.subjectTemplateBox{display:none}
+.eventItem input,.eventItem textarea,.commentItem input,.commentItem textarea,.examMasterRow input,.examMasterRow select,.examMasterRow textarea,.eventMasterRow input,.eventMasterRow select,.eventMasterRow textarea,.commentMasterRow input,.commentMasterRow select,.commentMasterRow textarea{width:100%;border:1px solid var(--line);border-radius:10px;padding:8px;background:#fff;font:inherit}.examMasterRow{display:grid;grid-template-columns:1.4fr 130px 1.1fr 1.2fr auto;gap:8px;align-items:end;margin:8px 0}.eventMasterRow{display:grid;grid-template-columns:1.25fr 155px 140px 140px 1.05fr 1.15fr auto;gap:8px;align-items:end;margin:8px 0}.commentMasterRow{display:grid;grid-template-columns:1.05fr 1.4fr 140px 140px 1.05fr 1.15fr auto;gap:8px;align-items:end;margin:8px 0}.subjectTemplateBox{display:none}
 
 .goukakuBox{border:1px solid var(--line);border-radius:12px;background:#fff;margin-top:8px;overflow:hidden}
 .goukakuHeader{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#f8fafc;border-bottom:1px solid var(--line);padding:8px 10px;font-weight:800}
@@ -881,7 +881,7 @@ main.wrap{max-width:none!important;height:auto!important;min-height:0!important;
 
   <section class="card">
     <p class="sectionTitle">今週の方針/コメントマスタ</p>
-    <div class="masterGridHint">今週の方針・共有コメントを登録します。対象学年/生徒の選び方はイベントマスタと同じです。</div>
+    <div class="masterGridHint">今週の方針・共有コメントを登録します。表示開始日・表示終了日を入れると、その期間の週開始日のときだけ表示します。空欄なら対象学年/生徒に常時表示します。</div>
     <details class="advanced">
       <summary>今週の方針/コメントマスタを編集</summary>
       <div id="commentMasterPanel"></div>
@@ -1099,6 +1099,10 @@ function norm(s){
 function setDefaultDate(){if(!$('#weekStart').value) $('#weekStart').value=ymd(new Date())}
 function getDates(){const base=new Date($('#weekStart').value+'T00:00:00');return Array.from({length:7},(_,i)=>{const d=new Date(base);d.setDate(base.getDate()+i);return d})}
 function daysBetween(a,b){const aa=new Date(a.getFullYear(),a.getMonth(),a.getDate());const bb=new Date(b.getFullYear(),b.getMonth(),b.getDate());return Math.round((bb-aa)/86400000)}
+function localDateOnlyValue(v){if(!v)return null;const s=String(v).trim();if(!s)return null;const m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);if(!m)return null;const d=new Date(Number(m[1]),Number(m[2])-1,Number(m[3]),0,0,0,0);return isNaN(d)?null:d}
+function currentWeekStartDateOnly(){return localDateOnlyValue($('#weekStart')?.value)||new Date(new Date().getFullYear(),new Date().getMonth(),new Date().getDate())}
+function isWeekStartInsideDisplayRange(item){const start=currentWeekStartDateOnly();const from=localDateOnlyValue(item&&item.displayStart);const to=localDateOnlyValue(item&&item.displayEnd);if(from && daysBetween(from,start)<0)return false;if(to && daysBetween(start,to)<0)return false;return true}
+function displayRangeHint(item){const from=(item&&item.displayStart)||'';const to=(item&&item.displayEnd)||'';if(from&&to)return `表示期間：${from}〜${to}`;if(from)return `表示開始：${from}〜`;if(to)return `表示終了：〜${to}`;return ''}
 function showSaveInfo(text){$('#saveInfo').textContent=text||''}
 function colName(n){let s='';while(n>0){let m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=Math.floor((n-1)/26)}return s}
 function cellRef(r,c){return colName(c)+r}
@@ -1345,7 +1349,66 @@ function applyStudents(){
   renderStudents();
   showSaveInfo(students.length?`${students.length}名の入力欄を表示中です。`:'生徒名を入力してください。');
 }
-function renderStudents(){
+function captureStudentViewState(){
+  const grid=$('#studentGrid');
+  const active=document.activeElement;
+  const activeCard=active?.closest?.('[data-student-card]');
+  const focus={
+    student: active?.dataset?.student || activeCard?.dataset?.studentCard || '',
+    kind: active?.dataset?.kind || '',
+    day: active?.dataset?.day || '',
+    row: active?.dataset?.row || '',
+    name: active?.getAttribute?.('name') || '',
+    id: active?.id || '',
+    tag: active?.tagName || ''
+  };
+  const cardScrolls={};
+  document.querySelectorAll('[data-student-card]').forEach(card=>{
+    const key=card.dataset.studentCard||'';
+    const overflowEls=Array.from(card.querySelectorAll('div[style*="overflow:auto"], .goukakuTableWrap, .modalBody'));
+    cardScrolls[key]={
+      scrollTop:card.scrollTop||0,
+      scrollLeft:card.scrollLeft||0,
+      inner:overflowEls.map(el=>({scrollTop:el.scrollTop||0,scrollLeft:el.scrollLeft||0}))
+    };
+  });
+  return {
+    gridScrollLeft:grid?.scrollLeft||0,
+    gridScrollTop:grid?.scrollTop||0,
+    windowX:window.scrollX||0,
+    windowY:window.scrollY||0,
+    focus,
+    cardScrolls
+  };
+}
+function restoreStudentViewState(state){
+  if(!state)return;
+  requestAnimationFrame(()=>{
+    const grid=$('#studentGrid');
+    if(grid){grid.scrollLeft=state.gridScrollLeft||0; grid.scrollTop=state.gridScrollTop||0;}
+    Object.entries(state.cardScrolls||{}).forEach(([key,val])=>{
+      const card=document.querySelector(`[data-student-card="${cssEscape(key)}"]`);
+      if(!card)return;
+      card.scrollTop=val.scrollTop||0;
+      card.scrollLeft=val.scrollLeft||0;
+      const overflowEls=Array.from(card.querySelectorAll('div[style*="overflow:auto"], .goukakuTableWrap, .modalBody'));
+      (val.inner||[]).forEach((pos,i)=>{
+        if(overflowEls[i]){overflowEls[i].scrollTop=pos.scrollTop||0; overflowEls[i].scrollLeft=pos.scrollLeft||0;}
+      });
+    });
+    const f=state.focus||{};
+    let target=null;
+    if(f.id) target=document.getElementById(f.id);
+    if(!target && f.student && f.kind){
+      target=document.querySelector(`[data-student="${cssEscape(f.student)}"][data-kind="${cssEscape(f.kind)}"]${f.day!==''?`[data-day="${cssEscape(f.day)}"]`:''}${f.row!==''?`[data-row="${cssEscape(f.row)}"]`:''}`);
+    }
+    if(target && typeof target.focus==='function') target.focus({preventScroll:true});
+    if(grid){grid.scrollLeft=state.gridScrollLeft||0; grid.scrollTop=state.gridScrollTop||0;}
+    window.scrollTo(state.windowX||0,state.windowY||0);
+  });
+}
+function renderStudents(options={}){
+  const viewState=options.viewState || (options.preserveView?captureStudentViewState():null);
   const grid=$('#studentGrid');
   if(!students.length){grid.innerHTML='<section class="card"><span class="empty">生徒名を入力して「② 生徒欄を作る」を押してください。</span></section>';return;}
   grid.innerHTML=students.map(name=>studentCardHtml(name)).join('');
@@ -1353,6 +1416,7 @@ function renderStudents(){
   updateScheduleHeaders();
   bindInputs();
   updateScheduleAddButtons();
+  if(viewState)restoreStudentViewState(viewState);
 }
 function studentCardHtml(name){
   return `<section class="card studentCard" data-student-card="${escapeHtml(name)}">
@@ -1399,8 +1463,12 @@ function visibleEventMastersForStudent(name){
     if(!ev.datetime)return false;
     const d=new Date(ev.datetime);
     if(isNaN(d))return false;
-    const diff=daysBetween(start,d);
-    if(diff<0||diff>14)return false;
+    if(ev.displayStart||ev.displayEnd){
+      if(!isWeekStartInsideDisplayRange(ev)) return false;
+    }else{
+      const diff=daysBetween(start,d);
+      if(diff<0||diff>14)return false;
+    }
     const targets=Array.isArray(ev.grades)?ev.grades.filter(Boolean):[];
     if(targets.length && !targets.includes(grade)) return false;
     const targetNames=Array.isArray(ev.students)?ev.students:splitTargetNames(ev.studentNames||'');
@@ -1414,7 +1482,7 @@ function eventPanelHtml(name){
   if(!grade){
     return '<div class="empty" style="margin-top:10px">学年を選択すると対象イベントが表示されます。</div>';
   }
-  const masterItems=visibleEventMastersForStudent(name).map(ev=>({id:eventId(ev),name:ev.name||'',datetime:ev.datetime||'',status:'',note:'',master:true,grades:ev.grades||[],students:ev.students||[]}));
+  const masterItems=visibleEventMastersForStudent(name).map(ev=>({id:eventId(ev),name:ev.name||'',datetime:ev.datetime||'',status:'',note:'',master:true,grades:ev.grades||[],students:ev.students||[],displayStart:ev.displayStart||'',displayEnd:ev.displayEnd||''}));
   const masterIds=new Set(masterItems.map(m=>m.id).filter(Boolean));
   const manualItems=saved.filter(ev=>!ev.id || !masterIds.has(ev.id));
   const items=[...masterItems,...manualItems];
@@ -1422,7 +1490,7 @@ function eventPanelHtml(name){
     return '<div class="empty" style="margin-top:10px">対象イベントはありません。</div>';
   }
   return items.map((ev,i)=>`<div class="eventItem" data-event-row="${i}" data-event-id="${escapeHtml(ev.id||'')}" data-event-master="${ev.master?'1':'0'}">
-    ${ev.master && (((ev.grades||[]).length)||((ev.students||[]).length)) ? `<div class="hint">対象：${escapeHtml([(ev.grades||[]).join('・'),(ev.students||[]).join('・')].filter(Boolean).join(' / '))}</div>` : ''}
+    ${ev.master && (((ev.grades||[]).length)||((ev.students||[]).length)||ev.displayStart||ev.displayEnd) ? `<div class="hint">${escapeHtml(['対象：'+[(ev.grades||[]).join('・'),(ev.students||[]).join('・')].filter(Boolean).join(' / '),displayRangeHint(ev)].filter(x=>x&&x!=='対象：').join('　'))}</div>` : ''}
     <div class="field"><label>イベント名</label><input data-student="${escapeHtml(name)}" data-event-name value="${escapeHtml(ev.name||'')}" placeholder="例：公開授業・説明会・面談会" ${ev.master?'readonly':''}></div>
     <div class="field" style="margin-top:8px"><label>日時</label><input type="datetime-local" data-student="${escapeHtml(name)}" data-event-datetime value="${escapeHtml(toDateTimeLocalValue(ev.datetime||''))}" ${ev.master?'readonly':''}></div>
     <div class="checkRow"><label><input type="radio" name="event_${escapeHtml(name)}_${i}" data-student="${escapeHtml(name)}" data-event-status value="参加">参加</label><label><input type="radio" name="event_${escapeHtml(name)}_${i}" data-student="${escapeHtml(name)}" data-event-status value="不参加">不参加</label><label><input type="checkbox" data-student="${escapeHtml(name)}" data-event-comiru>Comiru回答</label></div>
@@ -2014,8 +2082,9 @@ function bindInputs(){
     // これがないと、イベントマスタを追加した後に学年を選んでもイベント欄が更新されない。
     if(el.matches('[data-kind="grade"]')){
       el.onchange=()=>{
+        const viewState=captureStudentViewState();
         syncFromDom();
-        renderStudents();
+        renderStudents({viewState});
       };
     }
     el.onkeydown=(e)=>{
@@ -2289,6 +2358,7 @@ function visibleCommentMastersForStudent(name){
   const data=ensureStudent(name);
   const grade=data.grade||'';
   return getCommentMaster().filter(cm=>{
+    if(!isWeekStartInsideDisplayRange(cm)) return false;
     const targets=Array.isArray(cm.grades)?cm.grades.filter(Boolean):[];
     if(targets.length){
       if(!grade) return false;
@@ -2301,7 +2371,7 @@ function visibleCommentMastersForStudent(name){
 function commentPanelHtml(name){
   const data=ensureStudent(name);
   const saved=Array.isArray(data.comments)?data.comments:[];
-  const masterItems=visibleCommentMastersForStudent(name).map(cm=>({id:commentId(cm),title:cm.title||'',text:cm.text||'',note:'',master:true,grades:cm.grades||[],students:cm.students||[]}));
+  const masterItems=visibleCommentMastersForStudent(name).map(cm=>({id:commentId(cm),title:cm.title||'',text:cm.text||'',note:'',master:true,grades:cm.grades||[],students:cm.students||[],displayStart:cm.displayStart||'',displayEnd:cm.displayEnd||''}));
   const masterIds=new Set(masterItems.map(m=>m.id).filter(Boolean));
   const manualItems=saved.filter(cm=>!cm.id || !masterIds.has(cm.id));
   const items=[...masterItems,...manualItems];
@@ -2309,7 +2379,7 @@ function commentPanelHtml(name){
     return '<div class="empty" style="margin-top:10px">対象コメントはありません。必要ならコメント行を追加してください。</div>';
   }
   return items.map((cm,i)=>`<div class="commentItem" data-comment-row="${i}" data-comment-id="${escapeHtml(cm.id||'')}" data-comment-master="${cm.master?'1':'0'}">
-    ${cm.master && (((cm.grades||[]).length)||((cm.students||[]).length)) ? `<div class="hint">対象：${escapeHtml([(cm.grades||[]).join('・'),(cm.students||[]).join('・')].filter(Boolean).join(' / '))}</div>` : ''}
+    ${cm.master && (((cm.grades||[]).length)||((cm.students||[]).length)||cm.displayStart||cm.displayEnd) ? `<div class="hint">${escapeHtml(['対象：'+[(cm.grades||[]).join('・'),(cm.students||[]).join('・')].filter(Boolean).join(' / '),displayRangeHint(cm)].filter(x=>x&&x!=='対象：').join('　'))}</div>` : ''}
     <div class="field"><label>タイトル</label><input data-student="${escapeHtml(name)}" data-comment-title value="${escapeHtml(cm.title||'')}" placeholder="例：今週の方針" ${cm.master?'readonly':''}></div>
     <div class="field" style="margin-top:8px"><label>今週の方針/コメント</label><textarea data-student="${escapeHtml(name)}" data-comment-text placeholder="例：受講を優先して確認テストSSまで進める" ${cm.master?'readonly':''}>${escapeHtml(cm.text||'')}</textarea></div>
     <div class="field" style="margin-top:8px"><label>個別メモ</label><textarea data-student="${escapeHtml(name)}" data-comment-note placeholder="個別に追記することがあれば入力"></textarea></div>
@@ -2575,6 +2645,8 @@ function renderEventMasterPanel(){
     return `<div class="eventMasterRow" data-event-master-row="${i}">
     <div><label>イベント名</label><input data-event-master-name value="${escapeHtml(ev.name||'')}" placeholder="例：公開授業・説明会・面談会"></div>
     <div><label>日時</label><input data-event-master-datetime type="datetime-local" value="${escapeHtml(toDateTimeLocalValue(ev.datetime||''))}"></div>
+    <div><label>表示開始日</label><input data-event-master-display-start type="date" value="${escapeHtml(ev.displayStart||'')}"></div>
+    <div><label>表示終了日</label><input data-event-master-display-end type="date" value="${escapeHtml(ev.displayEnd||'')}"></div>
     <div><label>対象学年</label><div class="checkRow">${gradeCheckboxes(ev.grades||[])}</div></div>
     <div><label>対象生徒名</label><textarea data-event-master-students placeholder="空欄なら全員。例：北野、田中">${escapeHtml(targetNames)}</textarea></div>
     <div><button type="button" class="small secondary" data-delete-event-master="${i}">削除</button></div>
@@ -2586,6 +2658,8 @@ function collectEventMasterFromPanel(){
   return $$('.eventMasterRow').map(row=>({
     name:row.querySelector('[data-event-master-name]')?.value.trim()||'',
     datetime:row.querySelector('[data-event-master-datetime]')?.value||'',
+    displayStart:row.querySelector('[data-event-master-display-start]')?.value||'',
+    displayEnd:row.querySelector('[data-event-master-display-end]')?.value||'',
     grades:Array.from(row.querySelectorAll('[data-event-master-grade]:checked')).map(x=>x.value),
     students:splitTargetNames(row.querySelector('[data-event-master-students]')?.value||'')
   })).filter(x=>x.name||x.datetime||x.grades.length||x.students.length);
@@ -2638,6 +2712,8 @@ function renderCommentMasterPanel(){
     return `<div class="commentMasterRow" data-comment-master-row="${i}">
     <div><label>タイトル</label><input data-comment-master-title value="${escapeHtml(cm.title||'')}" placeholder="例：今週の方針"></div>
     <div><label>今週の方針/コメント</label><textarea data-comment-master-text placeholder="例：受講優先、確認テストSSまで進める">${escapeHtml(cm.text||'')}</textarea></div>
+    <div><label>表示開始日</label><input data-comment-master-display-start type="date" value="${escapeHtml(cm.displayStart||'')}"></div>
+    <div><label>表示終了日</label><input data-comment-master-display-end type="date" value="${escapeHtml(cm.displayEnd||'')}"></div>
     <div><label>対象学年</label><div class="checkRow">${gradeCheckboxes(cm.grades||[])}</div></div>
     <div><label>対象生徒名</label><textarea data-comment-master-students placeholder="空欄なら全員。例：佐藤、鈴木">${escapeHtml(targetNames)}</textarea></div>
     <div><button type="button" class="small secondary" data-delete-comment-master="${i}">削除</button></div>
@@ -2649,6 +2725,8 @@ function collectCommentMasterFromPanel(){
   return $$('.commentMasterRow').map(row=>({
     title:row.querySelector('[data-comment-master-title]')?.value.trim()||'',
     text:row.querySelector('[data-comment-master-text]')?.value||'',
+    displayStart:row.querySelector('[data-comment-master-display-start]')?.value||'',
+    displayEnd:row.querySelector('[data-comment-master-display-end]')?.value||'',
     grades:Array.from(row.querySelectorAll('[data-event-master-grade]:checked')).map(x=>x.value),
     students:splitTargetNames(row.querySelector('[data-comment-master-students]')?.value||'')
   })).filter(x=>x.title||x.text||x.grades.length||x.students.length);
