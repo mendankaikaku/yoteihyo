@@ -1103,6 +1103,149 @@ function localDateOnlyValue(v){if(!v)return null;const s=String(v).trim();if(!s)
 function currentWeekStartDateOnly(){return localDateOnlyValue($('#weekStart')?.value)||new Date(new Date().getFullYear(),new Date().getMonth(),new Date().getDate())}
 function isWeekStartInsideDisplayRange(item){const start=currentWeekStartDateOnly();const from=localDateOnlyValue(item&&item.displayStart);const to=localDateOnlyValue(item&&item.displayEnd);if(from && daysBetween(from,start)<0)return false;if(to && daysBetween(start,to)<0)return false;return true}
 function displayRangeHint(item){const from=(item&&item.displayStart)||'';const to=(item&&item.displayEnd)||'';if(from&&to)return `表示期間：${from}〜${to}`;if(from)return `表示開始：${from}〜`;if(to)return `表示終了：〜${to}`;return ''}
+
+const ROSTER_PROFILE_CACHE = {loaded:false, loading:null, profiles:[], byName:new Map(), byNo:new Map(), source:''};
+function profileKey(s){return String(s||'').replace(/[\s\u3000]+/g,'').trim();}
+function normSchoolKey(s){return profileKey(s);}
+function splitTargetText(s){return splitTargetNames(s||'');}
+function rosterHeaderIndex(header, names){
+  const h=(header||[]).map(x=>String(x??'').trim());
+  for(const name of names){const idx=h.findIndex(x=>x===name);if(idx>=0)return idx;}
+  return h.findIndex(x=>names.some(n=>x.includes(n)));
+}
+function simpleCsvRows(text){
+  const rows=[];let row=[],cell='',q=false;
+  for(let i=0;i<String(text||'').length;i++){
+    const ch=text[i], nx=text[i+1];
+    if(q){ if(ch==='"'&&nx==='"'){cell+='"';i++;} else if(ch==='"'){q=false;} else cell+=ch; }
+    else{ if(ch==='"')q=true; else if(ch===','){row.push(cell);cell='';} else if(ch==='\n'){row.push(cell);rows.push(row);row=[];cell='';} else if(ch==='\r'){} else cell+=ch; }
+  }
+  row.push(cell); if(row.some(v=>String(v).trim())) rows.push(row); return rows;
+}
+function addRosterProfile(p){
+  const name=String(p.name||'').trim();
+  const no=String(p.studentNo||'').trim();
+  if(!name && !no) return;
+  const item={name, studentNo:no, grade:String(p.grade||'').trim(), school:String(p.school||'').trim(), assistant:String(p.assistant||'').trim(), source:p.source||''};
+  const nk=profileKey(name); const pk=no?`no:${no}`:'';
+  const existing=nk?ROSTER_PROFILE_CACHE.byName.get(nk):null;
+  const merged=Object.assign({}, existing||{}, item);
+  if(nk) ROSTER_PROFILE_CACHE.byName.set(nk, merged);
+  if(pk) ROSTER_PROFILE_CACHE.byNo.set(pk, merged);
+}
+function parseRosterAoa(aoa, source=''){
+  if(!aoa||!aoa.length)return [];
+  let headerRow=-1,best=-1;
+  for(let r=0;r<Math.min(20,aoa.length);r++){
+    const joined=(aoa[r]||[]).map(x=>String(x??'').trim()).join('|');
+    let score=0; if(/生徒名|氏名|名前/.test(joined))score+=2; if(/生徒番号|番号|ID/.test(joined))score++; if(/学年/.test(joined))score++; if(/高校|学校/.test(joined))score++; if(/担当|担任|助手/.test(joined))score++;
+    if(score>best){best=score;headerRow=r;}
+  }
+  if(best<2)return [];
+  const header=(aoa[headerRow]||[]).map(x=>String(x??'').trim());
+  const idx={
+    studentNo:rosterHeaderIndex(header,['生徒番号','生徒No','番号','ID']),
+    name:rosterHeaderIndex(header,['生徒名','氏名','名前','フルネーム']),
+    grade:rosterHeaderIndex(header,['学年']),
+    school:rosterHeaderIndex(header,['高校','高校名','学校','学校名','在籍校']),
+    assistant:rosterHeaderIndex(header,['担当','担任助手','助手','担任','担当者'])
+  };
+  const out=[];
+  for(let r=headerRow+1;r<aoa.length;r++){
+    const row=aoa[r]||[];
+    if(!row.some(v=>String(v??'').trim()))continue;
+    const item={
+      studentNo:idx.studentNo>=0?String(row[idx.studentNo]??'').trim():'',
+      name:idx.name>=0?String(row[idx.name]??'').trim():'',
+      grade:idx.grade>=0?String(row[idx.grade]??'').trim():'',
+      school:idx.school>=0?String(row[idx.school]??'').trim():'',
+      assistant:idx.assistant>=0?String(row[idx.assistant]??'').trim():'',
+      source
+    };
+    if(item.name||item.studentNo)out.push(item);
+  }
+  return out;
+}
+async function refreshRosterProfilesFromShared(force=false){
+  if(!force && ROSTER_PROFILE_CACHE.loaded) return ROSTER_PROFILE_CACHE;
+  if(ROSTER_PROFILE_CACHE.loading) return ROSTER_PROFILE_CACHE.loading;
+  ROSTER_PROFILE_CACHE.loading=(async()=>{
+    ROSTER_PROFILE_CACHE.loaded=false; ROSTER_PROFILE_CACHE.profiles=[]; ROSTER_PROFILE_CACHE.byName=new Map(); ROSTER_PROFILE_CACHE.byNo=new Map(); ROSTER_PROFILE_CACHE.source='';
+    if(!sharedDirHandle){ROSTER_PROFILE_CACHE.loaded=true; return ROSTER_PROFILE_CACHE;}
+    const dir=await getDirectoryIfExists(sharedDirHandle,'対応表');
+    if(!dir){ROSTER_PROFILE_CACHE.loaded=true; return ROSTER_PROFILE_CACHE;}
+    const files=await listFilesInDirectoryByRegex(dir,/\.(xlsx|xlsm|xls|csv)$/i);
+    for(const file of files){
+      try{
+        let rows=[];
+        if(/\.csv$/i.test(file.name)) rows=simpleCsvRows(await file.text());
+        else if(window.XLSX){ const wb=await readWorkbookFromFileRobust(file); for(const sh of wb.SheetNames||[]){ rows.push(...sheetToAoaRobust(wb.Sheets[sh],false)); } }
+        const profs=parseRosterAoa(rows,file.name);
+        profs.forEach(addRosterProfile);
+        ROSTER_PROFILE_CACHE.profiles.push(...profs);
+      }catch(e){}
+    }
+    ROSTER_PROFILE_CACHE.source=files.map(f=>f.name).join('、');
+    ROSTER_PROFILE_CACHE.loaded=true; ROSTER_PROFILE_CACHE.loading=null;
+    return ROSTER_PROFILE_CACHE;
+  })();
+  return ROSTER_PROFILE_CACHE.loading;
+}
+function getKnownStudentProfile(name){
+  const data=studentData && studentData[name] ? studentData[name] : null;
+  const no=String(data?.studentNo||'').trim();
+  const byNo=no?ROSTER_PROFILE_CACHE.byNo.get(`no:${no}`):null;
+  const byName=ROSTER_PROFILE_CACHE.byName.get(profileKey(name));
+  const mapAssistant=Object.entries(ASSISTANT_STUDENT_MAP_FOR_INPUT||{}).find(([a,list])=>(list||[]).some(st=>profileKey(st)===profileKey(name)))?.[0]||'';
+  return Object.assign({}, byName||{}, byNo||{}, {name, studentNo:no||byNo?.studentNo||byName?.studentNo||'', grade:data?.grade||byNo?.grade||byName?.grade||'', school:data?.school||byNo?.school||byName?.school||'', assistant:data?.assistant||byNo?.assistant||byName?.assistant||mapAssistant});
+}
+function studentsForSchools(schools){
+  const keys=new Set((schools||[]).map(normSchoolKey).filter(Boolean));
+  if(!keys.size)return [];
+  const out=[]; const seen=new Set();
+  (ROSTER_PROFILE_CACHE.profiles||[]).forEach(p=>{if(keys.has(normSchoolKey(p.school))&&p.name&&!seen.has(profileKey(p.name))){seen.add(profileKey(p.name));out.push(p.name);}});
+  Object.keys(studentData||{}).forEach(name=>{const p=getKnownStudentProfile(name);if(keys.has(normSchoolKey(p.school))&&!seen.has(profileKey(name))){seen.add(profileKey(name));out.push(name);}});
+  return out;
+}
+function studentsForAssistants(assistants){
+  const keys=new Set((assistants||[]).map(profileKey).filter(Boolean));
+  if(!keys.size)return [];
+  const out=[]; const seen=new Set();
+  keys.forEach(k=>{const hitKey=Object.keys(ASSISTANT_STUDENT_MAP_FOR_INPUT||{}).find(a=>profileKey(a)===k); if(hitKey)(ASSISTANT_STUDENT_MAP_FOR_INPUT[hitKey]||[]).forEach(n=>{if(!seen.has(profileKey(n))){seen.add(profileKey(n));out.push(n);}});});
+  (ROSTER_PROFILE_CACHE.profiles||[]).forEach(p=>{if(keys.has(profileKey(p.assistant))&&p.name&&!seen.has(profileKey(p.name))){seen.add(profileKey(p.name));out.push(p.name);}});
+  Object.keys(studentData||{}).forEach(name=>{const p=getKnownStudentProfile(name);if(keys.has(profileKey(p.assistant))&&!seen.has(profileKey(name))){seen.add(profileKey(name));out.push(name);}});
+  return out;
+}
+function appendUniqueTargetStudents(current, additions){
+  const out=[]; const seen=new Set();
+  [...splitTargetText(current),...(additions||[])].forEach(n=>{const k=profileKey(n); if(k&&!seen.has(k)){seen.add(k);out.push(n);}});
+  return out;
+}
+async function expandMasterTargetStudents(row, kind){
+  await refreshRosterProfilesFromShared(false);
+  const prefix=kind==='comment'?'comment':'event';
+  const schoolEl=row.querySelector(`[data-${prefix}-master-schools]`);
+  const assistantEl=row.querySelector(`[data-${prefix}-master-assistants]`);
+  const studentsEl=row.querySelector(`[data-${prefix}-master-students]`);
+  const schools=splitTargetText(schoolEl?.value||'');
+  const assistants=splitTargetText(assistantEl?.value||'');
+  const add=[...studentsForSchools(schools),...studentsForAssistants(assistants)];
+  const expanded=appendUniqueTargetStudents(studentsEl?.value||'', add);
+  if(studentsEl) studentsEl.value=expanded.join('、');
+  showSaveInfo(`対象生徒を自動追加しました：高校 ${schools.length}件 / 担任助手 ${assistants.length}件 / 追加候補 ${add.length}名 / 対象生徒 ${expanded.length}名`);
+}
+function studentMatchesTargetProfile(name, item){
+  const schools=Array.isArray(item?.schools)?item.schools.filter(Boolean):splitTargetText(item?.schoolNames||'');
+  const assistants=Array.isArray(item?.assistants)?item.assistants.filter(Boolean):splitTargetText(item?.assistantNames||'');
+  if(!schools.length&&!assistants.length)return true;
+  const p=getKnownStudentProfile(name);
+  if(schools.length && schools.some(s=>normSchoolKey(s)===normSchoolKey(p.school))) return true;
+  if(assistants.length && assistants.some(a=>profileKey(a)===profileKey(p.assistant))) return true;
+  return false;
+}
+function itemHasAnyTarget(item){
+  return (item?.grades||[]).filter(Boolean).length || (item?.students||[]).filter(Boolean).length || (item?.schools||[]).filter(Boolean).length || (item?.assistants||[]).filter(Boolean).length;
+}
 function showSaveInfo(text){$('#saveInfo').textContent=text||''}
 function colName(n){let s='';while(n>0){let m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=Math.floor((n-1)/26)}return s}
 function cellRef(r,c){return colName(c)+r}
@@ -1280,7 +1423,7 @@ function warnAmbiguousStudentNames(issues){
   showSaveInfo(lines.join('\n'));
   return true;
 }
-function emptyStudentData(){return {studentNo:'',grade:'',weeklyMeetingAbsent:false,lessonCount:1,otherCount:1,schedule:Array.from({length:7},()=>Array(6).fill('')),materials:[{subject:'',book:'',content:''}],remarks:'',failureReason:'',exams:[],events:[],comments:[]}}
+function emptyStudentData(){return {studentNo:'',grade:'',school:'',assistant:'',weeklyMeetingAbsent:false,lessonCount:1,otherCount:1,schedule:Array.from({length:7},()=>Array(6).fill('')),materials:[{subject:'',book:'',content:''}],remarks:'',failureReason:'',exams:[],events:[],comments:[]}}
 function restoredDataBelongsToCurrentInputWeek(data){
   const restoredWeek=String(data?.weekStart||'').trim();
   const currentWeek=String($('#weekStart')?.value||'').trim();
@@ -1424,6 +1567,8 @@ function studentCardHtml(name){
     <div class="studentMeta">
       <div class="field"><label>学年</label><select data-student="${escapeHtml(name)}" data-kind="grade">${GRADE_OPTIONS.map(g=>`<option value="${escapeHtml(g)}">${g?escapeHtml(g):'未指定'}</option>`).join('')}</select></div>
       <div class="field"><label>生徒番号</label><input data-student="${escapeHtml(name)}" data-kind="studentNo" placeholder="例：33135165"></div>
+      <div class="field"><label>高校</label><input data-student="${escapeHtml(name)}" data-kind="school" placeholder="対応表 or 手入力"></div>
+      <div class="field"><label>担任助手</label><input data-student="${escapeHtml(name)}" data-kind="assistant" placeholder="例：武内"></div>
     </div>
     <div class="studentSection"><p class="sectionTitle">予定</p>
     <div style="overflow:auto"><table class="scheduleTable"><thead><tr><th style="width:100px">予定/日付</th>${Array.from({length:7},(_,d)=>`<th data-day-head="${d}"></th>`).join('')}</tr></thead><tbody>${scheduleRowsHtml(name)}</tbody></table></div>
@@ -1453,7 +1598,7 @@ function scheduleRowsHtml(name){
 }
 function materialRowsHtml(name){const data=ensureStudent(name);return (data.materials.length?data.materials:[{subject:'',book:'',content:''}]).map((m,i)=>`<tr><td><textarea data-student="${escapeHtml(name)}" data-kind="subj" data-mat="${i}" placeholder="教科"></textarea></td><td colspan="3"><textarea data-student="${escapeHtml(name)}" data-kind="book" data-mat="${i}" placeholder="問題集/高速マスター"></textarea></td><td colspan="4"><textarea data-student="${escapeHtml(name)}" data-kind="content" data-mat="${i}" placeholder="内容"></textarea></td><td style="text-align:center"><button type="button" class="small secondary" data-delete-material="${escapeHtml(name)}" data-index="${i}">削除</button></td></tr>`).join('')}
 function eventRowsHtml(name){return eventPanelHtml(name)}
-function eventId(ev){return `${ev.name||''}|${ev.datetime||''}|${(ev.grades||[]).join(',')}|${(ev.students||[]).join(',')}`}
+function eventId(ev){return `${ev.name||''}|${ev.datetime||''}|${(ev.grades||[]).join(',')}|${(ev.students||[]).join(',')}|${(ev.schools||[]).join(',')}|${(ev.assistants||[]).join(',')}`}
 function visibleEventMastersForStudent(name){
   const data=ensureStudent(name);
   const grade=data.grade||'';
@@ -1472,6 +1617,7 @@ function visibleEventMastersForStudent(name){
     const targets=Array.isArray(ev.grades)?ev.grades.filter(Boolean):[];
     if(targets.length && !targets.includes(grade)) return false;
     const targetNames=Array.isArray(ev.students)?ev.students:splitTargetNames(ev.studentNames||'');
+    if(!studentMatchesTargetProfile(name,ev)) return false;
     return examTargetNameMatch(name,targetNames);
   });
 }
@@ -1482,7 +1628,7 @@ function eventPanelHtml(name){
   if(!grade){
     return '<div class="empty" style="margin-top:10px">学年を選択すると対象イベントが表示されます。</div>';
   }
-  const masterItems=visibleEventMastersForStudent(name).map(ev=>({id:eventId(ev),name:ev.name||'',datetime:ev.datetime||'',status:'',note:'',master:true,grades:ev.grades||[],students:ev.students||[],displayStart:ev.displayStart||'',displayEnd:ev.displayEnd||''}));
+  const masterItems=visibleEventMastersForStudent(name).map(ev=>({id:eventId(ev),name:ev.name||'',datetime:ev.datetime||'',status:'',note:'',master:true,grades:ev.grades||[],students:ev.students||[],displayStart:ev.displayStart||'',displayEnd:ev.displayEnd||'',schools:ev.schools||[],assistants:ev.assistants||''}));
   const masterIds=new Set(masterItems.map(m=>m.id).filter(Boolean));
   const manualItems=saved.filter(ev=>!ev.id || !masterIds.has(ev.id));
   const items=[...masterItems,...manualItems];
@@ -1490,7 +1636,7 @@ function eventPanelHtml(name){
     return '<div class="empty" style="margin-top:10px">対象イベントはありません。</div>';
   }
   return items.map((ev,i)=>`<div class="eventItem" data-event-row="${i}" data-event-id="${escapeHtml(ev.id||'')}" data-event-master="${ev.master?'1':'0'}">
-    ${ev.master && (((ev.grades||[]).length)||((ev.students||[]).length)||ev.displayStart||ev.displayEnd) ? `<div class="hint">${escapeHtml(['対象：'+[(ev.grades||[]).join('・'),(ev.students||[]).join('・')].filter(Boolean).join(' / '),displayRangeHint(ev)].filter(x=>x&&x!=='対象：').join('　'))}</div>` : ''}
+    ${ev.master && (((ev.grades||[]).length)||((ev.students||[]).length)||ev.displayStart||ev.displayEnd) ? `<div class="hint">${escapeHtml(['対象：'+[(ev.grades||[]).join('・'),(ev.schools||[]).join('・'),(ev.assistants||[]).join('・'),(ev.students||[]).join('・')].filter(Boolean).join(' / '),displayRangeHint(ev)].filter(x=>x&&x!=='対象：').join('　'))}</div>` : ''}
     <div class="field"><label>イベント名</label><input data-student="${escapeHtml(name)}" data-event-name value="${escapeHtml(ev.name||'')}" placeholder="例：公開授業・説明会・面談会" ${ev.master?'readonly':''}></div>
     <div class="field" style="margin-top:8px"><label>日時</label><input type="datetime-local" data-student="${escapeHtml(name)}" data-event-datetime value="${escapeHtml(toDateTimeLocalValue(ev.datetime||''))}" ${ev.master?'readonly':''}></div>
     <div class="checkRow"><label><input type="radio" name="event_${escapeHtml(name)}_${i}" data-student="${escapeHtml(name)}" data-event-status value="参加">参加</label><label><input type="radio" name="event_${escapeHtml(name)}_${i}" data-student="${escapeHtml(name)}" data-event-status value="不参加">不参加</label><label><input type="checkbox" data-student="${escapeHtml(name)}" data-event-comiru>Comiru回答</label></div>
@@ -2069,9 +2215,9 @@ function addScheduleRow(kind,name){
 /* =========================================================
    3. 生徒別データ同期
 ========================================================= */
-function syncFromDom(){if(!students.length)return; students.forEach(name=>{const card=document.querySelector(`[data-student-card="${cssEscape(name)}"]`); if(!card)return; const data=ensureStudent(name); data.grade=card.querySelector('[data-kind="grade"]')?.value||''; data.studentNo=card.querySelector('[data-kind="studentNo"]')?.value||''; data.schedule=Array.from({length:7},(_,d)=>LIMITS.map((_,r)=>card.querySelector(`textarea[data-kind="schedule"][data-day="${d}"][data-row="${r}"]`)?.value||'')); data.materials=Array.from(card.querySelectorAll('tbody[data-material-body] tr')).map((tr,i)=>({subject:tr.querySelector(`[data-kind="subj"]`)?.value||'',book:tr.querySelector(`[data-kind="book"]`)?.value||'',content:tr.querySelector(`[data-kind="content"]`)?.value||''})); if(!data.materials.length)data.materials=[{subject:'',book:'',content:''}]; data.remarks=card.querySelector('textarea[data-kind="remarks"]')?.value||''; data.failureReason=card.querySelector('textarea[data-kind="failureReason"]')?.value||''; data.weeklyMeetingAbsent=!!card.querySelector('input[data-kind="weeklyMeetingAbsent"]')?.checked; data.exams=getExamInputsForCard(card); data.events=getEventInputsForCard(card); data.comments=getCommentInputsForCard(card);});}
+function syncFromDom(){if(!students.length)return; students.forEach(name=>{const card=document.querySelector(`[data-student-card="${cssEscape(name)}"]`); if(!card)return; const data=ensureStudent(name); data.grade=card.querySelector('[data-kind="grade"]')?.value||''; data.studentNo=card.querySelector('[data-kind="studentNo"]')?.value||''; data.school=card.querySelector('[data-kind="school"]')?.value||''; data.assistant=card.querySelector('[data-kind="assistant"]')?.value||''; data.schedule=Array.from({length:7},(_,d)=>LIMITS.map((_,r)=>card.querySelector(`textarea[data-kind="schedule"][data-day="${d}"][data-row="${r}"]`)?.value||'')); data.materials=Array.from(card.querySelectorAll('tbody[data-material-body] tr')).map((tr,i)=>({subject:tr.querySelector(`[data-kind="subj"]`)?.value||'',book:tr.querySelector(`[data-kind="book"]`)?.value||'',content:tr.querySelector(`[data-kind="content"]`)?.value||''})); if(!data.materials.length)data.materials=[{subject:'',book:'',content:''}]; data.remarks=card.querySelector('textarea[data-kind="remarks"]')?.value||''; data.failureReason=card.querySelector('textarea[data-kind="failureReason"]')?.value||''; data.weeklyMeetingAbsent=!!card.querySelector('input[data-kind="weeklyMeetingAbsent"]')?.checked; data.exams=getExamInputsForCard(card); data.events=getEventInputsForCard(card); data.comments=getCommentInputsForCard(card);});}
 function cssEscape(s){return String(s).replace(/\\/g,'\\\\').replace(/"/g,'\\"')}
-function fillStudentValues(name){const card=document.querySelector(`[data-student-card="${cssEscape(name)}"]`);if(!card)return; const data=ensureStudent(name); const gradeEl=card.querySelector('[data-kind="grade"]'); if(gradeEl)gradeEl.value=data.grade||''; const noEl=card.querySelector('[data-kind="studentNo"]'); if(noEl)noEl.value=data.studentNo||''; data.schedule.forEach((day,d)=>day.forEach((v,r)=>{const el=card.querySelector(`textarea[data-kind="schedule"][data-day="${d}"][data-row="${r}"]`);if(el)el.value=v||''})); (data.materials||[]).forEach((m,i)=>{const tr=card.querySelectorAll('tbody[data-material-body] tr')[i]; if(!tr)return; tr.querySelector('[data-kind="subj"]').value=m.subject||''; tr.querySelector('[data-kind="book"]').value=m.book||''; tr.querySelector('[data-kind="content"]').value=m.content||'';}); const rem=card.querySelector('textarea[data-kind="remarks"]'); if(rem)rem.value=data.remarks||''; const fr=card.querySelector('textarea[data-kind="failureReason"]'); if(fr)fr.value=data.failureReason||''; const absent=card.querySelector('input[data-kind="weeklyMeetingAbsent"]'); if(absent)absent.checked=!!data.weeklyMeetingAbsent; applyExamValuesToCard(card,data.exams||[]); applyEventValuesToCard(card,data.events||[]); applyCommentValuesToCard(card,data.comments||[]);}
+function fillStudentValues(name){const card=document.querySelector(`[data-student-card="${cssEscape(name)}"]`);if(!card)return; const data=ensureStudent(name); const gradeEl=card.querySelector('[data-kind="grade"]'); if(gradeEl)gradeEl.value=data.grade||''; const noEl=card.querySelector('[data-kind="studentNo"]'); if(noEl)noEl.value=data.studentNo||''; const schoolEl=card.querySelector('[data-kind="school"]'); if(schoolEl)schoolEl.value=data.school||getKnownStudentProfile(name).school||''; const assistantEl=card.querySelector('[data-kind="assistant"]'); if(assistantEl)assistantEl.value=data.assistant||getKnownStudentProfile(name).assistant||''; data.schedule.forEach((day,d)=>day.forEach((v,r)=>{const el=card.querySelector(`textarea[data-kind="schedule"][data-day="${d}"][data-row="${r}"]`);if(el)el.value=v||''})); (data.materials||[]).forEach((m,i)=>{const tr=card.querySelectorAll('tbody[data-material-body] tr')[i]; if(!tr)return; tr.querySelector('[data-kind="subj"]').value=m.subject||''; tr.querySelector('[data-kind="book"]').value=m.book||''; tr.querySelector('[data-kind="content"]').value=m.content||'';}); const rem=card.querySelector('textarea[data-kind="remarks"]'); if(rem)rem.value=data.remarks||''; const fr=card.querySelector('textarea[data-kind="failureReason"]'); if(fr)fr.value=data.failureReason||''; const absent=card.querySelector('input[data-kind="weeklyMeetingAbsent"]'); if(absent)absent.checked=!!data.weeklyMeetingAbsent; applyExamValuesToCard(card,data.exams||[]); applyEventValuesToCard(card,data.events||[]); applyCommentValuesToCard(card,data.comments||[]);}
 function bindInputs(){
   $$('input,textarea,select').forEach(el=>{
     el.oninput=()=>{
@@ -2353,7 +2499,7 @@ function applyEventValuesToCard(card,values=[]){
   });
 }
 
-function commentId(cm){return `${cm.title||''}|${cm.text||''}|${(cm.grades||[]).join(',')}|${(cm.students||[]).join(',')}`}
+function commentId(cm){return `${cm.title||''}|${cm.text||''}|${(cm.grades||[]).join(',')}|${(cm.students||[]).join(',')}|${(cm.schools||[]).join(',')}|${(cm.assistants||[]).join(',')}`}
 function visibleCommentMastersForStudent(name){
   const data=ensureStudent(name);
   const grade=data.grade||'';
@@ -2365,13 +2511,14 @@ function visibleCommentMastersForStudent(name){
       if(!targets.includes(grade)) return false;
     }
     const targetNames=Array.isArray(cm.students)?cm.students:splitTargetNames(cm.studentNames||'');
+    if(!studentMatchesTargetProfile(name,cm)) return false;
     return examTargetNameMatch(name,targetNames);
   });
 }
 function commentPanelHtml(name){
   const data=ensureStudent(name);
   const saved=Array.isArray(data.comments)?data.comments:[];
-  const masterItems=visibleCommentMastersForStudent(name).map(cm=>({id:commentId(cm),title:cm.title||'',text:cm.text||'',note:'',master:true,grades:cm.grades||[],students:cm.students||[],displayStart:cm.displayStart||'',displayEnd:cm.displayEnd||''}));
+  const masterItems=visibleCommentMastersForStudent(name).map(cm=>({id:commentId(cm),title:cm.title||'',text:cm.text||'',note:'',master:true,grades:cm.grades||[],students:cm.students||[],displayStart:cm.displayStart||'',displayEnd:cm.displayEnd||'',schools:cm.schools||[],assistants:cm.assistants||[]}));
   const masterIds=new Set(masterItems.map(m=>m.id).filter(Boolean));
   const manualItems=saved.filter(cm=>!cm.id || !masterIds.has(cm.id));
   const items=[...masterItems,...manualItems];
@@ -2379,7 +2526,7 @@ function commentPanelHtml(name){
     return '<div class="empty" style="margin-top:10px">対象コメントはありません。必要ならコメント行を追加してください。</div>';
   }
   return items.map((cm,i)=>`<div class="commentItem" data-comment-row="${i}" data-comment-id="${escapeHtml(cm.id||'')}" data-comment-master="${cm.master?'1':'0'}">
-    ${cm.master && (((cm.grades||[]).length)||((cm.students||[]).length)||cm.displayStart||cm.displayEnd) ? `<div class="hint">${escapeHtml(['対象：'+[(cm.grades||[]).join('・'),(cm.students||[]).join('・')].filter(Boolean).join(' / '),displayRangeHint(cm)].filter(x=>x&&x!=='対象：').join('　'))}</div>` : ''}
+    ${cm.master && (((cm.grades||[]).length)||((cm.students||[]).length)||cm.displayStart||cm.displayEnd) ? `<div class="hint">${escapeHtml(['対象：'+[(cm.grades||[]).join('・'),(cm.schools||[]).join('・'),(cm.assistants||[]).join('・'),(cm.students||[]).join('・')].filter(Boolean).join(' / '),displayRangeHint(cm)].filter(x=>x&&x!=='対象：').join('　'))}</div>` : ''}
     <div class="field"><label>タイトル</label><input data-student="${escapeHtml(name)}" data-comment-title value="${escapeHtml(cm.title||'')}" placeholder="例：今週の方針" ${cm.master?'readonly':''}></div>
     <div class="field" style="margin-top:8px"><label>今週の方針/コメント</label><textarea data-student="${escapeHtml(name)}" data-comment-text placeholder="例：受講を優先して確認テストSSまで進める" ${cm.master?'readonly':''}>${escapeHtml(cm.text||'')}</textarea></div>
     <div class="field" style="margin-top:8px"><label>個別メモ</label><textarea data-student="${escapeHtml(name)}" data-comment-note placeholder="個別に追記することがあれば入力"></textarea></div>
@@ -2421,11 +2568,13 @@ function saveExamTargetHistory(list){
     if(!item||!item.name)return;
     const grades=Array.isArray(item.grades)?item.grades.filter(Boolean):[];
     const students=Array.isArray(item.students)?item.students.filter(Boolean):[];
-    if(!grades.length&&!students.length)return;
+    const schools=Array.isArray(item.schools)?item.schools.filter(Boolean):[];
+    const assistants=Array.isArray(item.assistants)?item.assistants.filter(Boolean):[];
+    if(!grades.length&&!students.length&&!schools.length&&!assistants.length)return;
     const key=normalizeExamNameForTarget(item.name);
     if(!key||seen.has(key))return;
     seen.add(key);
-    cleaned.push({name:item.name,grades,students,savedAt:item.savedAt||new Date().toISOString()});
+    cleaned.push({name:item.name,grades,schools,assistants,students,savedAt:item.savedAt||new Date().toISOString()});
   });
   localStorage.setItem(EXAM_TARGET_HISTORY_KEY,JSON.stringify(cleaned.slice(0,200)));
 }
@@ -2588,25 +2737,27 @@ function saveEventTargetHistory(list){
     if(!item||!item.name)return;
     const grades=Array.isArray(item.grades)?item.grades.filter(Boolean):[];
     const students=Array.isArray(item.students)?item.students.filter(Boolean):[];
-    if(!grades.length&&!students.length)return;
+    const schools=Array.isArray(item.schools)?item.schools.filter(Boolean):[];
+    const assistants=Array.isArray(item.assistants)?item.assistants.filter(Boolean):[];
+    if(!grades.length&&!students.length&&!schools.length&&!assistants.length)return;
     const key=normalizeExamNameForTarget(item.name);
     if(!key||seen.has(key))return;
     seen.add(key);
-    cleaned.push({name:item.name,grades,students,savedAt:item.savedAt||new Date().toISOString()});
+    cleaned.push({name:item.name,grades,schools,assistants,students,savedAt:item.savedAt||new Date().toISOString()});
   });
   localStorage.setItem(EVENT_TARGET_HISTORY_KEY,JSON.stringify(cleaned.slice(0,200)));
 }
 function updateEventTargetHistoryFromMasters(rows){
   const current=(rows||[])
-    .filter(ev=>ev&&ev.name&&((ev.grades||[]).length||(ev.students||[]).length))
-    .map(ev=>({name:ev.name,grades:ev.grades||[],students:ev.students||[],savedAt:new Date().toISOString()}));
+    .filter(ev=>ev&&ev.name&&itemHasAnyTarget(ev))
+    .map(ev=>({name:ev.name,grades:ev.grades||[],schools:ev.schools||[],assistants:ev.assistants||[],students:ev.students||[],savedAt:new Date().toISOString()}));
   saveEventTargetHistory([...current,...getEventTargetHistory()]);
 }
 function findSimilarEventTarget(name, rowsForSearch=[]){
   const key=normalizeExamNameForTarget(name);
   if(!key)return null;
   const candidates=[...(rowsForSearch||[]),...getEventMaster(),...getEventTargetHistory()]
-    .filter(ev=>ev&&ev.name&&normalizeExamNameForTarget(ev.name)!==key&&((ev.grades||[]).length||(ev.students||[]).length));
+    .filter(ev=>ev&&ev.name&&normalizeExamNameForTarget(ev.name)!==key&&itemHasAnyTarget(ev));
   let best=null;
   for(const ev of candidates){
     const k=normalizeExamNameForTarget(ev.name);
@@ -2626,7 +2777,7 @@ function commonEventNameCoreMatch(a,b){
 function applyPreviousEventTargetsWithConfirm(rows){
   return (rows||[]).map((ev,idx)=>{
     if(!ev||!ev.name)return ev;
-    const hasTarget=(ev.grades&&ev.grades.length)||(ev.students&&ev.students.length);
+    const hasTarget=(ev.grades&&ev.grades.length)||(ev.students&&ev.students.length)||(ev.schools&&ev.schools.length)||(ev.assistants&&ev.assistants.length);
     if(hasTarget)return ev;
     const previous=findSimilarEventTarget(ev.name, rows.slice(0,idx));
     if(!previous)return ev;
@@ -2634,7 +2785,7 @@ function applyPreviousEventTargetsWithConfirm(rows){
     const studentText=(previous.students||[]).join('、')||'指定なし';
     const ok=confirm(`前回の「${previous.name}」の対象を「${ev.name}」にも反映しますか？\n\n対象学年：${gradeText}\n対象生徒：${studentText}`);
     if(!ok)return ev;
-    return Object.assign({},ev,{grades:[...(previous.grades||[])],students:[...(previous.students||[])]});
+    return Object.assign({},ev,{grades:[...(previous.grades||[])],schools:[...(previous.schools||[])],assistants:[...(previous.assistants||[])],students:[...(previous.students||[])]});
   });
 }
 function renderEventMasterPanel(){
@@ -2648,11 +2799,14 @@ function renderEventMasterPanel(){
     <div><label>表示開始日</label><input data-event-master-display-start type="date" value="${escapeHtml(ev.displayStart||'')}"></div>
     <div><label>表示終了日</label><input data-event-master-display-end type="date" value="${escapeHtml(ev.displayEnd||'')}"></div>
     <div><label>対象学年</label><div class="checkRow">${gradeCheckboxes(ev.grades||[])}</div></div>
+    <div><label>対象高校</label><textarea data-event-master-schools placeholder="例：〇〇高校、△△高校">${escapeHtml((ev.schools||[]).join('、'))}</textarea></div>
+    <div><label>対象担任助手</label><textarea data-event-master-assistants placeholder="例：武内、今道">${escapeHtml((ev.assistants||[]).join('、'))}</textarea></div>
     <div><label>対象生徒名</label><textarea data-event-master-students placeholder="空欄なら全員。例：北野、田中">${escapeHtml(targetNames)}</textarea></div>
-    <div><button type="button" class="small secondary" data-delete-event-master="${i}">削除</button></div>
+    <div><button type="button" class="small secondary" data-expand-event-targets="${i}">高校/助手から追加</button><button type="button" class="small secondary" data-delete-event-master="${i}">削除</button></div>
   </div>`;
   }).join('')||'<div class="empty">まだイベントマスタがありません。</div>';
   $$('[data-delete-event-master]').forEach(btn=>btn.onclick=()=>{const arr=getEventMaster();arr.splice(Number(btn.dataset.deleteEventMaster),1);saveEventMasterData(arr);renderEventMasterPanel();renderStudents()});
+  $$('[data-expand-event-targets]').forEach(btn=>btn.onclick=async()=>{await expandMasterTargetStudents(btn.closest('.eventMasterRow'),'event');});
 }
 function collectEventMasterFromPanel(){
   return $$('.eventMasterRow').map(row=>({
@@ -2661,8 +2815,10 @@ function collectEventMasterFromPanel(){
     displayStart:row.querySelector('[data-event-master-display-start]')?.value||'',
     displayEnd:row.querySelector('[data-event-master-display-end]')?.value||'',
     grades:Array.from(row.querySelectorAll('[data-event-master-grade]:checked')).map(x=>x.value),
+    schools:splitTargetNames(row.querySelector('[data-event-master-schools]')?.value||''),
+    assistants:splitTargetNames(row.querySelector('[data-event-master-assistants]')?.value||''),
     students:splitTargetNames(row.querySelector('[data-event-master-students]')?.value||'')
-  })).filter(x=>x.name||x.datetime||x.grades.length||x.students.length);
+  })).filter(x=>x.name||x.datetime||x.grades.length||x.schools.length||x.assistants.length||x.students.length);
 }
 function addEventMasterRow(){const arr=collectEventMasterFromPanel();arr.push({name:'',datetime:'',grades:[],students:[]});saveEventMasterData(arr);renderEventMasterPanel()}
 function saveEventMasterFromPanel(){
@@ -2690,18 +2846,20 @@ function saveCommentTargetHistory(list){
     if(!item||!item.title)return;
     const grades=Array.isArray(item.grades)?item.grades.filter(Boolean):[];
     const students=Array.isArray(item.students)?item.students.filter(Boolean):[];
-    if(!grades.length&&!students.length)return;
+    const schools=Array.isArray(item.schools)?item.schools.filter(Boolean):[];
+    const assistants=Array.isArray(item.assistants)?item.assistants.filter(Boolean):[];
+    if(!grades.length&&!students.length&&!schools.length&&!assistants.length)return;
     const key=normalizeExamNameForTarget(item.title);
     if(!key||seen.has(key))return;
     seen.add(key);
-    cleaned.push({title:item.title,grades,students,savedAt:item.savedAt||new Date().toISOString()});
+    cleaned.push({title:item.title,grades,schools,assistants,students,savedAt:item.savedAt||new Date().toISOString()});
   });
   localStorage.setItem(COMMENT_TARGET_HISTORY_KEY,JSON.stringify(cleaned.slice(0,200)));
 }
 function updateCommentTargetHistoryFromMasters(rows){
   const current=(rows||[])
-    .filter(cm=>cm&&cm.title&&((cm.grades||[]).length||(cm.students||[]).length))
-    .map(cm=>({title:cm.title,grades:cm.grades||[],students:cm.students||[],savedAt:new Date().toISOString()}));
+    .filter(cm=>cm&&cm.title&&itemHasAnyTarget(cm))
+    .map(cm=>({title:cm.title,grades:cm.grades||[],schools:cm.schools||[],assistants:cm.assistants||[],students:cm.students||[],savedAt:new Date().toISOString()}));
   saveCommentTargetHistory([...current,...getCommentTargetHistory()]);
 }
 function renderCommentMasterPanel(){
@@ -2715,11 +2873,14 @@ function renderCommentMasterPanel(){
     <div><label>表示開始日</label><input data-comment-master-display-start type="date" value="${escapeHtml(cm.displayStart||'')}"></div>
     <div><label>表示終了日</label><input data-comment-master-display-end type="date" value="${escapeHtml(cm.displayEnd||'')}"></div>
     <div><label>対象学年</label><div class="checkRow">${gradeCheckboxes(cm.grades||[])}</div></div>
+    <div><label>対象高校</label><textarea data-comment-master-schools placeholder="例：〇〇高校、△△高校">${escapeHtml((cm.schools||[]).join('、'))}</textarea></div>
+    <div><label>対象担任助手</label><textarea data-comment-master-assistants placeholder="例：武内、今道">${escapeHtml((cm.assistants||[]).join('、'))}</textarea></div>
     <div><label>対象生徒名</label><textarea data-comment-master-students placeholder="空欄なら全員。例：佐藤、鈴木">${escapeHtml(targetNames)}</textarea></div>
-    <div><button type="button" class="small secondary" data-delete-comment-master="${i}">削除</button></div>
+    <div><button type="button" class="small secondary" data-expand-comment-targets="${i}">高校/助手から追加</button><button type="button" class="small secondary" data-delete-comment-master="${i}">削除</button></div>
   </div>`;
   }).join('')||'<div class="empty">まだコメントマスタがありません。</div>';
   $$('[data-delete-comment-master]').forEach(btn=>btn.onclick=()=>{const arr=getCommentMaster();arr.splice(Number(btn.dataset.deleteCommentMaster),1);saveCommentMasterData(arr);renderCommentMasterPanel();renderStudents()});
+  $$('[data-expand-comment-targets]').forEach(btn=>btn.onclick=async()=>{await expandMasterTargetStudents(btn.closest('.commentMasterRow'),'comment');});
 }
 function collectCommentMasterFromPanel(){
   return $$('.commentMasterRow').map(row=>({
@@ -2728,8 +2889,10 @@ function collectCommentMasterFromPanel(){
     displayStart:row.querySelector('[data-comment-master-display-start]')?.value||'',
     displayEnd:row.querySelector('[data-comment-master-display-end]')?.value||'',
     grades:Array.from(row.querySelectorAll('[data-event-master-grade]:checked')).map(x=>x.value),
+    schools:splitTargetNames(row.querySelector('[data-comment-master-schools]')?.value||''),
+    assistants:splitTargetNames(row.querySelector('[data-comment-master-assistants]')?.value||''),
     students:splitTargetNames(row.querySelector('[data-comment-master-students]')?.value||'')
-  })).filter(x=>x.title||x.text||x.grades.length||x.students.length);
+  })).filter(x=>x.title||x.text||x.grades.length||x.schools.length||x.assistants.length||x.students.length);
 }
 function addCommentMasterRow(){const arr=collectCommentMasterFromPanel();arr.push({title:'',text:'',grades:[],students:[]});saveCommentMasterData(arr);renderCommentMasterPanel()}
 function saveCommentMasterFromPanel(){
@@ -2904,6 +3067,7 @@ async function pickSaveRootFolder(forcePick=false){
     excelOutputDirHandle = null;
     extraStudentCandidatesLoadedFromFolder = false;
     await refreshDynamicStudentNameCandidatesFromFolder(dir);
+    await refreshRosterProfilesFromShared(true);
     return dir;
   }catch(e){
     return null;
@@ -2977,7 +3141,8 @@ async function buildInputRestoreDiagnostics(rootDir, names=[]){
 
   const rosterDir=await getDirectoryIfExists(rootDir,'対応表');
   const rosterFiles=rosterDir ? await listFilesInDirectoryByRegex(rosterDir,/\.(xlsx|xlsm|xls|csv)$/i) : [];
-  lines.push(`${rosterDir ? '✅' : '⚠'} 対応表: ${rosterDir ? rosterFiles.length + '件' : 'フォルダーなし'}`);
+  if(rosterDir) await refreshRosterProfilesFromShared(true);
+  lines.push(`${rosterDir ? '✅' : '⚠'} 対応表: ${rosterDir ? rosterFiles.length + '件 / 生徒情報 '+(ROSTER_PROFILE_CACHE.profiles?.length||0)+'件' : 'フォルダーなし'}`);
 
   const planDir=await getDirectoryIfExists(rootDir,'打ち込み結果');
   const planFiles=planDir ? await listFilesInDirectoryByRegex(planDir,/\.(xlsx|xlsm|xls)$/i) : [];
@@ -3423,7 +3588,7 @@ function maxUsedOther(data){let m=1;(data.schedule||[]).forEach(day=>[3,4,5].for
 /* =========================================================
    6. コピー・POS
 ========================================================= */
-function buildCopyText(name){syncFromDom(); const data=ensureStudent(name),dates=getDates(),lines=[]; lines.push(`${name} 面談内容`); if(data.studentNo)lines.push(`生徒番号 ${data.studentNo}`); dates.forEach((d,di)=>{const items=data.schedule[di].map((v,i)=>String(v||'').trim()?`${LIMITS[i]} ${String(v||'').trim().replace(/\s*\n\s*/g,' / ')}`:'').filter(Boolean).join(' / '); lines.push(`${jpDate(d)}（${DOW[d.getDay()]}） ${items}`.trim())}); data.materials.forEach(m=>{const subject=String(m.subject||'').trim().replace(/\s*\n\s*/g,' / '),book=String(m.book||'').trim().replace(/\s*\n\s*/g,' / '),content=String(m.content||'').trim().replace(/\s*\n\s*/g,' / '); if(subject||book||content)lines.push([subject,book,content].filter(Boolean).join('　'))}); const remarks=String(data.remarks||'').trim().replace(/\s*\n\s*/g,' / '); if(remarks)lines.push(`備考 ${remarks}`); const failureReason=String(data.failureReason||'').trim().replace(/\s*\n\s*/g,' / '); if(failureReason)lines.push(`達成できなかった理由 ${failureReason}`); if(data.weeklyMeetingAbsent)lines.push('週面欠席'); (data.exams||[]).forEach(ex=>{if(ex.name||ex.status||ex.comiruAnswered||ex.subjectChanged)lines.push(`模試 ${ex.name} ${ex.status} Comiru回答:${ex.comiruAnswered?'済':'未'} 科目変更:${ex.subjectChanged?'あり':'なし'}`.trim())}); (data.events||[]).forEach(ev=>{if(ev.name||ev.status||ev.comiruAnswered||ev.note)lines.push(`イベント ${ev.name} ${ev.datetime||''} ${ev.status} Comiru回答:${ev.comiruAnswered?'済':'未'} ${ev.note||''}`.trim())}); (data.comments||[]).forEach(cm=>{if(cm.title||cm.text||cm.note)lines.push(`今週の方針/コメント ${cm.title||''} ${cm.text||''} ${cm.note||''}`.trim())}); return lines.join('\n')}
+function buildCopyText(name){syncFromDom(); const data=ensureStudent(name),dates=getDates(),lines=[]; lines.push(`${name} 面談内容`); if(data.studentNo)lines.push(`生徒番号 ${data.studentNo}`); if(data.school)lines.push(`高校 ${data.school}`); if(data.assistant)lines.push(`担任助手 ${data.assistant}`); dates.forEach((d,di)=>{const items=data.schedule[di].map((v,i)=>String(v||'').trim()?`${LIMITS[i]} ${String(v||'').trim().replace(/\s*\n\s*/g,' / ')}`:'').filter(Boolean).join(' / '); lines.push(`${jpDate(d)}（${DOW[d.getDay()]}） ${items}`.trim())}); data.materials.forEach(m=>{const subject=String(m.subject||'').trim().replace(/\s*\n\s*/g,' / '),book=String(m.book||'').trim().replace(/\s*\n\s*/g,' / '),content=String(m.content||'').trim().replace(/\s*\n\s*/g,' / '); if(subject||book||content)lines.push([subject,book,content].filter(Boolean).join('　'))}); const remarks=String(data.remarks||'').trim().replace(/\s*\n\s*/g,' / '); if(remarks)lines.push(`備考 ${remarks}`); const failureReason=String(data.failureReason||'').trim().replace(/\s*\n\s*/g,' / '); if(failureReason)lines.push(`達成できなかった理由 ${failureReason}`); if(data.weeklyMeetingAbsent)lines.push('週面欠席'); (data.exams||[]).forEach(ex=>{if(ex.name||ex.status||ex.comiruAnswered||ex.subjectChanged)lines.push(`模試 ${ex.name} ${ex.status} Comiru回答:${ex.comiruAnswered?'済':'未'} 科目変更:${ex.subjectChanged?'あり':'なし'}`.trim())}); (data.events||[]).forEach(ev=>{if(ev.name||ev.status||ev.comiruAnswered||ev.note)lines.push(`イベント ${ev.name} ${ev.datetime||''} ${ev.status} Comiru回答:${ev.comiruAnswered?'済':'未'} ${ev.note||''}`.trim())}); (data.comments||[]).forEach(cm=>{if(cm.title||cm.text||cm.note)lines.push(`今週の方針/コメント ${cm.title||''} ${cm.text||''} ${cm.note||''}`.trim())}); return lines.join('\n')}
 async function copyOne(name){const text=buildCopyText(name); try{if(navigator.clipboard&&window.isSecureContext)await navigator.clipboard.writeText(text); else{const ta=document.createElement('textarea');ta.value=text;ta.setAttribute('readonly','');ta.style.position='fixed';ta.style.left='-9999px';document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta)} alert(`${name}の面談内容をコピーしました。POSを開きます。`); const opened=window.open(POS_URL,'_blank','noopener'); if(!opened)alert('POSを開けませんでした。ポップアップブロック設定を確認してください。')}catch(e){alert('自動コピーに失敗しました。')}}
 async function copyOnly(name){const text=buildCopyText(name); try{if(navigator.clipboard&&window.isSecureContext)await navigator.clipboard.writeText(text); else{const ta=document.createElement('textarea');ta.value=text;ta.setAttribute('readonly','');ta.style.position='fixed';ta.style.left='-9999px';document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta)} alert(`${name}の面談内容をコピーしました。`);}catch(e){alert('自動コピーに失敗しました。')}}
 
@@ -3435,8 +3600,8 @@ function rowXml(r,cells){return `<row r="${r}">${cells.join('')}</row>`}
 function buildPlanSheetXml(name){const data=ensureStudent(name),dates=getDates();let rows=[],r=1;rows.push(rowXml(r,[cellXml(r,1,'予定入力表',1)]));r++;rows.push(rowXml(r,[cellXml(r,1,'生徒名',2),cellXml(r,2,name,0),cellXml(r,4,'週開始',2),cellXml(r,5,$('#weekStart').value,0)]));r+=2;rows.push(rowXml(r,[cellXml(r,1,'予定/日付',2),...dates.map((d,i)=>cellXml(r,2+i,`${jpDate(d)}（${DOW[d.getDay()]}）`,2))]));r++;LIMITS.forEach((lim,li)=>{rows.push(rowXml(r,[cellXml(r,1,lim,2),...data.schedule.map((day,di)=>cellXml(r,2+di,day[li]||'',0))]));r++});r++;const headerRow=r;rows.push(rowXml(r,[cellXml(r,1,'教科',2),cellXml(r,2,'問題集/高速マスター',2),cellXml(r,5,'内容',2)]));r++;data.materials.forEach(m=>{if(m.subject||m.book||m.content){rows.push(rowXml(r,[cellXml(r,1,m.subject,0),cellXml(r,2,m.book,0),cellXml(r,5,m.content,0)]));r++}});const remarksRow=r;rows.push(rowXml(r,[cellXml(r,1,'備考',2),cellXml(r,2,data.remarks,0)]));r++;const failureRow=r;rows.push(rowXml(r,[cellXml(r,1,'達成できなかった理由',2),cellXml(r,2,data.failureReason||'',0)]));r++;const absentRow=r;rows.push(rowXml(r,[cellXml(r,1,'週面欠席',2),cellXml(r,2,data.weeklyMeetingAbsent?'欠席':'',0)]));const merges=[`<mergeCell ref="A1:H1"/>`,`<mergeCell ref="B${headerRow}:D${headerRow}"/>`,`<mergeCell ref="E${headerRow}:H${headerRow}"/>`];for(let rr=headerRow+1;rr<remarksRow;rr++)merges.push(`<mergeCell ref="B${rr}:D${rr}"/>`,`<mergeCell ref="E${rr}:H${rr}"/>`);merges.push(`<mergeCell ref="B${remarksRow}:H${remarksRow}"/>`,`<mergeCell ref="B${failureRow}:H${failureRow}"/>`,`<mergeCell ref="B${absentRow}:H${absentRow}"/>`);return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="4" topLeftCell="A5" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols><col min="1" max="1" width="15" customWidth="1"/><col min="2" max="8" width="20" customWidth="1"/></cols><sheetData>${rows.join('')}</sheetData><mergeCells count="${merges.length}">${merges.join('')}</mergeCells><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`}
 function simpleSheetXml(aoa){const rows=[];aoa.forEach((row,idx)=>{const r=idx+1;rows.push(rowXml(r,row.map((v,c)=>cellXml(r,c+1,v,idx===0?2:0))))});return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols><col min="1" max="12" width="22" customWidth="1"/></cols><sheetData>${rows.join('')}</sheetData><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`}
 function buildExamSheetXml(name){const data=ensureStudent(name);const aoa=[['生徒名','生徒番号','週開始','模試名','実施日','受験方法','Comiru回答','科目変更あり','科目','保存日時']];filterVisibleExamRowsForStudent(name, data.exams||[]).forEach(ex=>{if(ex.name||ex.status||ex.comiruAnswered||ex.subjectChanged||(ex.subjects||[]).length)aoa.push([name,data.studentNo||'',$('#weekStart').value,ex.name,ex.date,ex.status,ex.comiruAnswered?'済':'',ex.subjectChanged?'○':'',examSubjectsText(ex.subjects||[]),new Date().toLocaleString('ja-JP')])});return simpleSheetXml(aoa)}
-function buildEventSheetXml(name){const data=ensureStudent(name);const aoa=[['生徒名','生徒番号','学年','週開始','イベント名','日時','参加/不参加','Comiru回答','備考','保存日時']];(data.events||[]).forEach(ev=>{if(ev.name||ev.datetime||ev.status||ev.comiruAnswered||ev.note)aoa.push([name,data.studentNo||'',data.grade||'',$('#weekStart').value,ev.name,ev.datetime||'',ev.status,ev.comiruAnswered?'済':'',ev.note,new Date().toLocaleString('ja-JP')])});return simpleSheetXml(aoa)}
-function buildCommentSheetXml(name){const data=ensureStudent(name);const aoa=[['生徒名','生徒番号','学年','週開始','タイトル','今週の方針/コメント','個別メモ','保存日時']];(data.comments||[]).forEach(cm=>{if(cm.title||cm.text||cm.note)aoa.push([name,data.studentNo||'',data.grade||'',$('#weekStart').value,cm.title||'',cm.text||'',cm.note||'',new Date().toLocaleString('ja-JP')])});return simpleSheetXml(aoa)}
+function buildEventSheetXml(name){const data=ensureStudent(name);const aoa=[['生徒名','生徒番号','学年','高校','担任助手','週開始','イベント名','日時','参加/不参加','Comiru回答','備考','保存日時']];(data.events||[]).forEach(ev=>{if(ev.name||ev.datetime||ev.status||ev.comiruAnswered||ev.note)aoa.push([name,data.studentNo||'',data.grade||'',data.school||'',data.assistant||'',$('#weekStart').value,ev.name,ev.datetime||'',ev.status,ev.comiruAnswered?'済':'',ev.note,new Date().toLocaleString('ja-JP')])});return simpleSheetXml(aoa)}
+function buildCommentSheetXml(name){const data=ensureStudent(name);const aoa=[['生徒名','生徒番号','学年','高校','担任助手','週開始','タイトル','今週の方針/コメント','個別メモ','保存日時']];(data.comments||[]).forEach(cm=>{if(cm.title||cm.text||cm.note)aoa.push([name,data.studentNo||'',data.grade||'',data.school||'',data.assistant||'',$('#weekStart').value,cm.title||'',cm.text||'',cm.note||'',new Date().toLocaleString('ja-JP')])});return simpleSheetXml(aoa)}
 const enc=new TextEncoder();function bytes(s){return enc.encode(s)}function crcTable(){let t=[];for(let i=0;i<256;i++){let c=i;for(let k=0;k<8;k++)c=(c&1)?(0xedb88320^(c>>>1)):(c>>>1);t[i]=c>>>0}return t}const CRC_TABLE=crcTable();function crc32Bytes(arr){let crc=0xffffffff;for(let i=0;i<arr.length;i++)crc=(crc>>>8)^CRC_TABLE[(crc^arr[i])&0xff];return (crc^0xffffffff)>>>0}function put16(a,o,v){a[o]=v&255;a[o+1]=(v>>>8)&255}function put32(a,o,v){a[o]=v&255;a[o+1]=(v>>>8)&255;a[o+2]=(v>>>16)&255;a[o+3]=(v>>>24)&255}function concat(parts){let len=parts.reduce((s,p)=>s+p.length,0),out=new Uint8Array(len),pos=0;parts.forEach(p=>{out.set(p,pos);pos+=p.length});return out}
 function zipBytes(files){let parts=[],central=[],offset=0;files.forEach(f=>{const name=bytes(f.name),data=(f.data instanceof Uint8Array)?f.data:bytes(f.data),crc=crc32Bytes(data);let h=new Uint8Array(30);put32(h,0,0x04034b50);put16(h,4,20);put16(h,6,0x0800);put16(h,8,0);put16(h,10,0);put16(h,12,0);put32(h,14,crc);put32(h,18,data.length);put32(h,22,data.length);put16(h,26,name.length);put16(h,28,0);parts.push(h,name,data);let c=new Uint8Array(46);put32(c,0,0x02014b50);put16(c,4,20);put16(c,6,20);put16(c,8,0x0800);put16(c,10,0);put16(c,12,0);put16(c,14,0);put32(c,16,crc);put32(c,20,data.length);put32(c,24,data.length);put16(c,28,name.length);put16(c,30,0);put16(c,32,0);put16(c,34,0);put16(c,36,0);put32(c,38,0);put32(c,42,offset);central.push(c,name);offset+=h.length+name.length+data.length});const centralBytes=concat(central);let e=new Uint8Array(22);put32(e,0,0x06054b50);put16(e,4,0);put16(e,6,0);put16(e,8,files.length);put16(e,10,files.length);put32(e,12,centralBytes.length);put32(e,16,offset);put16(e,20,0);return concat([...parts,centralBytes,e])}
 function makeXlsxBytesForStudent(name){const files=[{name:'[Content_Types].xml',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/worksheets/sheet3.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/worksheets/sheet4.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`},{name:'_rels/.rels',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`},{name:'xl/workbook.xml',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="予定入力" sheetId="1" r:id="rId1"/><sheet name="模試確認" sheetId="2" r:id="rId2"/><sheet name="イベント確認" sheetId="3" r:id="rId3"/><sheet name="コメント確認" sheetId="4" r:id="rId4"/></sheets></workbook>`},{name:'xl/_rels/workbook.xml.rels',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet3.xml"/><Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet4.xml"/><Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`},{name:'xl/styles.xml',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Yu Gothic"/></font><font><b/><sz val="11"/><name val="Yu Gothic"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFEFF6FF"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"/><right style="thin"/><top style="thin"/><bottom style="thin"/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"><alignment wrapText="1" vertical="top"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`},{name:'xl/worksheets/sheet1.xml',data:buildPlanSheetXml(name)},{name:'xl/worksheets/sheet2.xml',data:buildExamSheetXml(name)},{name:'xl/worksheets/sheet3.xml',data:buildEventSheetXml(name)},{name:'xl/worksheets/sheet4.xml',data:buildCommentSheetXml(name)}];return zipBytes(files)}
