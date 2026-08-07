@@ -7557,5 +7557,134 @@ initV30ClassicHorizontalUX();
 })();
 </script>
 
+
+<!-- ============================================================
+  初見用・左側収納取説（入力用）
+  普段は左下の「取説」ボタンだけ。開くと目次付きで各機能の目的・読取元・優先順位・エラー原因を確認できます。
+============================================================ -->
+<style id="appManualDrawerStyle">
+  .manualDockBtn{position:fixed;left:14px;bottom:14px;z-index:70;border:1px solid #bfdbfe!important;background:#eff6ff!important;color:#1e40af!important;border-radius:999px!important;box-shadow:0 10px 26px rgba(15,23,42,.18)!important;min-height:38px!important;padding:8px 13px!important;font-size:13px!important;font-weight:900!important}
+  .manualDockBtn:hover{filter:none!important;background:#dbeafe!important}.manualBackdrop{position:fixed;inset:0;background:rgba(15,23,42,.28);z-index:1998;display:none}.manualBackdrop.open{display:block}.manualDrawer{position:fixed;left:0;top:0;bottom:0;width:min(520px,92vw);background:#fff;z-index:1999;box-shadow:20px 0 60px rgba(15,23,42,.25);transform:translateX(-105%);transition:transform .18s ease;display:flex;flex-direction:column;border-right:1px solid #dbe4ef}.manualDrawer.open{transform:translateX(0)}.manualDrawerHead{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px;border-bottom:1px solid #e5e7eb;background:#f8fafc}.manualDrawerTitle{font-size:17px;font-weight:900;margin:0}.manualDrawerClose{background:#e5e7eb!important;color:#111827!important;box-shadow:none!important;min-height:34px!important;padding:6px 10px!important}.manualDrawerBody{padding:14px 16px 24px;overflow:auto;line-height:1.65}.manualDigest{border:1px solid #bfdbfe;background:#eff6ff;color:#1e3a8a;border-radius:12px;padding:10px 12px;font-size:13px;margin-bottom:12px}.manualToc{border:1px solid #e5e7eb;background:#f8fafc;border-radius:12px;padding:10px 12px;margin-bottom:12px}.manualToc b{display:block;margin-bottom:6px}.manualToc a{display:block;color:#1d4ed8;text-decoration:none;font-weight:800;font-size:13px;padding:3px 0}.manualToc a:hover{text-decoration:underline}.manualDrawer h3{font-size:15px;margin:18px 0 8px;padding-top:8px;border-top:1px solid #e5e7eb}.manualDrawer h4{font-size:13px;margin:10px 0 4px;color:#334155}.manualDrawer p,.manualDrawer li{font-size:13px}.manualDrawer ul,.manualDrawer ol{padding-left:20px;margin:6px 0}.manualSpecBox{border:1px solid #e5e7eb;border-radius:12px;background:#fff;padding:10px 12px;margin:8px 0}.manualSpecBox.warn{background:#fff7ed;border-color:#fed7aa;color:#9a3412}.manualMiniLabel{display:inline-block;border-radius:999px;background:#eef2ff;color:#1e40af;font-size:11px;font-weight:900;padding:2px 7px;margin-right:4px}.manualDrawer code{background:#f1f5f9;border-radius:6px;padding:1px 4px;font-size:12px}.manualDrawer .manualSmall{font-size:12px;color:#64748b}.manualDrawer table{width:100%;border-collapse:collapse;margin:6px 0;background:#fff}.manualDrawer th,.manualDrawer td{border:1px solid #d0d5dd;padding:6px;vertical-align:top;font-size:12px;white-space:normal}.manualDrawer th{background:#f8fafc;text-align:left}.manualDrawer kbd{background:#172033;color:#fff;border-radius:5px;padding:1px 5px;font-size:11px}.manualDrawer #manualInputDiag{white-space:pre-wrap;border:1px dashed #cbd5e1;background:#f8fafc;border-radius:10px;padding:8px;font-size:12px;color:#475569}.manualDrawerBody .dangerWord{color:#b91c1c;font-weight:900}@media(max-width:720px){.manualDockBtn{left:10px;bottom:10px}.manualDrawer{width:94vw}.manualDrawerBody{padding:12px}}
+</style>
+<div id="appManualBackdrop" class="manualBackdrop" aria-hidden="true"></div>
+<aside id="appManualDrawer" class="manualDrawer" aria-hidden="true" aria-label="入力用アプリの取説">
+  <div class="manualDrawerHead">
+    <p class="manualDrawerTitle">入力用アプリ 取説</p>
+    <button id="appManualClose" class="manualDrawerClose" type="button">閉じる</button>
+  </div>
+  <div class="manualDrawerBody">
+    <div class="manualDigest">
+      <b>最初に覚えることはこれだけ。</b><br>
+      ① 助手名を入れる → ② 生徒一覧 → ③ 開始日を確認 → ④ 生徒欄を作る → ⑤ 入力 → ⑥ 保存。<br>
+      詳細ログや細かい仕様は、必要なときだけこの取説と右下ログを見る。
+    </div>
+    <nav class="manualToc">
+      <b>目次</b>
+      <a href="#manual-input-quick">1. 初見用ダイジェスト</a>
+      <a href="#manual-input-flow">2. 普段の操作手順</a>
+      <a href="#manual-input-read">3. 何を読み取っているか</a>
+      <a href="#manual-input-priority">4. 優先順位・上書きルール</a>
+      <a href="#manual-input-feature">5. 各機能の目的</a>
+      <a href="#manual-input-error">6. エラー・困ったとき</a>
+      <a href="#manual-input-check">7. 開く前チェック</a>
+    </nav>
+
+    <h3 id="manual-input-quick">1. 初見用ダイジェスト</h3>
+    <div class="manualSpecBox">
+      <span class="manualMiniLabel">目的</span> 生徒ごとの2週間予定、面談準備、模試確認、イベント、今週方針を1人ずつ入力して、保存・復元できるようにする。<br>
+      <span class="manualMiniLabel">使う人</span> 担任助手・社員・フロント。<br>
+      <span class="manualMiniLabel">基本</span> 迷ったら、上から順番に押す。保存だけは最後に必ず押す。
+    </div>
+    <ol>
+      <li><b>助手名</b>に自分の名前を入れる。複数人なら「武内,今道」みたいに区切る。</li>
+      <li><b>生徒一覧</b>を押すと、担当生徒が生徒名欄に入る。</li>
+      <li><b>開始日</b>が今週の開始日になっているか確認する。</li>
+      <li><b>生徒欄を作る</b>を押す。</li>
+      <li>予定・面談準備・模試・イベントを入力する。</li>
+      <li><b>保存</b>を押す。保存後、統合用アプリでまとめる。</li>
+    </ol>
+
+    <h3 id="manual-input-flow">2. 普段の操作手順</h3>
+    <div class="manualSpecBox">
+      <h4>毎週の入力</h4>
+      <ol>
+        <li>入力用を開く。</li><li>助手名 → 生徒一覧 → 生徒欄を作る。</li><li>前回の続きが必要なら「前回を復元」。</li><li>生徒ごとに予定・準備物・欠席・方針を確認。</li><li>保存して、出たExcel/JSONを保存復元フォルダーに戻す。</li>
+      </ol>
+    </div>
+    <div class="manualSpecBox">
+      <h4>面談準備を印刷するとき</h4>
+      合格設計図Excel/PDFを読み込んで、面談準備印刷を押す。3枚目は面談フロー固定。週面シートがなくても動く設計。
+    </div>
+
+    <h3 id="manual-input-read">3. 何を読み取っているか</h3>
+    <table><thead><tr><th>場所</th><th>読む内容</th><th>何に使うか</th></tr></thead><tbody>
+      <tr><td>対応表</td><td>生徒名・学年・高校・生徒番号・担任助手</td><td>高校/助手から対象生徒を自動展開、学年表示、名寄せ</td></tr>
+      <tr><td>json</td><td>前回保存した入力データ</td><td>前回復元、入力継続</td></tr>
+      <tr><td>打ち込み結果</td><td>個人別の予定Excel</td><td>統合用に渡す元データ</td></tr>
+      <tr><td>全員分リスト</td><td>当日/後日/不受験、Comiru回答、科目変更など</td><td>手修正の復元</td></tr>
+      <tr><td>科目リスト</td><td>模試科目の詳細</td><td>模試確認欄への反映</td></tr>
+      <tr><td>Comiru</td><td>CSV回答</td><td>模試・イベントの回答状況反映</td></tr>
+    </tbody></table>
+
+    <h3 id="manual-input-priority">4. 優先順位・上書きルール</h3>
+    <div class="manualSpecBox">
+      <b>基本ルール：</b> 新しい具体的な値が勝つ。ただし、空欄は具体的な値を消さない。<br>
+      <b>科目：</b> 科目リストExcelの具体的な科目が強い。空欄では上書きしない。<br>
+      <b>当日/後日/不受験・Comiru・科目変更：</b> 全員分リストの手修正をできるだけ維持。<br>
+      <b>対象生徒：</b> 直接入力が最優先。高校/助手から追加した分は不足分を補う役割。
+    </div>
+
+    <h3 id="manual-input-feature">5. 各機能の目的</h3>
+    <div class="manualSpecBox"><b>生徒一覧</b><br>助手名から担当生徒を生徒名欄へ入れる。重複姓は短縮名で区別する。</div>
+    <div class="manualSpecBox"><b>前回を復元</b><br>前回保存したJSONやExcelから入力内容を戻す。続き作業用。</div>
+    <div class="manualSpecBox"><b>保存</b><br>現在の入力内容を保存する。統合用アプリが読む元になるので最重要。</div>
+    <div class="manualSpecBox"><b>高校/助手から追加</b><br>イベント・模試・コメントの対象生徒を対応表から自動で増やす。</div>
+    <div class="manualSpecBox"><b>右下ログ</b><br>詳細な復元・保存・名寄せ結果を貯める場所。普段は閉じておく。</div>
+
+    <h3 id="manual-input-error">6. エラー・困ったとき</h3>
+    <div class="manualSpecBox warn">
+      <ul>
+        <li><b>生徒が出ない：</b> 助手名の表記違い、対応表未読込、担当生徒リスト未登録の可能性。</li>
+        <li><b>高校から追加されない：</b> 高校名の表記違い、対応表の高校列が空欄、対象高校の入力ミス。</li>
+        <li><b>復元されない：</b> 保存復元フォルダーの場所違い、JSON未保存、ファイル名変更の可能性。</li>
+        <li><b>科目が違う：</b> 科目リストExcelと全員分リストの手修正が競合している可能性。ログを見る。</li>
+        <li><b>ボタンが押せない：</b> HTMLを途中でコピペして壊れている、libsフォルダー不足、ブラウザ再読み込みが必要。</li>
+      </ul>
+    </div>
+
+    <h3 id="manual-input-check">7. 開く前チェック</h3>
+    <div id="manualInputDiag">診断中...</div>
+    <p class="manualSmall">ここは画面上の部品が存在しているかだけを見る簡易診断。データの正しさは右下ログを見る。</p>
+  </div>
+</aside>
+<button id="appManualOpen" class="manualDockBtn" type="button">取説</button>
+<script id="appManualDrawerScript">
+(function(){
+  function $(id){return document.getElementById(id);}
+  function setOpen(open){
+    var drawer=$('appManualDrawer'), back=$('appManualBackdrop');
+    if(!drawer||!back) return;
+    drawer.classList.toggle('open',open); back.classList.toggle('open',open);
+    drawer.setAttribute('aria-hidden',open?'false':'true'); back.setAttribute('aria-hidden',open?'false':'true');
+    if(open) setTimeout(updateDiag,50);
+  }
+  function exists(id){return !!document.getElementById(id);}
+  function updateDiag(){
+    var el=$('manualInputDiag'); if(!el) return;
+    var rows=[['助手名欄','assistantNames'],['生徒名欄','studentNames'],['開始日','weekStart'],['生徒欄','studentGrid'],['保存情報','saveInfo']];
+    el.textContent=rows.map(function(r){return (exists(r[1])?'OK  ':'注意 ') + r[0] + '：' + r[1];}).join('\n') + '\n\n注意が出ても、該当機能を使わないならそのまま進められる場合があります。';
+  }
+  function bind(){
+    var open=$('appManualOpen'), close=$('appManualClose'), back=$('appManualBackdrop');
+    if(open && open.dataset.bound!=='1'){open.dataset.bound='1';open.addEventListener('click',function(){setOpen(true);});}
+    if(close && close.dataset.bound!=='1'){close.dataset.bound='1';close.addEventListener('click',function(){setOpen(false);});}
+    if(back && back.dataset.bound!=='1'){back.dataset.bound='1';back.addEventListener('click',function(){setOpen(false);});}
+    document.addEventListener('keydown',function(e){if(e.key==='Escape') setOpen(false);},{once:false});
+    updateDiag();
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',bind); else bind();
+})();
+</script>
+
 </body>
 </html>
