@@ -298,6 +298,43 @@ main.wrap{max-width:none!important;height:auto!important;min-height:0!important;
   color:#fff!important;
   border:1px solid #2563eb!important;
 }
+
+/* 保存しました表示と同じように、操作結果を画面右上に即時表示する */
+.uxSaveToast{
+  position:fixed;
+  right:16px;
+  top:68px;
+  z-index:99999;
+  width:min(560px, calc(100vw - 32px));
+  max-height:62vh;
+  overflow:auto;
+  background:#ffffff;
+  border:1px solid #dbe4ef;
+  border-left:6px solid #2563eb;
+  border-radius:14px;
+  box-shadow:0 16px 44px rgba(15,23,42,.18);
+  padding:12px 14px;
+  font-size:12px;
+  line-height:1.55;
+  color:#334155;
+  white-space:pre-wrap;
+  display:none;
+}
+.uxSaveToast.show{display:block;}
+.uxSaveToast .toastTitle{font-weight:900;color:#1e40af;margin-bottom:4px;}
+.uxSaveToast .toastBody{white-space:pre-wrap;}
+.uxSaveToast button{
+  position:absolute;
+  right:8px;
+  top:6px;
+  border:0;
+  background:transparent;
+  color:#64748b;
+  font-weight:900;
+  cursor:pointer;
+  padding:2px 6px;
+}
+
 #saveInfo.saveInfoBox{display:none!important;}
 .workflowCard .prepCompactCard{margin-top:8px!important;}
 @media(max-width:1050px){
@@ -6400,11 +6437,30 @@ function bindGlobalEvents(){
 ========================================================= */
 const UX_STATE={dirty:true,lastSavedAt:null,mode:'dirty'};
 const UX_ORIGINAL_SHOW_SAVE_INFO=showSaveInfo;
+function uxShowSaveToast(text){
+  const t=String(text||'').trim();
+  if(!t) return;
+  let box=document.getElementById('uxSaveToast');
+  if(!box){
+    box=document.createElement('div');
+    box.id='uxSaveToast';
+    box.className='uxSaveToast';
+    box.innerHTML='<button type="button" aria-label="閉じる">×</button><div class="toastTitle">操作結果</div><div class="toastBody"></div>';
+    document.body.appendChild(box);
+    box.querySelector('button').onclick=()=>box.classList.remove('show');
+  }
+  const body=box.querySelector('.toastBody');
+  if(body) body.textContent=t;
+  box.classList.add('show');
+  clearTimeout(uxShowSaveToast._timer);
+  uxShowSaveToast._timer=setTimeout(()=>box.classList.remove('show'), t.length>500?18000:9000);
+}
 showSaveInfo=function(text){
   UX_ORIGINAL_SHOW_SAVE_INFO(text);
   const t=String(text||'');
+  uxShowSaveToast(t);
   if(/保存済み|保存が完了|保存しました|同期しました/.test(t)) uxSetSaved('saved');
-  else if(/復元しました|読み込みました|反映しました|選択しました/.test(t)) uxSetSaved('loaded');
+  else if(/復元しました|読み込みました|反映しました|選択しました|自動追加しました/.test(t)) uxSetSaved('loaded');
   uxUpdateSummary();
 };
 function uxEnsureDock(){
