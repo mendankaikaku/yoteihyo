@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>面談予定入力・準備資料アプリ v36（上部2段固定版）</title>
+<title>面談予定入力・準備資料アプリ v36（上部2段固定・ログ完全収納版）</title>
 <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
 <script src="./libs/xlsx.bundle.js"></script>
 <script></script>
@@ -928,7 +928,7 @@ body .prepCompactCard .prepDetails summary{min-height:28px!important;font-size:1
 <header class="appHeader"><div class="wrap appHeaderInner">
   <div>
     <h1>面談予定入力・準備資料アプリ <span class="versionBadge">v36 上部2段固定修正版</span></h1>
-    <div class="sub">生徒カードは横スクロールで同時編集できます。印刷メニューは上部、確認ログは右上、マスタ設定は下にまとめて表示します。</div>
+    <div class="sub">生徒カードは横スクロールで同時編集できます。印刷メニューは上部、詳しいログは右下の「ログ」ボタンに収納します。保存・復元メッセージは中央に何度も出しません。</div>
   </div>
   <div class="saveWarningBadge" id="uxHeaderSaveBadge">未保存</div>
 </div></header>
@@ -6716,14 +6716,14 @@ const UX_ORIGINAL_SHOW_SAVE_INFO=showSaveInfo;
 function uxShowSaveToast(text){
   const t=String(text||'').trim();
   if(!t) return;
-  // 右上トーストではなく、ブラウザ標準の中央ダイアログで表示する。
-  // EnterキーでOKできるので、入力中に邪魔になったログをすぐ閉じられる。
+  // 保存・復元・展開などの長いメッセージは中央アラートに出さず、右下ログへ収納する。
   try{
-    alert(t);
-  }catch(e){
+    if(typeof window.addQuietLog === 'function'){ window.addQuietLog(t); return; }
+  }catch(e){}
+  try{
     const el=document.getElementById('saveInfo');
-    if(el) el.textContent=t;
-  }
+    if(el) el.textContent=t.split(/\n+/)[0]+'（詳細は右下のログ）';
+  }catch(e){}
 }
 
 showSaveInfo=function(text){
@@ -7557,5 +7557,43 @@ initV30ClassicHorizontalUX();
 })();
 </script>
 
+
+
+<!-- =========================================================
+     最終安全網: 保存・復元・展開ログは必ず右下ログへ収納
+     ========================================================= -->
+<script id="finalQuietLogSafetyPatch">
+(function(){
+  function isOperationalLog(msg){
+    var t=String(msg||'');
+    if(t.length>100) return true;
+    return /保存しました|保存が完了|保存済み|復元しました|読み込みました|反映しました|同期しました|自動追加しました|展開しました|診断|ログ|衝突|科目リスト反映|対象生徒|保存復元|まとめて保存|内容を復元|読み込み完了/.test(t);
+  }
+  var nativeAlert = window.__nativeAlertForInputApp || window.alert;
+  window.__nativeAlertForInputApp = nativeAlert;
+  window.alert = function(msg){
+    if(isOperationalLog(msg)){
+      try{ if(typeof window.addQuietLog === 'function') window.addQuietLog(msg); }catch(e){}
+      return;
+    }
+    return nativeAlert.call(window, msg);
+  };
+  if(typeof window.showSaveInfo === 'function'){
+    window.showSaveInfo = function(text){
+      try{ if(typeof window.addQuietLog === 'function') window.addQuietLog(text); }catch(e){}
+      var first = String(text||'').split(/\n+/).map(function(x){return x.trim();}).filter(Boolean)[0] || '';
+      try{
+        var el=document.getElementById('saveInfo');
+        if(el) el.textContent = first ? first + '（詳細は右下のログ）' : '';
+      }catch(e){}
+      try{
+        if(/保存済み|保存が完了|保存しました|同期しました/.test(String(text||'')) && typeof uxSetSaved==='function') uxSetSaved('saved');
+        else if(/復元しました|読み込みました|反映しました|選択しました|自動追加しました/.test(String(text||'')) && typeof uxSetSaved==='function') uxSetSaved('loaded');
+        if(typeof uxUpdateSummary==='function') uxUpdateSummary();
+      }catch(e){}
+    };
+  }
+})();
+</script>
 </body>
 </html>
