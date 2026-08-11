@@ -372,6 +372,13 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
   }
 }
 
+
+.manualPriorityBox{grid-column:1 / -1;border:1px solid #bfdbfe;background:#eff6ff;border-radius:10px;padding:10px;margin-top:10px;}
+.manualPriorityBox h3{margin:0 0 8px;font-size:14px;}
+.manualPriorityBox table{width:100%;border-collapse:collapse;background:#fff;}
+.manualPriorityBox th,.manualPriorityBox td{border:1px solid #cbd5e1;padding:6px 8px;font-size:12px;text-align:left;vertical-align:top;white-space:normal;}
+.manualPriorityBox th{background:#dbeafe;}
+
 </style>
 </head>
 <body>
@@ -402,11 +409,11 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
   <section class="controlGrid">
     <div class="card">
       <p class="cardTitle"><span class="step">①</span>フォルダーを読み取る</p>
-      <div class="hint" style="margin-bottom:10px;">「まとめて復元」フォルダーを選ぶだけで、json / 毎日更新 / 打ち込み結果 / 対応表 / 全員分リスト / 毎日更新 / 全体予定表 を自動で振り分けます。</div>
+      <div class="hint" style="margin-bottom:10px;">「保存復元フォルダー」を選ぶだけで、json / 毎日更新 / 打ち込み結果 / 対応表 / 全員分リスト / 科目リスト / 全体予定表 / Comiru を自動で振り分けます。※画面では「保存復元フォルダー」という名前で統一しています。</div>
       <div class="bundleActionGrid">
         <button id="readBundleBtn" class="ok primaryAction" type="button">① フォルダーを読み取る</button>
       </div>
-      <div class="safetyNote">出力前に③を押して、毎日更新.xlsxを result_history.json に退避します。</div>
+      <div class="safetyNote">出力前に③を押して、毎日更新.xlsxを result_history.json に退避します。押し忘れると、毎日更新.xlsxを次の日に上書きしたあと、過去結果を掲示へ戻せなくなる可能性があります。</div>
       <div id="bundleReadSummary" class="hint" style="margin-top:10px;white-space:pre-wrap;">まだ読み込んでいません</div>
       
 
@@ -445,8 +452,8 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
             <li>アプリとは関係なく毎日更新フォルダから毎日更新.xlsxに前日の結果を貼り付ける。</li>
             <li>毎日更新.xlsxを上書き保存して閉じる。</li>
             <li>このアプリで①フォルダー読取 → ②統合 → ③結果履歴を保存。</li>
-            <li>④毎日掲示を押して、出たExcelを開いて印刷。</li>
-            <li>毎日掲示.xlsxは毎日"掲示"フォルダに保存</li>
+            <li>④毎日掲示を押して、出たExcelを開いて印刷。画面上部の「毎日掲示の対象」を見て、対象日が合っているか確認する。</li>
+            <li>毎日掲示.xlsxは「毎日掲示」フォルダーに保存</li>
           </ol>
         </div>
 
@@ -482,6 +489,20 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
             <li>見出し行(1行目)は消さない。列の追加・並び替えはOK。</li>
           </ul>
         </div>
+      </div>
+
+
+
+      <div class="manualPriorityBox">
+        <h3>優先順位・上書きルール</h3>
+        <table>
+          <tr><th>内容</th><th>優先されるもの</th><th>注意</th></tr>
+          <tr><td>通常の予定・結果</td><td>入力用から出た個人Excelの具体値</td><td>同じ生徒・同じ予定が複数ある場合は新しいファイルを優先。空欄では上書きしない。</td></tr>
+          <tr><td>模試科目</td><td>科目リストフォルダー内の手修正Excel</td><td>入力用やComiruと違う場合、科目リストの手修正を優先する。</td></tr>
+          <tr><td>当日/後日/不受験・Comiru・備考</td><td>全員分リストフォルダー内の手修正Excel</td><td>フロントで聞いた内容を残すため、手修正をできるだけ維持する。</td></tr>
+          <tr><td>毎日掲示</td><td>アプリを開いた日の前日・開いた月</td><td>開きっぱなしで日付をまたいだ場合は、いったん開き直す。</td></tr>
+        </table>
+        <div class="manualMini">③結果履歴を保存は、毎日更新.xlsxを result_history.json に退避するためのボタンです。押し忘れると、毎日更新.xlsxを上書きした後に過去の掲示データを復元しにくくなります。</div>
       </div>
 
       <div class="manualMini">
@@ -647,7 +668,7 @@ function refreshOutputButtonReason(){
   if(monthlyBtn) monthlyBtn.disabled = !hasDailyPosterSource();
 }
 function updateMainOutputButtons(){
-  // まとめて復元フォルダーを読んだ時点で、上部の出力ボタンを押せるようにする。
+  // 保存復元フォルダーを読んだ時点で、上部の出力ボタンを押せるようにする。
   // まだ統合プレビューを押していない場合は、出力ボタン側で自動的にプレビューを作成してから出力する。
   const hasPlanFiles = hasPlanOutputSource();
   setDownloadButtonsDisabled(!hasPlanFiles);
@@ -1198,7 +1219,7 @@ function shouldSkipFile(file){
 }
 function shouldSkipBundleFile(file){
   const name = String(file?.name || '');
-  // まとめて復元フォルダーでは Excel / CSV / JSON を読む。
+  // 保存復元フォルダーでは Excel / CSV / JSON を読む。
   // 以前は shouldSkipFile() を使っていたため、JSON と CSV がここで除外されていた。
   if(/^~\$/.test(name)) return true;
   if(/^\./.test(name)) return true;
@@ -7752,7 +7773,7 @@ document.addEventListener('DOMContentLoaded', function(){
 
     <h3 id="manual-int-flow">2. 普段の操作手順</h3>
     <div class="manualSpecBox"><h4>2週間予定表</h4>①→②→③→④2週間出力。手修正したExcelは全体予定表フォルダーへ戻す。</div>
-    <div class="manualSpecBox"><h4>全員分リスト</h4>①→②→④全員分リスト。フロント確認結果を手入力し、全員分リストフォルダーへ戻す。</div>
+    <div class="manualSpecBox"><h4>全員分リスト</h4>①→②→③→④全員分リスト。フロント確認結果を手入力し、全員分リストフォルダーへ戻す。</div>
     <div class="manualSpecBox"><h4>毎日掲示</h4>毎日更新.xlsxへ前日結果を貼る → ①→②→③→④毎日掲示。出たExcelを毎日掲示フォルダーへ保存。</div>
 
     <h3 id="manual-int-read">3. 何を読み取っているか</h3>
@@ -7768,11 +7789,13 @@ document.addEventListener('DOMContentLoaded', function(){
 
     <h3 id="manual-int-priority">4. 優先順位・上書きルール</h3>
     <div class="manualSpecBox">
-      <b>基本：</b> 最新ファイルの具体値が勝つ。空欄は具体値を消さない。<br>
-      <b>個人Excel重複：</b> 同じ生徒・同じ予定なら更新日時が新しいものを優先。ただし空欄で上書きしない。<br>
-      <b>全員分リスト：</b> 手修正を維持する。回答・状態・Comiru・科目変更は消えにくい設計。<br>
-      <b>科目リスト：</b> 手修正された科目詳細を復元する。<br>
-      <b>毎日掲示：</b> 当月・前日など、出力ごとの日付ルールを優先する。
+      <b>大原則：</b>具体値が勝つ。空欄は具体値を消さない。手修正は、次回も残す前提で復元する。<br>
+      <table><thead><tr><th>内容</th><th>優先</th><th>理由</th></tr></thead><tbody>
+        <tr><td>通常の予定・結果</td><td>入力用の個人Excel。重複時は新しい具体値。</td><td>担任助手が最後に保存した内容を使うため。</td></tr>
+        <tr><td>模試科目</td><td>科目リストフォルダー内の手修正Excel。</td><td>科目変更や聞き取り修正を残すため。</td></tr>
+        <tr><td>当日/後日/不受験・Comiru・備考</td><td>全員分リストフォルダー内の手修正Excel。</td><td>フロント確認や電話確認の結果を残すため。</td></tr>
+        <tr><td>毎日掲示</td><td>アプリを開いた日の前日・開いた月。</td><td>毎朝の掲示対象を固定するため。日付をまたいだら開き直す。</td></tr>
+      </tbody></table>
     </div>
 
     <h3 id="manual-int-output">5. 各出力の目的</h3>
