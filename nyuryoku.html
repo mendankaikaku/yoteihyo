@@ -975,7 +975,7 @@ body .prepCompactCard .prepDetails summary{min-height:28px!important;font-size:1
 
   <section class="card">
     <p class="sectionTitle">模試マスタ</p>
-    <div class="masterGridHint">模試名・日付・対象学年/生徒を登録します。対象学年/生徒が未選択の模試は、生徒の入力欄にも印刷にも表示しません。模試マスタでは週開始日から3週間以内の模試だけ表示し、科目型だけを選択します。生徒入力欄・面談準備印刷・統合用の科目リストでは、その科目型から科目チェックを自動表示します。</div>
+    <div class="masterGridHint">模試名・日付・対象学年/生徒を必要な分だけ登録します。初期値は入れていません。対象学年/生徒が未選択の模試は、生徒の入力欄にも印刷にも表示しません。模試マスタでは週開始日から3週間以内の模試だけ表示し、科目型だけを選択します。</div>
     <details class="advanced">
       <summary>模試マスタを編集</summary>
       <div id="examMasterPanel"></div>
@@ -1077,7 +1077,7 @@ const DEFAULT_SUBJECT_TEMPLATES=[
 const SUBJECT_POOL=[...new Set([...COMMON_TEST_SUBJECTS,...CROWN_TEST_SUBJECTS,'数学','社会','総合問題','面接','小論文'])];
 const EXAM_MASTER_KEY='yoteiExamMaster';
 const EXAM_MASTER_DEFAULT_VERSION_KEY='yoteiExamMasterDefaultVersion';
-const DEFAULT_TOSHIN_EXAM_VERSION='toshin_2026_schedule_20260620_fix_unicode';
+const DEFAULT_TOSHIN_EXAM_VERSION='exam_master_defaults_disabled_20260817';
 const DEFAULT_TOSHIN_EXAM_MASTER=[
   ['\u5168\u56fd\u7d71\u4e00\u9ad8\u6821\u751f\u30c6\u30b9\u30c8','2026-06-21',['\u9ad81','\u9ad82','\u9ad83']],
   ['\u4eac\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-06-21',['\u9ad83']],
@@ -2575,9 +2575,15 @@ function looksMojibakeExamRow(row){
   return /[蜈鬮繝譛隧荳莠蛹譚]/.test(s);
 }
 function examMasterNeedsDefaultRows(rows){
-  if(!Array.isArray(rows) || !rows.length) return true;
-  const keys=new Set(rows.map(row=>`${row?.name||''}|${row?.date||''}`));
-  return defaultToshinExamRows().some(row=>!keys.has(`${row.name}|${row.date}`));
+  // 模試マスタの初期値は入れない。空なら空のまま使う。
+  return false;
+}
+function stripDefaultExamMasterRows(rows){
+  const defaultKeys=new Set(defaultToshinExamRows().map(row=>`${row.name||''}|${row.date||''}`));
+  return (Array.isArray(rows)?rows:[]).filter(row=>{
+    if(!row || !row.name) return false;
+    return !defaultKeys.has(`${row.name||''}|${row.date||''}`);
+  });
 }
 
 // 旧JSON復元対策：古い個人JSON/グループJSON/settingsに残った「対象生徒」を勝手に復活させない。
@@ -2619,8 +2625,8 @@ function buildMasterSettingsPayload(savedAt=new Date().toISOString()){
     savedAt
   };
 }
-function getExamMaster(){try{const saved=JSON.parse(localStorage.getItem(EXAM_MASTER_KEY)||'[]');let rows=Array.isArray(saved)?saved:[];if(localStorage.getItem(EXAM_MASTER_KEY+':targetVersion')!==String(MASTER_TARGET_RESTORE_VERSION)){rows=stripLegacyExamTargetStudents(rows);localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(rows));localStorage.setItem(EXAM_MASTER_KEY+':targetVersion',String(MASTER_TARGET_RESTORE_VERSION));}if(localStorage.getItem(EXAM_MASTER_DEFAULT_VERSION_KEY)!==DEFAULT_TOSHIN_EXAM_VERSION || examMasterNeedsDefaultRows(rows)){const merged=mergeDefaultExamMaster(rows);localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(merged));localStorage.setItem(EXAM_MASTER_DEFAULT_VERSION_KEY,DEFAULT_TOSHIN_EXAM_VERSION);return merged}return rows}catch(e){return defaultToshinExamRows()}}
-function saveExamMasterData(rows){const merged=mergeDefaultExamMaster(Array.isArray(rows)?rows:[]);localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(merged));localStorage.setItem(EXAM_MASTER_DEFAULT_VERSION_KEY,DEFAULT_TOSHIN_EXAM_VERSION);localStorage.setItem(EXAM_MASTER_KEY+':targetVersion',String(MASTER_TARGET_RESTORE_VERSION))}
+function getExamMaster(){try{let rows=JSON.parse(localStorage.getItem(EXAM_MASTER_KEY)||'[]');rows=Array.isArray(rows)?rows:[];if(localStorage.getItem(EXAM_MASTER_KEY+':targetVersion')!==String(MASTER_TARGET_RESTORE_VERSION)){rows=stripLegacyExamTargetStudents(rows);localStorage.setItem(EXAM_MASTER_KEY+':targetVersion',String(MASTER_TARGET_RESTORE_VERSION));}if(localStorage.getItem(EXAM_MASTER_DEFAULT_VERSION_KEY)!==DEFAULT_TOSHIN_EXAM_VERSION){rows=stripDefaultExamMasterRows(rows);localStorage.setItem(EXAM_MASTER_DEFAULT_VERSION_KEY,DEFAULT_TOSHIN_EXAM_VERSION);}localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(rows));return rows}catch(e){return []}}
+function saveExamMasterData(rows){const clean=(Array.isArray(rows)?rows:[]).filter(row=>row&&row.name);localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(clean));localStorage.setItem(EXAM_MASTER_DEFAULT_VERSION_KEY,DEFAULT_TOSHIN_EXAM_VERSION);localStorage.setItem(EXAM_MASTER_KEY+':targetVersion',String(MASTER_TARGET_RESTORE_VERSION))}
 function visibleExamMasters(){const start=new Date($('#weekStart').value+'T00:00:00');return getExamMaster().filter(ex=>{if(!ex.date)return false;const d=new Date(ex.date+'T00:00:00');const diff=daysBetween(start,d);return diff>=0&&diff<=21})}
 function getSubjectTemplates(){
   try{
@@ -2655,8 +2661,8 @@ function saveSubjectTemplates(list){localStorage.setItem(SUBJECT_TEMPLATE_KEY,JS
 function findSubjectTemplate(name){return getSubjectTemplates().find(t=>t.name===name)||null}
 function defaultTemplateNameForType(type){return type==='crown'?'冠模試型':'共テ型'}
 function examSubjectsForType(type,templateName){const t=findSubjectTemplate(templateName||defaultTemplateNameForType(type));return t?t.subjects:(type==='crown'?CROWN_TEST_SUBJECTS:COMMON_TEST_SUBJECTS)}
-function getExamMaster(){try{const saved=JSON.parse(localStorage.getItem(EXAM_MASTER_KEY)||'[]');let rows=Array.isArray(saved)?saved:[];if(localStorage.getItem(EXAM_MASTER_KEY+':targetVersion')!==String(MASTER_TARGET_RESTORE_VERSION)){rows=stripLegacyExamTargetStudents(rows);localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(rows));localStorage.setItem(EXAM_MASTER_KEY+':targetVersion',String(MASTER_TARGET_RESTORE_VERSION));}if(localStorage.getItem(EXAM_MASTER_DEFAULT_VERSION_KEY)!==DEFAULT_TOSHIN_EXAM_VERSION || examMasterNeedsDefaultRows(rows)){const merged=mergeDefaultExamMaster(rows);localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(merged));localStorage.setItem(EXAM_MASTER_DEFAULT_VERSION_KEY,DEFAULT_TOSHIN_EXAM_VERSION);return merged}return rows}catch(e){return defaultToshinExamRows()}}
-function saveExamMasterData(rows){const merged=mergeDefaultExamMaster(Array.isArray(rows)?rows:[]);localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(merged));localStorage.setItem(EXAM_MASTER_DEFAULT_VERSION_KEY,DEFAULT_TOSHIN_EXAM_VERSION);localStorage.setItem(EXAM_MASTER_KEY+':targetVersion',String(MASTER_TARGET_RESTORE_VERSION))}
+function getExamMaster(){try{let rows=JSON.parse(localStorage.getItem(EXAM_MASTER_KEY)||'[]');rows=Array.isArray(rows)?rows:[];if(localStorage.getItem(EXAM_MASTER_KEY+':targetVersion')!==String(MASTER_TARGET_RESTORE_VERSION)){rows=stripLegacyExamTargetStudents(rows);localStorage.setItem(EXAM_MASTER_KEY+':targetVersion',String(MASTER_TARGET_RESTORE_VERSION));}if(localStorage.getItem(EXAM_MASTER_DEFAULT_VERSION_KEY)!==DEFAULT_TOSHIN_EXAM_VERSION){rows=stripDefaultExamMasterRows(rows);localStorage.setItem(EXAM_MASTER_DEFAULT_VERSION_KEY,DEFAULT_TOSHIN_EXAM_VERSION);}localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(rows));return rows}catch(e){return []}}
+function saveExamMasterData(rows){const clean=(Array.isArray(rows)?rows:[]).filter(row=>row&&row.name);localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(clean));localStorage.setItem(EXAM_MASTER_DEFAULT_VERSION_KEY,DEFAULT_TOSHIN_EXAM_VERSION);localStorage.setItem(EXAM_MASTER_KEY+':targetVersion',String(MASTER_TARGET_RESTORE_VERSION))}
 function visibleExamMasters(){const start=new Date($('#weekStart').value+'T00:00:00');return getExamMaster().filter(ex=>{if(!ex.date)return false;const d=new Date(ex.date+'T00:00:00');const diff=daysBetween(start,d);return diff>=0&&diff<=21})}
 function examId(ex){return `${ex.name||''}|${ex.date||''}|${ex.type||'common'}|${ex.subjectTemplate||defaultTemplateNameForType(ex.type)}`}
 function splitTargetNames(s){return String(s||'').split(/[、，,\n]+/).map(x=>x.trim()).filter(Boolean)}
