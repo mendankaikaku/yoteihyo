@@ -392,17 +392,17 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
       <button id="readBundleTopBtn" class="ok primaryAction" type="button">① フォルダーを読み取る</button>
       <button id="mergeBtn" class="ok primaryAction">② 統合する</button>
       <button id="saveResultHistoryBtn" class="saveImportant primaryAction" type="button">③ 結果履歴を保存</button>
-      <button id="download2wBtn" class="outputAction" disabled>④ 2週間出力</button>
-      <button id="download1mBtn" class="outputAction" disabled>④ 1か月出力</button>
-      <button id="downloadBtn" class="outputAction" disabled>④ 期間指定出力</button>
-      <button id="downloadAllListBtn" class="outputAction" disabled>④ 全員分リスト</button>
-      <button id="downloadExamSubjectListBtn" class="outputAction" disabled>④ 科目リスト出力</button>
+      <button id="download2wBtn" class="outputAction">④ 2週間出力</button>
+      <button id="download1mBtn" class="outputAction">④ 1か月出力</button>
+      <button id="downloadBtn" class="outputAction">④ 期間指定出力</button>
+      <button id="downloadAllListBtn" class="outputAction">④ 全員分リスト</button>
+      <button id="downloadExamSubjectListBtn" class="outputAction">④ 科目リスト出力</button>
       <button id="downloadMonthlyPosterBtn" class="outputAction">④ 毎日掲示</button>
       <div id="dailyPosterTargetPreview" class="hint" style="margin-top:6px;line-height:1.55;white-space:pre-wrap;"></div>
       <button id="clearBtn" class="secondary">リセット</button>
     </div>
   </div>
-  <div id="outputButtonReason" class="outputBlockerNote">まだ保存復元フォルダーを読み込んでいません。</div>
+  <div id="outputButtonReason" class="outputBlockerNote">④ボタンは常に押せます。先に①フォルダー読取をすると、出力内容が入ります。</div>
 </header>
 
 <div class="wrap">
@@ -625,9 +625,11 @@ const APP_OPENED_AT = new Date();
 
 const $ = id => document.getElementById(id);
 function setDownloadButtonsDisabled(disabled){
+  // v本番 出力条件解除版：④の出力ボタンは常に押せるようにする。
+  // データ不足時はボタンを無効化せず、押した後に理由をログ/ダイアログで案内する。
   ["downloadBtn","download2wBtn","download1mBtn","downloadAllListBtn","downloadExamSubjectListBtn"].forEach(id => {
     const el = $(id);
-    if(el) el.disabled = disabled;
+    if(el) el.disabled = false;
   });
 }
 function hasPlanOutputSource(){
@@ -644,9 +646,9 @@ function buildOutputButtonReasonText(){
   const hasPlanFiles = hasPlanOutputSource();
   const hasPosterFiles = hasDailyPosterSource();
   if(hasPlanFiles){
-    lines.push(`✅ 2週間・1か月・期間指定・全員分リスト・科目リスト：出力できます（打ち込み結果 ${state.files.length}件）`);
+    lines.push(`✅ 2週間・1か月・期間指定・全員分リスト・科目リスト：④は押せます（打ち込み結果 ${state.files.length}件）`);
   }else{
-    lines.push('⚠ 2週間・1か月・期間指定・全員分リスト・科目リスト：保存復元フォルダー/打ち込み結果/ に入力用で出した予定Excelがないため押せません。');
+    lines.push('ℹ 2週間・1か月・期間指定・全員分リスト・科目リスト：④は押せます。ただし保存復元フォルダー/打ち込み結果/ が空の場合、出力は空または対象なしになります。');
   }
   if(hasPosterFiles){
     const daily = Array.isArray(state.resultFiles) ? state.resultFiles.length : 0;
@@ -654,7 +656,7 @@ function buildOutputButtonReasonText(){
     const memory = (Array.isArray(state.resultRecords) ? state.resultRecords.length : 0) + (Array.isArray(state.resultHistoryRecords) ? state.resultHistoryRecords.length : 0);
     lines.push(`✅ 毎日掲示：出力できます（毎日更新.xlsx ${daily}件 / result_history.json ${hist}件 / 画面内履歴 ${memory}件）`);
   }else{
-    lines.push('⚠ 毎日掲示：保存復元フォルダー/毎日更新/毎日更新.xlsx または 保存復元フォルダー/json/result_history.json がないため押せません。');
+    lines.push('ℹ 毎日掲示：④は押せます。ただし毎日更新.xlsx / result_history.json がない場合、対象なしになる可能性があります。');
   }
   return lines.join('\n');
 }
@@ -662,10 +664,11 @@ function refreshOutputButtonReason(){
   const note = $('outputButtonReason');
   if(note){
     note.textContent = buildOutputButtonReasonText();
-    note.classList.toggle('ok', hasPlanOutputSource() && hasDailyPosterSource());
+    note.classList.toggle('ok', true);
   }
   const monthlyBtn = $('downloadMonthlyPosterBtn');
-  if(monthlyBtn) monthlyBtn.disabled = !hasDailyPosterSource();
+  if(monthlyBtn) monthlyBtn.disabled = false;
+  setDownloadButtonsDisabled(false);
 }
 function updateMainOutputButtons(){
   // 保存復元フォルダーを読んだ時点で、上部の出力ボタンを押せるようにする。
@@ -676,15 +679,14 @@ function updateMainOutputButtons(){
 }
 async function ensureWorkbookReadyForOutput(){
   if(state.workbookReady) return true;
-  if(hasPlanOutputSource()){
-    await merge();
-    return !!state.workbookReady;
+  // v本番 出力条件解除版：打ち込み結果がなくても、まず統合処理を走らせる。
+  // merge() 側も空の打ち込み結果を許可し、毎日更新/result_history/Comiru/手修正ファイルだけでも確認できるようにする。
+  await merge();
+  if(!state.workbookReady){
+    log('出力対象データが見つかりませんでした。④ボタンは押せますが、保存復元フォルダー/打ち込み結果/、毎日更新.xlsx、result_history.json のいずれも空の可能性があります。');
   }
-  const reason = '出力できません。\n保存復元フォルダー/打ち込み結果/ に入力用で出した予定Excelがありません。\n入力用で対象生徒を保存してから、統合用で①フォルダーを読み直してください。';
-  alert(reason);
-  log(reason);
   refreshOutputButtonReason();
-  return false;
+  return true;
 }
 function log(msg){ $("status").textContent = msg; }
 function esc(s){ return String(s ?? "").replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
@@ -2741,10 +2743,13 @@ function dedupeEventRecordsByLatest(records, logRows){
 
 async function merge(){
   const files = state.files.filter(f => !shouldSkipFile(f));
-  if(!files.length){ alert("Excelファイルを選択してください"); return; }
   $("mergeBtn").disabled = true;
-  setDownloadButtonsDisabled(true);
-  log(`読み込み中...\n対象Excel: ${files.length}件\n毎日更新.xlsx: ${state.resultFiles.length}件`);
+  setDownloadButtonsDisabled(false);
+  if(!files.length){
+    log(`読み込み中...\n対象Excel: 0件（打ち込み結果なし）\n毎日更新.xlsx: ${state.resultFiles.length}件\n※④ボタンは押せます。予定系の出力は空または対象なしになります。`);
+  }else{
+    log(`読み込み中...\n対象Excel: ${files.length}件\n毎日更新.xlsx: ${state.resultFiles.length}件`);
+  }
 
   let allRecords = [];
   let allExamRecords = [];
@@ -2811,7 +2816,9 @@ async function merge(){
   state.listAoa = out.listAoa;
   state.resultAoa = out.resultAoa;
   state.logAoa = out.logAoa;
-  state.workbookReady = allRecords.length > 0;
+  // 打ち込み結果が0件でも、④ボタンは常に押せる。
+  // 実データがなければ空の出力/対象なし案内にする。
+  state.workbookReady = true;
 
   renderAoa("calendarPane", state.calendarAoa, 300);
   renderAoa("listPane", state.listAoa, 300);
