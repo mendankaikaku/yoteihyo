@@ -5986,17 +5986,43 @@ function meetingPrepListenItemsHtml(name){
   return items.length ? items.join('<br>') : '<span class="muted">未入力の模試・イベント確認なし</span>';
 }
 
+function meetingPrepPrintSizeClass(text){
+  const plain=String(text||'').replace(/<[^>]*>/g,'').replace(/\s+/g,'');
+  const len=plain.length;
+  if(len>260) return 'meetingTextFit-micro';
+  if(len>170) return 'meetingTextFit-tiny';
+  if(len>95) return 'meetingTextFit-compact';
+  return 'meetingTextFit-normal';
+}
+function meetingPrepClippedListHtml(items, emptyHtml){
+  if(!items.length) return emptyHtml;
+  const raw=items.map(x=>x.text||'').join('\n');
+  const cls=meetingPrepPrintSizeClass(raw);
+  return `<div class="dayClip ${cls}"><ul>${items.map(x=>x.html).join('')}</ul></div>`;
+}
 function meetingPrepScheduleTableHtml(name, resultRecords){
   const data=getMeetingPrepPrintData(name), dates=getMeetingPrepPreviousDates();
   let html='<h3>対象日までの一週間の予定・結果</h3>';
-  html+='<table class="prepTable"><thead><tr><th style="width:90px">日付</th><th>予定</th><th>結果</th></tr></thead><tbody>';
+  html+='<table class="prepTable prepScheduleTable"><thead><tr><th class="dateCol">日付</th><th>予定</th><th>結果</th></tr></thead><tbody>';
   dates.forEach((d,di)=>{
     const dateKey=ymd(d);
     const si=scheduleIndexForPrepDate(data,d,di);
     const daySchedule = si >= 0 ? (data.schedule?.[si] || []) : [];
-    const plans=daySchedule.map((v,i)=>String(v||'').trim()?`<li>${esc(LIMITS[i])} ${esc(v).replace(/\n/g,'<br>')}</li>`:'').filter(Boolean).join('');
-    const results=resultForStudentDate(resultRecords,name,dateKey).map(r=>`<li>${esc(r.timeLabel? r.timeLabel+' ' : '')}${esc(r.summary)}</li>`).join('');
-    html+=`<tr><th>${jpDate(d)}<br>${DOW[d.getDay()]}曜</th><td>${plans?'<ul>'+plans+'</ul>':'<span class="muted">予定なし</span>'}</td><td>${results?'<ul>'+results+'</ul>':'<span class="muted">結果なし</span>'}</td></tr>`;
+    const planItems=daySchedule.map((v,i)=>{
+      const body=String(v||'').trim();
+      if(!body) return null;
+      return {
+        text:`${LIMITS[i]} ${body}`,
+        html:`<li>${esc(LIMITS[i])} ${esc(body).replace(/\n/g,'<br>')}</li>`
+      };
+    }).filter(Boolean);
+    const resultItems=resultForStudentDate(resultRecords,name,dateKey).map(r=>{
+      const line=`${r.timeLabel? r.timeLabel+' ' : ''}${r.summary||''}`;
+      return {text:line, html:`<li>${esc(line)}</li>`};
+    });
+    const plans=meetingPrepClippedListHtml(planItems, '<span class="muted">予定なし</span>');
+    const results=meetingPrepClippedListHtml(resultItems, '<span class="muted">結果なし</span>');
+    html+=`<tr class="dayRow"><th class="dayHeader">${jpDate(d)}<br>${DOW[d.getDay()]}曜</th><td class="dayCell">${plans}</td><td class="dayCell">${results}</td></tr>`;
   });
   html+='</tbody></table>';
   html+='<table class="prepTable listenTable"><tbody><tr><th style="width:120px">今週聞き取る内容<br><span class="muted">模試・イベント</span></th><td>'+meetingPrepListenItemsHtml(name)+'</td></tr></tbody></table>';
@@ -6188,6 +6214,7 @@ function buildMeetingPrepPrintHtml(resultRecords, weeklyHtml){
     .subline,.muted{color:#667085;font-size:10px}.box{border:1px solid #9ca3af;padding:6px;border-radius:6px;white-space:pre-wrap;}
     .prepTable{border-collapse:collapse;width:100%;font-size:10px;margin:4px 0 7px;}.prepTable th,.prepTable td{border:1px solid #9ca3af;padding:3px 4px;vertical-align:top;word-break:break-word;}.prepTable th{background:#f3f4f6;text-align:center;font-weight:800;}.prepTable ul{margin:0;padding-left:1.1em;}.prepTable li{margin:0 0 1px;}.listenTable th{background:#eef2ff}.listenTable td{font-size:11px;line-height:1.45}.twoCols{display:grid;grid-template-columns:1fr 1fr;gap:7px;align-items:start}.examConfirmBlock,.eventConfirmBlock{margin-top:4px;break-inside:avoid;page-break-inside:avoid}.examConfirmTable{table-layout:fixed;width:100%;font-size:9.2px;line-height:1.22}.examConfirmTable th:first-child,.examConfirmTable td:first-child{width:27mm}.examConfirmTable th,.examConfirmTable td{padding:2px 3px}.examPrintDetail{line-height:1.23}.examPrintLine{margin:0 0 1px}.subjectWrap{display:flex;flex-wrap:wrap;gap:1px 5px;align-items:flex-start}.printCheck{display:inline-block;white-space:nowrap;min-width:13mm}.smallChecks{font-size:9px}.eventConfirmTable{font-size:9.2px;line-height:1.25;table-layout:fixed;width:100%}.eventConfirmTable th:first-child,.eventConfirmTable td:first-child{width:34mm}.weekly{font-size:9px}.weekly th,.weekly td{padding:3px;}.blankTable td{height:12mm}.blankLines div{height:6mm;border-bottom:1px solid #d1d5db}.blankBox{height:24mm}
     .prevResultPage{padding:5mm;overflow:hidden}.fitPageShell{width:100%;height:270mm;overflow:hidden;position:relative}.fitPageInner{transform-origin:top left;width:100%;}.prevResultPage h1{font-size:17px}.prevResultPage h2{font-size:13px;margin:6px 0 4px}.prevResultPage h3{font-size:11.5px;margin:4px 0 3px}.prevResultPage .prepTable{font-size:9.8px;margin:3px 0 5px}.prevResultPage .prepTable th,.prevResultPage .prepTable td{padding:2.4px 3.4px}.prevResultPage .box{padding:4.5px}
+    .prepScheduleTable{table-layout:fixed!important;width:100%!important;font-size:9.2px!important;line-height:1.14!important;margin-bottom:4px!important}.prepScheduleTable .dateCol{width:20mm!important}.prepScheduleTable .dayRow{height:18mm!important;max-height:18mm!important}.prepScheduleTable .dayHeader{height:18mm!important;max-height:18mm!important;overflow:hidden!important;vertical-align:middle!important;font-size:8.8px!important;line-height:1.15!important}.prepScheduleTable .dayCell{height:18mm!important;max-height:18mm!important;overflow:hidden!important;padding:1.3px 2.2px!important}.prepScheduleTable .dayClip{height:16.7mm!important;max-height:16.7mm!important;overflow:hidden!important}.prepScheduleTable ul{margin:0!important;padding-left:.95em!important}.prepScheduleTable li{margin:0!important;padding:0!important}.meetingTextFit-normal{font-size:9.2px!important;line-height:1.13!important}.meetingTextFit-compact{font-size:8.1px!important;line-height:1.08!important}.meetingTextFit-tiny{font-size:7.1px!important;line-height:1.04!important}.meetingTextFit-micro{font-size:6.1px!important;line-height:1.0!important}
     .weeklyPage{padding:5mm;}
     .goukakuPrintPage{padding:5mm;overflow:hidden;display:flex;flex-direction:column;height:282mm!important;max-height:282mm!important}.goukakuPrintPage h1{font-size:13px;margin:0 0 .8mm;flex:0 0 auto}.goukakuPrintPage h2{font-size:10px;margin:0 0 .8mm;flex:0 0 auto}.goukakuPrintPage .muted{font-size:8px;margin-top:1mm;flex:0 0 auto}.goukakuPrintPdf{height:auto;width:100%;flex:1 1 auto;min-height:0;border:1px solid #9ca3af;background:#f8fafc;overflow:hidden;position:relative;display:flex;align-items:center;justify-content:center}.goukakuPrintPdf iframe{width:100%;height:100%;border:0;background:#fff}.goukakuPrintPdf canvas.goukakuAllPagesCanvas{max-width:100%;max-height:100%;width:auto;height:auto;display:block;background:#fff}.goukakuPdfRenderStatus{position:absolute;left:4mm;right:4mm;bottom:4mm;padding:2mm;background:rgba(255,255,255,.92);border:1px solid #d1d5db;border-radius:4px;font-size:9px;color:#475569;text-align:center}.goukakuPrintPdf.rendered .goukakuFallbackPdf,.goukakuPrintPdf.rendered .goukakuPdfRenderStatus{display:none}.goukakuPrintPdf.fallback .goukakuPdfRenderStatus{background:#fff7ed;color:#9a3412;border-color:#fed7aa}.goukakuStyledSheetTable{border-collapse:collapse;width:max-content;min-width:100%;font-size:10px;line-height:1.2;table-layout:auto}.goukakuStyledSheetTable th,.goukakuStyledSheetTable td{border:1px solid #d0d5dd;padding:2px 4px;min-width:26px;max-width:180px;white-space:pre-wrap;word-break:break-word;vertical-align:middle}.goukakuStyledSheetTable .goukakuColHeader th,.goukakuStyledSheetTable .goukakuRowHeader{background:#f2f4f7;color:#475569;font-weight:800;text-align:center}.goukakuPrintExcelWrap{flex:1 1 auto;min-height:0;overflow:hidden;border:1px solid #9ca3af;background:#fff}.goukakuPrintExcelWrap .goukakuStyledSheetTable{width:100%;font-size:6px;line-height:1.03;table-layout:fixed}.goukakuPrintExcelWrap .goukakuStyledSheetTable th,.goukakuPrintExcelWrap .goukakuStyledSheetTable td{padding:.35mm .55mm;max-width:none;min-width:0}.goukakuPrintTable{font-size:6.8px;table-layout:fixed;width:100%;line-height:1.12}.goukakuPrintTable th,.goukakuPrintTable td{padding:1px 2px;min-width:0;max-width:none;white-space:normal;word-break:break-word;}
     @media print{.printGuide{display:none!important}.page{break-after:auto!important;page-break-after:auto!important;}.page + .page{break-before:page!important;page-break-before:always!important;}}
