@@ -927,7 +927,7 @@ body .prepCompactCard .prepDetails summary{min-height:28px!important;font-size:1
 
 <header class="appHeader"><div class="wrap appHeaderInner">
   <div>
-    <h1>面談予定入力・準備資料アプリ <span class="versionBadge">v36 上部2段固定修正版</span></h1>
+    <h1>面談予定入力・準備資料アプリ <span class="versionBadge">v36 助手フォルダー限定版</span></h1>
     <div class="sub">生徒カードは横スクロールで同時編集できます。印刷メニューは上部、詳しいログは右下の「ログ」ボタンに収納します。保存・復元メッセージは中央に何度も出しません。</div>
   </div>
   <div class="saveWarningBadge" id="uxHeaderSaveBadge">未保存</div>
@@ -1337,28 +1337,62 @@ function parseRosterAoa(aoa, source=''){
   let headerRow=-1,best=-1;
   for(let r=0;r<Math.min(20,aoa.length);r++){
     const joined=(aoa[r]||[]).map(x=>String(x??'').trim()).join('|');
-    let score=0; if(/生徒名|氏名|名前/.test(joined))score+=2; if(/生徒番号|番号|ID/.test(joined))score++; if(/学年/.test(joined))score++; if(/高校|学校/.test(joined))score++; if(/担当|担任|助手/.test(joined))score++;
+    let score=0;
+    if(/生徒名|氏名|名前|フルネーム/.test(joined))score+=2;
+    if(/生徒番号|生徒No|番号|ID/.test(joined))score++;
+    if(/学年/.test(joined))score++;
+    if(/高校|学校|在籍校|所属校|在学校/.test(joined))score++;
+    if(/担当|担任|助手/.test(joined))score++;
     if(score>best){best=score;headerRow=r;}
   }
-  if(best<2)return [];
+  const out=[];
+
+  // 新しい対応表の固定列にも対応：
+  // A学年 / B生徒番号 / C生徒名 / Dカナ / E電話番号① / F電話番号② / G高校 / H担当助手名 / I備考
+  function fixedItemFromRow(row){
+    return {
+      grade:String(row[0]??'').trim(),
+      studentNo:String(row[1]??'').trim(),
+      name:String(row[2]??'').trim(),
+      school:String(row[6]??'').trim(),
+      assistant:String(row[7]??'').trim(),
+      source
+    };
+  }
+  function looksLikeRosterHeaderRow(row){
+    const joined=(row||[]).map(x=>String(x??'').trim()).join('|');
+    return /学年/.test(joined) && /(生徒番号|生徒No|番号|ID)/.test(joined) && /(生徒名|氏名|名前|フルネーム)/.test(joined);
+  }
+
+  if(best<2){
+    for(let r=0;r<aoa.length;r++){
+      const row=aoa[r]||[];
+      if(!row.some(v=>String(v??'').trim()))continue;
+      if(looksLikeRosterHeaderRow(row))continue;
+      const item=fixedItemFromRow(row);
+      if(item.name||item.studentNo)out.push(item);
+    }
+    return out;
+  }
+
   const header=(aoa[headerRow]||[]).map(x=>String(x??'').trim());
   const idx={
     studentNo:rosterHeaderIndex(header,['生徒番号','生徒No','番号','ID']),
     name:rosterHeaderIndex(header,['生徒名','氏名','名前','フルネーム']),
     grade:rosterHeaderIndex(header,['学年']),
     school:rosterHeaderIndex(header,['高校','高校名','学校','学校名','在籍校','所属校','在学校']),
-    assistant:rosterHeaderIndex(header,['担当','担任助手','助手','担任','担当者'])
+    assistant:rosterHeaderIndex(header,['担当助手名','担当','担任助手','助手','担任','担当者'])
   };
-  const out=[];
   for(let r=headerRow+1;r<aoa.length;r++){
     const row=aoa[r]||[];
     if(!row.some(v=>String(v??'').trim()))continue;
+    const fixed=fixedItemFromRow(row);
     const item={
-      studentNo:idx.studentNo>=0?String(row[idx.studentNo]??'').trim():'',
-      name:idx.name>=0?String(row[idx.name]??'').trim():'',
-      grade:idx.grade>=0?String(row[idx.grade]??'').trim():'',
-      school:idx.school>=0?String(row[idx.school]??'').trim():'',
-      assistant:idx.assistant>=0?String(row[idx.assistant]??'').trim():'',
+      studentNo:idx.studentNo>=0?String(row[idx.studentNo]??'').trim():fixed.studentNo,
+      name:idx.name>=0?String(row[idx.name]??'').trim():fixed.name,
+      grade:idx.grade>=0?String(row[idx.grade]??'').trim():fixed.grade,
+      school:idx.school>=0?String(row[idx.school]??'').trim():fixed.school,
+      assistant:idx.assistant>=0?String(row[idx.assistant]??'').trim():fixed.assistant,
       source
     };
     if(item.name||item.studentNo)out.push(item);
@@ -1384,7 +1418,7 @@ function diagnoseRosterAoa(aoa, source=''){
     name:rosterHeaderIndex(header,['生徒名','氏名','名前','フルネーム']),
     grade:rosterHeaderIndex(header,['学年']),
     school:rosterHeaderIndex(header,['高校','高校名','学校','学校名','在籍校','所属校','在学校']),
-    assistant:rosterHeaderIndex(header,['担当','担任助手','助手','担任','担当者'])
+    assistant:rosterHeaderIndex(header,['担当助手名','担当','担任助手','助手','担任','担当者'])
   };
   info.idx=idx;
   const schools=[], assistants=[], names=[];
@@ -1479,6 +1513,28 @@ function getKnownStudentProfile(name){
   const mapAssistant=Object.entries(ASSISTANT_STUDENT_MAP_FOR_INPUT||{}).find(([a,list])=>(list||[]).some(st=>profileKey(st)===profileKey(name)))?.[0]||'';
   return Object.assign({}, byName||{}, byNo||{}, {name, studentNo:no||byNo?.studentNo||byName?.studentNo||'', grade:data?.grade||byNo?.grade||byName?.grade||'', school:data?.school||byNo?.school||byName?.school||'', assistant:data?.assistant||byNo?.assistant||byName?.assistant||mapAssistant});
 }
+function normalizeInputRosterGradeValue(v){
+  const s=String(v||'').replace(/[\s\u3000]+/g,'').trim();
+  if(!s) return '';
+  if(/^(高)?1年?$/.test(s) || /高校?1/.test(s)) return '高1';
+  if(/^(高)?2年?$/.test(s) || /高校?2/.test(s)) return '高2';
+  if(/^(高)?3年?$/.test(s) || /高校?3/.test(s)) return '高3';
+  if(['高1','高2','高3'].includes(s)) return s;
+  return s;
+}
+function applyKnownRosterProfileToStudentData(name, overwrite=false){
+  const data=ensureStudent(name);
+  const p=getKnownStudentProfile(name);
+  const grade=normalizeInputRosterGradeValue(p.grade||'');
+  if(p.studentNo && (overwrite || !data.studentNo)) data.studentNo=p.studentNo;
+  if(grade && (overwrite || !data.grade)) data.grade=grade;
+  if(p.school && (overwrite || !data.school)) data.school=p.school;
+  if(p.assistant && (overwrite || !data.assistant)) data.assistant=p.assistant;
+  return data;
+}
+function applyKnownRosterProfilesToStudents(names, overwrite=false){
+  (names||[]).forEach(name=>applyKnownRosterProfileToStudentData(name, overwrite));
+}
 function studentsForSchools(schools){
   const inputSchools=(schools||[]).map(s=>String(s||'').trim()).filter(Boolean);
   if(!inputSchools.length)return [];
@@ -1496,12 +1552,8 @@ function studentsForAssistants(assistants){
   const keys=new Set((assistants||[]).map(profileKey).filter(Boolean));
   if(!keys.size)return [];
   const out=[]; const seen=new Set();
-  // まずアプリ内の正式な入力用表示名リスト（苗字だけ/同姓は下一文字つき）を優先する。
-  keys.forEach(k=>{
-    const hitKey=Object.keys(ASSISTANT_STUDENT_MAP_FOR_INPUT||{}).find(a=>profileKey(a)===k);
-    if(hitKey)(ASSISTANT_STUDENT_MAP_FOR_INPUT[hitKey]||[]).forEach(n=>addTargetStudentNameOnce(out, seen, n));
-  });
-  // 対応表がフルネームでも、inputTargetDisplayName で入力用表示名へ寄せて重複を消す。
+  // マスタの「担任助手から追加」は、固定リストではなく対応表/現在の生徒データを正とする。
+  // 固定リストは古くなる可能性があるため、対象生徒名へ勝手に追加しない。
   (ROSTER_PROFILE_CACHE.profiles||[]).forEach(p=>{
     if(keys.has(profileKey(p.assistant)) && p.name) addTargetStudentNameOnce(out, seen, p.name);
   });
@@ -1518,19 +1570,20 @@ function appendUniqueTargetStudents(current, additions){
 }
 async function expandMasterTargetStudents(row, kind){
   await refreshRosterProfilesFromShared(false);
-  const prefix=kind==='comment'?'comment':'event';
-  const schoolEl=row.querySelector(`[data-${prefix}-master-schools]`);
-  const assistantEl=row.querySelector(`[data-${prefix}-master-assistants]`);
-  const studentsEl=row.querySelector(`[data-${prefix}-master-students]`);
-  const schools=splitTargetText(schoolEl?.value||'');
-  const assistants=splitTargetText(assistantEl?.value||'');
-  const schoolAdds=studentsForSchools(schools);
-  const assistantAdds=studentsForAssistants(assistants);
-  const add=[...schoolAdds,...assistantAdds];
-  const expanded=appendUniqueTargetStudents(studentsEl?.value||'', add);
-  if(studentsEl) studentsEl.value=expanded.join('、');
-  const diag=rosterDiagnosticsText(schools, assistants);
-  showSaveInfo(`対象生徒を自動追加しました：高校 ${schools.length}件 / 担任助手 ${assistants.length}件 / 高校から ${schoolAdds.length}名 / 助手から ${assistantAdds.length}名 / 対象生徒 ${expanded.length}名
+  const prefix = kind === 'comment' ? 'comment' : (kind === 'exam' ? 'exam' : 'event');
+  const schoolEl = row.querySelector(`[data-${prefix}-master-schools]`);
+  const assistantEl = row.querySelector(`[data-${prefix}-master-assistants]`);
+  const studentsEl = row.querySelector(`[data-${prefix}-master-students]`);
+  const schools = splitTargetText(schoolEl?.value || '');
+  const assistants = splitTargetText(assistantEl?.value || '');
+  const schoolAdds = studentsForSchools(schools);
+  const assistantAdds = studentsForAssistants(assistants);
+  const add = [...schoolAdds, ...assistantAdds];
+  const expanded = appendUniqueTargetStudents(studentsEl?.value || '', add);
+  if(studentsEl) studentsEl.value = expanded.join('、');
+  const label = kind === 'exam' ? '模試マスタ' : (kind === 'comment' ? 'コメントマスタ' : 'イベントマスタ');
+  const diag = rosterDiagnosticsText(schools, assistants);
+  showSaveInfo(`${label}の対象生徒を自動追加しました：高校 ${schools.length}件 / 担任助手 ${assistants.length}件 / 高校から ${schoolAdds.length}名 / 助手から ${assistantAdds.length}名 / 対象生徒 ${expanded.length}名
 ※高校名は「高等学校/高校」「府立/県立/市立/私立」などの表記ゆれを吸収して照合します。
 ※フルネームは入力用表示名（苗字だけ/同姓は下一文字つき）へ寄せて重複を除外します。
 ${diag}`);
@@ -1577,22 +1630,95 @@ function splitStudentNameTokensRaw(){return ($('#studentNames').value||'').split
 function splitAssistantNameTokensRaw(){return ($('#assistantNames')?.value||'').split(/[、，,]/).map(x=>x.trim()).filter(Boolean)}
 function splitNames(){return splitStudentNameTokensRaw()}
 function expandAssistantNamesToStudents(tokens){
+  // 旧固定リスト展開は廃止。
+  // 助手名から生徒一覧を出す場合は expandAssistantNamesToStudentsPreferFolders() で
+  // 実際の「担任助手フォルダー/助手名/」直下の生徒フォルダーだけを読む。
+  const missing=(tokens||[]).map(normalizeAssistantInputKey).filter(Boolean);
+  return {names:[], logs:['固定リストからの生徒一覧展開は廃止しました。担任助手フォルダーを選んでください。'], missing};
+}
+function inputAssistantFolderNameMatches(a,b){return normalizeAssistantInputKey(a)===normalizeAssistantInputKey(b)}
+function shouldUseFolderNameAsAssistantListStudent(name){
+  const key=normalizeStudentNameKeyForAmbiguity(name);
+  const ignore=new Set(['保存復元フォルダー','担任助手フォルダー','打ち込み結果','毎日更新','対応表','全員分リスト','全体予定表','json','Comiru','コミル','アンケート','科目リスト','マスタ','毎日掲示','生徒フォルダー例']);
+  return !!key && !ignore.has(key);
+}
+async function listDirectStudentFolderNamesForAssistant(dir){
+  const names=[];
+  if(!dir || !dir.values) return names;
+  for await (const entry of dir.values()){
+    if(entry.kind!=='directory') continue;
+    const nm=normalizeStudentNameKeyForAmbiguity(entry.name||'');
+    if(shouldUseFolderNameAsAssistantListStudent(nm)) names.push(nm);
+  }
+  return Array.from(new Set(names)).sort((a,b)=>a.localeCompare(b,'ja'));
+}
+async function findAssistantFolderHandlesFromRoot(rootDir, assistantName, maxDepth=5){
+  const out=[];
+  const seen=new Set();
+  async function add(dir,label){
+    const key=label || dir?.name || '';
+    if(!dir || seen.has(key)) return;
+    seen.add(key);
+    out.push({dir,label:key});
+  }
+  async function walk(dir, depth, pathParts){
+    if(!dir || depth<0 || !dir.values) return;
+    const label=pathParts.join(' / ') || (dir.name||'選択フォルダー');
+    if(inputAssistantFolderNameMatches(dir.name||'', assistantName)){
+      await add(dir,label);
+      return;
+    }
+    for await (const entry of dir.values()){
+      if(entry.kind!=='directory') continue;
+      const next=[...pathParts, entry.name||''];
+      if(inputAssistantFolderNameMatches(entry.name||'', assistantName)){
+        await add(entry,next.join(' / '));
+        continue;
+      }
+      const key=normalizeStudentNameKeyForAmbiguity(entry.name||'');
+      // 生徒フォルダーの下まで深掘りしすぎない。
+      if(shouldUseFolderNameAsAssistantListStudent(key) && depth<maxDepth) continue;
+      await walk(entry, depth-1, next);
+    }
+  }
+  await walk(rootDir, maxDepth, [rootDir?.name || '選択フォルダー']);
+  return out;
+}
+async function expandAssistantNamesToStudentsPreferFolders(tokens){
   const out=[];
   const seen=new Set();
   const logs=[];
   const missing=[];
-  tokens.forEach(token=>{
+  for(const token of tokens){
     const key=normalizeAssistantInputKey(token);
-    if(!key) return;
-    const list=Object.prototype.hasOwnProperty.call(ASSISTANT_STUDENT_MAP_FOR_INPUT,key) ? ASSISTANT_STUDENT_MAP_FOR_INPUT[key] : null;
-    if(!list){ missing.push(key); return; }
-    if(!list.length){ logs.push(`${key} → 生徒リスト未登録のため展開なし`); return; }
-    logs.push(`${key} → ${list.length}名（${list.join('、')}）`);
-    list.forEach(name=>{
-      const k=normalizeStudentNameKeyForAmbiguity(name);
-      if(k && !seen.has(k)){seen.add(k); out.push(name);}
-    });
-  });
+    if(!key) continue;
+
+    if(!sharedDirHandle){
+      missing.push(`${key}（フォルダー未選択）`);
+      continue;
+    }
+
+    const dirs=await findAssistantFolderHandlesFromRoot(sharedDirHandle,key,5);
+    const folderNames=[];
+    for(const hit of dirs){
+      const names=await listDirectStudentFolderNamesForAssistant(hit.dir);
+      if(names.length){
+        folderNames.push(...names);
+        logs.push(`${key} → 助手フォルダー「${hit.label}」から ${names.length}名（${names.join('、')}）`);
+      }
+    }
+    const uniqueFolderNames=Array.from(new Set(folderNames.map(normalizeStudentNameKeyForAmbiguity).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'ja'));
+    if(uniqueFolderNames.length){
+      uniqueFolderNames.forEach(n=>EXTRA_STUDENT_NAME_CANDIDATES.add(n));
+      uniqueFolderNames.forEach(n=>addTargetStudentNameOnce(out, seen, n));
+      continue;
+    }
+
+    if(dirs.length){
+      logs.push(`${key} → 助手フォルダーは見つかりましたが、直下に生徒フォルダーがありません`);
+    }
+    missing.push(key);
+  }
   return {names:out, logs, missing};
 }
 async function expandAssistantStudentsToStudentField(){
@@ -1602,20 +1728,47 @@ async function expandAssistantStudentsToStudentField(){
     const el=$('#assistantNames'); if(el) el.focus();
     return;
   }
-  const result=expandAssistantNamesToStudents(tokens);
+  // 助手名→生徒一覧は、実際の「担任助手フォルダー/助手名/」直下の生徒フォルダーだけを正とする。
+  // 固定リストや対応表からは勝手に展開しない。
+  if(!sharedDirHandle){
+    if(!window.showDirectoryPicker){
+      alert('このブラウザではフォルダーを直接読めないため、生徒一覧を自動展開できません。Chrome/Edgeで開いて、担任助手フォルダーを選んでください。');
+      return;
+    }
+    const ok=confirm(`生徒一覧は、実際の「担任助手フォルダー/助手名/」直下の生徒フォルダーだけから読み取ります。
+
+選ぶもの：
+・担任助手フォルダー
+・または「担任助手フォルダー」を含む親フォルダー
+
+固定リストや対応表からは展開しません。フォルダーを選びますか？`);
+    if(!ok){
+      showSaveInfo('生徒一覧を展開しませんでした。助手名から出すには、担任助手フォルダーを選んでください。');
+      return;
+    }
+    await pickSaveRootFolder(false);
+  }
+  if(sharedDirHandle && !extraStudentCandidatesLoadedFromFolder){
+    await refreshDynamicStudentNameCandidatesFromFolder(sharedDirHandle);
+  }
+  const result=await expandAssistantNamesToStudentsPreferFolders(tokens);
   const lines=[];
   if(result.logs.length) lines.push(...result.logs);
-  if(result.missing.length) lines.push(`未登録の助手名: ${result.missing.join('、')}`);
+  if(result.missing.length) lines.push(`助手フォルダー未発見または生徒フォルダーなし: ${result.missing.join('、')}`);
   if(!result.names.length){
-    showSaveInfo(`生徒一覧を展開できませんでした。\n${lines.join('\n')}`);
-    alert(`生徒一覧を展開できませんでした。\n${lines.join('\n')}`);
+    const msg=`生徒一覧を展開できませんでした。
+${lines.join('\n')}
+
+確認：選んだフォルダー内に「担任助手フォルダー/助手名/生徒名フォルダー」があるか見てください。固定リスト・対応表からは出しません。`;
+    showSaveInfo(msg);
+    alert(msg);
     return;
   }
   $('#studentNames').value=result.names.join(', ');
-  showSaveInfo(`助手名から生徒一覧を反映しました。\n${lines.join('\n')}`);
+  showSaveInfo(`助手フォルダーから生徒一覧を反映しました。
+${lines.join('\n')}`);
   await applyStudentsWithDynamicCandidates();
 }
-
 // 生徒名の下一文字つけ忘れ防止。例：平井 → 平井瑛 / 平井駿 / 平井秀 の候補を出して止める。
 // 初期フォルダーZIPに入れている担任助手→生徒リストに加えて、実際に選んだ担任助手フォルダー配下の生徒フォルダー名も候補に混ぜて判定する。
 const KNOWN_STUDENT_NAME_CANDIDATES = [
@@ -1696,6 +1849,9 @@ async function refreshDynamicStudentNameCandidatesFromFolder(rootDir){
 async function applyStudentsWithDynamicCandidates(){
   if(sharedDirHandle && !extraStudentCandidatesLoadedFromFolder){
     await refreshDynamicStudentNameCandidatesFromFolder(sharedDirHandle);
+  }
+  if(sharedDirHandle){
+    await refreshRosterProfilesFromShared(false);
   }
   applyStudents();
 }
@@ -1790,6 +1946,7 @@ function applyStudents(){
   if(warnAmbiguousStudentNames(ambiguityIssues)) return;
   students=names.length?names:[];
   students.forEach(ensureStudent);
+  applyKnownRosterProfilesToStudents(students, false);
   renderStudents();
   showSaveInfo(students.length?`${students.length}名の入力欄を表示中です。`:'生徒名を入力してください。');
 }
@@ -1918,7 +2075,12 @@ function visibleEventMastersForStudent(name){
     const targets=Array.isArray(ev.grades)?ev.grades.filter(Boolean):[];
     if(targets.length && !targets.includes(grade)) return false;
     const targetNames=Array.isArray(ev.students)?ev.students:splitTargetNames(ev.studentNames||'');
-    if(!studentMatchesTargetProfile(name,ev)) return false;
+    const targetSchools=Array.isArray(ev.schools)?ev.schools.filter(Boolean):splitTargetText(ev.schoolNames||'');
+    const targetAssistants=Array.isArray(ev.assistants)?ev.assistants.filter(Boolean):splitTargetText(ev.assistantNames||'');
+    // 対象高校・対象担任助手は「対象生徒名へ一括追加するためだけ」に使う。
+    // 高校/助手だけ指定して対象生徒名が空のイベントは、生徒欄・印刷には出さない。
+    // 全員向けイベントにしたい場合は、対象高校・対象担任助手・対象生徒名をすべて空にする。
+    if(!targetNames.length && (targetSchools.length || targetAssistants.length)) return false;
     return examTargetNameMatch(name,targetNames);
   });
 }
@@ -2518,7 +2680,7 @@ function addScheduleRow(kind,name){
 ========================================================= */
 function syncFromDom(){if(!students.length)return; students.forEach(name=>{const card=document.querySelector(`[data-student-card="${cssEscape(name)}"]`); if(!card)return; const data=ensureStudent(name); data.grade=card.querySelector('[data-kind="grade"]')?.value||''; data.studentNo=card.querySelector('[data-kind="studentNo"]')?.value||''; data.school=card.querySelector('[data-kind="school"]')?.value||''; data.assistant=card.querySelector('[data-kind="assistant"]')?.value||''; data.schedule=Array.from({length:7},(_,d)=>LIMITS.map((_,r)=>card.querySelector(`textarea[data-kind="schedule"][data-day="${d}"][data-row="${r}"]`)?.value||'')); data.materials=Array.from(card.querySelectorAll('tbody[data-material-body] tr')).map((tr,i)=>({subject:tr.querySelector(`[data-kind="subj"]`)?.value||'',book:tr.querySelector(`[data-kind="book"]`)?.value||'',content:tr.querySelector(`[data-kind="content"]`)?.value||''})); if(!data.materials.length)data.materials=[{subject:'',book:'',content:''}]; data.remarks=card.querySelector('textarea[data-kind="remarks"]')?.value||''; data.failureReason=card.querySelector('textarea[data-kind="failureReason"]')?.value||''; data.weeklyMeetingAbsent=!!card.querySelector('input[data-kind="weeklyMeetingAbsent"]')?.checked; data.exams=getExamInputsForCard(card); data.events=getEventInputsForCard(card); data.comments=getCommentInputsForCard(card);});}
 function cssEscape(s){return String(s).replace(/\\/g,'\\\\').replace(/"/g,'\\"')}
-function fillStudentValues(name){const card=document.querySelector(`[data-student-card="${cssEscape(name)}"]`);if(!card)return; const data=ensureStudent(name); const gradeEl=card.querySelector('[data-kind="grade"]'); if(gradeEl)gradeEl.value=data.grade||''; const noEl=card.querySelector('[data-kind="studentNo"]'); if(noEl)noEl.value=data.studentNo||''; const schoolEl=card.querySelector('[data-kind="school"]'); if(schoolEl)schoolEl.value=data.school||getKnownStudentProfile(name).school||''; const assistantEl=card.querySelector('[data-kind="assistant"]'); if(assistantEl)assistantEl.value=data.assistant||getKnownStudentProfile(name).assistant||''; data.schedule.forEach((day,d)=>day.forEach((v,r)=>{const el=card.querySelector(`textarea[data-kind="schedule"][data-day="${d}"][data-row="${r}"]`);if(el)el.value=v||''})); (data.materials||[]).forEach((m,i)=>{const tr=card.querySelectorAll('tbody[data-material-body] tr')[i]; if(!tr)return; tr.querySelector('[data-kind="subj"]').value=m.subject||''; tr.querySelector('[data-kind="book"]').value=m.book||''; tr.querySelector('[data-kind="content"]').value=m.content||'';}); const rem=card.querySelector('textarea[data-kind="remarks"]'); if(rem)rem.value=data.remarks||''; const fr=card.querySelector('textarea[data-kind="failureReason"]'); if(fr)fr.value=data.failureReason||''; const absent=card.querySelector('input[data-kind="weeklyMeetingAbsent"]'); if(absent)absent.checked=!!data.weeklyMeetingAbsent; applyExamValuesToCard(card,data.exams||[]); applyEventValuesToCard(card,data.events||[]); applyCommentValuesToCard(card,data.comments||[]);}
+function fillStudentValues(name){const card=document.querySelector(`[data-student-card="${cssEscape(name)}"]`);if(!card)return; const data=ensureStudent(name); const profile=getKnownStudentProfile(name); const gradeEl=card.querySelector('[data-kind="grade"]'); if(gradeEl)gradeEl.value=data.grade||normalizeInputRosterGradeValue(profile.grade)||''; const noEl=card.querySelector('[data-kind="studentNo"]'); if(noEl)noEl.value=data.studentNo||profile.studentNo||''; const schoolEl=card.querySelector('[data-kind="school"]'); if(schoolEl)schoolEl.value=data.school||profile.school||''; const assistantEl=card.querySelector('[data-kind="assistant"]'); if(assistantEl)assistantEl.value=data.assistant||profile.assistant||''; data.schedule.forEach((day,d)=>day.forEach((v,r)=>{const el=card.querySelector(`textarea[data-kind="schedule"][data-day="${d}"][data-row="${r}"]`);if(el)el.value=v||''})); (data.materials||[]).forEach((m,i)=>{const tr=card.querySelectorAll('tbody[data-material-body] tr')[i]; if(!tr)return; tr.querySelector('[data-kind="subj"]').value=m.subject||''; tr.querySelector('[data-kind="book"]').value=m.book||''; tr.querySelector('[data-kind="content"]').value=m.content||'';}); const rem=card.querySelector('textarea[data-kind="remarks"]'); if(rem)rem.value=data.remarks||''; const fr=card.querySelector('textarea[data-kind="failureReason"]'); if(fr)fr.value=data.failureReason||''; const absent=card.querySelector('input[data-kind="weeklyMeetingAbsent"]'); if(absent)absent.checked=!!data.weeklyMeetingAbsent; applyExamValuesToCard(card,data.exams||[]); applyEventValuesToCard(card,data.events||[]); applyCommentValuesToCard(card,data.comments||[]);}
 function bindInputs(){
   $$('input,textarea,select').forEach(el=>{
     el.oninput=()=>{
@@ -2723,21 +2885,22 @@ function examSubjectsText(subjects){
 function examMasterExplicitTargets(ex){
   const targetGrades = Array.isArray(ex?.grades) ? ex.grades.filter(Boolean) : [];
   const targetNames = Array.isArray(ex?.students) ? ex.students.filter(Boolean) : splitTargetNames(ex?.studentNames || '');
-  return {targetGrades, targetNames, hasTarget: targetGrades.length > 0 || targetNames.length > 0};
+  const targetSchools = Array.isArray(ex?.schools) ? ex.schools.filter(Boolean) : splitTargetText(ex?.schoolNames || '');
+  const targetAssistants = Array.isArray(ex?.assistants) ? ex.assistants.filter(Boolean) : splitTargetText(ex?.assistantNames || '');
+  return {targetGrades, targetNames, targetSchools, targetAssistants, hasTarget: targetGrades.length > 0 || targetNames.length > 0 || targetSchools.length > 0 || targetAssistants.length > 0};
 }
 function examMasterTargetsStudent(ex, name){
   const data = ensureStudent(name);
   const grade = data.grade || '';
-  const {targetGrades, targetNames, hasTarget} = examMasterExplicitTargets(ex);
-  // 対象学年も対象生徒も未選択の模試マスタは、入力欄にも印刷にも出さない。
-  if(!hasTarget) return false;
+  const {targetGrades, targetNames} = examMasterExplicitTargets(ex);
+  // 模試マスタの表示対象は「対象生徒名」に残っている生徒だけ。
+  // 対象高校・対象担任助手は、対象生徒名へ一括追加するための検索条件としてだけ使う。
+  // そのため高校/助手だけ指定して対象生徒名が空の模試は、生徒欄・印刷には出さない。
+  if(!targetNames.length) return false;
   if(targetGrades.length){
     if(!grade || !targetGrades.includes(grade)) return false;
   }
-  if(targetNames.length){
-    return examTargetNameMatch(name, targetNames);
-  }
-  return true;
+  return examTargetNameMatch(name, targetNames);
 }
 function visibleExamIdSetForStudent(name){
   return new Set(visibleExamMastersForStudent(name).map(ex => examId(ex)));
@@ -2765,7 +2928,7 @@ function examPanelHtml(name){
   if(!exams.length)return '<div class="empty" style="margin-top:10px">3週間以内に表示対象の模試はありません。</div>';
   return exams.map(ex=>{
     const id=examId(ex);
-    const targetInfo=[(ex.grades||[]).join('・'), (ex.students||[]).join('・')].filter(Boolean).join(' / ');
+    const targetInfo=[(ex.grades||[]).join('・'), (ex.schools||[]).join('・'), (ex.assistants||[]).join('・'), (ex.students||[]).join('・')].filter(Boolean).join(' / ');
     const subjectAttr=escapeHtml(examSubjectsText(ex.subjects||[]));
     return `<div class="examItem" data-exam-id="${escapeHtml(id)}" data-exam-name="${escapeHtml(ex.name)}" data-exam-date="${escapeHtml(ex.date)}" data-exam-type="${escapeHtml(ex.type||'common')}" data-exam-template="${escapeHtml(ex.subjectTemplate||'')}" data-exam-master-subjects="${subjectAttr}"><div class="examHead"><span>${escapeHtml(ex.name)}</span><span class="examDate">${escapeHtml(ex.date)}${targetInfo?' / 対象:'+escapeHtml(targetInfo):''}</span></div><div class="checkRow">${['当日','後日','不受験'].map(st=>`<label><input type="radio" name="exam_${escapeHtml(name)}_${escapeHtml(id)}" data-exam-status value="${st}">${st}</label>`).join('')}<label><input type="checkbox" data-exam-comiru>Comiru回答</label><label><input type="checkbox" data-exam-subject-changed>科目変更あり</label></div>${examSubjectCheckboxesForStudent(ex)}</div>`;
   }).join('')
@@ -2887,15 +3050,15 @@ function saveExamTargetHistory(list){
 }
 function updateExamTargetHistoryFromMasters(rows){
   const current=(rows||[])
-    .filter(ex=>ex&&ex.name&&((ex.grades||[]).length||(ex.students||[]).length))
-    .map(ex=>({name:ex.name,grades:ex.grades||[],students:ex.students||[],savedAt:new Date().toISOString()}));
+    .filter(ex=>ex&&ex.name&&itemHasAnyTarget(ex))
+    .map(ex=>({name:ex.name,grades:ex.grades||[],schools:ex.schools||[],assistants:ex.assistants||[],students:ex.students||[],savedAt:new Date().toISOString()}));
   saveExamTargetHistory([...current,...getExamTargetHistory()]);
 }
 function findSimilarExamTarget(name, rowsForSearch=[]){
   const key=normalizeExamNameForTarget(name);
   if(!key)return null;
   const candidates=[...(rowsForSearch||[]),...getExamMaster(),...getExamTargetHistory()]
-    .filter(ex=>ex&&ex.name&&normalizeExamNameForTarget(ex.name)!==key&&((ex.grades||[]).length||(ex.students||[]).length));
+    .filter(ex=>ex&&ex.name&&normalizeExamNameForTarget(ex.name)!==key&&itemHasAnyTarget(ex));
   let best=null;
   for(const ex of candidates){
     const k=normalizeExamNameForTarget(ex.name);
@@ -2915,7 +3078,7 @@ function commonExamNameCoreMatch(a,b){
 function applyPreviousExamTargetsWithConfirm(rows){
   return (rows||[]).map((ex,idx)=>{
     if(!ex||!ex.name)return ex;
-    const hasTarget=(ex.grades&&ex.grades.length)||(ex.students&&ex.students.length);
+    const hasTarget=itemHasAnyTarget(ex);
     if(hasTarget)return ex;
     const previous=findSimilarExamTarget(ex.name, rows.slice(0,idx));
     if(!previous)return ex;
@@ -2941,11 +3104,14 @@ function renderExamMasterPanel(){
       <div><label>科目型</label><select data-master-template>${examTemplateOptions(tmpl,type)}</select></div>
       <div><button type="button" class="small secondary" data-delete-master="${i}">削除</button></div>
       <div><label>対象学年</label><div class="checkRow">${examGradeCheckboxes(ex.grades||[])}</div></div>
-      <div style="grid-column:2/-1"><label>対象生徒名</label><textarea data-master-students placeholder="未選択なら生徒欄・印刷には表示しません。例：北野、田中">${escapeHtml(targetNames)}</textarea></div>
-      <div style="grid-column:1/-1"><div class="hint">模試マスタ編集欄は、週開始日から3週間以内の模試だけ表示します。表示されていない過去/遠い未来の模試も保存データには残ります。</div></div>
+      <div><label>対象高校</label><textarea data-exam-master-schools placeholder="例：〇〇高校、△△高校">${escapeHtml((ex.schools||[]).join('、'))}</textarea></div>
+      <div><label>対象担任助手</label><textarea data-exam-master-assistants placeholder="例：武内、今道">${escapeHtml((ex.assistants||[]).join('、'))}</textarea></div>
+      <div style="grid-column:1/-1"><label>対象生徒名</label><textarea data-exam-master-students data-master-students placeholder="未選択なら生徒欄・印刷には表示しません。例：北野、田中">${escapeHtml(targetNames)}</textarea></div>
+      <div style="grid-column:1/-1"><button type="button" class="small secondary" data-expand-exam-targets="${i}">高校/助手から追加</button><div class="hint" style="margin-top:6px">対象高校・対象担任助手は、対象生徒名へ一括追加するためだけに使います。実際に生徒欄・印刷に出るのは「対象生徒名」に残っている生徒だけです。模試マスタ編集欄は、週開始日から3週間以内の模試だけ表示します。</div></div>
     </div>`;
   }).join('')||'<div class="empty">3週間以内に編集対象の模試はありません。必要なら「模試を追加」してください。</div>';
   $$('[data-delete-master]').forEach(btn=>btn.onclick=()=>{const arr=getExamMaster();arr.splice(Number(btn.dataset.deleteMaster),1);saveExamMasterData(arr);renderExamMasterPanel();renderStudents()});
+  $$('[data-expand-exam-targets]').forEach(btn=>btn.onclick=async()=>{await expandMasterTargetStudents(btn.closest('.examMasterRow'),'exam');});
   $$('.examMasterRow [data-master-type]').forEach(sel=>{
     sel.onchange=()=>{
       const row=sel.closest('.examMasterRow');
@@ -2984,7 +3150,7 @@ function mergeVisibleExamMasterRowsForSave(editedRows){
     if(Number.isInteger(idx) && idx>=0 && idx<all.length) all[idx]=clean;
     else all.push(clean);
   });
-  return all.filter(x=>x.name||x.date||(x.grades||[]).length||(x.students||[]).length||x.subjectTemplate);
+  return all.filter(x=>x.name||x.date||(x.grades||[]).length||(x.schools||[]).length||(x.assistants||[]).length||(x.students||[]).length||x.subjectTemplate);
 }
 
 function collectExamMasterFromPanel(){return $$('.examMasterRow').map(row=>{
@@ -2997,16 +3163,18 @@ function collectExamMasterFromPanel(){return $$('.examMasterRow').map(row=>{
     type,
     subjectTemplate,
     grades:Array.from(row.querySelectorAll('[data-master-grade]:checked')).map(x=>x.value),
+    schools:splitTargetNames(row.querySelector('[data-exam-master-schools]')?.value||''),
+    assistants:splitTargetNames(row.querySelector('[data-exam-master-assistants]')?.value||''),
     students:splitTargetNames(row.querySelector('[data-master-students]')?.value||''),
     // 模試マスタでは科目を個別に持たず、科目型から自動展開する。
     subjects:[]
   };
-}).filter(x=>x.name||x.date||x.grades.length||x.students.length||x.subjectTemplate)}
+}).filter(x=>x.name||x.date||x.grades.length||x.schools.length||x.assistants.length||x.students.length||x.subjectTemplate)}
 function addExamMasterRow(){
   const arr=collectExamMasterFromPanel();
   // 空の模試名だと mergeDefaultExamMaster() 側で保存対象から落ちるため、
   // 追加直後に消えないよう仮名を入れてから編集できる状態にする。
-  arr.push({name:'新規模試',date:'',type:'common',subjectTemplate:'',grades:[],students:[]});
+  arr.push({name:'新規模試',date:'',type:'common',subjectTemplate:'',grades:[],schools:[],assistants:[],students:[]});
   saveExamMasterData(arr);
   renderExamMasterPanel();
   renderStudents();
@@ -3108,8 +3276,8 @@ function renderEventMasterPanel(){
     <div><label>対象学年</label><div class="checkRow">${gradeCheckboxes(ev.grades||[])}</div></div>
     <div><label>対象高校</label><textarea data-event-master-schools placeholder="例：〇〇高校、△△高校">${escapeHtml((ev.schools||[]).join('、'))}</textarea></div>
     <div><label>対象担任助手</label><textarea data-event-master-assistants placeholder="例：武内、今道">${escapeHtml((ev.assistants||[]).join('、'))}</textarea></div>
-    <div><label>対象生徒名</label><textarea data-event-master-students placeholder="空欄なら全員。例：北野、田中">${escapeHtml(targetNames)}</textarea></div>
-    <div><button type="button" class="small secondary" data-expand-event-targets="${i}">高校/助手から追加</button><button type="button" class="small secondary" data-delete-event-master="${i}">削除</button></div>
+    <div><label>対象生徒名</label><textarea data-event-master-students placeholder="全員向けは高校/助手/生徒名をすべて空欄。個別指定はここに残った生徒だけ。例：北野、田中">${escapeHtml(targetNames)}</textarea></div>
+    <div><button type="button" class="small secondary" data-expand-event-targets="${i}">高校/助手から追加</button><button type="button" class="small secondary" data-delete-event-master="${i}">削除</button><div class="hint" style="margin-top:6px">対象高校・対象担任助手は、対象生徒名へ一括追加するためだけに使います。実際に生徒欄・印刷に出るのは「対象生徒名」に残っている生徒だけです。全員向けイベントは対象高校・対象担任助手・対象生徒名をすべて空欄にします。</div></div>
   </div>`;
   }).join('')||'<div class="empty">まだイベントマスタがありません。</div>';
   $$('[data-delete-event-master]').forEach(btn=>btn.onclick=()=>{const arr=getEventMaster();arr.splice(Number(btn.dataset.deleteEventMaster),1);saveEventMasterData(arr);renderEventMasterPanel();renderStudents()});
