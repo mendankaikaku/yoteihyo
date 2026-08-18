@@ -7936,10 +7936,10 @@ async function expandAssistantStudentsToStudentField(){
 <script id="masterTargetFolderNamePatch">
 // ============================================================
 // 修正: 模試/イベント/コメントマスタの「高校/助手から追加」
-// - 対象担任助手は、①助手名→生徒一覧ボタンと同じく
-//   保存復元フォルダ/打ち込み結果/担任助手フォルダ/助手名/生徒名フォルダ だけから追加する。
-// - 固定名簿・対応表だけから勝手に対象生徒名へ追加しない。
-// - 対象生徒名に入れる名前は、実際の生徒フォルダ名を優先する。
+// - 対象高校だけ：対応表から追加する。
+// - 対象担任助手だけ：①助手名→生徒一覧ボタンと同じく、実フォルダーから追加する。
+// - 対象高校＋対象担任助手：まず助手フォルダーで候補を出し、対応表高校で絞る。
+// - 固定名簿には戻さない。対象生徒名に入れる名前は、実際の生徒フォルダ名を優先する。
 // ============================================================
 function addFolderTargetStudentNameOnce(out, seen, name){
   const raw=String(name||'').trim();
@@ -7989,6 +7989,37 @@ function resolveRosterNameToFolderName(name, folderRecords){
   });
   return hit ? hit.studentName : raw;
 }
+function uniqueRosterProfilesForFolderStudentName(folderName){
+  const raw=String(folderName||'').trim();
+  const rawKey=profileKey(raw);
+  const rawCanonical=(typeof targetStudentCanonicalKey==='function') ? targetStudentCanonicalKey(raw) : rawKey;
+  if(!rawKey) return [];
+  const out=[]; const seen=new Set();
+  (ROSTER_PROFILE_CACHE.profiles||[]).forEach(p=>{
+    const name=String(p&&p.name||'').trim();
+    if(!name) return;
+    const nameKey=profileKey(name);
+    const nameCanonical=(typeof targetStudentCanonicalKey==='function') ? targetStudentCanonicalKey(name) : nameKey;
+    const match = nameKey===rawKey ||
+      (rawCanonical && nameCanonical && rawCanonical===nameCanonical) ||
+      (rawKey.length>=2 && nameKey.startsWith(rawKey)) ||
+      (nameKey.length>=2 && rawKey.startsWith(nameKey));
+    if(!match) return;
+    const k=String(p.studentNo||'').trim() || nameKey;
+    if(!seen.has(k)){ seen.add(k); out.push(p); }
+  });
+  return out;
+}
+function folderStudentMatchesAnySchool(studentName, schools){
+  const inputSchools=(schools||[]).map(s=>String(s||'').trim()).filter(Boolean);
+  if(!inputSchools.length) return true;
+  const profiles=uniqueRosterProfilesForFolderStudentName(studentName);
+  if(profiles.length){
+    return profiles.some(p=>p.school && inputSchools.some(s=>schoolNameMatches(s,p.school)));
+  }
+  const p=getKnownStudentProfile(studentName);
+  return !!(p && p.school && inputSchools.some(s=>schoolNameMatches(s,p.school)));
+}
 async function studentsForAssistantsFromStudentFolders(assistants){
   const keys=new Set((assistants||[]).map(profileKey).filter(Boolean));
   const out=[]; const seen=new Set(); const logs=[]; const missing=[];
@@ -8013,11 +8044,13 @@ async function expandMasterTargetStudents(row, kind){
   const studentsEl=row.querySelector(`[data-${prefix}-students]`) || row.querySelector(`[data-${prefix}-master-students]`);
   const schools=splitTargetText(schoolEl?.value||'');
   const assistants=splitTargetText(assistantEl?.value||'');
+
   let folderRecords=[];
   try{ folderRecords=await listAllFolderStudentRecordsForMasterTargets(); }catch(e){ folderRecords=[]; }
-  const schoolAddsRaw=studentsForSchools(schools);
-  const schoolAdds=schoolAddsRaw.map(n=>resolveRosterNameToFolderName(n, folderRecords));
+
   let assistantAdds=[]; let assistantLogs=[]; let missingAssistants=[]; let assistantError='';
+  let add=[]; let mode='';
+
   if(assistants.length){
     try{
       const res=await studentsForAssistantsFromStudentFolders(assistants);
@@ -8028,20 +8061,43 @@ async function expandMasterTargetStudents(row, kind){
       assistantError=String(e&&e.message?e.message:e||'フォルダ読取エラー');
     }
   }
-  const add=[...schoolAdds,...assistantAdds];
+
+  if(schools.length && assistants.length){
+    mode='対象高校＋対象担任助手：助手フォルダー → 対応表高校で絞り込み';
+    add=assistantAdds.filter(n=>folderStudentMatchesAnySchool(n, schools));
+  }else if(assistants.length){
+    mode='対象担任助手のみ：実フォルダーから追加';
+    add=assistantAdds;
+  }else if(schools.length){
+    mode='対象高校のみ：対応表から追加';
+    const schoolAddsRaw=studentsForSchools(schools);
+    add=schoolAddsRaw.map(n=>resolveRosterNameToFolderName(n, folderRecords));
+  }else{
+    mode='対象高校/対象担任助手なし';
+    add=[];
+  }
+
   const expanded=appendUniqueFolderTargetStudents(studentsEl?.value||'', add);
   if(studentsEl) studentsEl.value=expanded.join('、');
+
   const diag=rosterDiagnosticsText(schools, []);
   const lines=[];
-  lines.push(`対象生徒を自動追加しました：高校 ${schools.length}件 / 担任助手 ${assistants.length}件 / 高校から ${schoolAdds.length}名 / 助手フォルダーから ${assistantAdds.length}名 / 対象生徒 ${expanded.length}名`);
+  lines.push(`対象生徒を自動追加しました：${mode}`);
+  lines.push(`対象高校 ${schools.length}件 / 対象担任助手 ${assistants.length}件 / 追加 ${add.length}名 / 対象生徒 ${expanded.length}名`);
+  lines.push('ルール：高校だけ＝対応表、助手だけ＝実フォルダー、高校＋助手＝助手フォルダーで出した生徒を対応表高校で絞り込み。');
   lines.push('※対象生徒名には、実際の生徒フォルダ名を優先して入れます。');
-  lines.push('※担任助手から追加は、①助手名→生徒一覧ボタンと同じく「保存復元/打ち込み結果/担任助手フォルダ/助手名/生徒名フォルダ」だけを読みます。固定名簿には戻しません。');
+  lines.push('※固定名簿には戻しません。');
   if(assistantLogs.length) lines.push('--- 助手フォルダー読取 ---\n' + assistantLogs.join('\n'));
+  if(schools.length && assistants.length && assistantAdds.length){
+    const excluded=assistantAdds.filter(n=>!add.includes(n));
+    if(excluded.length) lines.push(`高校条件で除外: ${excluded.join('、')}`);
+  }
   if(missingAssistants.length) lines.push(`見つからない助手フォルダー: ${missingAssistants.join('、')}`);
   if(assistantError) lines.push(`助手フォルダー読取エラー: ${assistantError}`);
   lines.push(diag);
   showSaveInfo(lines.join('\n'));
 }
+
 </script>
 
 </body>
