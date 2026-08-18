@@ -6887,15 +6887,23 @@ function safeSheetName(name, fallback='学年未設定'){
   let s = String(name || fallback).replace(/[\\\/\?\*\[\]:]/g, ' ').trim() || fallback;
   return s.slice(0, 31);
 }
+
+function isAllListOneLineIdentityHeader(headerText, colIndex){
+  const t = String(headerText || '').replace(/[\s\n\r　]+/g, '');
+  // 全員分リストでは、生徒番号・氏名・カナは絶対に折り返さず1行表示にする。
+  // 長い場合はExcel側の「縮小して全体を表示」で1行内に収める。
+  return /^(生徒番号|氏名|生徒名|カナ|読み仮名)$/.test(t);
+}
+
 function styleAllStudentGradeSheet(ws, aoa){
   const colCount = Math.max(...aoa.map(r => r.length));
   const widths = [];
   for(let c=0;c<colCount;c++){
     const h=String(aoa[1]?.[c]||'');
     if(c===0) widths.push(5);          // 学年
-    else if(c===1) widths.push(9);     // 生徒番号
-    else if(c===2) widths.push(11);    // 生徒名
-    else if(c===3) widths.push(8);     // カナ
+    else if(c===1) widths.push(11);    // 生徒番号（1行表示）
+    else if(c===2) widths.push(14);    // 氏名（1行表示）
+    else if(c===3) widths.push(10);    // カナ（1行表示）
     else if(c===4) widths.push(10);    // 高校
     else if(c===5) widths.push(9);     // 担当
     else if(c===6) widths.push(16);    // 備考
@@ -6959,7 +6967,12 @@ function styleAllStudentGradeSheet(ws, aoa){
       (/\nComiru$/.test(headerText) && text === '×') ||
       (/\n科目変更$/.test(headerText) && text === '〇')
     );
-    const style = {font:R===0?fontTitle:(R===1?fontHeader:fontBase), alignment:{vertical:'center', horizontal:'center', wrapText:true, shrinkToFit:true}, border};
+    const oneLineIdentity = R > 0 && isAllListOneLineIdentityHeader(headerText, C);
+    const style = {font:R===0?fontTitle:(R===1?fontHeader:fontBase), alignment:{vertical:'center', horizontal:'center', wrapText:!oneLineIdentity, shrinkToFit:true}, border};
+    if(oneLineIdentity){
+      style.alignment.horizontal = 'center';
+      style.alignment.vertical = 'center';
+    }
     if(R===0) style.fill = titleFill;
     else if(R===1) style.fill = headerFill;
     else if(C<=2) style.fill = nameFill;
@@ -7197,6 +7210,9 @@ function applyCompactPrintRows(ws, aoa, widths){
     if(r === 1) return {hpt:13};
     let lines = 1;
     (row || []).forEach((v, c) => {
+      const headerText = String(header[c] || '');
+      // 生徒番号・氏名・カナは印刷でも1行に縮小表示するため、行高計算で折り返し扱いにしない。
+      if(isAllListOneLineIdentityHeader(headerText, c)) return;
       const isPlanResultCol = planResultStartCol >= 0 && c >= planResultStartCol;
       const effectiveWidth = isPlanResultCol
         ? (rowWidthChars[c] || 18) * planResultWidthMultiplier
@@ -7412,17 +7428,19 @@ function allListBuildAutoPrintWidths(aoa, manualCount, planCount){
 }
 
 
-function allListForcePrintTextFitAllCells(ws, range){
+function allListForcePrintTextFitAllCells(ws, range, aoa){
   if(!ws || !range) return;
+  const header = aoa?.[1] || [];
   for(let R=range.s.r; R<=range.e.r; R++){
     for(let C=range.s.c; C<=range.e.c; C++){
       const addr = XLSX.utils.encode_cell({r:R,c:C});
       if(!ws[addr]) continue;
+      const oneLineIdentity = R > 0 && isAllListOneLineIdentityHeader(header[C], C);
       ws[addr].s = ws[addr].s || {};
       ws[addr].s.alignment = Object.assign({}, ws[addr].s.alignment || {}, {
-        vertical: 'top',
+        vertical: oneLineIdentity ? 'center' : 'top',
         horizontal: 'center',
-        wrapText: true,
+        wrapText: !oneLineIdentity,
         shrinkToFit: true
       });
     }
@@ -7519,7 +7537,8 @@ function styleAllStudentPrintSheet(ws, aoa){
       const len = allListPrintVisualTextLength(text);
       cellFont = R===0 ? fontTitle : (R===1 ? fontHeader : (len > 120 ? fontBaseTiny : (len > 70 ? fontBaseMid : fontBase)));
     }
-    const style = {font:cellFont, alignment:{vertical:'top', horizontal:'center', wrapText:true, shrinkToFit:true}, border};
+    const oneLineIdentity = R > 0 && isAllListOneLineIdentityHeader(String(aoa[1]?.[C] || ''), C);
+    const style = {font:cellFont, alignment:{vertical:oneLineIdentity ? 'center' : 'top', horizontal:'center', wrapText:!oneLineIdentity, shrinkToFit:true}, border};
     if(R===0) style.fill = titleFill;
     else if(R===1) style.fill = headerFill;
     else if(C<=1) style.fill = nameFill;
@@ -7541,7 +7560,7 @@ function styleAllStudentPrintSheet(ws, aoa){
 
   // 印刷用は全セルで「折り返して全体を表示」＋「縮小して全体を表示」を強制。
   // 個別の赤セル・タイトル・ヘッダー設定の後にもう一度かける。
-  allListForcePrintTextFitAllCells(ws, range);
+  allListForcePrintTextFitAllCells(ws, range, aoa);
   return ws;
 }
 
