@@ -1564,6 +1564,19 @@ const COMMON_TEST_SUBJECTS_FOR_EXAM = ['英語R','英語L','数学ⅠA','数学�
 const CROWN_TEST_SUBJECTS_FOR_EXAM = ['英語','数学','国語','物理','化学','生物','地学','日本史','世界史','地理','小論文'];
 const EXAM_STATUS_OPTIONS = ['当日','後日','不受験'];
 
+function parseExcelMarkBoolean(value){
+  const raw = norm(value);
+  if(!raw) return false;
+  const s = toHalfWidth(raw).replace(/[\s　]/g,'').toLowerCase();
+  // ExcelやCSVで「×」「未回答」「false」「0」が入っている場合、空欄と同じく false として扱う。
+  // 以前の !!norm(...) だと「×」も true になり、全員分リストでComiruや科目変更が誤って〇になる可能性があった。
+  if(/^(×|✕|x|false|0|なし|無|未|未回答|未提出|未送信|未完了|未入力|不明|-|ー|―|－)$/.test(s)) return false;
+  if(/未回答|未提出|未送信|未完了|未入力|なし|無し|変更なし/.test(s)) return false;
+  if(/^(〇|○|◯|◎|true|1|あり|有|済|回答済|提出済|入力済|変更あり)$/.test(s)) return true;
+  if(/回答済|提出済|入力済|変更あり|あり|有/.test(s)) return true;
+  return false;
+}
+
 function splitSubjectList(s){
   return String(s ?? '')
     .split(/[、,，\/／\n]+/)
@@ -1617,8 +1630,8 @@ async function parseExamFile(file){
       const row = aoa[r] || [];
       const examName = norm(row[h.examName]);
       const status = h.status >= 0 ? norm(row[h.status]) : '';
-      const comiruAnswered = h.comiru >= 0 ? !!norm(row[h.comiru]) : false;
-      const subjectChanged = h.subjectChanged >= 0 ? !!norm(row[h.subjectChanged]) : false;
+      const comiruAnswered = h.comiru >= 0 ? parseExcelMarkBoolean(row[h.comiru]) : false;
+      const subjectChanged = h.subjectChanged >= 0 ? parseExcelMarkBoolean(row[h.subjectChanged]) : false;
       const subjects = h.subjects >= 0 ? splitSubjectList(row[h.subjects]) : [];
       if(!examName && !status && !comiruAnswered && !subjectChanged && !subjects.length) continue;
       const rawStudent = h.student >= 0 ? norm(row[h.student]) : '';
@@ -1720,7 +1733,7 @@ async function parseEventFile(file){
       const row = aoa[r] || [];
       const eventName = norm(row[h.eventName]);
       const status = h.status >= 0 ? norm(row[h.status]) : '';
-      const comiruAnswered = h.comiru >= 0 ? !!norm(row[h.comiru]) : false;
+      const comiruAnswered = h.comiru >= 0 ? parseExcelMarkBoolean(row[h.comiru]) : false;
       const note = h.note >= 0 ? norm(row[h.note]) : '';
       if(!eventName && !status && !comiruAnswered && !note) continue;
       const rawStudent = h.student >= 0 ? norm(row[h.student]) : '';
@@ -6864,8 +6877,8 @@ async function downloadAllStudentList(){
       ['結果records', String((state.resultRecords || []).length), `出力直前にJSON/毎日更新を再読込: ${allListResultRefresh.before}→${allListResultRefresh.after}件`],
       ['選択中result_history.json', String((state.resultHistoryFiles || []).length), '全員分リスト出力直前に直接読込'],
       ['選択中毎日更新.xlsx', String((state.resultFiles || []).length), '全員分リスト出力直前に直接読込'],
-      ['模試レコード', String(exams.length), '期間指定がある場合はその期間で抽出'],
-      ['イベントレコード', String(events.length), '期間指定がある場合はその期間で抽出'],
+      ['模試レコード', String(exams.length), '期間指定がある場合はその期間で抽出。Comiru/科目変更の×や未回答はfalse扱い'],
+      ['イベントレコード', String(events.length), '期間指定がある場合はその期間で抽出。Comiruの×や未回答はfalse扱い'],
       ['学年別シート数', String(gradeAoas.length), '各学年の更新入力・印刷シートを作成'],
       ['手修正衝突ログ', String(Math.max(0, (state.allListUpdateLog?.length || 1) - 1)), '更新ログシートを確認']
     ]);
