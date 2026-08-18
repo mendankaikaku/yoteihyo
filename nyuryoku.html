@@ -1,10 +1,9 @@
-
 <!doctype html>
 <html lang="ja">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>面談予定入力・準備資料アプリ https://mendan-yotei-app.tsuba-mendan.workers.dev/integration　https://mendan-yotei-app.tsuba-mendan.workers.dev/input　v36（上部2段固定版）</title>
+<title>面談予定入力・準備資料アプリ v36（上部2段固定版）</title>
 <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
 <script src="./libs/xlsx.bundle.js"></script>
 <script></script>
@@ -867,7 +866,6 @@ body .prepCompactCard .prepDetails summary{min-height:28px!important;font-size:1
       <h3>最初に作るフォルダー</h3>
       <ul>
         <li>保存復元フォルダー</li>
-        <li>担任助手フォルダー</li>
       </ul>
     </div>
 
@@ -876,6 +874,9 @@ body .prepCompactCard .prepDetails summary{min-height:28px!important;font-size:1
       <div class="folderStructureSmall">太字のフォルダー名は、アプリが自動で探す名前なので基本的に変更しないでください。</div>
       <div class="folderTree"><strong>保存復元フォルダー</strong>
 ├─ <strong>打ち込み結果</strong>
+│  └─ <strong>担任助手フォルダ</strong>
+│     └─ 助手名
+│        └─ 生徒名
 ├─ <strong>毎日更新</strong>
 ├─ <strong>対応表</strong>
 ├─ <strong>全員分リスト</strong>
@@ -895,17 +896,17 @@ body .prepCompactCard .prepDetails summary{min-height:28px!important;font-size:1
     </div>
 
     <div class="folderStructureBox">
-      <h3>担任助手フォルダー</h3>
-      <div class="folderTree">担任助手フォルダー
-├─ 山田太郎
-│  ├─ 合格設計図.pdf
-│  ├─ 合格設計図.xlsx
-│  └─ 過去の予定Excel
-├─ 生徒名
-│  ├─ 合格設計図.pdf
-│  └─ 合格設計図.xlsx
-└─ 鈴木一郎
-   └─ 合格設計図.xlsx</div>
+      <h3>担任助手・生徒フォルダー</h3>
+      <div class="folderTree">保存復元フォルダー
+└─ 打ち込み結果
+   └─ 担任助手フォルダ
+      ├─ 助手A
+      │  ├─ 生徒A
+      │  │  ├─ 合格設計図.pdf
+      │  │  └─ 合格設計図.xlsx
+      │  └─ 生徒B
+      └─ 助手B
+         └─ 生徒C</div>
       <ul>
         <li>生徒フォルダー名は、アプリに入力する生徒名と合わせます。</li>
         <li>合格設計図はPDF優先、なければExcelを使います。</li>
@@ -917,7 +918,7 @@ body .prepCompactCard .prepDetails summary{min-height:28px!important;font-size:1
       <h3>迷ったら守ること</h3>
       <ul>
         <li>保存・復元では「保存復元フォルダー」を選びます。</li>
-        <li>印刷では「担任助手フォルダー」内の生徒フォルダーを使い、合格設計図を自動で探します。週面シートは使いません。</li>
+        <li>印刷では「打ち込み結果/担任助手フォルダ/助手名」内の生徒フォルダーを使い、合格設計図を自動で探します。週面シートは使いません。</li>
         <li>Excelを手修正したら、対応するフォルダーへ戻します。</li>
         <li>太字のフォルダー名は変更しないでください。</li>
       </ul>
@@ -1602,8 +1603,10 @@ async function expandAssistantStudentsToStudentField(){
 const KNOWN_STUDENT_NAME_CANDIDATES = [];
 const EXTRA_STUDENT_NAME_CANDIDATES = new Set();
 const KNOWN_ASSISTANT_FOLDER_NAMES_FOR_AMBIGUITY = [];
+const INPUT_RESULT_FOLDER_NAMES_FOR_LOOKUP = ['打ち込み結果','面談結果打ち込み','面談結果打ち込みフォルダ'];
+const ASSISTANT_CONTAINER_FOLDER_NAMES_FOR_LOOKUP = ['担任助手フォルダ','担任助手フォルダー'];
 const STUDENT_FOLDER_IGNORE_NAMES_FOR_AMBIGUITY = new Set([
-  '保存復元フォルダー','担任助手フォルダー','打ち込み結果','面談結果打ち込み','面談結果打ち込みフォルダ','毎日更新','対応表','全員分リスト','全体予定表','json','Comiru','コミル','アンケート','科目リスト','マスタ','毎日掲示','生徒フォルダー例'
+  '保存復元フォルダー','担任助手フォルダ','担任助手フォルダー','打ち込み結果','面談結果打ち込み','面談結果打ち込みフォルダ','毎日更新','対応表','全員分リスト','全体予定表','json','Comiru','コミル','アンケート','科目リスト','マスタ','毎日掲示','生徒フォルダー例'
 ]);
 let extraStudentCandidatesLoadedFromFolder = false;
 function normalizeStudentNameKeyForAmbiguity(name){
@@ -1620,11 +1623,13 @@ function shouldUseFolderNameAsStudentCandidateForAmbiguity(dirName, pathParts, r
   if(!name || STUDENT_FOLDER_IGNORE_NAMES_FOR_AMBIGUITY.has(name)) return false;
   const path=(pathParts||[]).map(normalizeStudentNameKeyForAmbiguity).filter(Boolean);
   const root=normalizeStudentNameKeyForAmbiguity(rootName);
-  // 保存復元フォルダーを選んだ場合：打ち込み結果 / 助手名 / 生徒名
-  const resultIndex=path.findIndex(x=>['打ち込み結果','面談結果打ち込み','面談結果打ち込みフォルダ'].includes(x));
-  if(resultIndex>=0 && path.length===resultIndex+2) return true;
-  // 打ち込み結果フォルダー自体を選んだ場合：助手名 / 生徒名
-  if(['打ち込み結果','面談結果打ち込み','面談結果打ち込みフォルダ'].includes(root) && path.length===1) return true;
+  // 保存復元フォルダーを選んだ場合：打ち込み結果 / 担任助手フォルダ / 助手名 / 生徒名
+  const resultIndex=path.findIndex(x=>INPUT_RESULT_FOLDER_NAMES_FOR_LOOKUP.includes(x));
+  if(resultIndex>=0 && path.length===resultIndex+3 && ASSISTANT_CONTAINER_FOLDER_NAMES_FOR_LOOKUP.includes(path[resultIndex+1])) return true;
+  // 打ち込み結果フォルダー自体を選んだ場合：担任助手フォルダ / 助手名 / 生徒名
+  if(INPUT_RESULT_FOLDER_NAMES_FOR_LOOKUP.includes(root) && path.length===2 && ASSISTANT_CONTAINER_FOLDER_NAMES_FOR_LOOKUP.includes(path[0])) return true;
+  // 担任助手フォルダー自体を選んだ場合：助手名 / 生徒名
+  if(ASSISTANT_CONTAINER_FOLDER_NAMES_FOR_LOOKUP.includes(root) && path.length===1) return true;
   return false;
 }
 async function collectStudentFolderNameCandidatesForAmbiguity(rootDir, maxDepth=5){
@@ -1636,7 +1641,7 @@ async function collectStudentFolderNameCandidatesForAmbiguity(rootDir, maxDepth=
       const name=entry.name || '';
       if(shouldUseFolderNameAsStudentCandidateForAmbiguity(name, pathParts, rootDir?.name || '')) found.push(name);
       const key=normalizeStudentNameKeyForAmbiguity(name);
-      if(STUDENT_FOLDER_IGNORE_NAMES_FOR_AMBIGUITY.has(key) && key!=='担任助手フォルダー') continue;
+      if(STUDENT_FOLDER_IGNORE_NAMES_FOR_AMBIGUITY.has(key) && !ASSISTANT_CONTAINER_FOLDER_NAMES_FOR_LOOKUP.includes(key)) continue;
       try{ await walk(entry, depth-1, [...pathParts, name]); }catch(e){}
     }
   }
@@ -7306,7 +7311,7 @@ initV30ClassicHorizontalUX();
       '使い方：',
       '1. このZIPを職場PCで展開します。',
       '2. 統合用アプリでは「保存復元フォルダー」を選びます。',
-      '3. 入力用アプリでは、「担任助手フォルダー」配下の各担任助手名フォルダーを使います。',
+      '3. 入力用アプリでは、「保存復元フォルダー/打ち込み結果/担任助手フォルダ」配下の各担任助手名フォルダーを使います。',
       '4. 各担任助手名フォルダーの中に、生徒ごとのフォルダーを作ります。',
       '',
       '保存復元フォルダーの中身：',
@@ -7324,13 +7329,14 @@ initV30ClassicHorizontalUX();
       '見出し行は消さないでください。列の追加・並び替えはOKです。',
       'placeholder.txt は不要なら消してOKです。',
       '',
-      '担任助手フォルダー：',
-      '担任助手名フォルダーと生徒名フォルダーは、職場PC側で作成してください。'
+      '担任助手フォルダ：',
+      '「保存復元フォルダー/打ち込み結果/担任助手フォルダ」の下に、担任助手名フォルダーと生徒名フォルダーを職場PC側で作成してください。'
     ].join('\n');
     const keep = 'このフォルダーに該当ファイルを入れてください。不要ならこのplaceholder.txtは消してOKです。\n';
     const dirs = [
       '保存復元フォルダー/',
       '保存復元フォルダー/打ち込み結果/',
+      '保存復元フォルダー/打ち込み結果/担任助手フォルダ/',
       '保存復元フォルダー/毎日更新/',
       '保存復元フォルダー/対応表/',
       '保存復元フォルダー/全員分リスト/',
@@ -7340,10 +7346,9 @@ initV30ClassicHorizontalUX();
       '保存復元フォルダー/科目リスト/',
       '保存復元フォルダー/マスタ/',
       '保存復元フォルダー/毎日掲示/',
-      '担任助手フォルダー/',
       ...ASSISTANT_FOLDER_NAMES.flatMap(n => [
-        `担任助手フォルダー/${n}/`,
-        ...studentsForStaff(n).map(st => `担任助手フォルダー/${n}/${st}/`)
+        `保存復元フォルダー/打ち込み結果/担任助手フォルダ/${n}/`,
+        ...studentsForStaff(n).map(st => `保存復元フォルダー/打ち込み結果/担任助手フォルダ/${n}/${st}/`)
       ])
     ];
     const entries = dirs.map(name => ({name, data:''}));
@@ -7359,7 +7364,7 @@ initV30ClassicHorizontalUX();
     entries.push({name:'保存復元フォルダー/毎日掲示/placeholder.txt', data:keep});
     for(const staff of ASSISTANT_FOLDER_NAMES){
       for(const student of studentsForStaff(staff)){
-        entries.push({name:`担任助手フォルダー/${staff}/${student}/合格設計図はここに入れる.txt`, data:'生徒ごとのフォルダー直下に、合格設計図.xlsx または 合格設計図.pdf を入れます。\n'});
+        entries.push({name:`保存復元フォルダー/打ち込み結果/担任助手フォルダ/${staff}/${student}/合格設計図はここに入れる.txt`, data:'生徒ごとのフォルダー直下に、合格設計図.xlsx または 合格設計図.pdf を入れます。\n'});
       }
     }
     return entries;
@@ -7502,8 +7507,8 @@ initV30ClassicHorizontalUX();
 <script id="assistantFolderDirectOnlyPatch">
 // ============================================================
 // 修正: 助手名 → 生徒一覧 は、固定リストではなく実フォルダーから読む
-// 前提: 保存復元フォルダ / 打ち込み結果 / 各担任助手名 / 生徒名フォルダ
-// 例: 保存復元フォルダ/打ち込み結果/助手名/生徒名
+// 前提: 保存復元フォルダ / 打ち込み結果 / 担任助手フォルダ / 各担任助手名 / 生徒名フォルダ
+// 例: 保存復元フォルダ/打ち込み結果/担任助手フォルダ/助手名/生徒名
 // ============================================================
 let ASSISTANT_SAVE_ROOT_HANDLE = null;
 function assistantFolderKeyForLookup(s){
@@ -7534,8 +7539,16 @@ async function getChildDirectoryByExactName(parentHandle, wantedName){
 async function getInputResultRootFolder(saveRootHandle){
   // 必ず保存復元フォルダ直下の面談結果用フォルダーを起点にする。
   // 保存復元フォルダ直下や固定リストには戻さない。
-  for(const folderName of ['打ち込み結果','面談結果打ち込み','面談結果打ち込みフォルダ']){
+  for(const folderName of INPUT_RESULT_FOLDER_NAMES_FOR_LOOKUP){
     const found=await getChildDirectoryByExactName(saveRootHandle, folderName);
+    if(found) return found;
+  }
+  return null;
+}
+async function getAssistantContainerFolder(inputResultRoot){
+  if(!inputResultRoot) return null;
+  for(const folderName of ASSISTANT_CONTAINER_FOLDER_NAMES_FOR_LOOKUP){
+    const found=await getChildDirectoryByExactName(inputResultRoot, folderName);
     if(found) return found;
   }
   return null;
@@ -7543,7 +7556,9 @@ async function getInputResultRootFolder(saveRootHandle){
 async function findAssistantFolderInInputResults(saveRootHandle, assistantName){
   const inputResultRoot = await getInputResultRootFolder(saveRootHandle);
   if(!inputResultRoot) return null;
-  return await getChildDirectoryByExactName(inputResultRoot, assistantName);
+  const assistantContainer = await getAssistantContainerFolder(inputResultRoot);
+  if(!assistantContainer) return null;
+  return await getChildDirectoryByExactName(assistantContainer, assistantName);
 }
 async function listStudentFolderNamesUnderAssistant(assistantHandle){
   const out=[];
@@ -7588,13 +7603,20 @@ async function expandAssistantStudentsToStudentField(){
     alert(msg);
     return;
   }
+  const assistantContainer = await getAssistantContainerFolder(inputResultRoot);
+  if(!assistantContainer){
+    const msg='「担任助手フォルダ」が見つかりません。\n保存復元フォルダ/打ち込み結果/担任助手フォルダ/ の構造になっているか確認してください。';
+    if(typeof showSaveInfo==='function') showSaveInfo(msg);
+    alert(msg);
+    return;
+  }
   const all=[];
   const logs=[];
   const missing=[];
   for(const token of tokens){
     const assistantName=String(token||'').trim();
     if(!assistantName) continue;
-    const assistantDir=await getChildDirectoryByExactName(inputResultRoot, assistantName);
+    const assistantDir=await getChildDirectoryByExactName(assistantContainer, assistantName);
     if(!assistantDir){
       missing.push(assistantName);
       continue;
@@ -7606,7 +7628,7 @@ async function expandAssistantStudentsToStudentField(){
   const finalNames=mergeStudentNamesUniqueForFolder(all);
   const info=[];
   if(logs.length) info.push(...logs);
-  if(missing.length) info.push(`見つからない助手フォルダー: ${missing.join('、')}\n※保存復元フォルダ/打ち込み結果/助手名/ の構造になっているか確認してください。`);
+  if(missing.length) info.push(`見つからない助手フォルダー: ${missing.join('、')}\n※保存復元フォルダ/打ち込み結果/担任助手フォルダ/助手名/ の構造になっているか確認してください。`);
   if(!finalNames.length){
     const msg=`生徒一覧を展開できませんでした。\n${info.join('\n')}`;
     if(typeof showSaveInfo==='function') showSaveInfo(msg);
