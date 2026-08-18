@@ -6377,6 +6377,19 @@ function mergeRestoredAllListAoa(grade, generatedAoa){
         continue;
       }
 
+      // 基本情報列は対応表/今回読み込んだ入力結果を正とする。
+      // 旧全員分リスト側でF列「担当」に高校名が残っていても、ここでは引き継がない。
+      // 例：対応表F列が空欄なら、全員分リストF列も必ず空欄にする。
+      if(['学年','生徒番号','氏名','生徒名','カナ','読み仮名','高校','担当','備考'].includes(canon)){
+        newRow[c] = autoVal;
+        if(canon === '高校') newRow[c] = normalizeSchoolDisplayName(newRow[c]);
+        if(restoredVal && gen && restoredVal !== newRow[c]){
+          allListAddUpdateLog('基本情報更新', grade, key, studentName, col, col, restoredVal, autoVal, newRow[c], '基本情報は対応表/入力結果を正本として採用。旧全員分リストの値は引き継がない');
+          conflictCells.push(`${outRowIndex}:${c}`);
+        }
+        continue;
+      }
+
       newRow[c] = restoredVal !== '' ? restoredVal : autoVal;
       if(canon === '高校') newRow[c] = normalizeSchoolDisplayName(newRow[c]);
     }
