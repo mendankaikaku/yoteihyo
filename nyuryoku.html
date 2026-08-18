@@ -8037,13 +8037,26 @@ async function studentsForAssistantsFromStudentFolders(assistants){
   return {names:out, logs, missing};
 }
 async function expandMasterTargetStudents(row, kind){
-  await refreshRosterProfilesFromShared(false);
   const prefix=kind==='comment'?'comment':(kind==='exam'?'master':'event');
   const schoolEl=row.querySelector(`[data-${prefix}-schools]`) || row.querySelector(`[data-${prefix}-master-schools]`);
   const assistantEl=row.querySelector(`[data-${prefix}-assistants]`) || row.querySelector(`[data-${prefix}-master-assistants]`);
   const studentsEl=row.querySelector(`[data-${prefix}-students]`) || row.querySelector(`[data-${prefix}-master-students]`);
   const schools=splitTargetText(schoolEl?.value||'');
   const assistants=splitTargetText(assistantEl?.value||'');
+
+  // Chrome/Edgeのフォルダー選択は、クリック直後のユーザー操作中に呼ぶ必要がある。
+  // 先に対応表読込などを await すると、権限の都合で選択画面が出ないことがあるため、
+  // 対象担任助手を使う場合は最初に保存復元フォルダを確保する。
+  if(assistants.length && !ASSISTANT_SAVE_ROOT_HANDLE && !(typeof sharedDirHandle !== 'undefined' && sharedDirHandle)){
+    try{
+      await chooseAssistantSaveRootFolder();
+    }catch(e){
+      alert('保存復元フォルダを選択できませんでした。\n保存復元フォルダを選んでください。\n構造：保存復元/打ち込み結果/担任助手フォルダ/助手名/生徒名');
+      return;
+    }
+  }
+
+  await refreshRosterProfilesFromShared(false);
 
   let folderRecords=[];
   try{ folderRecords=await listAllFolderStudentRecordsForMasterTargets(); }catch(e){ folderRecords=[]; }
