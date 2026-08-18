@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>予定統合アプリ</title>
+  <title>予定統合アプ</title>
   <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
   <script src="./libs/xlsx.bundle.js"></script>
   <script>
@@ -675,6 +675,71 @@ function normalizeSchoolDisplayName(s){
   // 例：北野高等学校 → 北野、豊中高校 → 豊中
   return v.replace(/[\s\u3000]*(?:高等学校|高校)$/u, "").trim();
 }
+function looksLikeSchoolNameForTeacherColumn(v, school){
+  const raw = norm(v);
+  if(!raw) return false;
+  // 担当列に「○○高等学校」「○○高校」が入るのは誤読なので必ず消す。
+  if(/高等学校|高校/.test(raw)) return true;
+  const s = normalizeSchoolDisplayName(school || '');
+  if(s && normalizeSchoolDisplayName(raw) === s) return true;
+  return false;
+}
+function sanitizeTeacherDisplayName(v, school){
+  const raw = norm(v);
+  if(!raw) return '';
+  return looksLikeSchoolNameForTeacherColumn(raw, school) ? '' : raw;
+}
+function allListEnforceTeacherColumnSanity(aoa){
+  if(!aoa || aoa.length < 2) return aoa;
+  const header = (aoa[1] || []).map(normalizeAllListHeaderText);
+  const canon = header.map(allListCanonicalHeader);
+  const idxTeacher = canon.findIndex(h => h === '担当');
+  const idxSchool = canon.findIndex(h => h === '高校');
+  if(idxTeacher < 0) return aoa;
+  for(let r=2; r<aoa.length; r++){
+    const row = aoa[r] || [];
+    const school = idxSchool >= 0 ? row[idxSchool] : '';
+    row[idxTeacher] = sanitizeTeacherDisplayName(row[idxTeacher], school);
+    aoa[r] = row;
+  }
+  return aoa;
+}
+function enforceAllListBasicColumnsFromGenerated(mergedAoa, generatedAoa){
+  if(!mergedAoa || mergedAoa.length < 2 || !generatedAoa || generatedAoa.length < 2) return allListEnforceTeacherColumnSanity(mergedAoa);
+  const header = (mergedAoa[1] || []).map(normalizeAllListHeaderText);
+  const canon = header.map(allListCanonicalHeader);
+  const genHeader = (generatedAoa[1] || []).map(normalizeAllListHeaderText);
+  const genCanon = genHeader.map(allListCanonicalHeader);
+  const generatedByKey = new Map();
+  for(const row of generatedAoa.slice(2)){
+    const key = allListRowKeyFromCells(row, genHeader);
+    if(key && key !== 'name:') generatedByKey.set(key, row);
+  }
+  const baseCanons = new Set(['学年','生徒番号','生徒名','読み仮名','高校','担当','入力用備考']);
+  for(let r=2; r<mergedAoa.length; r++){
+    const row = mergedAoa[r] || [];
+    const key = allListRowKeyFromCells(row, header);
+    const gen = key ? generatedByKey.get(key) : null;
+    if(gen){
+      for(let c=0; c<canon.length; c++){
+        const cc = canon[c];
+        if(!baseCanons.has(cc)) continue;
+        const gi = genCanon.findIndex(g => g === cc);
+        if(gi < 0) continue;
+        row[c] = gen[gi] || '';
+        if(cc === '高校') row[c] = normalizeSchoolDisplayName(row[c]);
+      }
+    }
+    const idxTeacher = canon.findIndex(h => h === '担当');
+    const idxSchool = canon.findIndex(h => h === '高校');
+    if(idxTeacher >= 0){
+      row[idxTeacher] = sanitizeTeacherDisplayName(row[idxTeacher], idxSchool >= 0 ? row[idxSchool] : '');
+    }
+    if(idxSchool >= 0) row[idxSchool] = normalizeSchoolDisplayName(row[idxSchool]);
+    mergedAoa[r] = row;
+  }
+  return mergedAoa;
+}
 function pad2(n){ return String(n).padStart(2,"0"); }
 function ymd(d){ return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`; }
 function mmdd(d){ return `${d.getMonth()+1}/${d.getDate()}`; }
@@ -1137,6 +1202,7 @@ async function parseRosterFile(file){
     meta["読み仮名"] = kana;
     meta["カナ"] = kana;
     meta["高校"] = normalizeSchoolDisplayName(meta["高校"] || "");
+    meta["担当"] = sanitizeTeacherDisplayName(meta["担当"] || "", meta["高校"] || "");
     if(!meta["生徒名"]) return false;
     // 見出し行や説明行を誤登録しない
     if(["名前","生徒名","氏名"].includes(meta["生徒名"])) return false;
@@ -5159,7 +5225,7 @@ function addStudentToListMap(map, student, overrideMeta={}){
       studentNo: meta['生徒番号'] || '',
       student: finalName || name,
       kana: meta['読み仮名'] || meta['カナ'] || '',
-      teacher: meta['担当'] || '',
+      teacher: sanitizeTeacherDisplayName(meta['担当'] || '', meta['高校'] || ''),
       school: normalizeSchoolDisplayName(meta['高校'] || ''),
       note: meta['備考'] || ''
     });
@@ -5169,8 +5235,9 @@ function addStudentToListMap(map, student, overrideMeta={}){
     row.studentNo = row.studentNo || meta['生徒番号'] || '';
     row.student = row.student || finalName || name;
     row.kana = row.kana || meta['読み仮名'] || meta['カナ'] || '';
-    row.teacher = row.teacher || meta['担当'] || '';
+    row.teacher = row.teacher || sanitizeTeacherDisplayName(meta['担当'] || '', meta['高校'] || row.school || '');
     row.school = row.school || normalizeSchoolDisplayName(meta['高校'] || '');
+    row.teacher = sanitizeTeacherDisplayName(row.teacher, row.school);
     row.note = row.note || meta['備考'] || '';
   }
 }
@@ -6331,6 +6398,7 @@ function mergeRestoredAllListAoa(grade, generatedAoa){
         if(ri >= 0){
           manualRow[c] = restored[ri] || '';
           if(slots[c].canon === '高校') manualRow[c] = normalizeSchoolDisplayName(manualRow[c]);
+          if(slots[c].canon === '担当') manualRow[c] = sanitizeTeacherDisplayName(manualRow[c], '');
         }
       }
       out.push(manualRow);
@@ -6742,7 +6810,7 @@ function buildAllStudentListAoaByGrade(examRecords=[], eventRecords=[]){
     for(const st of students){
       const key = studentKeyForList(st.student, st.studentNo);
       const inputNote = inputNoteByStudent.get(key) || allListSmallBlockStrip(st.note || '');
-      const row = [st.grade, st.studentNo, st.student, st.kana, normalizeSchoolDisplayName(st.school), st.teacher, inputNote, ''];
+      const row = [st.grade, st.studentNo, st.student, st.kana, normalizeSchoolDisplayName(st.school), sanitizeTeacherDisplayName(st.teacher, st.school), inputNote, ''];
       const smallItems = smallByStudent.get(key) || [];
       for(let i=0;i<maxSmallSlots;i++){
         const item = smallItems[i];
@@ -6770,6 +6838,9 @@ function buildAllStudentListAoaByGrade(examRecords=[], eventRecords=[]){
     }
     let mergedAoa = mergeRestoredAllListAoa(grade, aoa);
     mergedAoa = ensureAllListSmallSubjectListColumns(mergedAoa, aoa);
+    // 最終防衛：基本情報列は今回生成した対応表/入力結果を正本に戻す。
+    // これにより、旧全員分リストのF列に高校名が残っていても、担当列へ絶対に残さない。
+    mergedAoa = enforceAllListBasicColumnsFromGenerated(mergedAoa, aoa);
     gradeAoas.push({grade, title, aoa:mergedAoa, windowDates, examCount:examGroups.length, eventCount:eventGroups.length, smallPendingMap, smallSlotCount:maxSmallSlots, restored: !!findAllListRestoreForGrade(grade)});
   }
   return gradeAoas;
