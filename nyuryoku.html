@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>面談予定入力・準備資料アプリ v37（合格設計図フォルダ読取修正版）</title>
+<title>面談予定入力・準備資料アプリ v36（上部2段固定版）</title>
 <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
 <script src="./libs/xlsx.bundle.js"></script>
 <script></script>
@@ -102,7 +102,7 @@ details.advanced{background:#fff;border-color:#e2e8f0}details.advanced summary{f
    v25 実務UI版：状態表示・操作順・保存忘れ防止
 ========================================================= */
 .appHeader{background:rgba(248,250,252,.96);border-bottom:1px solid #dbe4ef;box-shadow:0 2px 14px rgba(15,23,42,.06)}
-.appHeaderInner{display:flex;justify-content:space-between;align-items:center;gap:16px}.versionBadge{font-size:12px;color:#1d4ed8;background:#dbeafe;border:1px solid #bfdbfe;border-radius:999px;padding:3px 8px;vertical-align:middle}.versionBadge.updateBadge{color:#166534;background:#dcfce7;border-color:#86efac}.saveWarningBadge{min-width:92px;text-align:center;border-radius:999px;padding:8px 12px;font-weight:900;font-size:13px;border:1px solid #fecaca;background:#fee2e2;color:#991b1b}.saveWarningBadge.saved{border-color:#bbf7d0;background:#dcfce7;color:#166534}.saveWarningBadge.loaded{border-color:#bfdbfe;background:#dbeafe;color:#1e40af}
+.appHeaderInner{display:flex;justify-content:space-between;align-items:center;gap:16px}.versionBadge{font-size:12px;color:#1d4ed8;background:#dbeafe;border:1px solid #bfdbfe;border-radius:999px;padding:3px 8px;vertical-align:middle}.saveWarningBadge{min-width:92px;text-align:center;border-radius:999px;padding:8px 12px;font-weight:900;font-size:13px;border:1px solid #fecaca;background:#fee2e2;color:#991b1b}.saveWarningBadge.saved{border-color:#bbf7d0;background:#dcfce7;color:#166534}.saveWarningBadge.loaded{border-color:#bfdbfe;background:#dbeafe;color:#1e40af}
 .workflowCard{border-top:6px solid #2563eb}.workflowCard .sectionTitle{font-size:18px}.topActions{grid-template-columns:minmax(320px,1fr) 170px auto auto auto auto}.topActions button{white-space:nowrap}.topActions #saveGroupMemory{font-size:16px;box-shadow:0 8px 18px rgba(22,163,74,.22)}.topActions #loadGroupMemory{background:#eef2ff;color:#1e40af;border:1px solid #c7d2fe}.appSteps{grid-template-columns:repeat(4,minmax(0,1fr))}.appSteps .quickStep{position:relative;background:#f8fafc;border-color:#dbe4ef;color:#334155}.appSteps .quickStep b{font-size:14px}.appSteps .quickStep:not(:last-child)::after{content:"→";position:absolute;right:-14px;top:50%;transform:translateY(-50%);color:#94a3b8;font-weight:900}.saveInfoBox{margin-top:12px;border:1px solid #dbe4ef;background:#f8fafc;border-radius:12px;padding:10px 12px;min-height:40px;color:#475569;line-height:1.6}
 .uxDashboard{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;padding:14px;background:#0f172a;color:#fff;border:0}.uxStat{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px}.uxStat span{display:block;font-size:12px;color:#cbd5e1;font-weight:800}.uxStat b{display:block;font-size:22px;margin-top:3px}.uxStat small{display:block;font-size:11px;color:#94a3b8;margin-top:2px}.uxDashboard.saved{background:#14532d}.uxDashboard.loaded{background:#172554}.studentCard{transition:box-shadow .15s ease, transform .15s ease}.studentCard:hover{box-shadow:0 14px 32px rgba(15,23,42,.10);transform:translateY(-1px)}.studentCard.hasAbsent{border-top-color:#f97316}.studentCard.hasFailure{box-shadow:0 0 0 2px rgba(59,130,246,.16), var(--shadow)}.tinyCheck{transition:.12s}.tinyCheck:has(input:checked){background:#ffedd5;border-color:#fb923c;color:#9a3412}.studentSection .sectionTitle{color:#172033}.studentSection:has(textarea[data-kind="failureReason"]){background:linear-gradient(180deg,#fff 0%,#f8fafc 100%);border-radius:12px}.prepCompactCard{border-left:6px solid #7c3aed}.prepCompactCard summary{font-size:15px}.prepCompactCard button#printMeetingPrep{background:#7c3aed;color:#fff}.prepCompactCard button#printWeeklyAbsentList{background:#f97316;color:#fff}.masterGridHint::before{content:"普段は閉じたままでOK：";font-weight:900;color:#1e40af}.advancedButtons .danger{font-size:12px;opacity:.78}.uxActionDock{position:fixed;right:18px;bottom:18px;z-index:30;background:#fff;border:1px solid #dbe4ef;border-radius:18px;box-shadow:0 20px 50px rgba(15,23,42,.18);padding:10px;display:flex;gap:8px;align-items:center}.uxActionDock button{min-height:34px;padding:8px 10px;font-size:12px}.uxActionDock .uxDockSave{background:#16a34a}.uxActionDock .uxDockPrint{background:#7c3aed}.uxActionDock .uxDockAbsent{background:#f97316}.uxActionDock .uxDockStatus{font-size:12px;color:#475569;font-weight:800;padding:0 4px;max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @media(max-width:1100px){.appHeaderInner{align-items:flex-start;flex-direction:column}.uxDashboard{grid-template-columns:1fr 1fr}.appSteps{grid-template-columns:1fr 1fr}.appSteps .quickStep::after{display:none}.uxActionDock{left:10px;right:10px;bottom:10px;justify-content:space-between}.uxActionDock .uxDockStatus{display:none}}
@@ -866,6 +866,7 @@ body .prepCompactCard .prepDetails summary{min-height:28px!important;font-size:1
       <h3>最初に作るフォルダー</h3>
       <ul>
         <li>保存復元フォルダー</li>
+        <li>担任助手フォルダー</li>
       </ul>
     </div>
 
@@ -874,9 +875,6 @@ body .prepCompactCard .prepDetails summary{min-height:28px!important;font-size:1
       <div class="folderStructureSmall">太字のフォルダー名は、アプリが自動で探す名前なので基本的に変更しないでください。</div>
       <div class="folderTree"><strong>保存復元フォルダー</strong>
 ├─ <strong>打ち込み結果</strong>
-│  └─ <strong>担任助手フォルダ</strong>
-│     └─ 助手名
-│        └─ 生徒名
 ├─ <strong>毎日更新</strong>
 ├─ <strong>対応表</strong>
 ├─ <strong>全員分リスト</strong>
@@ -896,17 +894,17 @@ body .prepCompactCard .prepDetails summary{min-height:28px!important;font-size:1
     </div>
 
     <div class="folderStructureBox">
-      <h3>担任助手・生徒フォルダー</h3>
-      <div class="folderTree">保存復元フォルダー
-└─ 打ち込み結果
-   └─ 担任助手フォルダ
-      ├─ 助手A
-      │  ├─ 生徒A
-      │  │  ├─ 合格設計図.pdf
-      │  │  └─ 合格設計図.xlsx
-      │  └─ 生徒B
-      └─ 助手B
-         └─ 生徒C</div>
+      <h3>担任助手フォルダー</h3>
+      <div class="folderTree">担任助手フォルダー
+├─ 山田太郎
+│  ├─ 合格設計図.pdf
+│  ├─ 合格設計図.xlsx
+│  └─ 過去の予定Excel
+├─ 佐藤花子
+│  ├─ 合格設計図.pdf
+│  └─ 合格設計図.xlsx
+└─ 鈴木一郎
+   └─ 合格設計図.xlsx</div>
       <ul>
         <li>生徒フォルダー名は、アプリに入力する生徒名と合わせます。</li>
         <li>合格設計図はPDF優先、なければExcelを使います。</li>
@@ -918,7 +916,7 @@ body .prepCompactCard .prepDetails summary{min-height:28px!important;font-size:1
       <h3>迷ったら守ること</h3>
       <ul>
         <li>保存・復元では「保存復元フォルダー」を選びます。</li>
-        <li>印刷では「打ち込み結果/担任助手フォルダ/助手名」内の生徒フォルダーを使い、合格設計図を自動で探します。週面シートは使いません。</li>
+        <li>印刷では「担任助手フォルダー」内の生徒フォルダーを使い、合格設計図を自動で探します。週面シートは使いません。</li>
         <li>Excelを手修正したら、対応するフォルダーへ戻します。</li>
         <li>太字のフォルダー名は変更しないでください。</li>
       </ul>
@@ -929,7 +927,7 @@ body .prepCompactCard .prepDetails summary{min-height:28px!important;font-size:1
 
 <header class="appHeader"><div class="wrap appHeaderInner">
   <div>
-    <h1>面談予定入力・準備資料アプリ <span class="versionBadge updateBadge">v37 合格設計図フォルダ読取修正版 2026.08.18</span></h1>
+    <h1>面談予定入力・準備資料アプリ <span class="versionBadge">v36 上部2段固定修正版</span></h1>
     <div class="sub">生徒カードは横スクロールで同時編集できます。印刷メニューは上部、確認ログは右上、マスタ設定は下にまとめて表示します。</div>
   </div>
   <div class="saveWarningBadge" id="uxHeaderSaveBadge">未保存</div>
@@ -938,9 +936,9 @@ body .prepCompactCard .prepDetails summary{min-height:28px!important;font-size:1
   <section class="card workflowCard" id="uxWorkflowCard">
     <p class="sectionTitle">今日の操作</p>
     <div class="topActions">
-      <div class="field assistantNameField"><label>① 助手名（任意・複数可）</label><input id="assistantNames" placeholder="例：助手A, 助手B" /></div>
+      <div class="field assistantNameField"><label>① 助手名（任意・複数可）</label><input id="assistantNames" placeholder="例：武内, 今道" /></div>
       <button id="expandAssistantStudents" class="secondary primaryBig assistantListBtn" type="button">生徒一覧</button>
-      <div class="field wide studentNameField"><label>② 生徒名（複数はカンマ区切り）</label><input id="studentNames" placeholder="例：山田, 鈴木, 高橋　※生徒フォルダ名と同じにする" /></div>
+      <div class="field wide studentNameField"><label>② 生徒名（複数はカンマ区切り）</label><input id="studentNames" placeholder="例：佐藤, 鈴木, 高橋, ×横田→〇横田朋, ×平井→〇平井瑛,   ※生徒フォルダ名と同じにする" /></div>
       <div class="field startDateField"><label>開始日</label><input id="weekStart" type="date" /></div>
       <button id="applyStudents" class="primaryBig">③ 生徒欄を作る</button>
       <button class="secondary primaryBig" id="loadGroupMemory">④ 前回を復元</button>
@@ -1295,7 +1293,7 @@ function simpleCsvRows(text){
 }
 
 // 対応表などでフルネームが来ても、入力用の表示名（苗字だけ/同姓は下一文字つき）へ寄せる。
-// フォルダー名と入力名の表記差を吸収する。候補がなければ元の名前を維持する。
+// 例：北野碧人 → 北野碧、平井瑛太 → 平井瑛。候補がなければ元の名前を維持する。
 function inputTargetDisplayName(name){
   const raw=String(name||'').trim();
   const key=profileKey(raw);
@@ -1552,9 +1550,28 @@ function itemHasAnyTarget(item){
 function showSaveInfo(text){$('#saveInfo').textContent=text||''}
 function colName(n){let s='';while(n>0){let m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=Math.floor((n-1)/26)}return s}
 function cellRef(r,c){return colName(c)+r}
-// 生徒名簿はHTMLへ埋め込まない。
-// 助手→生徒の対応は、選択した「打ち込み結果/助手名/生徒名」フォルダーだけから取得する。
-const ASSISTANT_STUDENT_MAP_FOR_INPUT = {};
+const ASSISTANT_STUDENT_MAP_FOR_INPUT = {
+  '武内':['稲田','坂浦','平井瑛','青野','増永','石塚大','渡邊','岡崎','楠田','北野碧','末藤'],
+  '今道':['間嶋','谷崎','古町','前田','三島和','木下','三浦','丸尾','石塚隆'],
+  '佐藤':['信岡','藤田旺','田中','濱田','中村'],
+  '森':['松田','齋藤結','藤田沙','小坂','木村','寺松','山本啓','奥戸','中川','真名子'],
+  '稲垣':['表田','吉田照','藤原','中村彩','満田','山之内','東野','齋藤智','橘','藤田紘','越智','川畑'],
+  '藤原':['宮木','岡田','片岡','赤井','高木','藤森','今瀬','中山愛','川地'],
+  '源津':['坂上','大橋','山本綾','増尾','野田','古久保','桂田'],
+  '五島':['前川','小松原','池田','山本空','高岡','今西','音田','宮本','松浦','石川','舛中','青山'],
+  '齋藤':['遠藤','大谷','大津','笹本','北野綾','樋口','横田朋','金城','中井'],
+  '森永':['狩谷','齋藤健','村上','今村','横田悦','吉川','横田亮','戸上','丁','山本遥'],
+  '宮木':['川口','秦','角田','宮崎','谷','稲山'],
+  '今堀':['古津','西岡','小倉','岩部','石橋','山奥','杉本','清水','安藤'],
+  '上田':['三辻','池上','新居','神戸','渡辺','長谷川','三島偲','武藤','杉山','小林'],
+  '厚地':['山口歩','久保','大坂','大前','大蔵','加藤','舛田','勝亦','一ノ瀬','仲居','平井秀'],
+  '藤吉':['山下','平井駿','山口渉','牧田','志賀','三木','竹田','黒坂','濱西','岸川'],
+  '山際':['林','中山凛','吉田結','関本','立花','宮地','坂崎颯','福本'],
+  '安達':['竹内','藤本','稲垣','正木','森下','冨田','呉','池澤'],
+  '高岡':[],
+  '西賀':['吉永','森永','中','上野'],
+  '有田':['川村','上杉','土井','赤橋']
+};
 function normalizeAssistantInputKey(s){return String(s||'').replace(/[\s　]+/g,'').trim()}
 function splitStudentNameTokensRaw(){return ($('#studentNames').value||'').split(/[、，,]/).map(x=>x.trim()).filter(Boolean)}
 function splitAssistantNameTokensRaw(){return ($('#assistantNames')?.value||'').split(/[、，,]/).map(x=>x.trim()).filter(Boolean)}
@@ -1581,7 +1598,7 @@ function expandAssistantNamesToStudents(tokens){
 async function expandAssistantStudentsToStudentField(){
   const tokens=splitAssistantNameTokensRaw();
   if(!tokens.length){
-    alert('助手名欄に担任助手名を入力してください。例：助手A, 助手B');
+    alert('助手名欄に担任助手名を入力してください。例：武内, 今道');
     const el=$('#assistantNames'); if(el) el.focus();
     return;
   }
@@ -1599,14 +1616,33 @@ async function expandAssistantStudentsToStudentField(){
   await applyStudentsWithDynamicCandidates();
 }
 
-// 名前候補もHTMLへ固定保存せず、実フォルダーから読み込む。
-const KNOWN_STUDENT_NAME_CANDIDATES = [];
+// 生徒名の下一文字つけ忘れ防止。例：平井 → 平井瑛 / 平井駿 / 平井秀 の候補を出して止める。
+// 初期フォルダーZIPに入れている担任助手→生徒リストに加えて、実際に選んだ担任助手フォルダー配下の生徒フォルダー名も候補に混ぜて判定する。
+const KNOWN_STUDENT_NAME_CANDIDATES = [
+  '稲田','坂浦','平井瑛','青野','増永','石塚大','渡邊','岡崎','楠田','北野碧','末藤',
+  '間嶋','谷崎','古町','前田','三島和','木下','三浦','丸尾','石塚隆',
+  '信岡','藤田旺','田中','濱田','中村',
+  '松田','齋藤結','藤田沙','小坂','木村','寺松','山本啓','奥戸','中川','真名子',
+  '表田','吉田照','藤原','中村彩','満田','山之内','東野','齋藤智','橘','藤田紘','越智','川畑',
+  '宮木','岡田','片岡','赤井','高木','藤森','今瀬','中山愛','川地',
+  '坂上','大橋','山本綾','増尾','野田','古久保','桂田',
+  '前川','小松原','池田','山本空','高岡','今西','音田','宮本','松浦','石川','舛中','青山',
+  '遠藤','大谷','大津','笹本','北野綾','樋口','横田朋','金城','中井',
+  '狩谷','齋藤健','村上','今村','横田悦','吉川','横田亮','戸上','丁','山本遥',
+  '川口','秦','角田','宮崎','谷','稲山',
+  '古津','西岡','小倉','岩部','石橋','山奥','杉本','清水','安藤',
+  '三辻','池上','新居','神戸','渡辺','長谷川','三島偲','武藤','杉山','小林',
+  '山口歩','久保','大坂','大前','大蔵','加藤','舛田','勝亦','一ノ瀬','仲居','平井秀',
+  '山下','平井駿','山口渉','牧田','志賀','三木','竹田','黒坂','濱西','岸川',
+  '林','中山凛','吉田結','関本','立花','宮地','坂崎颯','福本',
+  '竹内','藤本','稲垣','正木','森下','冨田','呉','池澤',
+  '吉永','森永','中','上野',
+  '川村','上杉','土井','赤橋'
+];
 const EXTRA_STUDENT_NAME_CANDIDATES = new Set();
-const KNOWN_ASSISTANT_FOLDER_NAMES_FOR_AMBIGUITY = [];
-const INPUT_RESULT_FOLDER_NAMES_FOR_LOOKUP = ['打ち込み結果','面談結果打ち込み','面談結果打ち込みフォルダ'];
-const ASSISTANT_CONTAINER_FOLDER_NAMES_FOR_LOOKUP = ['担任助手フォルダ','担任助手フォルダー'];
+const KNOWN_ASSISTANT_FOLDER_NAMES_FOR_AMBIGUITY = ['武内','今道','佐藤','森','稲垣','藤原','源津','五島','齋藤','森永','宮木','今堀','上田','厚地','藤吉','山際','安達','高岡','西賀','有田'];
 const STUDENT_FOLDER_IGNORE_NAMES_FOR_AMBIGUITY = new Set([
-  '保存復元フォルダー','担任助手フォルダ','担任助手フォルダー','打ち込み結果','面談結果打ち込み','面談結果打ち込みフォルダ','毎日更新','対応表','全員分リスト','全体予定表','json','Comiru','コミル','アンケート','科目リスト','マスタ','毎日掲示','生徒フォルダー例'
+  '保存復元フォルダー','担任助手フォルダー','打ち込み結果','毎日更新','対応表','全員分リスト','全体予定表','json','Comiru','コミル','アンケート','科目リスト','マスタ','毎日掲示','生徒フォルダー例'
 ]);
 let extraStudentCandidatesLoadedFromFolder = false;
 function normalizeStudentNameKeyForAmbiguity(name){
@@ -1622,14 +1658,11 @@ function shouldUseFolderNameAsStudentCandidateForAmbiguity(dirName, pathParts, r
   const name=normalizeStudentNameKeyForAmbiguity(dirName);
   if(!name || STUDENT_FOLDER_IGNORE_NAMES_FOR_AMBIGUITY.has(name)) return false;
   const path=(pathParts||[]).map(normalizeStudentNameKeyForAmbiguity).filter(Boolean);
+  const parent=path[path.length-1] || normalizeStudentNameKeyForAmbiguity(rootName);
   const root=normalizeStudentNameKeyForAmbiguity(rootName);
-  // 保存復元フォルダーを選んだ場合：打ち込み結果 / 担任助手フォルダ / 助手名 / 生徒名
-  const resultIndex=path.findIndex(x=>INPUT_RESULT_FOLDER_NAMES_FOR_LOOKUP.includes(x));
-  if(resultIndex>=0 && path.length===resultIndex+3 && ASSISTANT_CONTAINER_FOLDER_NAMES_FOR_LOOKUP.includes(path[resultIndex+1])) return true;
-  // 打ち込み結果フォルダー自体を選んだ場合：担任助手フォルダ / 助手名 / 生徒名
-  if(INPUT_RESULT_FOLDER_NAMES_FOR_LOOKUP.includes(root) && path.length===2 && ASSISTANT_CONTAINER_FOLDER_NAMES_FOR_LOOKUP.includes(path[0])) return true;
-  // 担任助手フォルダー自体を選んだ場合：助手名 / 生徒名
-  if(ASSISTANT_CONTAINER_FOLDER_NAMES_FOR_LOOKUP.includes(root) && path.length===1) return true;
+  if(KNOWN_ASSISTANT_FOLDER_NAMES_FOR_AMBIGUITY.includes(parent)) return true;
+  if(path.length>=1 && KNOWN_ASSISTANT_FOLDER_NAMES_FOR_AMBIGUITY.includes(path[path.length-1])) return true;
+  if(path.length===0 && KNOWN_ASSISTANT_FOLDER_NAMES_FOR_AMBIGUITY.includes(root)) return true;
   return false;
 }
 async function collectStudentFolderNameCandidatesForAmbiguity(rootDir, maxDepth=5){
@@ -1641,7 +1674,7 @@ async function collectStudentFolderNameCandidatesForAmbiguity(rootDir, maxDepth=
       const name=entry.name || '';
       if(shouldUseFolderNameAsStudentCandidateForAmbiguity(name, pathParts, rootDir?.name || '')) found.push(name);
       const key=normalizeStudentNameKeyForAmbiguity(name);
-      if(STUDENT_FOLDER_IGNORE_NAMES_FOR_AMBIGUITY.has(key) && !ASSISTANT_CONTAINER_FOLDER_NAMES_FOR_LOOKUP.includes(key)) continue;
+      if(STUDENT_FOLDER_IGNORE_NAMES_FOR_AMBIGUITY.has(key) && key!=='担任助手フォルダー') continue;
       try{ await walk(entry, depth-1, [...pathParts, name]); }catch(e){}
     }
   }
@@ -1836,7 +1869,7 @@ function studentCardHtml(name){
       <div class="field"><label>学年</label><select data-student="${escapeHtml(name)}" data-kind="grade">${GRADE_OPTIONS.map(g=>`<option value="${escapeHtml(g)}">${g?escapeHtml(g):'未指定'}</option>`).join('')}</select></div>
       <div class="field"><label>生徒番号</label><input data-student="${escapeHtml(name)}" data-kind="studentNo" placeholder="例：33135165"></div>
       <div class="field"><label>高校</label><input data-student="${escapeHtml(name)}" data-kind="school" placeholder="対応表 or 手入力"></div>
-      <div class="field"><label>担任助手</label><input data-student="${escapeHtml(name)}" data-kind="assistant" placeholder="例：助手A"></div>
+      <div class="field"><label>担任助手</label><input data-student="${escapeHtml(name)}" data-kind="assistant" placeholder="例：武内"></div>
     </div>
     <div class="studentSection"><p class="sectionTitle">予定</p>
     <div style="overflow:auto"><table class="scheduleTable"><thead><tr><th style="width:100px">予定/日付</th>${Array.from({length:7},(_,d)=>`<th data-day-head="${d}"></th>`).join('')}</tr></thead><tbody>${scheduleRowsHtml(name)}</tbody></table></div>
@@ -2245,17 +2278,13 @@ async function saveAllEditedGoukakuExcels(){
 }
 async function findStudentFoldersRecursive(root, studentName, maxDepth=5){
   const target=String(studentName||'').trim();
-  const normalizedTarget=normalizeFolderNameForMatch(target);
   const matches=[];
   async function walk(dir, pathParts, depth){
     if(!dir || depth<0 || !dir.entries) return;
     for await (const [entryName, handle] of dir.entries()){
       if(handle.kind !== 'directory') continue;
       const nextPath=[...pathParts, entryName];
-      const normalizedEntry=normalizeFolderNameForMatch(entryName);
-      if(normalizedEntry===normalizedTarget || normalizedEntry.includes(normalizedTarget) || normalizedTarget.includes(normalizedEntry)){
-        matches.push({dir:handle, label:nextPath.join(' / ')});
-      }
+      if(entryName === target) matches.push({dir:handle, label:nextPath.join(' / ')});
       await walk(handle, nextPath, depth-1);
     }
   }
@@ -2906,7 +2935,7 @@ function renderExamMasterPanel(){
       <div><label>科目型</label><select data-master-template>${examTemplateOptions(tmpl,type)}</select></div>
       <div><button type="button" class="small secondary" data-delete-master="${i}">削除</button></div>
       <div><label>対象学年</label><div class="checkRow">${examGradeCheckboxes(ex.grades||[])}</div></div>
-      <div style="grid-column:2/-1"><label>対象生徒名</label><textarea data-master-students placeholder="未選択なら生徒欄・印刷には表示しません。例：生徒A、生徒B">${escapeHtml(targetNames)}</textarea></div>
+      <div style="grid-column:2/-1"><label>対象生徒名</label><textarea data-master-students placeholder="未選択なら生徒欄・印刷には表示しません。例：北野、田中">${escapeHtml(targetNames)}</textarea></div>
       <div style="grid-column:1/-1"><div class="hint">模試マスタ編集欄は、週開始日から3週間以内の模試だけ表示します。表示されていない過去/遠い未来の模試も保存データには残ります。</div></div>
     </div>`;
   }).join('')||'<div class="empty">3週間以内に編集対象の模試はありません。必要なら「模試を追加」してください。</div>';
@@ -3072,8 +3101,8 @@ function renderEventMasterPanel(){
     <div><label>表示終了日</label><input data-event-master-display-end type="date" value="${escapeHtml(ev.displayEnd||'')}"></div>
     <div><label>対象学年</label><div class="checkRow">${gradeCheckboxes(ev.grades||[])}</div></div>
     <div><label>対象高校</label><textarea data-event-master-schools placeholder="例：〇〇高校、△△高校">${escapeHtml((ev.schools||[]).join('、'))}</textarea></div>
-    <div><label>対象担任助手</label><textarea data-event-master-assistants placeholder="例：助手A、助手B">${escapeHtml((ev.assistants||[]).join('、'))}</textarea></div>
-    <div><label>対象生徒名</label><textarea data-event-master-students placeholder="空欄なら全員。例：生徒A、生徒B">${escapeHtml(targetNames)}</textarea></div>
+    <div><label>対象担任助手</label><textarea data-event-master-assistants placeholder="例：武内、今道">${escapeHtml((ev.assistants||[]).join('、'))}</textarea></div>
+    <div><label>対象生徒名</label><textarea data-event-master-students placeholder="空欄なら全員。例：北野、田中">${escapeHtml(targetNames)}</textarea></div>
     <div><button type="button" class="small secondary" data-expand-event-targets="${i}">高校/助手から追加</button><button type="button" class="small secondary" data-delete-event-master="${i}">削除</button></div>
   </div>`;
   }).join('')||'<div class="empty">まだイベントマスタがありません。</div>';
@@ -3146,8 +3175,8 @@ function renderCommentMasterPanel(){
     <div><label>表示終了日</label><input data-comment-master-display-end type="date" value="${escapeHtml(cm.displayEnd||'')}"></div>
     <div><label>対象学年</label><div class="checkRow">${gradeCheckboxes(cm.grades||[])}</div></div>
     <div><label>対象高校</label><textarea data-comment-master-schools placeholder="例：〇〇高校、△△高校">${escapeHtml((cm.schools||[]).join('、'))}</textarea></div>
-    <div><label>対象担任助手</label><textarea data-comment-master-assistants placeholder="例：助手A、助手B">${escapeHtml((cm.assistants||[]).join('、'))}</textarea></div>
-    <div><label>対象生徒名</label><textarea data-comment-master-students placeholder="空欄なら全員。例：生徒A、生徒B">${escapeHtml(targetNames)}</textarea></div>
+    <div><label>対象担任助手</label><textarea data-comment-master-assistants placeholder="例：武内、今道">${escapeHtml((cm.assistants||[]).join('、'))}</textarea></div>
+    <div><label>対象生徒名</label><textarea data-comment-master-students placeholder="空欄なら全員。例：佐藤、鈴木">${escapeHtml(targetNames)}</textarea></div>
     <div><button type="button" class="small secondary" data-expand-comment-targets="${i}">高校/助手から追加</button><button type="button" class="small secondary" data-delete-comment-master="${i}">削除</button></div>
   </div>`;
   }).join('')||'<div class="empty">まだコメントマスタがありません。</div>';
@@ -3826,10 +3855,8 @@ async function loadGroup(){
       // 週面シートの自動読込は廃止。面談準備印刷の3ページ目は常に面談フローを使う。
       details.push('週面シート: 読み取り廃止（3ページ目は常に面談フロー）');
 
-      // 合格設計図は保存復元フォルダ配下から生徒ごとに探す。
-      // 「打ち込み結果 / 担任助手フォルダ / 各担任助手名 / 各生徒名」の階層にも対応し、
-      // 他の復元対象生徒が同じ担任助手フォルダにいなくても読み込める。
-      const goukakuResult=await loadGoukakuDesignsFromRoot(dir, students);
+      // 合格設計図は 担任助手フォルダ / 生徒名フォルダ / 合格設計図PDFまたはExcel を読む。
+      const goukakuResult=await loadGoukakuDesignsFromStudentParent(studentParent.dir, students);
       const goukakuMsg=formatGoukakuLoadSummary(goukakuResult);
       if(goukakuMsg) details.push(goukakuMsg);
     }catch(e){
@@ -7304,8 +7331,28 @@ initV30ClassicHorizontalUX();
     return new Blob([...fileParts, ...centralParts, end], {type:'application/zip'});
   }
   function initialFolderEntries(){
-    // 個人名をHTMLへ埋め込まない。初期ZIPは共通フォルダーだけを作る。
-    const ASSISTANT_STUDENTS = {};
+    const ASSISTANT_STUDENTS = {
+      '武内':['稲田','坂浦','平井瑛','青野','増永','石塚大','渡邊','岡崎','楠田','北野碧','末藤'],
+      '今道':['間嶋','谷崎','古町','前田','三島和','木下','三浦','丸尾','石塚隆'],
+      '佐藤':['信岡','藤田旺','田中','濱田','中村'],
+      '森':['松田','齋藤結','藤田沙','小坂','木村','寺松','山本啓','奥戸','中川','真名子'],
+      '稲垣':['表田','吉田照','藤原','中村彩','満田','山之内','東野','齋藤智','橘','藤田紘','越智','川畑'],
+      '藤原':['宮木','岡田','片岡','赤井','高木','藤森','今瀬','中山愛','川地'],
+      '源津':['坂上','大橋','山本綾','増尾','野田','古久保','桂田'],
+      '五島':['前川','小松原','池田','山本空','高岡','今西','音田','宮本','松浦','石川','舛中','青山'],
+      '齋藤':['遠藤','大谷','大津','笹本','北野綾','樋口','横田朋','金城','中井'],
+      '森永':['狩谷','齋藤健','村上','今村','横田悦','吉川','横田亮','戸上','丁','山本遥'],
+      '宮木':['川口','秦','角田','宮崎','谷','稲山'],
+      '今堀':['古津','西岡','小倉','岩部','石橋','山奥','杉本','清水','安藤'],
+      '上田':['三辻','池上','新居','神戸','渡辺','長谷川','三島偲','武藤','杉山','小林'],
+      '厚地':['山口歩','久保','大坂','大前','大蔵','加藤','舛田','勝亦','一ノ瀬','仲居','平井秀'],
+      '藤吉':['山下','平井駿','山口渉','牧田','志賀','三木','竹田','黒坂','濱西','岸川'],
+      '山際':['林','中山凛','吉田結','関本','立花','宮地','坂崎颯','福本'],
+      '安達':['竹内','藤本','稲垣','正木','森下','冨田','呉','池澤'],
+      '高岡':[],
+      '西賀':['吉永','森永','中','上野'],
+      '有田':['川村','上杉','土井','赤橋'],
+    };
     const ASSISTANT_FOLDER_NAMES = Object.keys(ASSISTANT_STUDENTS);
     function studentsForStaff(staff){
       const list = ASSISTANT_STUDENTS[staff] || [];
@@ -7317,7 +7364,7 @@ initV30ClassicHorizontalUX();
       '使い方：',
       '1. このZIPを職場PCで展開します。',
       '2. 統合用アプリでは「保存復元フォルダー」を選びます。',
-      '3. 入力用アプリでは、「保存復元フォルダー/打ち込み結果/担任助手フォルダ」配下の各担任助手名フォルダーを使います。',
+      '3. 入力用アプリでは、「担任助手フォルダー」配下の各担任助手名フォルダーを使います。',
       '4. 各担任助手名フォルダーの中に、生徒ごとのフォルダーを作ります。',
       '',
       '保存復元フォルダーの中身：',
@@ -7335,14 +7382,14 @@ initV30ClassicHorizontalUX();
       '見出し行は消さないでください。列の追加・並び替えはOKです。',
       'placeholder.txt は不要なら消してOKです。',
       '',
-      '担任助手フォルダ：',
-      '「保存復元フォルダー/打ち込み結果/担任助手フォルダ」の下に、担任助手名フォルダーと生徒名フォルダーを職場PC側で作成してください。'
+      '担任助手フォルダー：',
+      '各担任助手フォルダーの下に、下記の生徒フォルダーを最初から作っています。',
+      ...ASSISTANT_FOLDER_NAMES.map(staff => `・${staff}：${studentsForStaff(staff).join('、')}`)
     ].join('\n');
     const keep = 'このフォルダーに該当ファイルを入れてください。不要ならこのplaceholder.txtは消してOKです。\n';
     const dirs = [
       '保存復元フォルダー/',
       '保存復元フォルダー/打ち込み結果/',
-      '保存復元フォルダー/打ち込み結果/担任助手フォルダ/',
       '保存復元フォルダー/毎日更新/',
       '保存復元フォルダー/対応表/',
       '保存復元フォルダー/全員分リスト/',
@@ -7352,9 +7399,10 @@ initV30ClassicHorizontalUX();
       '保存復元フォルダー/科目リスト/',
       '保存復元フォルダー/マスタ/',
       '保存復元フォルダー/毎日掲示/',
+      '担任助手フォルダー/',
       ...ASSISTANT_FOLDER_NAMES.flatMap(n => [
-        `保存復元フォルダー/打ち込み結果/担任助手フォルダ/${n}/`,
-        ...studentsForStaff(n).map(st => `保存復元フォルダー/打ち込み結果/担任助手フォルダ/${n}/${st}/`)
+        `担任助手フォルダー/${n}/`,
+        ...studentsForStaff(n).map(st => `担任助手フォルダー/${n}/${st}/`)
       ])
     ];
     const entries = dirs.map(name => ({name, data:''}));
@@ -7370,7 +7418,7 @@ initV30ClassicHorizontalUX();
     entries.push({name:'保存復元フォルダー/毎日掲示/placeholder.txt', data:keep});
     for(const staff of ASSISTANT_FOLDER_NAMES){
       for(const student of studentsForStaff(staff)){
-        entries.push({name:`保存復元フォルダー/打ち込み結果/担任助手フォルダ/${staff}/${student}/合格設計図はここに入れる.txt`, data:'生徒ごとのフォルダー直下に、合格設計図.xlsx または 合格設計図.pdf を入れます。\n'});
+        entries.push({name:`担任助手フォルダー/${staff}/${student}/合格設計図はここに入れる.txt`, data:'生徒ごとのフォルダー直下に、合格設計図.xlsx または 合格設計図.pdf を入れます。\n'});
       }
     }
     return entries;
@@ -7513,8 +7561,8 @@ initV30ClassicHorizontalUX();
 <script id="assistantFolderDirectOnlyPatch">
 // ============================================================
 // 修正: 助手名 → 生徒一覧 は、固定リストではなく実フォルダーから読む
-// 前提: 保存復元フォルダ / 打ち込み結果 / 担任助手フォルダ / 各担任助手名 / 生徒名フォルダ
-// 例: 保存復元フォルダ/打ち込み結果/担任助手フォルダ/助手名/生徒名
+// 前提: 保存復元フォルダ / 打ち込み結果 / 担任助手フォルダー / 各担任助手名 / 各生徒名フォルダ
+// 例: 保存復元フォルダ/打ち込み結果/担任助手フォルダー/武内/稲田
 // ============================================================
 let ASSISTANT_SAVE_ROOT_HANDLE = null;
 function assistantFolderKeyForLookup(s){
@@ -7543,28 +7591,14 @@ async function getChildDirectoryByExactName(parentHandle, wantedName){
   return null;
 }
 async function getInputResultRootFolder(saveRootHandle){
-  // 必ず保存復元フォルダ直下の面談結果用フォルダーを起点にする。
+  // 必ず「保存復元フォルダ/打ち込み結果」を起点にする。
   // 保存復元フォルダ直下や固定リストには戻さない。
-  for(const folderName of INPUT_RESULT_FOLDER_NAMES_FOR_LOOKUP){
-    const found=await getChildDirectoryByExactName(saveRootHandle, folderName);
-    if(found) return found;
-  }
-  return null;
-}
-async function getAssistantContainerFolder(inputResultRoot){
-  if(!inputResultRoot) return null;
-  for(const folderName of ASSISTANT_CONTAINER_FOLDER_NAMES_FOR_LOOKUP){
-    const found=await getChildDirectoryByExactName(inputResultRoot, folderName);
-    if(found) return found;
-  }
-  return null;
+  return await getChildDirectoryByExactName(saveRootHandle, '打ち込み結果');
 }
 async function findAssistantFolderInInputResults(saveRootHandle, assistantName){
   const inputResultRoot = await getInputResultRootFolder(saveRootHandle);
   if(!inputResultRoot) return null;
-  const assistantContainer = await getAssistantContainerFolder(inputResultRoot);
-  if(!assistantContainer) return null;
-  return await getChildDirectoryByExactName(assistantContainer, assistantName);
+  return await getChildDirectoryByExactName(inputResultRoot, assistantName);
 }
 async function listStudentFolderNamesUnderAssistant(assistantHandle){
   const out=[];
@@ -7591,7 +7625,7 @@ function mergeStudentNamesUniqueForFolder(names){
 async function expandAssistantStudentsToStudentField(){
   const tokens=(typeof splitAssistantNameTokensRaw==='function') ? splitAssistantNameTokensRaw() : ((document.getElementById('assistantNames')?.value||'').split(/[、，,]/).map(x=>x.trim()).filter(Boolean));
   if(!tokens.length){
-    alert('助手名欄に担任助手名を入力してください。例：助手A, 助手B');
+    alert('助手名欄に担任助手名を入力してください。例：武内, 今道');
     const el=document.getElementById('assistantNames'); if(el) el.focus();
     return;
   }
@@ -7609,20 +7643,13 @@ async function expandAssistantStudentsToStudentField(){
     alert(msg);
     return;
   }
-  const assistantContainer = await getAssistantContainerFolder(inputResultRoot);
-  if(!assistantContainer){
-    const msg='「担任助手フォルダ」が見つかりません。\n保存復元フォルダ/打ち込み結果/担任助手フォルダ/ の構造になっているか確認してください。';
-    if(typeof showSaveInfo==='function') showSaveInfo(msg);
-    alert(msg);
-    return;
-  }
   const all=[];
   const logs=[];
   const missing=[];
   for(const token of tokens){
     const assistantName=String(token||'').trim();
     if(!assistantName) continue;
-    const assistantDir=await getChildDirectoryByExactName(assistantContainer, assistantName);
+    const assistantDir=await getChildDirectoryByExactName(inputResultRoot, assistantName);
     if(!assistantDir){
       missing.push(assistantName);
       continue;
@@ -7634,7 +7661,7 @@ async function expandAssistantStudentsToStudentField(){
   const finalNames=mergeStudentNamesUniqueForFolder(all);
   const info=[];
   if(logs.length) info.push(...logs);
-  if(missing.length) info.push(`見つからない助手フォルダー: ${missing.join('、')}\n※保存復元フォルダ/打ち込み結果/担任助手フォルダ/助手名/ の構造になっているか確認してください。`);
+  if(missing.length) info.push(`見つからない助手フォルダー: ${missing.join('、')}\n※保存復元フォルダ/打ち込み結果/担任助手フォルダー/助手名/ の構造になっているか確認してください。`);
   if(!finalNames.length){
     const msg=`生徒一覧を展開できませんでした。\n${info.join('\n')}`;
     if(typeof showSaveInfo==='function') showSaveInfo(msg);
@@ -7649,6 +7676,163 @@ async function expandAssistantStudentsToStudentField(){
   else if(typeof applyStudents==='function') applyStudents();
 }
 (function bindAssistantFolderDirectOnly(){
+  const btn=document.getElementById('expandAssistantStudents');
+  if(btn) btn.onclick=expandAssistantStudentsToStudentField;
+})();
+</script>
+
+
+<script id="correctInputResultsStaffFolderStructurePatch">
+// ============================================================
+// 修正: フォルダー構造を正式仕様に固定
+// 保存復元フォルダ / 打ち込み結果 / 担任助手フォルダー / 各担任助手名 / 各生徒名
+// ・助手名→生徒一覧はこの構造だけを見る。固定リスト/対応表には戻さない。
+// ・合格設計図も復元時にこの構造から、生徒名フォルダ直下のPDF/Excelを読む。
+// ============================================================
+async function getInputResultRootFolder(saveRootHandle){
+  return await getChildDirectoryByExactName(saveRootHandle, '打ち込み結果');
+}
+async function getStaffFolderContainerFromSaveRoot(saveRootHandle){
+  const inputResultRoot = await getInputResultRootFolder(saveRootHandle);
+  if(!inputResultRoot) return null;
+  return await getChildDirectoryByExactName(inputResultRoot, '担任助手フォルダー');
+}
+async function findAssistantFolderInInputResults(saveRootHandle, assistantName){
+  const staffContainer = await getStaffFolderContainerFromSaveRoot(saveRootHandle);
+  if(!staffContainer) return null;
+  return await getChildDirectoryByExactName(staffContainer, assistantName);
+}
+async function expandAssistantStudentsToStudentField(){
+  const tokens=(typeof splitAssistantNameTokensRaw==='function') ? splitAssistantNameTokensRaw() : ((document.getElementById('assistantNames')?.value||'').split(/[、，,]/).map(x=>x.trim()).filter(Boolean));
+  if(!tokens.length){
+    alert('助手名欄に担任助手名を入力してください。例：武内, 今道');
+    const el=document.getElementById('assistantNames'); if(el) el.focus();
+    return;
+  }
+  let saveRoot;
+  try{
+    saveRoot=await getAssistantSaveRootFolder();
+  }catch(e){
+    alert('保存復元フォルダを選択できませんでした。\n保存復元フォルダを選んでください。');
+    return;
+  }
+  const inputResultRoot = await getInputResultRootFolder(saveRoot);
+  if(!inputResultRoot){
+    const msg='「打ち込み結果」フォルダが見つかりません。\n保存復元フォルダ直下に「打ち込み結果」フォルダがあるか確認してください。';
+    if(typeof showSaveInfo==='function') showSaveInfo(msg);
+    alert(msg);
+    return;
+  }
+  const staffContainer = await getStaffFolderContainerFromSaveRoot(saveRoot);
+  if(!staffContainer){
+    const msg='「担任助手フォルダー」フォルダが見つかりません。\n保存復元フォルダ/打ち込み結果/担任助手フォルダー/ の構造になっているか確認してください。';
+    if(typeof showSaveInfo==='function') showSaveInfo(msg);
+    alert(msg);
+    return;
+  }
+  const all=[];
+  const logs=[];
+  const missing=[];
+  for(const token of tokens){
+    const assistantName=String(token||'').trim();
+    if(!assistantName) continue;
+    const assistantDir=await getChildDirectoryByExactName(staffContainer, assistantName);
+    if(!assistantDir){
+      missing.push(assistantName);
+      continue;
+    }
+    const names=await listStudentFolderNamesUnderAssistant(assistantDir);
+    logs.push(`${assistantName} → ${names.length}名（${names.join('、')||'生徒フォルダーなし'}）`);
+    all.push(...names);
+  }
+  const finalNames=mergeStudentNamesUniqueForFolder(all);
+  const info=[];
+  if(logs.length) info.push(...logs);
+  if(missing.length) info.push(`見つからない担任助手名フォルダ: ${missing.join('、')}\n※保存復元フォルダ/打ち込み結果/担任助手フォルダー/助手名/ の構造になっているか確認してください。`);
+  if(!finalNames.length){
+    const msg=`生徒一覧を展開できませんでした。\n${info.join('\n')}`;
+    if(typeof showSaveInfo==='function') showSaveInfo(msg);
+    alert(msg);
+    return;
+  }
+  const studentInput=document.getElementById('studentNames');
+  if(studentInput) studentInput.value=finalNames.join(', ');
+  const msg=`打ち込み結果/担任助手フォルダー から生徒一覧を反映しました。\n${info.join('\n')}`;
+  if(typeof showSaveInfo==='function') showSaveInfo(msg);
+  if(typeof applyStudentsWithDynamicCandidates==='function') await applyStudentsWithDynamicCandidates();
+  else if(typeof applyStudents==='function') applyStudents();
+}
+async function findStudentFolderParentFromSaveRoot(root, names){
+  const staffContainer = await getStaffFolderContainerFromSaveRoot(root);
+  if(staffContainer){
+    const rootName = root?.name || '保存復元フォルダ';
+    return {dir:staffContainer, label:`${rootName} / 打ち込み結果 / 担任助手フォルダー`};
+  }
+  throw new Error('保存復元フォルダ/打ち込み結果/担任助手フォルダー が見つかりません。');
+}
+async function findStudentDirectoryUnderStaffContainer(staffContainer, studentName){
+  const matches=[];
+  const target=String(studentName||'').trim();
+  if(!staffContainer || !staffContainer.entries || !target) return matches;
+  for await (const [assistantName, assistantDir] of staffContainer.entries()){
+    if(!assistantDir || assistantDir.kind!=='directory') continue;
+    const found=await findDirectStudentDirectory(assistantDir, target);
+    if(found){
+      matches.push({dir:found.dir,label:`${assistantName} / ${found.label}`});
+    }
+  }
+  return matches;
+}
+async function loadGoukakuDesignsFromStudentParent(studentParentDir, names=students){
+  if(!studentParentDir || !names || !names.length) return {loaded:[],missing:[],failed:[],duplicate:[]};
+  const loaded=[], missing=[], failed=[], duplicate=[];
+  for(const name of names){
+    try{
+      const matches=await findStudentDirectoryUnderStaffContainer(studentParentDir, name);
+      if(!matches.length){
+        missing.push(`${name}: 担任助手フォルダー配下に生徒フォルダなし`);
+        goukakuDesignSheets[name]={error:'保存復元フォルダ/打ち込み結果/担任助手フォルダー/各担任助手名フォルダ/ の下に生徒名フォルダが見つかりません。'};
+        renderGoukakuPanel(name);
+        continue;
+      }
+      if(matches.length>1){
+        duplicate.push(`${name}: ${matches.map(d=>d.label).join(' / ')}`);
+        goukakuDesignSheets[name]={error:'同じ生徒名フォルダが複数見つかったため読み込みませんでした。'};
+        renderGoukakuPanel(name);
+        continue;
+      }
+      const found=matches[0];
+      const pdfHit=await findGoukakuPdfInStudentFolder(found.dir);
+      const excelHit=await findGoukakuExcelInStudentFolder(found.dir);
+      const printPdf=pdfHit ? await readGoukakuPdfPrintSource(pdfHit) : null;
+      revokeGoukakuPdfUrls(goukakuDesignSheets[name]);
+      if(excelHit){
+        const file=await excelHit.handle.getFile();
+        const parsed=await readGoukakuExcelFile(file);
+        goukakuDesignSheets[name]={kind:'excel',fileName:excelHit.name,sheetName:parsed.sheetName,aoa:parsed.aoa,model:parsed.model,workbook:parsed.workbook,fileHandle:excelHit.handle,dirHandle:found.dir,path:found.label,dirty:false,editedCells:{},printPdf};
+        const label=excelHit.isEdited ? '編集済みExcel' : 'Excel簡易表示';
+        loaded.push(`${name}: ${found.label} / ${excelHit.name}（${label}${printPdf ? '・印刷はPDF優先' : ''}）`);
+        renderGoukakuPanel(name);
+        continue;
+      }
+      if(printPdf){
+        goukakuDesignSheets[name]={kind:'pdf',fileName:printPdf.fileName,pdfUrl:printPdf.pdfUrl,pdfBase64:printPdf.pdfBase64,path:found.label,fileHandle:printPdf.fileHandle,dirHandle:found.dir,dirty:false};
+        loaded.push(`${name}: ${found.label} / ${printPdf.fileName}（PDF）`);
+        renderGoukakuPanel(name);
+        continue;
+      }
+      missing.push(`${name}: 合格設計図PDF/Excelなし`);
+      goukakuDesignSheets[name]={error:'生徒フォルダ直下に「合格設計図」を含むPDFまたはExcelがありません。'};
+      renderGoukakuPanel(name);
+    }catch(e){
+      failed.push(`${name}: ${e?.message||e}`);
+      goukakuDesignSheets[name]={error:e?.message||String(e)};
+      renderGoukakuPanel(name);
+    }
+  }
+  return {loaded,missing,failed,duplicate};
+}
+(function bindCorrectInputResultsStaffFolderStructure(){
   const btn=document.getElementById('expandAssistantStudents');
   if(btn) btn.onclick=expandAssistantStudentsToStudentField;
 })();
