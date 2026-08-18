@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>面談予定入力アプリ yes</title>
+<title>面談予定入力・準備資料アプリ v37（合格設計図フォルダ読取修正版）</title>
 <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
 <script src="./libs/xlsx.bundle.js"></script>
 <script></script>
@@ -102,7 +102,7 @@ details.advanced{background:#fff;border-color:#e2e8f0}details.advanced summary{f
    v25 実務UI版：状態表示・操作順・保存忘れ防止
 ========================================================= */
 .appHeader{background:rgba(248,250,252,.96);border-bottom:1px solid #dbe4ef;box-shadow:0 2px 14px rgba(15,23,42,.06)}
-.appHeaderInner{display:flex;justify-content:space-between;align-items:center;gap:16px}.versionBadge{font-size:12px;color:#1d4ed8;background:#dbeafe;border:1px solid #bfdbfe;border-radius:999px;padding:3px 8px;vertical-align:middle}.saveWarningBadge{min-width:92px;text-align:center;border-radius:999px;padding:8px 12px;font-weight:900;font-size:13px;border:1px solid #fecaca;background:#fee2e2;color:#991b1b}.saveWarningBadge.saved{border-color:#bbf7d0;background:#dcfce7;color:#166534}.saveWarningBadge.loaded{border-color:#bfdbfe;background:#dbeafe;color:#1e40af}
+.appHeaderInner{display:flex;justify-content:space-between;align-items:center;gap:16px}.versionBadge{font-size:12px;color:#1d4ed8;background:#dbeafe;border:1px solid #bfdbfe;border-radius:999px;padding:3px 8px;vertical-align:middle}.versionBadge.updateBadge{color:#166534;background:#dcfce7;border-color:#86efac}.saveWarningBadge{min-width:92px;text-align:center;border-radius:999px;padding:8px 12px;font-weight:900;font-size:13px;border:1px solid #fecaca;background:#fee2e2;color:#991b1b}.saveWarningBadge.saved{border-color:#bbf7d0;background:#dcfce7;color:#166534}.saveWarningBadge.loaded{border-color:#bfdbfe;background:#dbeafe;color:#1e40af}
 .workflowCard{border-top:6px solid #2563eb}.workflowCard .sectionTitle{font-size:18px}.topActions{grid-template-columns:minmax(320px,1fr) 170px auto auto auto auto}.topActions button{white-space:nowrap}.topActions #saveGroupMemory{font-size:16px;box-shadow:0 8px 18px rgba(22,163,74,.22)}.topActions #loadGroupMemory{background:#eef2ff;color:#1e40af;border:1px solid #c7d2fe}.appSteps{grid-template-columns:repeat(4,minmax(0,1fr))}.appSteps .quickStep{position:relative;background:#f8fafc;border-color:#dbe4ef;color:#334155}.appSteps .quickStep b{font-size:14px}.appSteps .quickStep:not(:last-child)::after{content:"→";position:absolute;right:-14px;top:50%;transform:translateY(-50%);color:#94a3b8;font-weight:900}.saveInfoBox{margin-top:12px;border:1px solid #dbe4ef;background:#f8fafc;border-radius:12px;padding:10px 12px;min-height:40px;color:#475569;line-height:1.6}
 .uxDashboard{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;padding:14px;background:#0f172a;color:#fff;border:0}.uxStat{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px}.uxStat span{display:block;font-size:12px;color:#cbd5e1;font-weight:800}.uxStat b{display:block;font-size:22px;margin-top:3px}.uxStat small{display:block;font-size:11px;color:#94a3b8;margin-top:2px}.uxDashboard.saved{background:#14532d}.uxDashboard.loaded{background:#172554}.studentCard{transition:box-shadow .15s ease, transform .15s ease}.studentCard:hover{box-shadow:0 14px 32px rgba(15,23,42,.10);transform:translateY(-1px)}.studentCard.hasAbsent{border-top-color:#f97316}.studentCard.hasFailure{box-shadow:0 0 0 2px rgba(59,130,246,.16), var(--shadow)}.tinyCheck{transition:.12s}.tinyCheck:has(input:checked){background:#ffedd5;border-color:#fb923c;color:#9a3412}.studentSection .sectionTitle{color:#172033}.studentSection:has(textarea[data-kind="failureReason"]){background:linear-gradient(180deg,#fff 0%,#f8fafc 100%);border-radius:12px}.prepCompactCard{border-left:6px solid #7c3aed}.prepCompactCard summary{font-size:15px}.prepCompactCard button#printMeetingPrep{background:#7c3aed;color:#fff}.prepCompactCard button#printWeeklyAbsentList{background:#f97316;color:#fff}.masterGridHint::before{content:"普段は閉じたままでOK：";font-weight:900;color:#1e40af}.advancedButtons .danger{font-size:12px;opacity:.78}.uxActionDock{position:fixed;right:18px;bottom:18px;z-index:30;background:#fff;border:1px solid #dbe4ef;border-radius:18px;box-shadow:0 20px 50px rgba(15,23,42,.18);padding:10px;display:flex;gap:8px;align-items:center}.uxActionDock button{min-height:34px;padding:8px 10px;font-size:12px}.uxActionDock .uxDockSave{background:#16a34a}.uxActionDock .uxDockPrint{background:#7c3aed}.uxActionDock .uxDockAbsent{background:#f97316}.uxActionDock .uxDockStatus{font-size:12px;color:#475569;font-weight:800;padding:0 4px;max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @media(max-width:1100px){.appHeaderInner{align-items:flex-start;flex-direction:column}.uxDashboard{grid-template-columns:1fr 1fr}.appSteps{grid-template-columns:1fr 1fr}.appSteps .quickStep::after{display:none}.uxActionDock{left:10px;right:10px;bottom:10px;justify-content:space-between}.uxActionDock .uxDockStatus{display:none}}
@@ -929,7 +929,7 @@ body .prepCompactCard .prepDetails summary{min-height:28px!important;font-size:1
 
 <header class="appHeader"><div class="wrap appHeaderInner">
   <div>
-    <h1>面談予定入力・準備資料アプリ <span class="versionBadge">v36 上部2段固定修正版</span></h1>
+    <h1>面談予定入力・準備資料アプリ <span class="versionBadge updateBadge">v37 合格設計図フォルダ読取修正版 2026.08.18</span></h1>
     <div class="sub">生徒カードは横スクロールで同時編集できます。印刷メニューは上部、確認ログは右上、マスタ設定は下にまとめて表示します。</div>
   </div>
   <div class="saveWarningBadge" id="uxHeaderSaveBadge">未保存</div>
@@ -2245,13 +2245,17 @@ async function saveAllEditedGoukakuExcels(){
 }
 async function findStudentFoldersRecursive(root, studentName, maxDepth=5){
   const target=String(studentName||'').trim();
+  const normalizedTarget=normalizeFolderNameForMatch(target);
   const matches=[];
   async function walk(dir, pathParts, depth){
     if(!dir || depth<0 || !dir.entries) return;
     for await (const [entryName, handle] of dir.entries()){
       if(handle.kind !== 'directory') continue;
       const nextPath=[...pathParts, entryName];
-      if(entryName === target) matches.push({dir:handle, label:nextPath.join(' / ')});
+      const normalizedEntry=normalizeFolderNameForMatch(entryName);
+      if(normalizedEntry===normalizedTarget || normalizedEntry.includes(normalizedTarget) || normalizedTarget.includes(normalizedEntry)){
+        matches.push({dir:handle, label:nextPath.join(' / ')});
+      }
       await walk(handle, nextPath, depth-1);
     }
   }
@@ -3822,8 +3826,10 @@ async function loadGroup(){
       // 週面シートの自動読込は廃止。面談準備印刷の3ページ目は常に面談フローを使う。
       details.push('週面シート: 読み取り廃止（3ページ目は常に面談フロー）');
 
-      // 合格設計図は 担任助手フォルダ / 生徒名フォルダ / 合格設計図PDFまたはExcel を読む。
-      const goukakuResult=await loadGoukakuDesignsFromStudentParent(studentParent.dir, students);
+      // 合格設計図は保存復元フォルダ配下から生徒ごとに探す。
+      // 「打ち込み結果 / 担任助手フォルダ / 各担任助手名 / 各生徒名」の階層にも対応し、
+      // 他の復元対象生徒が同じ担任助手フォルダにいなくても読み込める。
+      const goukakuResult=await loadGoukakuDesignsFromRoot(dir, students);
       const goukakuMsg=formatGoukakuLoadSummary(goukakuResult);
       if(goukakuMsg) details.push(goukakuMsg);
     }catch(e){
