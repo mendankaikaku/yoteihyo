@@ -5262,10 +5262,32 @@ function groupAllListStudentsByGrade(studentMap){
     String(a.student).localeCompare(String(b.student),'ja')
   );
   const byGrade = new Map();
+  let skippedNoStudentNo = 0;
+  let skippedNoGrade = 0;
   for(const s of students){
-    const grade = s.grade || '学年未設定';
+    const noKey = normalizeStudentNoKey(s.studentNo || '');
+    const grade = norm(s.grade || '');
+    // 「生徒番号未対応」「学年未設定」だけの余分なシートは作らない。
+    // 全員分リストは対応表/入力結果で生徒番号と学年が確定している生徒だけを出力する。
+    if(!noKey){
+      skippedNoStudentNo++;
+      if(typeof allListAddUpdateLog === 'function'){
+        allListAddUpdateLog('未対応生徒除外', grade || '学年未設定', studentKeyForList(s.student || '', s.studentNo || ''), s.student || '', '生徒行', '生徒番号', '', s.studentNo || '', '', '生徒番号未対応のため、全員分リストの生徒シートへ出力しません');
+      }
+      continue;
+    }
+    if(!grade){
+      skippedNoGrade++;
+      if(typeof allListAddUpdateLog === 'function'){
+        allListAddUpdateLog('未対応生徒除外', '学年未設定', studentKeyForList(s.student || '', s.studentNo || ''), s.student || '', '生徒行', '学年', '', s.grade || '', '', '学年未設定のため、全員分リストの生徒シートへ出力しません');
+      }
+      continue;
+    }
     if(!byGrade.has(grade)) byGrade.set(grade, []);
     byGrade.get(grade).push(s);
+  }
+  if(typeof log === 'function' && (skippedNoStudentNo || skippedNoGrade)){
+    log(`全員分リスト: 生徒番号未対応 ${skippedNoStudentNo}名 / 学年未設定 ${skippedNoGrade}名は出力対象から除外しました。`);
   }
   return byGrade;
 }
