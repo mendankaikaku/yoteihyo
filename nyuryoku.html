@@ -2635,7 +2635,7 @@ function applyExamMasterFromRestoredMemory(mem, sourceLabel='復元JSON'){
 }
 function buildMasterSettingsPayload(savedAt=new Date().toISOString()){
   return {
-    version:2,
+    version:3,
     type:'master-settings',
     targetRestoreVersion:MASTER_TARGET_RESTORE_VERSION,
     examMaster:getExamMaster(),
@@ -2647,6 +2647,114 @@ function buildMasterSettingsPayload(savedAt=new Date().toISOString()){
     subjectTemplates:getSubjectTemplates(),
     savedAt
   };
+}
+function extractStandaloneRows(mem, mainKey){
+  if(!mem) return [];
+  if(Array.isArray(mem)) return mem;
+  if(Array.isArray(mem[mainKey])) return mem[mainKey];
+  if(Array.isArray(mem.rows)) return mem.rows;
+  return [];
+}
+function standaloneSavedAt(mem){
+  if(mem && typeof mem==='object' && mem.savedAt) return String(mem.savedAt);
+  return '';
+}
+async function writeMasterSettingsFilesToShared(mem){
+  // settings_exam_master.json だけに入れると、どこで消えたか分かりにくいので、
+  // イベント・模試・コメントを単独JSONにも同時保存する。
+  // 復元時は settings と単独JSONの両方を見て、新しい方/残っている方を採用する。
+  await writeMasterSettingsFilesToShared(mem);
+  await writeJsonToShared('event_master.json', {
+    version:3,
+    type:'event-master',
+    eventMaster:mem.eventMaster || [],
+    eventTargetHistory:mem.eventTargetHistory || [],
+    savedAt:mem.savedAt
+  });
+  await writeJsonToShared('exam_master.json', {
+    version:3,
+    type:'exam-master',
+    examMaster:mem.examMaster || [],
+    examTargetHistory:mem.examTargetHistory || [],
+    subjectTemplates:mem.subjectTemplates || [],
+    savedAt:mem.savedAt
+  });
+  await writeJsonToShared('comment_master.json', {
+    version:3,
+    type:'comment-master',
+    commentMaster:mem.commentMaster || [],
+    commentTargetHistory:mem.commentTargetHistory || [],
+    savedAt:mem.savedAt
+  });
+}
+async function readMasterSettingsFilesFromShared(){
+  const settings = await readJsonFromShared('settings_exam_master.json');
+  const eventOnly = await readJsonFromShared('event_master.json');
+  const examOnly = await readJsonFromShared('exam_master.json');
+  const commentOnly = await readJsonFromShared('comment_master.json');
+  if(!settings && !eventOnly && !examOnly && !commentOnly) return null;
+  const merged = Object.assign({version:3,type:'master-settings'}, settings || {});
+  const settingsSavedAt = String((settings && settings.savedAt) || '');
+
+  const eventRows = extractStandaloneRows(eventOnly, 'eventMaster');
+  if(eventRows.length && (!Array.isArray(merged.eventMaster) || !merged.eventMaster.length || standaloneSavedAt(eventOnly) >= settingsSavedAt)){
+    merged.eventMaster = eventRows;
+  }
+  if(eventOnly && Array.isArray(eventOnly.eventTargetHistory) && (!Array.isArray(merged.eventTargetHistory) || standaloneSavedAt(eventOnly) >= settingsSavedAt)){
+    merged.eventTargetHistory = eventOnly.eventTargetHistory;
+  }
+
+  const examRows = extractStandaloneRows(examOnly, 'examMaster');
+  if(examRows.length && (!Array.isArray(merged.examMaster) || !merged.examMaster.length || standaloneSavedAt(examOnly) >= settingsSavedAt)){
+    merged.examMaster = examRows;
+  }
+  if(examOnly && Array.isArray(examOnly.examTargetHistory) && (!Array.isArray(merged.examTargetHistory) || standaloneSavedAt(examOnly) >= settingsSavedAt)){
+    merged.examTargetHistory = examOnly.examTargetHistory;
+  }
+  if(examOnly && Array.isArray(examOnly.subjectTemplates) && (!Array.isArray(merged.subjectTemplates) || standaloneSavedAt(examOnly) >= settingsSavedAt)){
+    merged.subjectTemplates = examOnly.subjectTemplates;
+  }
+
+  const commentRows = extractStandaloneRows(commentOnly, 'commentMaster');
+  if(commentRows.length && (!Array.isArray(merged.commentMaster) || !merged.commentMaster.length || standaloneSavedAt(commentOnly) >= settingsSavedAt)){
+    merged.commentMaster = commentRows;
+  }
+  if(commentOnly && Array.isArray(commentOnly.commentTargetHistory) && (!Array.isArray(merged.commentTargetHistory) || standaloneSavedAt(commentOnly) >= settingsSavedAt)){
+    merged.commentTargetHistory = commentOnly.commentTargetHistory;
+  }
+
+  merged.savedAt = merged.savedAt || standaloneSavedAt(eventOnly) || standaloneSavedAt(examOnly) || standaloneSavedAt(commentOnly) || new Date().toISOString();
+  return merged;
+}
+function persistMasterPanelsToLocalForSave(){
+  // 画面で編集中のマスタを、保存直前に必ずlocalStorageへ反映する。
+  // これがないと「イベントマスタを編集したのに、別の保存ボタンで旧マスタを保存する」事故が起きる。
+  try{
+    const examRows = mergeVisibleExamMasterRowsForSave(collectExamMasterFromPanel());
+    saveExamMasterData(examRows);
+    updateExamTargetHistoryFromMasters(examRows);
+  }catch(e){}
+  try{
+    const eventRows = applyPreviousEventTargetsWithConfirm(collectEventMasterFromPanel());
+    saveEventMasterData(eventRows);
+    updateEventTargetHistoryFromMasters(eventRows);
+  }catch(e){}
+  try{
+    saveCommentMasterData(collectCommentMasterFromPanel());
+  }catch(e){}
+}
+function masterRowKey(row, kind){
+  const r=row||{};
+  if(kind==='event') return ['event',r.name||'',r.datetime||'',r.displayStart||'',r.displayEnd||''].join('|');
+  if(kind==='exam') return ['exam',r.name||'',r.date||'',r.type||'',r.subjectTemplate||''].join('|');
+  if(kind==='comment') return ['comment',r.title||'',r.text||'',r.displayStart||'',r.displayEnd||''].join('|');
+  return JSON.stringify(r);
+}
+function mergeMasterRowsKeepCurrent(current, restored, kind){
+  const out=[]; const seen=new Set();
+  (current||[]).forEach(r=>{const k=masterRowKey(r,kind); if(!seen.has(k)){seen.add(k); out.push(r);}});
+  (restored||[]).forEach(r=>{const k=masterRowKey(r,kind); if(!seen.has(k)){seen.add(k); out.push(r);}});
+  return out;
 }
 function getExamMaster(){try{const saved=JSON.parse(localStorage.getItem(EXAM_MASTER_KEY)||'[]');let rows=Array.isArray(saved)?saved:[];if(localStorage.getItem(EXAM_MASTER_KEY+':targetVersion')!==String(MASTER_TARGET_RESTORE_VERSION)){rows=stripLegacyExamTargetStudents(rows);localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(rows));localStorage.setItem(EXAM_MASTER_KEY+':targetVersion',String(MASTER_TARGET_RESTORE_VERSION));}if(localStorage.getItem(EXAM_MASTER_DEFAULT_VERSION_KEY)!==DEFAULT_TOSHIN_EXAM_VERSION){rows=[];localStorage.setItem(EXAM_MASTER_KEY,'[]');localStorage.setItem(EXAM_MASTER_DEFAULT_VERSION_KEY,DEFAULT_TOSHIN_EXAM_VERSION);return rows}return rows}catch(e){return []}}
 function saveExamMasterData(rows){const merged=mergeDefaultExamMaster(Array.isArray(rows)?rows:[]);localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(merged));localStorage.setItem(EXAM_MASTER_DEFAULT_VERSION_KEY,DEFAULT_TOSHIN_EXAM_VERSION);localStorage.setItem(EXAM_MASTER_KEY+':targetVersion',String(MASTER_TARGET_RESTORE_VERSION))}
@@ -3367,7 +3475,7 @@ async function saveOne(name,showAlert=true){
   if(sharedDirHandle){
     try{
       await writeJsonToShared(sharedStudentFileName(name),mem);
-      await writeJsonToShared('settings_exam_master.json', buildMasterSettingsPayload(savedAt));
+      await writeMasterSettingsFilesToShared(buildMasterSettingsPayload(savedAt));
       place='保存用フォルダ＋ブラウザ内';
     }catch(e){
       if(showAlert)alert('保存用フォルダへの個人保存に失敗しました。ブラウザ内には保存しました。');
@@ -4417,7 +4525,7 @@ async function saveSharedFolder(){
       const mem=Object.assign({studentName:name,savedAt:groupMem.savedAt},ensureStudent(name));
       await writeJsonToShared(sharedStudentFileName(name), mem);
     }
-    await writeJsonToShared('settings_exam_master.json', buildMasterSettingsPayload(groupMem.savedAt));
+    await writeMasterSettingsFilesToShared(buildMasterSettingsPayload(groupMem.savedAt));
     showSaveInfo(`保存用フォルダ/jsonに保存しました：${students.join('、')}（${new Date(groupMem.savedAt).toLocaleString('ja-JP')}）`);
     alert('保存用フォルダ直下の「json」フォルダに、グループ内容・個人内容・模試設定を保存しました。');
   }catch(e){
@@ -4425,7 +4533,7 @@ async function saveSharedFolder(){
   }
 }
 async function applySharedSettingsIfAny(){
-  const settings=await readJsonFromShared('settings_exam_master.json');
+  const settings=await readMasterSettingsFilesFromShared();
   if(settings){
     applyExamMasterFromRestoredMemory(settings, 'settings_exam_master.json');
     if(Array.isArray(settings.eventMaster)) saveEventMasterData(settings.eventMaster);
@@ -4513,14 +4621,7 @@ async function saveAllCurrentDataToShared(showAlert=false){
   for(const name of students){
     await writeJsonToShared(sharedStudentFileName(name), buildIndividualMemory(name, mem.savedAt));
   }
-  await writeJsonToShared('settings_exam_master.json', {
-    examMaster:getExamMaster(),
-    eventMaster:getEventMaster(),
-    examTargetHistory:getExamTargetHistory(),
-    eventTargetHistory:getEventTargetHistory(),commentMaster:getCommentMaster(),commentTargetHistory:getCommentTargetHistory(),
-    subjectTemplates:getSubjectTemplates(),
-    savedAt:mem.savedAt
-  });
+  await writeMasterSettingsFilesToShared(buildMasterSettingsPayload(mem.savedAt));
   if(showAlert){
     alert('保存用フォルダ直下の「json」フォルダに、面談内容・個人保存データ・マスタをまとめて保存しました。');
   }
@@ -5300,8 +5401,31 @@ async function syncAllSharedData(){
     const dir=await pickSharedFolder();
     if(!dir) return;
 
-    // まず保存用フォルダのマスタを反映。なければ現在のマスタを後で保存する。
-    await loadMasterSettingsFromShared(false);
+    // 保存直前に、いま画面で編集中のマスタを先に確定する。
+    // その後で保存用フォルダ側の古いマスタを読むと、新規作成イベントが消えるため、
+    // 現在値を退避してから「現在値優先」でマージする。
+    persistMasterPanelsToLocalForSave();
+    const currentExamMaster=getExamMaster();
+    const currentEventMaster=getEventMaster();
+    const currentCommentMaster=getCommentMaster();
+    const currentExamTargetHistory=getExamTargetHistory();
+    const currentEventTargetHistory=getEventTargetHistory();
+    const currentCommentTargetHistory=getCommentTargetHistory();
+    const currentSubjectTemplates=getSubjectTemplates();
+    const restoredSettings=await readMasterSettingsFilesFromShared();
+    if(restoredSettings){
+      applyExamMasterFromRestoredMemory(restoredSettings, '保存用フォルダ既存マスタ');
+      if(Array.isArray(restoredSettings.eventMaster)) saveEventMasterData(restoredSettings.eventMaster);
+      if(Array.isArray(restoredSettings.commentMaster)) saveCommentMasterData(restoredSettings.commentMaster);
+      if(Array.isArray(restoredSettings.subjectTemplates)) saveSubjectTemplates(restoredSettings.subjectTemplates);
+      saveExamMasterData(mergeMasterRowsKeepCurrent(currentExamMaster, getExamMaster(), 'exam'));
+      saveEventMasterData(mergeMasterRowsKeepCurrent(currentEventMaster, getEventMaster(), 'event'));
+      saveCommentMasterData(mergeMasterRowsKeepCurrent(currentCommentMaster, getCommentMaster(), 'comment'));
+      if(currentExamTargetHistory.length) saveExamTargetHistory(currentExamTargetHistory);
+      if(currentEventTargetHistory.length) saveEventTargetHistory(currentEventTargetHistory);
+      if(currentCommentTargetHistory.length) saveCommentTargetHistory(currentCommentTargetHistory);
+      if(currentSubjectTemplates.length) saveSubjectTemplates(currentSubjectTemplates);
+    }
 
     syncFromDom();
     let names=splitNames();
@@ -5343,11 +5467,12 @@ function buildMasterSettingsMemory(){
 
 async function saveMasterSettingsToShared(showAlert=true){
   try{
+    persistMasterPanelsToLocalForSave();
     const mem=buildMasterSettingsMemory();
-    await writeJsonToShared('settings_exam_master.json', mem);
+    await writeMasterSettingsFilesToShared(mem);
     if(showAlert){
       showSaveInfo(`模試・イベント・コメントマスタを保存用フォルダに保存しました（${new Date(mem.savedAt).toLocaleString('ja-JP')}）`);
-      alert('模試マスタ・イベントマスタ・コメントマスタを保存用フォルダ直下の「json」フォルダに保存しました。');
+      alert('模試マスタ・イベントマスタ・コメントマスタを保存用フォルダ直下の「json」フォルダに保存しました。\n※settings_exam_master.json に加えて event_master.json も作成します。');
     }
     return true;
   }catch(e){
@@ -5357,7 +5482,7 @@ async function saveMasterSettingsToShared(showAlert=true){
 }
 async function loadMasterSettingsFromShared(showAlert=true){
   try{
-    const settings=await readJsonFromShared('settings_exam_master.json');
+    const settings=await readMasterSettingsFilesFromShared();
     if(!settings){
       if(showAlert)alert('保存用フォルダにマスタ保存データが見つかりません。');
       return false;
