@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>予定統合アプリ0:01（掲示背景薄赤・文字罫線黒版）</title>
+  <title>予定統合アプリ（掲示背景薄赤・文字罫線黒版）</title>
   <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
   <script src="./libs/xlsx.bundle.js"></script>
   <script>
@@ -409,12 +409,14 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
       <div class="hint" style="margin-bottom:10px;">「まとめて復元」フォルダーを選ぶだけで、json / 毎日更新 / 打ち込み結果 / 対応表 / 全員分リスト / 毎日更新 / 全体予定表 を自動で振り分けます。</div>
       <div class="bundleActionGrid">
         <button id="readBundleBtn" class="ok primaryAction" type="button">① フォルダーを読み取る</button>
+        <label for="bundleFolderInput" id="bundleFolderDirectLabel" class="filePickLabel ok" style="margin-left:8px;">予備：フォルダー直接選択</label>
       </div>
       <div class="safetyNote">出力前に③を押して、毎日更新.xlsxを result_history.json に退避します。</div>
       <div id="bundleReadSummary" class="hint" style="margin-top:10px;white-space:pre-wrap;">まだ読み込んでいません</div>
       
 
-      <!-- 下のinputは処理用に非表示で保持。 -->
+      <!-- フォルダー読取は昔から安定していた webkitdirectory 方式を正にする。
+           上のボタンでも、予備ラベルでも、この input を直接開く。 -->
       <input id="bundleFolderInput" class="visuallyHiddenFileInput" type="file" webkitdirectory directory multiple />
       <input id="folderInput" class="hidden" type="file" webkitdirectory directory multiple accept=".xlsx,.xls,.xlsm" />
       <input id="rosterInput" class="hidden" type="file" accept=".xlsx,.xls,.xlsm,.csv" />
@@ -7238,9 +7240,13 @@ function bundleCheckLine(label, files, required=false){
   const latest=latestFileLabel(files);
   return `${icon} ${label}: ${count}件${latest ? '（採用候補: '+latest+'）' : ''}`;
 }
-function buildBundleDiagnostics({planned,results,histories,allLists,dailyPosters,wholeSchedules,examSubjectLists,comiruCsvs,rosters,rosterMsg,restoreLogs}){
+function bundleSamplePaths(files, limit=18){
+  return [...(files||[])].slice(0,limit).map(f => '・' + normalizePickedFilePath(f)).join('\n');
+}
+function buildBundleDiagnostics({rawCount,usableCount,skippedCount,allExcelFiles,planned,results,histories,allLists,dailyPosters,wholeSchedules,examSubjectLists,comiruCsvs,rosters,rosterMsg,restoreLogs}){
   const lines=[];
   lines.push('--- 読み取り診断 ---');
+  lines.push(`選択ファイル総数: ${rawCount||0}件 / 読取対象: ${usableCount||0}件 / 除外: ${skippedCount||0}件`);
   lines.push(bundleCheckLine('打ち込み結果', planned, true));
   lines.push(bundleCheckLine('毎日更新.xlsx', results, false));
   lines.push(bundleCheckLine('result_history.json', histories, false));
@@ -7254,13 +7260,21 @@ function buildBundleDiagnostics({planned,results,histories,allLists,dailyPosters
   const logs=[];
   Object.entries(restoreLogs || {}).forEach(([label,arr])=>{ if(arr && arr.length) logs.push(`${label}: ${arr.join(' / ')}`); });
   if(logs.length) lines.push('復元読取詳細: '+logs.join(' / '));
-  if(!planned.length) lines.push('⚠ 出力ボタンが押せない場合は、保存復元フォルダー/打ち込み結果/ に入力用で出した予定Excelがあるか確認してください。');
+  if(!planned.length){
+    lines.push('⚠ 打ち込み結果の予定Excelが0件です。保存復元フォルダーを選んでいるか、打ち込み結果/担任助手フォルダー/助手名/生徒名/ の下に入力用で保存したExcelがあるか確認してください。');
+    const samples = bundleSamplePaths(allExcelFiles || [], 20);
+    if(samples) lines.push('読み取ったExcel候補の例:\n' + samples);
+  }
   if(!results.length && !histories.length) lines.push('⚠ 毎日掲示は、毎日更新.xlsx または result_history.json がないと作れません。');
   return lines.join('\n');
 }
 
 async function setBundleFolderFiles(fileList){
-  const files = [...fileList].filter(f => !shouldSkipBundleFile(f));
+  const rawFiles = [...(fileList || [])];
+  const files = rawFiles.filter(f => !shouldSkipBundleFile(f));
+  const rawCount = rawFiles.length;
+  const usableCount = files.length;
+  const skippedCount = rawCount - usableCount;
   const planned = [];
   const results = [];
   const histories = [];
@@ -7271,6 +7285,7 @@ async function setBundleFolderFiles(fileList){
   const wholeSchedules = [];
   const examSubjectLists = [];
   const comiruCsvs = [];
+  const allExcelFiles = files.filter(f => /\.(xlsx|xlsm|xls)$/i.test(f.name || ''));
   for(const f of files){
     const name = f.name || '';
     const isExcel = /\.(xlsx|xlsm|xls)$/i.test(name);
@@ -7326,7 +7341,7 @@ async function setBundleFolderFiles(fileList){
   updateStats(state.files, [], [], [], state.resultRecords);
   const summary = `読み取り完了
 ${buildBundleDiagnostics({
-    planned, results, histories, allLists, dailyPosters, wholeSchedules, examSubjectLists, comiruCsvs, rosters, rosterMsg,
+    rawCount, usableCount, skippedCount, allExcelFiles, planned, results, histories, allLists, dailyPosters, wholeSchedules, examSubjectLists, comiruCsvs, rosters, rosterMsg,
     restoreLogs:{
       '全員分リスト': allListRestoreLogs,
       '毎日掲示': dailyPosterRestoreLogs,
@@ -7390,32 +7405,15 @@ pathPartsOfFile = function(file){
 };
 async function openBundleFolderInput(){
   const input = $("bundleFolderInput");
-  // Chrome/Edge では showDirectoryPicker の方が安定する。
-  // 必ずユーザーのクリック直後に呼ぶため、この関数の最初で実行する。
-  if(window.showDirectoryPicker){
-    try{
-      const root = await window.showDirectoryPicker({mode:"read"});
-      if($('bundleReadSummary')) $('bundleReadSummary').textContent = 'フォルダーを読み取り中です…';
-      log('保存復元フォルダーを読み取り中です…');
-      const files = await collectFilesFromDirectoryHandle(root, root.name || '保存復元');
-      if(!files.length){
-        log('選択したフォルダー内に読み取れるファイルがありません。保存復元フォルダーの中身を確認してください。');
-        if($('bundleReadSummary')) $('bundleReadSummary').textContent = '読み取れるファイルがありません。';
-        return;
-      }
-      await setBundleFolderFiles(files);
-      return;
-    }catch(e){
-      if(e && (e.name === 'AbortError' || e.name === 'NotAllowedError')){
-        log('フォルダー選択がキャンセルされました。もう一度①フォルダーを読み取るを押してください。');
-        return;
-      }
-      console.warn('showDirectoryPicker失敗。file inputへ切替', e);
-      log('フォルダー選択APIで読み取れなかったため、従来方式に切り替えます。もう一度フォルダーを選んでください。');
-    }
+  if(!input){
+    log('フォルダー読取用inputが見つかりません。HTMLを最新版に差し替えてください。');
+    return;
   }
-  if(!input) return;
+  // 読み取れていた時代と同じ webkitdirectory 方式に戻す。
+  // showDirectoryPicker は環境差があり、権限や非同期タイミングで無反応になることがあるため使わない。
   input.value = "";
+  if($('bundleReadSummary')) $('bundleReadSummary').textContent = 'フォルダー選択画面を開きます。保存復元フォルダーを選んでください。';
+  log('フォルダー選択画面を開きます。保存復元フォルダーを選んでください。');
   input.click();
 }
 function bindBundleReadButton(id){
@@ -7434,7 +7432,7 @@ function bindBundleReadButton(id){
 }
 bindBundleReadButton("readBundleTopBtn");
 bindBundleReadButton("readBundleBtn");
-$("bundleFolderInput").addEventListener("change", async e => {
+if($("bundleFolderInput")) $("bundleFolderInput").addEventListener("change", async e => {
   try{
     const files = e.target.files;
     if(!files || !files.length){
