@@ -6320,6 +6320,280 @@ async function allListWriteFileWithDropdownXml(wb, filename){
   }
 }
 
+
+
+
+
+
+
+
+
+// 旧版互換：全員分リスト 予定/結果マップ・日付見出し・更新ログ書式
+function buildPlanResultMapsForAllList(windowDates){
+  const dateKeys = new Set(windowDates.map(ymd));
+  const planByStudentDate = new Map();
+  const resultByStudentDate = new Map();
+
+  for(const r of state.records || []){
+    if(!dateKeys.has(r.dateKey)) continue;
+    const keys = allListStudentKeysFromRecord(r);
+    if(!keys.length) continue;
+    for(const key of keys){
+      const mapKey = `${key}|${r.dateKey}`;
+      if(!planByStudentDate.has(mapKey)) planByStudentDate.set(mapKey, []);
+      const line = compactPlanLine(r);
+      if(line && !planByStudentDate.get(mapKey).includes(line)) planByStudentDate.get(mapKey).push(line);
+    }
+  }
+  for(const r of state.resultRecords || []){
+    if(!dateKeys.has(r.dateKey)) continue;
+    const keys = allListStudentKeysFromRecord(r);
+    if(!keys.length) continue;
+    for(const key of keys){
+      const mapKey = `${key}|${r.dateKey}`;
+      if(!resultByStudentDate.has(mapKey)) resultByStudentDate.set(mapKey, []);
+      const line = compactResultLine(r);
+      if(line && !resultByStudentDate.get(mapKey).includes(line)) resultByStudentDate.get(mapKey).push(line);
+    }
+  }
+  return {planByStudentDate, resultByStudentDate};
+}
+
+function isAllListDateDynamicHeader(h){
+  const t = normalizeAllListHeaderText(h);
+  return /\d{1,2}\/\d{1,2}.*\n(予定|結果)$/.test(t) || /\n(予定|結果)$/.test(t);
+}
+
+function styleAllListUpdateLogSheet(ws, aoa){
+  if(!ws || !aoa) return;
+  ws['!cols'] = [
+    {wch:18},{wch:16},{wch:10},{wch:24},{wch:16},{wch:22},{wch:22},{wch:34},{wch:34},{wch:34},{wch:42}
+  ];
+  ws['!freeze'] = {xSplit:0, ySplit:1};
+  if(typeof setRangeStyle === 'function' && ws['!ref']){
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    const border = {top:{style:'thin',color:{rgb:'CBD5E1'}},bottom:{style:'thin',color:{rgb:'CBD5E1'}},left:{style:'thin',color:{rgb:'CBD5E1'}},right:{style:'thin',color:{rgb:'CBD5E1'}}};
+    setRangeStyle(ws, range, (R,C,cell)=>({
+      font:{name:'Yu Gothic', sz:R===0?10:9, bold:R===0, color:{rgb:'111827'}},
+      alignment:{vertical:'top', horizontal:R===0?'center':'left', wrapText:true},
+      border,
+      fill:R===0?{fgColor:{rgb:'FDE68A'}}:undefined
+    }));
+  }
+}
+
+// 旧版互換：全員分リスト更新ログ初期化
+function allListNowText(){
+  const d = new Date();
+  const p = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
+function allListEnsureUpdateLog(){
+  if(!state.allListUpdateLog || !Array.isArray(state.allListUpdateLog)){
+    state.allListUpdateLog = [["日時","区分","学年","生徒キー","生徒名","対象","列名","全員分リストの値","自動データの値","採用値","理由"]];
+  }
+  return state.allListUpdateLog;
+}
+
+// 旧版互換：全員分リスト更新ログ/名称整形
+function allListAddUpdateLog(kind, grade, key, studentName, target, colName, restoredValue, autoValue, adoptedValue, reason){
+  const logAoa = allListEnsureUpdateLog();
+  const rv = norm(restoredValue), av = norm(autoValue), ad = norm(adoptedValue);
+  // 完全一致や両方空はログを増やさない
+  if(rv === av && av === ad) return;
+  if(!rv && !av && !ad) return;
+  logAoa.push([allListNowText(), kind, grade || '', key || '', studentName || '', target || '', colName || '', rv, av, ad, reason || '']); 
+}
+
+function allListSlotCleanName(name){
+  return allListCellText(name).replace(/^【(?:模試|イベント)】/,'').trim();
+}
+
+// ============================================================
+// 全員分リスト 小規模模試/イベント 復旧補助関数
+// 旧方式フォルダー読取復帰時に抜けた関数をここで再定義。
+// ============================================================
+function allListSlotDateDisplay(value){
+  const raw = allListCellText(value);
+  if(!raw) return '';
+  const d = parseDateTimeLoose(raw);
+  if(!d) return raw;
+  const base = `${d.getMonth()+1}/${d.getDate()}(${WEEK_JA[d.getDay()]})`;
+  const hasTime = /(?:T|\s)\d{1,2}:\d{2}|午前|午後/.test(raw);
+  if(!hasTime && d.getHours()===0 && d.getMinutes()===0) return base;
+  return `${base}${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+function allListSlotDisplayName(item){
+  const kind = item?.kind === '模試' ? '模試' : 'イベント';
+  const name = allListCellText(item?.name || '');
+  if(!name) return '';
+  if(/^【(模試|イベント)】/.test(name)) return name;
+  return `【${kind}】${name}`;
+}
+
+function allListSmallDedupeDateKey(value){
+  const raw = allListCellText(value);
+  if(!raw) return '';
+  const d = parseDateTimeLoose(raw);
+  if(!d) return raw.replace(/[（(][日月火水木金土][）)]/g,'').replace(/\s+/g,'').trim();
+  const hasTime = /(?:T|\s)\d{1,2}:\d{2}|午前|午後|\d{1,2}:\d{2}/.test(raw);
+  const day = ymd(d);
+  return hasTime ? `${day} ${pad2(d.getHours())}:${pad2(d.getMinutes())}` : day;
+}
+
+function allListSmallDedupeNameKey(value){
+  return allListSlotCleanName(value || '').replace(/\s+/g,'').trim();
+}
+
+function allListSmallDedupeKey(obj){
+  if(!obj) return '';
+  const kind = obj.kind === '模試' ? '模試' : 'イベント';
+  return [
+    obj.studentKey || studentKeyForList(obj.student || '', obj.studentNo || ''),
+    kind,
+    allListSmallDedupeDateKey(obj.date || ''),
+    allListSmallDedupeNameKey(obj.name || '')
+  ].join('|');
+}
+
+function allListSmallMergeRestoredOverAuto(oldObj, newObj){
+  if(!oldObj) return newObj;
+  if(!newObj) return oldObj;
+
+  const isOldRestore = oldObj._source === 'restore';
+  const isNewRestore = newObj._source === 'restore';
+  const hasText = v => v !== undefined && v !== null && String(v) !== '';
+
+  // 読み込んだExcel側を優先。ただし空欄は自動データを消さない。
+  // これにより、全員分リストの回答/Comiru/科目変更が空欄でも、
+  // 入力用Excelや自動生成側の値を勝手に「未」「×」へ戻さない。
+  if(isNewRestore){
+    const merged = Object.assign({}, oldObj);
+    ['kind','date','name','count','grade','studentNo','student','machineKey','studentKey'].forEach(k=>{
+      if(hasText(newObj[k])) merged[k] = newObj[k];
+    });
+    ['status','subject','comiru','note'].forEach(k=>{
+      if(hasText(newObj[k])) merged[k] = newObj[k];
+    });
+    ['comiruAnswered','subjectChanged'].forEach(k=>{
+      if(newObj[k] !== undefined && newObj[k] !== null) merged[k] = newObj[k];
+    });
+    merged._source = 'restore';
+    return merged;
+  }
+
+  if(isOldRestore){
+    const merged = Object.assign({}, newObj);
+    ['kind','date','name','count','grade','studentNo','student','machineKey','studentKey'].forEach(k=>{
+      if(hasText(oldObj[k])) merged[k] = oldObj[k];
+    });
+    ['status','subject','comiru','note'].forEach(k=>{
+      if(hasText(oldObj[k])) merged[k] = oldObj[k];
+    });
+    ['comiruAnswered','subjectChanged'].forEach(k=>{
+      if(oldObj[k] !== undefined && oldObj[k] !== null) merged[k] = oldObj[k];
+    });
+    merged._source = 'restore';
+    return merged;
+  }
+
+  return Object.assign({}, oldObj, newObj);
+}
+
+function allListSmallSlotAnswer(obj){
+  if(!obj) return '';
+  if(obj.kind === '模試') return allListExamStatusFull(obj.status);
+  return allListEventStatusMark(obj.status);
+}
+
+function allListSmallSlotComiru(obj){
+  if(!obj) return '';
+  if(obj.comiruAnswered === true) return '〇';
+  if(obj.comiruAnswered === false) return '×';
+  const s=norm(obj.comiru || '');
+  if(s.includes('済')) return '〇';
+  return '×';
+}
+
+function allListSmallSlotSubjectChanged(obj){
+  if(!obj) return false;
+  if(obj.subjectChanged === true) return true;
+  const s=norm(obj.subject || '');
+  return !!s && !/なし|無|×/.test(s);
+}
+
+function allListSmallSlotMachineKey(kind, name, date){
+  if(kind === '模試') return `${date || ''}\t${name || ''}\tcommon`;
+  return `${date || ''}\t${name || ''}`;
+}
+
+function allListFindSmallSlotColumn(header, no, field){
+  const n = String(no || '').replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0)-0xFEE0));
+  return (header || []).findIndex(h => allListSmallSlotNoFromHeader(h, field) === n);
+}
+
+function allListSmallSlotNoFromHeader(h, field){
+  const t = normalizeAllListHeaderText(h);
+  const re = new RegExp(`^(?:小規模\\s*)?([0-9０-９]+)\\s*\\n${field}$`);
+  const m = t.match(re);
+  if(!m) return '';
+  return String(m[1]).replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0)-0xFEE0));
+}
+
+function ensureAllListSmallSubjectListColumns(mergedAoa, generatedAoa){
+  if(!mergedAoa || mergedAoa.length < 2) return mergedAoa;
+  const out = mergedAoa.map(row => Array.isArray(row) ? row.slice() : []);
+  const header = out[1].map(normalizeAllListHeaderText);
+  const genHeader = (generatedAoa?.[1] || []).map(normalizeAllListHeaderText);
+  const allNos = new Set();
+  for(const h of header){
+    ['日付','名称','回答','Comiru','備考','科目変更','科目リスト'].forEach(field => {
+      const n = allListSmallSlotNoFromHeader(h, field);
+      if(n) allNos.add(n);
+    });
+  }
+  for(const h of genHeader){
+    ['日付','名称','回答','Comiru','備考','科目変更','科目リスト'].forEach(field => {
+      const n = allListSmallSlotNoFromHeader(h, field);
+      if(n) allNos.add(n);
+    });
+  }
+  if(!allNos.size) return mergedAoa;
+
+  const outHeader = out[1].map(normalizeAllListHeaderText);
+  const genCanon = genHeader.map(allListCanonicalHeader);
+  const generatedByKey = new Map();
+  for(const row of (generatedAoa || []).slice(2)){
+    const key = allListRowKeyFromCells(row, genHeader);
+    if(key && key !== 'name:') generatedByKey.set(key, row);
+  }
+
+  const sortedNos = [...allNos].sort((a,b)=>Number(a)-Number(b));
+  for(const no of sortedNos){
+    if(allListFindSmallSlotColumn(outHeader, no, '科目リスト') >= 0) continue;
+    const noteIdx = allListFindSmallSlotColumn(outHeader, no, '備考');
+    const subjectIdx = allListFindSmallSlotColumn(outHeader, no, '科目変更');
+    const insertAt = noteIdx >= 0 ? noteIdx + 1 : (subjectIdx >= 0 ? subjectIdx : outHeader.length);
+    const newHeader = `${no}\n科目リスト`;
+    outHeader.splice(insertAt, 0, newHeader);
+    out[1].splice(insertAt, 0, newHeader);
+
+    const genIdx = allListFindSmallSlotColumn(genHeader, no, '科目リスト');
+    for(let r=2; r<out.length; r++){
+      const row = out[r] || [];
+      const key = allListRowKeyFromCells(row, outHeader.filter((_,i)=>i!==insertAt));
+      const genRow = generatedByKey.get(key);
+      const val = genRow && genIdx >= 0 ? (genRow[genIdx] || '') : '';
+      row.splice(insertAt, 0, val);
+      out[r] = row;
+    }
+  }
+  if(mergedAoa._allListConflictCells) out._allListConflictCells = mergedAoa._allListConflictCells;
+  return out;
+}
+
 function buildSmallSlotObjectsByStudent(examRecords=[], eventRecords=[]){
   const subjectStatusIndex = buildAllListSubjectStatusIndex(examRecords);
   const examCounts = allListGroupTargetCountByBase(examRecords, examKeyOf, allListExamStillVisible);
