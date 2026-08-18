@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>予定統合アプ</title>
+  <title>予定統合アプリ（掲示背景薄赤・文字罫線黒版）</title>
   <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
   <script src="./libs/xlsx.bundle.js"></script>
   <script>
@@ -2939,10 +2939,44 @@ function setWorksheetFreezePane(ws, xSplit, ySplit, topLeftCell, activePane){
   const ys = Number(ySplit || 0);
   const tl = topLeftCell || XLSX.utils.encode_cell({r:ys, c:xs});
   const pane = activePane || (xs && ys ? 'bottomRight' : (ys ? 'bottomLeft' : 'topRight'));
+  const previousView = (ws['!views'] && ws['!views'][0]) ? Object.assign({}, ws['!views'][0]) : {};
   // 出力環境によって参照されるプロパティが違うことがあるため、両方へ入れる。
   // これでExcel/Sheets系で開いたとき、下スクロール時に見出し行を固定しやすくする。
   ws['!freeze'] = {xSplit:xs, ySplit:ys, topLeftCell:tl, activePane:pane, state:'frozen'};
-  ws['!views'] = [{state:'frozen', xSplit:xs, ySplit:ys, topLeftCell:tl, activePane:pane}];
+  ws['!views'] = [Object.assign(previousView, {state:'frozen', xSplit:xs, ySplit:ys, topLeftCell:tl, activePane:pane})];
+}
+
+function allListFindLastVisibleValueCol(aoa){
+  let last = 0;
+  (aoa || []).forEach(row => {
+    (row || []).forEach((v, c) => {
+      if(v != null && String(v).trim() !== '') last = Math.max(last, c);
+    });
+  });
+  return last;
+}
+function allListSetInitialOpenZoom(ws, aoa, opts={}){
+  if(!ws) return;
+  const lastCol = Math.max(0, allListFindLastVisibleValueCol(aoa));
+  const cols = ws['!cols'] || [];
+  let totalWch = 0;
+  for(let c=0; c<=lastCol; c++) totalWch += Number(cols[c]?.wch || 10);
+  // Excelを開いた瞬間に、値が入っている主要列ができるだけ画面内に入るように初期倍率を自動設定する。
+  // PC画面の幅差があるため、通常画面でおおむね見渡せる 105〜115 wch を基準にする。
+  const targetWch = Number(opts.targetWch || 110);
+  const minZoom = Number(opts.minZoom || 45);
+  const maxZoom = Number(opts.maxZoom || 100);
+  let zoom = 100;
+  if(totalWch > targetWch){
+    zoom = Math.floor((targetWch / Math.max(1, totalWch)) * 100);
+  }
+  zoom = Math.max(minZoom, Math.min(maxZoom, zoom));
+  const previousView = (ws['!views'] && ws['!views'][0]) ? Object.assign({}, ws['!views'][0]) : {};
+  previousView.zoomScale = zoom;
+  previousView.zoomScaleNormal = 100;
+  previousView.workbookViewId = 0;
+  ws['!views'] = [previousView];
+  ws._allListOpenZoomInfo = {lastCol, totalWch, targetWch, zoom};
 }
 function setRangeStyle(ws, range, styleFn){
   if(!range) return;
@@ -4019,8 +4053,8 @@ async function downloadExamSubjectListWorkbook(){
   const border = {top:{style:"thin",color:{rgb:"98A2B3"}},bottom:{style:"thin",color:{rgb:"98A2B3"}},left:{style:"thin",color:{rgb:"98A2B3"}},right:{style:"thin",color:{rgb:"98A2B3"}}};
   const headerFill = {fgColor:{rgb:"E5E7EB"}};
   const nameFill = {fgColor:{rgb:"F1F5F9"}};
-  const fontBase = {name:"Yu Gothic", sz:11, color:{rgb:"111827"}};
-  const fontHeader = {name:"Yu Gothic", sz:11, bold:true, color:{rgb:"111827"}};
+  const fontBase = {name:"Yu Gothic", sz:11, color:{rgb:"000000"}};
+  const fontHeader = {name:"Yu Gothic", sz:11, bold:true, color:{rgb:"000000"}};
 
   for(const item of examSheets){
     const ws = aoaToSheet(item.aoa);
@@ -4703,19 +4737,21 @@ function buildMonthlyPosterResultAoa(records, rule, label){
 }
 function styleMonthlyPosterSheet(ws, aoa){
   const widths = [10, 22, 82, 16];
-  const range = applyNiceSheetSettings(ws, aoa, widths, {rows:{min:30,max:160,header:34,pxPerLine:20}});
+  const range = applyNiceSheetSettings(ws, aoa, widths, {rows:{min:36,max:190,header:46,pxPerLine:26}});
   const colCount = Math.max(3, (aoa && aoa[1] ? aoa[1].length : 3));
   ws['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:colCount-1}}];
   ws['!freeze'] = {xSplit:0, ySplit:2};
   ws['!pageSetup'] = {orientation:'portrait', fitToWidth:1, fitToHeight:0};
   ws['!margins'] = {left:0.28, right:0.28, top:0.35, bottom:0.35, header:0.15, footer:0.15};
-  const border = {top:{style:'thin',color:{rgb:'94A3B8'}},bottom:{style:'thin',color:{rgb:'94A3B8'}},left:{style:'thin',color:{rgb:'94A3B8'}},right:{style:'thin',color:{rgb:'94A3B8'}}};
-  const titleFill = {fgColor:{rgb:'DBEAFE'}};
-  const headerFill = {fgColor:{rgb:'E5E7EB'}};
-  const nameFill = {fgColor:{rgb:'F8FAFC'}};
-  const fontTitle = {name:'Yu Gothic', sz:18, bold:true, color:{rgb:'111827'}};
-  const fontHeader = {name:'Yu Gothic', sz:13, bold:true, color:{rgb:'111827'}};
-  const fontBase = {name:'Yu Gothic', sz:12, color:{rgb:'111827'}};
+  const border = {top:{style:'thin',color:{rgb:'000000'}},bottom:{style:'thin',color:{rgb:'000000'}},left:{style:'thin',color:{rgb:'000000'}},right:{style:'thin',color:{rgb:'000000'}}};
+  // 掲示物は遠くから見やすい BIZ UDPゴシック。文字と罫線は黒、背景だけ薄い赤系にする。
+  const titleFill = {fgColor:{rgb:'FEE2E2'}};
+  const headerFill = {fgColor:{rgb:'FCE7E7'}};
+  const nameFill = {fgColor:{rgb:'FFF5F5'}};
+  const posterFontName = 'BIZ UDPゴシック';
+  const fontTitle = {name:posterFontName, sz:26, bold:true, color:{rgb:'000000'}};
+  const fontHeader = {name:posterFontName, sz:17, bold:true, color:{rgb:'000000'}};
+  const fontBase = {name:posterFontName, sz:15, bold:true, color:{rgb:'000000'}};
   setRangeStyle(ws, range, (R,C,cell)=>{
     const style = {font:fontBase, alignment:{vertical:'center', horizontal:'center', wrapText:true}, border};
     if(R === 0){ style.font = fontTitle; style.fill = titleFill; style.alignment = {vertical:'center', horizontal:'center', wrapText:true}; }
@@ -4863,18 +4899,20 @@ function styleHighSpeedRankingSheet(ws, aoa){
   Object.keys(ws).forEach(k=>{ if(k[0] !== '!') delete ws[k]; });
   XLSX.utils.sheet_add_aoa(ws, cleanAoa, {origin:'A1'});
   const widths = [8,10,24,14];
-  const range = applyNiceSheetSettings(ws, cleanAoa, widths, {rows:{min:28,max:72,header:34,pxPerLine:18}});
+  const range = applyNiceSheetSettings(ws, cleanAoa, widths, {rows:{min:38,max:92,header:48,pxPerLine:24}});
   ws['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:3}}];
   ws['!freeze'] = {xSplit:0, ySplit:2};
   ws['!pageSetup'] = {orientation:'portrait', fitToWidth:1, fitToHeight:1};
   ws['!margins'] = {left:0.35, right:0.35, top:0.4, bottom:0.35, header:0.15, footer:0.15};
-  const border = {top:{style:'thin',color:{rgb:'94A3B8'}},bottom:{style:'thin',color:{rgb:'94A3B8'}},left:{style:'thin',color:{rgb:'94A3B8'}},right:{style:'thin',color:{rgb:'94A3B8'}}};
-  const titleFill = {fgColor:{rgb:'FEF3C7'}};
-  const headerFill = {fgColor:{rgb:'E5E7EB'}};
-  const rankFill = {fgColor:{rgb:'FEF9C3'}};
-  const fontTitle = {name:'Yu Gothic', sz:18, bold:true, color:{rgb:'111827'}};
-  const fontHeader = {name:'Yu Gothic', sz:12, bold:true, color:{rgb:'111827'}};
-  const fontBase = {name:'Yu Gothic', sz:12, color:{rgb:'111827'}};
+  const border = {top:{style:'thin',color:{rgb:'000000'}},bottom:{style:'thin',color:{rgb:'000000'}},left:{style:'thin',color:{rgb:'000000'}},right:{style:'thin',color:{rgb:'000000'}}};
+  // ランキング掲示も BIZ UDPゴシック。文字と罫線は黒、背景だけ薄い赤系にする。
+  const titleFill = {fgColor:{rgb:'FEE2E2'}};
+  const headerFill = {fgColor:{rgb:'FCE7E7'}};
+  const rankFill = {fgColor:{rgb:'FFF5F5'}};
+  const posterFontName = 'BIZ UDPゴシック';
+  const fontTitle = {name:posterFontName, sz:28, bold:true, color:{rgb:'000000'}};
+  const fontHeader = {name:posterFontName, sz:17, bold:true, color:{rgb:'000000'}};
+  const fontBase = {name:posterFontName, sz:18, bold:true, color:{rgb:'000000'}};
   setRangeStyle(ws, range, (R,C,cell)=>{
     const style = {font:fontBase, alignment:{vertical:'center', horizontal:'center', wrapText:true}, border};
     if(R === 0){ style.font = fontTitle; style.fill = titleFill; style.alignment = {vertical:'center', horizontal:'center', wrapText:true}; }
@@ -6168,7 +6206,7 @@ function styleAllListUpdateLogSheet(ws, aoa){
     const range = XLSX.utils.decode_range(ws['!ref']);
     const border = {top:{style:'thin',color:{rgb:'CBD5E1'}},bottom:{style:'thin',color:{rgb:'CBD5E1'}},left:{style:'thin',color:{rgb:'CBD5E1'}},right:{style:'thin',color:{rgb:'CBD5E1'}}};
     setRangeStyle(ws, range, (R,C,cell)=>({
-      font:{name:'Yu Gothic', sz:R===0?10:9, bold:R===0, color:{rgb:'111827'}},
+      font:{name:'Yu Gothic', sz:R===0?10:9, bold:R===0, color:{rgb:'000000'}},
       alignment:{vertical:'top', horizontal:R===0?'center':'left', wrapText:true},
       border,
       fill:R===0?{fgColor:{rgb:'FDE68A'}}:undefined
@@ -6883,6 +6921,7 @@ function styleAllStudentGradeSheet(ws, aoa){
   // 助手用の更新入力シートは、下にスクロールしても1行目タイトル・2行目見出しを固定する。
   // さらに左3列も固定して、生徒名を見失わないようにする。
   setWorksheetFreezePane(ws, 3, 2, 'D3', 'bottomRight');
+  allListSetInitialOpenZoom(ws, aoa, {targetWch:112, minZoom:45, maxZoom:100});
   ws['!pageSetup'] = {orientation:'landscape', paperSize:12, fitToWidth:1, fitToHeight:1};
   ws['!margins'] = {left:0.12, right:0.12, top:0.20, bottom:0.20, header:0.05, footer:0.05};
   if(colCount > 1){
@@ -6900,10 +6939,10 @@ function styleAllStudentGradeSheet(ws, aoa){
   const resultFill = {fgColor:{rgb:'ECFDF5'}};
   const missingFill = {fgColor:{rgb:'FECACA'}};
   const conflictFill = {fgColor:{rgb:'FDE68A'}};
-  const fontTitle = {name:'Yu Gothic', sz:11, bold:true, color:{rgb:'111827'}};
-  const fontHeader = {name:'Yu Gothic', sz:8, bold:true, color:{rgb:'111827'}};
-  const fontBase = {name:'Yu Gothic', sz:7, color:{rgb:'111827'}};
-  const fontRed = {name:'Yu Gothic', sz:7, bold:true, color:{rgb:'991B1B'}};
+  const fontTitle = {name:'Yu Gothic', sz:11, bold:true, color:{rgb:'000000'}};
+  const fontHeader = {name:'Yu Gothic', sz:8, bold:true, color:{rgb:'000000'}};
+  const fontBase = {name:'Yu Gothic', sz:7, color:{rgb:'000000'}};
+  const fontRed = {name:'Yu Gothic', sz:7, bold:true, color:{rgb:'000000'}};
   const fontConflict = {name:'Yu Gothic', sz:7, bold:true, color:{rgb:'92400E'}};
   const conflictCells = new Set(Array.isArray(aoa._allListConflictCells) ? aoa._allListConflictCells : []);
   setRangeStyle(ws, range, (R,C,cell)=>{
@@ -6970,8 +7009,8 @@ function allListPrintHasWarningText(text){
 function allListApplyRichWarningsToCell(cell){
   const text = cell && cell.v != null ? String(cell.v) : '';
   if(!text || !allListPrintHasWarningText(text)) return false;
-  const redFont = {name:'Yu Gothic', sz:8, bold:true, color:{rgb:'991B1B'}};
-  const baseFont = {name:'Yu Gothic', sz:8, color:{rgb:'111827'}};
+  const redFont = {name:'Yu Gothic', sz:6.2, bold:true, color:{rgb:'000000'}};
+  const baseFont = {name:'Yu Gothic', sz:6.2, color:{rgb:'000000'}};
   const runs = [];
   let last = 0;
   const re = allListPrintWarningRegex();
@@ -7151,11 +7190,11 @@ function applyCompactPrintRows(ws, aoa, widths){
 
   const header = aoa?.[1] || [];
   const planResultStartCol = header.findIndex(h => String(h || '').includes('予定'));
-  const planResultWidthMultiplier = 2.2; // 予定・結果は小さい文字なので、高さ計算では横幅を広めに見積もる
+  const planResultWidthMultiplier = 3.0; // 予定・結果は小さい文字なので、高さ計算では横幅をかなり広めに見積もり、無駄な行高を減らす
 
   ws['!rows'] = (aoa || []).map((row, r) => {
-    if(r === 0) return {hpt:16};
-    if(r === 1) return {hpt:16};
+    if(r === 0) return {hpt:14};
+    if(r === 1) return {hpt:13};
     let lines = 1;
     (row || []).forEach((v, c) => {
       const isPlanResultCol = planResultStartCol >= 0 && c >= planResultStartCol;
@@ -7166,7 +7205,7 @@ function applyCompactPrintRows(ws, aoa, widths){
       lines = Math.max(lines, textLineCount(v, effectiveWidth));
     });
     // B4横1ページに収めるため、印刷用だけ行高をさらに圧縮する。
-    return {hpt:Math.max(7, Math.min(64, 1 + lines * 5.5))};
+    return {hpt:Math.max(5.8, Math.min(50, 0.5 + lines * 4.2))};
   });
 }
 
@@ -7221,13 +7260,13 @@ function setHighSpeedRankingPrintAreaTop10(wb, sheetName){
 
 function allListApplyB4LandscapeOnePagePrintSettings(ws){
   if(!ws) return;
-  // B4横・1ページ縮小をできるだけ強くExcelに渡す。
+  // B4横・各学年2ページ縮小をできるだけ強くExcelに渡す。
   // SheetJS系の環境差に備えて、数値属性と明示属性を両方含める。
   ws['!pageSetup'] = {
     paperSize: 12,              // 12 = B4(JIS)
     orientation: 'landscape',   // 横
     fitToWidth: 1,
-    fitToHeight: 1,
+    fitToHeight: 2,
     fitToPage: true,
     usePrinterDefaults: false,
     horizontalDpi: 300,
@@ -7235,7 +7274,7 @@ function allListApplyB4LandscapeOnePagePrintSettings(ws){
   };
   ws['!printOptions'] = {
     horizontalCentered: true,
-    verticalCentered: true
+    verticalCentered: false
   };
   ws['!margins'] = {
     left: 0.03,
@@ -7381,7 +7420,7 @@ function allListForcePrintTextFitAllCells(ws, range){
       if(!ws[addr]) continue;
       ws[addr].s = ws[addr].s || {};
       ws[addr].s.alignment = Object.assign({}, ws[addr].s.alignment || {}, {
-        vertical: 'center',
+        vertical: 'top',
         horizontal: 'center',
         wrapText: true,
         shrinkToFit: true
@@ -7432,12 +7471,13 @@ function styleAllStudentPrintSheet(ws, aoa){
   // ただしB4横1ページに収めるため、列ごとに最小/最大幅を持たせて暴れすぎないようにする。
   const widths = allListBuildAutoPrintWidths(aoa, manualCount, planCount);
   // 印刷用は上下中央揃えを維持しつつ、行高だけを文字量ぎりぎりまで小さくする。
-  const range = applyNiceSheetSettings(ws, aoa, widths, {rows:{min:7,max:64,header:15,pxPerLine:5.5}});
+  const range = applyNiceSheetSettings(ws, aoa, widths, {rows:{min:5.8,max:50,header:13,pxPerLine:4.2}});
   applyCompactPrintRows(ws, aoa, widths);
   // 行高合計と列幅合計の比が、B4横の紙面比に近づくように列幅全体を拡大/縮小する。
   // これで「1ページ縮小」時に上下左右の余白が偏りにくくなる。
   allListAdjustPrintWidthsToB4LandscapeAspect(ws, widths);
-  ws['!freeze'] = {xSplit:2, ySplit:2};
+  setWorksheetFreezePane(ws, 2, 2, 'C3', 'bottomRight');
+  allListSetInitialOpenZoom(ws, aoa, {targetWch:112, minZoom:45, maxZoom:100});
   // 印刷用はB4横・1枚に収める。値がある範囲だけを印刷範囲にし、上下左右中央寄せ。
   allListApplyB4LandscapeOnePagePrintSettings(ws);
   if((aoa[1] || []).length > 1){
@@ -7452,13 +7492,17 @@ function styleAllStudentPrintSheet(ws, aoa){
   const eventFill = {fgColor:{rgb:'F5F3FF'}};
   const planFill = {fgColor:{rgb:'FFF7ED'}};
   const missingFill = {fgColor:{rgb:'FECACA'}};
-  const fontTitle = {name:'Yu Gothic', sz:14, bold:true, color:{rgb:'111827'}};
-  const fontHeader = {name:'Yu Gothic', sz:6, bold:true, color:{rgb:'111827'}};
-  const fontBase = {name:'Yu Gothic', sz:6, color:{rgb:'111827'}};
+  const fontTitle = {name:'Yu Gothic', sz:14, bold:true, color:{rgb:'000000'}};
+  const fontHeader = {name:'Yu Gothic', sz:6.5, bold:true, color:{rgb:'000000'}};
+  const fontBase = {name:'Yu Gothic', sz:7.2, color:{rgb:'000000'}};
+  const fontBaseMid = {name:'Yu Gothic', sz:6.2, color:{rgb:'000000'}};
+  const fontBaseTiny = {name:'Yu Gothic', sz:5.5, color:{rgb:'000000'}};
   // 赤セル文字は名前/通常文字と同じサイズ。
-  const fontMissing = {name:'Yu Gothic', sz:6, bold:true, color:{rgb:'991B1B'}};
-  const fontPlanResultSmall = {name:'Yu Gothic', sz:2.5, color:{rgb:'111827'}};
-  const fontPlanResultHeader = {name:'Yu Gothic', sz:3.5, bold:true, color:{rgb:'111827'}};
+  const fontMissing = {name:'Yu Gothic', sz:6.2, bold:true, color:{rgb:'000000'}};
+  const fontPlanResultSmall = {name:'Yu Gothic', sz:6.4, color:{rgb:'000000'}};
+  const fontPlanResultMid = {name:'Yu Gothic', sz:5.8, color:{rgb:'000000'}};
+  const fontPlanResultTiny = {name:'Yu Gothic', sz:5.2, color:{rgb:'000000'}};
+  const fontPlanResultHeader = {name:'Yu Gothic', sz:5.5, bold:true, color:{rgb:'000000'}};
   const totalCols = (aoa[1] || []).length;
   const eventCol = totalCols - 1 - planCount;
   setRangeStyle(ws, range, (R,C,cell)=>{
@@ -7467,10 +7511,15 @@ function styleAllStudentPrintSheet(ws, aoa){
     // 旧赤判定語はセル全体を赤くせず、後段で該当文字だけ赤字にする。
     const hasBlankWritingField = R>1 && C===eventCol && allListPrintHasBlankWritingField(text);
     const isPlanResultCol = C > eventCol;
-    const cellFont = isPlanResultCol
-      ? (R===1 ? fontPlanResultHeader : fontPlanResultSmall)
-      : (R===0 ? fontTitle : (R===1 ? fontHeader : fontBase));
-    const style = {font:cellFont, alignment:{vertical:'center', horizontal:'center', wrapText:true, shrinkToFit:true}, border};
+    let cellFont;
+    if(isPlanResultCol){
+      const len = allListPrintVisualTextLength(text);
+      cellFont = R===1 ? fontPlanResultHeader : (len > 120 ? fontPlanResultTiny : (len > 70 ? fontPlanResultMid : fontPlanResultSmall));
+    }else{
+      const len = allListPrintVisualTextLength(text);
+      cellFont = R===0 ? fontTitle : (R===1 ? fontHeader : (len > 120 ? fontBaseTiny : (len > 70 ? fontBaseMid : fontBase)));
+    }
+    const style = {font:cellFont, alignment:{vertical:'top', horizontal:'center', wrapText:true, shrinkToFit:true}, border};
     if(R===0) style.fill = titleFill;
     else if(R===1) style.fill = headerFill;
     else if(C<=1) style.fill = nameFill;
@@ -7478,7 +7527,7 @@ function styleAllStudentPrintSheet(ws, aoa){
     else if(C===eventCol) style.fill = hasBlankWritingField ? missingFill : eventFill;
     else if(C>eventCol) style.fill = planFill;
     if(hasBlankWritingField){
-      style.alignment = {vertical:'center', horizontal:'center', wrapText:true, shrinkToFit:true};
+      style.alignment = {vertical:'top', horizontal:'center', wrapText:true, shrinkToFit:true};
     }
     return style;
   });
@@ -7667,32 +7716,34 @@ function downloadWorkbookFromAoa(calendarAoa, listAoa, resultAoa, rosterAoa, log
   const resultRange = applyNiceSheetSettings(wsResult, resultAoa && resultAoa.length ? resultAoa : resultHeader, resultWidths, {rows:{min:24,max:130,header:30,pxPerLine:18}});
   const rosterRange = applyNiceSheetSettings(wsRoster, rosterAoa && rosterAoa.length ? rosterAoa : rosterHeader, rosterWidths, {rows:{min:24,max:95,header:30,pxPerLine:18}});
   const logRange = applyNiceSheetSettings(wsLog, logAoa && logAoa.length ? logAoa : [["ファイル","結果","内容","シート名/詳細"]], logWidths, {rows:{min:24,max:95,header:30,pxPerLine:18}});
-  const posterRange = applyNiceSheetSettings(wsPoster, posterAoa, posterWidths, {rows:{min:54,max:320,header:42,pxPerLine:24}});
+  const posterRange = applyNiceSheetSettings(wsPoster, posterAoa, posterWidths, {rows:{min:58,max:340,header:48,pxPerLine:26}});
   const examSheetRanges = examSheetObjects.map(s => ({...s, range: applyNiceSheetSettings(s.ws, s.aoa, (s.aoa[1] || s.aoa[0] || []).map((_,i)=> i===0?10:i===1?14:i===2?18:i===3?12:12), {rows:{min:24,max:90,header:30,pxPerLine:18}})}));
   const eventSheetRanges = eventSheetObjects.map(s => ({...s, range: applyNiceSheetSettings(s.ws, s.aoa, [10,14,18,18,14,36,20], {rows:{min:24,max:110,header:30,pxPerLine:18}})}));
 
-  const border = {top:{style:"thin",color:{rgb:"98A2B3"}},bottom:{style:"thin",color:{rgb:"98A2B3"}},left:{style:"thin",color:{rgb:"98A2B3"}},right:{style:"thin",color:{rgb:"98A2B3"}}};
-  const headerFill = {fgColor:{rgb:"E5E7EB"}};
-  const nameFill = {fgColor:{rgb:"F1F5F9"}};
-  const weekendFill = {fgColor:{rgb:"F8FAFC"}};
-  const warnFill = {fgColor:{rgb:"FCE7F3"}};
-  const yellowFill = {fgColor:{rgb:"FEF9C3"}};
-  const fontBase = {name:"Yu Gothic", sz:11, color:{rgb:"111827"}};
-  const fontHeader = {name:"Yu Gothic", sz:11, bold:true, color:{rgb:"111827"}};
-  const fontPoster = {name:"Yu Gothic", sz:14, color:{rgb:"111827"}};
-  const fontPosterHeader = {name:"Yu Gothic", sz:14, bold:true, color:{rgb:"111827"}};
-  const fontRed = {name:"Yu Gothic", sz:11, bold:true, color:{rgb:"DC2626"}};
+  const border = {top:{style:"thin",color:{rgb:"000000"}},bottom:{style:"thin",color:{rgb:"000000"}},left:{style:"thin",color:{rgb:"000000"}},right:{style:"thin",color:{rgb:"000000"}}};
+  // 掲示用カレンダーは BIZ UDPゴシック。文字と罫線は黒、背景だけ薄い赤系で遠くから読みやすい太字寄りにする。
+  const headerFill = {fgColor:{rgb:"FCE7E7"}};
+  const nameFill = {fgColor:{rgb:"FFF5F5"}};
+  const weekendFill = {fgColor:{rgb:"FFF8F8"}};
+  const warnFill = {fgColor:{rgb:"FDE2E2"}};
+  const yellowFill = {fgColor:{rgb:"FFF5F5"}};
+  const posterFontName = "BIZ UDPゴシック";
+  const fontBase = {name:posterFontName, sz:12, bold:true, color:{rgb:"000000"}};
+  const fontHeader = {name:posterFontName, sz:13, bold:true, color:{rgb:"000000"}};
+  const fontPoster = {name:posterFontName, sz:16, bold:true, color:{rgb:"000000"}};
+  const fontPosterHeader = {name:posterFontName, sz:16, bold:true, color:{rgb:"000000"}};
+  const fontRed = {name:posterFontName, sz:12, bold:true, color:{rgb:"000000"}};
   // 掲示用は印刷時に全内容が見えるよう、文字量に応じてフォントサイズを少し下げる。
   // 行高も上で文字量に合わせて伸ばしているので、長い結果でも切れにくい。
   function posterFontByText(text){
     const s = String(text ?? "");
     const flatLen = [...s.replace(/\r?\n/g, "")].reduce((n, ch) => n + (ch.charCodeAt(0) > 255 ? 1.7 : 1), 0);
     const lines = s ? s.split(/\r?\n/).length : 1;
-    let sz = 14;
-    if(flatLen > 85 || lines >= 5) sz = 12;
-    if(flatLen > 145 || lines >= 8) sz = 10;
-    if(flatLen > 220 || lines >= 12) sz = 9;
-    return {name:"Yu Gothic", sz, color:{rgb:"111827"}};
+    let sz = 16;
+    if(flatLen > 85 || lines >= 5) sz = 14;
+    if(flatLen > 145 || lines >= 8) sz = 12;
+    if(flatLen > 220 || lines >= 12) sz = 10;
+    return {name:posterFontName, sz, bold:true, color:{rgb:"000000"}};
   }
 
   setRangeStyle(wsCal, calRange, (R,C,cell)=>{
