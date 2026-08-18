@@ -4929,7 +4929,7 @@ function styleMonthlyPosterSheet(ws, aoa){
   const fontBase = {name:posterFontName, sz:15, bold:true, color:{rgb:'000000'}};
   setRangeStyle(ws, range, (R,C,cell)=>{
     const style = {font:fontBase, alignment:{vertical:'center', horizontal:'center', wrapText:true}, border};
-    if(R === 0){ style.font = fontTitle; style.fill = titleFill; style.alignment = {vertical:'center', horizontal:'center', wrapText:false, shrinkToFit:true}; }
+    if(R === 0){ style.font = fontTitle; style.fill = titleFill; style.alignment = {vertical:'center', horizontal:'center', wrapText:true}; }
     else if(R === 1){ style.font = fontHeader; style.fill = headerFill; style.alignment = {vertical:'center', horizontal:'center', wrapText:true}; }
     else if(C < 2){ style.fill = nameFill; }
     return style;
@@ -5073,7 +5073,7 @@ function styleHighSpeedRankingSheet(ws, aoa){
   const cleanAoa = posterMoveNoHitRowsToBottom(aoa || []).map(row => [row?.[0] ?? '', row?.[1] ?? '', row?.[2] ?? '', row?.[3] ?? '']);
   Object.keys(ws).forEach(k=>{ if(k[0] !== '!') delete ws[k]; });
   XLSX.utils.sheet_add_aoa(ws, cleanAoa, {origin:'A1'});
-  const widths = [8,10,42,14];
+  const widths = [8,10,24,14];
   const range = applyNiceSheetSettings(ws, cleanAoa, widths, {rows:{min:38,max:92,header:48,pxPerLine:24}});
   ws['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:3}}];
   ws['!freeze'] = {xSplit:0, ySplit:2};
@@ -6168,10 +6168,6 @@ function allListApplyDropdowns(ws, aoa){
       ws['!dataValidation'] = validations;
       ws['!validations'] = validations;
       ws['!allListDropdownSpecs'] = validations.map(v => ({sqref:v.sqref || v.ref, formula:v.formula1 || (v.formulae && v.formulae[0]) || '', prompt:v.prompt || ''}));
-      // 入力規則だけだと、Excel上で「×」などを選んでも色は変わらない。
-      // 全員分リストの手入力列には、xlsx内部XMLへ条件付き書式も直接入れる。
-      // 対象：× / 不受験 / 未 / 未入力 → 薄赤背景・黒文字（不参加は赤くしない）
-      ws['!allListConditionalFormatSpecs'] = validations.map(v => ({sqref:v.sqref || v.ref}));
       ws['!allListDropdownsApplied'] = validations.length;
       if(typeof log === 'function') log(`全員分リスト入力規則: ${validations.length}列にプルダウンを設定しました。`);
     }catch(e){
@@ -6204,48 +6200,6 @@ function allListPatchWorksheetXmlWithValidations(xml, specs){
   if(insertBefore >= 0) return out.slice(0, insertBefore) + validationXml + out.slice(insertBefore);
   return out + validationXml;
 }
-
-function allListBuildConditionalFormattingXml(specs, dxfId){
-  const arr = (specs || []).filter(v => v && v.sqref);
-  if(!arr.length || dxfId == null || dxfId < 0) return '';
-  return arr.map((v, idx) => {
-    const sqref = allListXmlEscapeAttr(v.sqref);
-    const first = String(v.sqref).split(':')[0] || '';
-    const m = first.match(/^([A-Z]+)(\d+)$/i);
-    if(!m) return '';
-    const col = m[1].toUpperCase();
-    const row = m[2];
-    const cell = `$${col}${row}`;
-    const formula = `OR(${cell}="×",${cell}="不受験",${cell}="未",${cell}="未入力")`;
-    return `<conditionalFormatting sqref="${sqref}"><cfRule type="expression" dxfId="${dxfId}" priority="${idx + 1}"><formula>${allListXmlEscapeText(formula)}</formula></cfRule></conditionalFormatting>`;
-  }).join('');
-}
-function allListPatchWorksheetXmlWithConditionalFormatting(xml, specs, dxfId){
-  const cfXml = allListBuildConditionalFormattingXml(specs, dxfId);
-  if(!cfXml) return xml;
-  let out = String(xml || '').replace(/<conditionalFormatting[\s\S]*?<\/conditionalFormatting>/g, '');
-  const insertBefore = out.search(/<dataValidations\b|<pageMargins\b|<pageSetup\b|<headerFooter\b|<drawing\b|<legacyDrawing\b|<picture\b|<tableParts\b|<extLst\b|<\/worksheet>/);
-  if(insertBefore >= 0) return out.slice(0, insertBefore) + cfXml + out.slice(insertBefore);
-  return out + cfXml;
-}
-function allListPatchStylesXmlForConditionalFormatting(xml){
-  const dxf = '<dxf><font><color rgb="FF000000"/></font><fill><patternFill patternType="solid"><fgColor rgb="FFFECACA"/><bgColor indexed="64"/></patternFill></fill></dxf>';
-  let out = String(xml || '');
-  const m = out.match(/<dxfs\b([^>]*)count="(\d+)"([^>]*)>([\s\S]*?)<\/dxfs>/);
-  if(m){
-    const dxfId = Number(m[2] || 0);
-    const before = out.slice(0, m.index);
-    const after = out.slice(m.index + m[0].length);
-    const attrs = (m[1] + m[3]).replace(/\s*count="\d+"/g,'');
-    const patched = `<dxfs${attrs} count="${dxfId + 1}">${m[4]}${dxf}</dxfs>`;
-    return {xml:before + patched + after, dxfId};
-  }
-  const insertBefore = out.search(/<tableStyles\b|<colors\b|<extLst\b|<\/styleSheet>/);
-  const dxfs = `<dxfs count="1">${dxf}</dxfs>`;
-  if(insertBefore >= 0) return {xml:out.slice(0, insertBefore) + dxfs + out.slice(insertBefore), dxfId:0};
-  return {xml:out + dxfs, dxfId:0};
-}
-
 function allListCrc32Table(){
   if(window.__allListCrc32Table) return window.__allListCrc32Table;
   const table = new Uint32Array(256);
@@ -6336,40 +6290,18 @@ async function allListWriteFileWithDropdownXml(wb, filename){
     const dec = new TextDecoder();
     const enc = new TextEncoder();
     const sheetNames = wb.SheetNames || [];
-    let hasCf = false;
-    for(let i=0;i<sheetNames.length;i++){
-      const ws = wb.Sheets[sheetNames[i]];
-      if(ws && ws['!allListConditionalFormatSpecs'] && ws['!allListConditionalFormatSpecs'].length) hasCf = true;
-    }
-    let redDxfId = -1;
-    if(hasCf){
-      const stylesEntry = entries.find(e => e.name === 'xl/styles.xml');
-      if(stylesEntry){
-        const patchedStyles = allListPatchStylesXmlForConditionalFormatting(dec.decode(stylesEntry.data));
-        stylesEntry.data = enc.encode(patchedStyles.xml);
-        redDxfId = patchedStyles.dxfId;
-      }
-    }
     let patchedCount=0;
-    let cfPatchedCount=0;
     for(let i=0;i<sheetNames.length;i++){
       const ws = wb.Sheets[sheetNames[i]];
       const specs = ws && ws['!allListDropdownSpecs'];
-      const cfSpecs = ws && ws['!allListConditionalFormatSpecs'];
-      if((!specs || !specs.length) && (!cfSpecs || !cfSpecs.length)) continue;
+      if(!specs || !specs.length) continue;
       const path = `xl/worksheets/sheet${i+1}.xml`;
       const entry = entries.find(e => e.name === path);
       if(!entry) continue;
-      let patched = dec.decode(entry.data);
-      if(cfSpecs && cfSpecs.length && redDxfId >= 0){
-        patched = allListPatchWorksheetXmlWithConditionalFormatting(patched, cfSpecs, redDxfId);
-        cfPatchedCount++;
-      }
-      if(specs && specs.length){
-        patched = allListPatchWorksheetXmlWithValidations(patched, specs);
-        patchedCount++;
-      }
+      const xml = dec.decode(entry.data);
+      const patched = allListPatchWorksheetXmlWithValidations(xml, specs);
       entry.data = enc.encode(patched);
+      patchedCount++;
     }
     if(!patchedCount) throw new Error('入力規則を付ける対象列が見つかりませんでした。');
     const outBytes = allListBuildStoredZip(entries);
@@ -6380,7 +6312,7 @@ async function allListWriteFileWithDropdownXml(wb, filename){
     document.body.appendChild(a);
     a.click();
     setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();}, 1000);
-    if(typeof log === 'function') log(`全員分リスト入力規則: ${patchedCount}シートにExcel XMLとして確実に書き込みました。条件付き書式: ${cfPatchedCount}シートに「×/未/不受験=薄赤」を設定しました。`);
+    if(typeof log === 'function') log(`全員分リスト入力規則: ${patchedCount}シートにExcel XMLとして確実に書き込みました。`);
   }catch(e){
     console.error('入力規則XML書き込みに失敗', e);
     if(typeof log === 'function') log('入力規則XML書き込みに失敗したため通常保存に戻します: ' + (e && e.message ? e.message : e));
