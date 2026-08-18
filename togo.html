@@ -77,6 +77,10 @@ summary{cursor:pointer;font-weight:900;font-size:13px;}
 .previewCard{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px;box-shadow:var(--shadow);}
 .previewWrap{overflow:auto;height:calc(100vh - 285px);min-height:460px;border:1px solid var(--line);border-radius:8px;background:#fff;}
 .hidden{display:none!important;}
+.visuallyHiddenFileInput{position:fixed!important;left:-10000px!important;top:0!important;width:1px!important;height:1px!important;opacity:0!important;}
+.filePickLabel{display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:8px;padding:9px 12px;background:var(--accent);color:#fff;font-weight:900;cursor:pointer;margin:0;font-size:13px;white-space:nowrap;min-height:38px;height:38px;box-shadow:0 1px 2px rgba(15,23,42,.08);user-select:none;}
+.filePickLabel.ok{background:var(--ok);color:#fff;}
+.filePickLabel:focus{outline:3px solid rgba(37,99,235,.25);outline-offset:2px;}
 table{border-collapse:collapse;background:#fff;width:max-content;min-width:100%;}
 th,td{border:1px solid #98a2b3;padding:6px 8px;vertical-align:top;min-width:110px;max-width:260px;white-space:pre-wrap;word-break:break-word;font-size:12px;}
 th{background:#f2f4f7;position:sticky;top:0;z-index:2;}
@@ -382,7 +386,7 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
       <div class="headerHint">①フォルダー読取 → ②統合 → ③結果履歴保存 → ④出力</div>
     </div>
     <div class="headerActions">
-      <button id="readBundleTopBtn" class="ok primaryAction" type="button">① フォルダーを読み取る</button>
+      <button id="readBundleTopBtn" class="ok primaryAction filePickLabel" type="button">① フォルダーを読み取る</button>
       <button id="mergeBtn" class="ok primaryAction">② 統合する</button>
       <button id="saveResultHistoryBtn" class="saveImportant primaryAction" type="button">③ 結果履歴を保存</button>
       <button id="download2wBtn" class="outputAction" disabled>④ 2週間出力</button>
@@ -411,7 +415,7 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
       
 
       <!-- 下のinputは処理用に非表示で保持。 -->
-      <input id="bundleFolderInput" class="hidden" type="file" webkitdirectory directory multiple />
+      <input id="bundleFolderInput" class="visuallyHiddenFileInput" type="file" webkitdirectory directory multiple />
       <input id="folderInput" class="hidden" type="file" webkitdirectory directory multiple accept=".xlsx,.xls,.xlsm" />
       <input id="rosterInput" class="hidden" type="file" accept=".xlsx,.xls,.xlsm,.csv" />
       <input id="resultInput" class="hidden" type="file" multiple accept=".xlsx,.xls,.xlsm" />
@@ -7210,6 +7214,19 @@ function pathPartsOfFile(file){
 function filePathIncludes(file, keyword){
   return pathPartsOfFile(file).some(p => p.includes(keyword));
 }
+function isYoteiInputAreaFile(file){
+  const parts = pathPartsOfFile(file);
+  // 基本構造：保存復元/打ち込み結果/担任助手フォルダー/助手名/生徒名/予定Excel
+  // 保存復元フォルダではなく「打ち込み結果」や「担任助手フォルダー」から選んだ場合でも拾えるようにする。
+  const inKnownExcluded = ['全員分リスト','全員リスト','毎日更新','毎日掲示','全体予定表','科目リスト','対応表','Comiru','コミル','json','履歴']
+    .some(k => filePathIncludes(file, k));
+  if(inKnownExcluded) return false;
+  if(filePathIncludes(file, '打ち込み結果')) return true;
+  if(filePathIncludes(file, '担任助手フォルダー') || filePathIncludes(file, '担任助手フォルダ')) return true;
+  // フォルダ選択位置が「担任助手フォルダー」直下や「打ち込み結果」直下だった場合、
+  // 相対パスが 助手名/生徒名/Excel だけになることがあるので、3階層以上なら予定候補に残す。
+  return parts.length >= 3;
+}
 
 function latestFileLabel(files){
   const arr=[...(files||[])].sort((a,b)=>(b.lastModified-a.lastModified)||String(a.name).localeCompare(String(b.name),'ja'));
@@ -7260,7 +7277,7 @@ async function setBundleFolderFiles(fileList){
     const isCsv = /\.csv$/i.test(name);
     const isJson = /\.json$/i.test(name);
     const parts = pathPartsOfFile(f).map(p => p.toLowerCase());
-    const relLower = String(f.webkitRelativePath || f.name || '').toLowerCase();
+    const relLower = normalizePickedFilePath(f).toLowerCase();
 
     // 現在の運用：
     // 保存復元フォルダ/毎日更新/毎日更新.xlsx は「結果データ」。
@@ -7276,8 +7293,8 @@ async function setBundleFolderFiles(fileList){
     else if(isCsv && (filePathIncludes(f, 'Comiru') || filePathIncludes(f, 'コミル') || /comiru|コミル/i.test(relLower))) comiruCsvs.push(f);
     // 掲示用手修正版を置く場合は「毎日掲示」フォルダだけを使う。
     else if(isExcel && filePathIncludes(f, '毎日掲示')) dailyPosters.push(f);
-    else if(isExcel && filePathIncludes(f, '打ち込み結果') && isYoteiInputWorkbookCandidate(f)) planned.push(f);
-    else if(isExcel && filePathIncludes(f, '打ち込み結果') && isGoukakuWorkbookFile(f)) {
+    else if(isExcel && isYoteiInputAreaFile(f) && isYoteiInputWorkbookCandidate(f)) planned.push(f);
+    else if(isExcel && isYoteiInputAreaFile(f) && isGoukakuWorkbookFile(f)) {
       // 生徒フォルダ直下の合格設計図Excelは入力用の復元/印刷専用。統合用の予定Excelとしては読まない。
     }
     else if((isExcel || isCsv) && filePathIncludes(f, '対応表')) rosters.push(f);
@@ -7342,22 +7359,97 @@ function setResultHistoryFiles(fileList){
   log(`結果履歴JSON選択完了\nJSONファイル: ${state.resultHistoryFiles.length}件\n毎日更新.xlsxを更新した日は「③ 結果履歴を保存」を押してから出力してください。`);
 }
 
-function openBundleFolderInput(){
+async function collectFilesFromDirectoryHandle(dirHandle, prefix=""){
+  const out=[];
+  for await (const [name, handle] of dirHandle.entries()){
+    if(!name || /^\./.test(name)) continue;
+    const rel = prefix ? `${prefix}/${name}` : name;
+    if(handle.kind === "file"){
+      try{
+        const file = await handle.getFile();
+        // showDirectoryPicker で得た File には webkitRelativePath がないため、
+        // 既存の自動振り分け処理がそのまま動くように相対パスを付与する。
+        try{ Object.defineProperty(file, "webkitRelativePath", {value:rel, configurable:true}); }catch(_){ file._relativePath = rel; }
+        out.push(file);
+      }catch(e){
+        console.warn("ファイル取得失敗", rel, e);
+      }
+    }else if(handle.kind === "directory"){
+      out.push(...await collectFilesFromDirectoryHandle(handle, rel));
+    }
+  }
+  return out;
+}
+function normalizePickedFilePath(file){
+  return String(file?.webkitRelativePath || file?._relativePath || file?.name || '');
+}
+// 既存処理は webkitRelativePath を見るので、File System Access API 用の予備パスもここで吸収する。
+const __originalPathPartsOfFile = pathPartsOfFile;
+pathPartsOfFile = function(file){
+  return normalizePickedFilePath(file).split(/[\/]+/).filter(Boolean);
+};
+async function openBundleFolderInput(){
   const input = $("bundleFolderInput");
+  // Chrome/Edge では showDirectoryPicker の方が安定する。
+  // 必ずユーザーのクリック直後に呼ぶため、この関数の最初で実行する。
+  if(window.showDirectoryPicker){
+    try{
+      const root = await window.showDirectoryPicker({mode:"read"});
+      if($('bundleReadSummary')) $('bundleReadSummary').textContent = 'フォルダーを読み取り中です…';
+      log('保存復元フォルダーを読み取り中です…');
+      const files = await collectFilesFromDirectoryHandle(root, root.name || '保存復元');
+      if(!files.length){
+        log('選択したフォルダー内に読み取れるファイルがありません。保存復元フォルダーの中身を確認してください。');
+        if($('bundleReadSummary')) $('bundleReadSummary').textContent = '読み取れるファイルがありません。';
+        return;
+      }
+      await setBundleFolderFiles(files);
+      return;
+    }catch(e){
+      if(e && (e.name === 'AbortError' || e.name === 'NotAllowedError')){
+        log('フォルダー選択がキャンセルされました。もう一度①フォルダーを読み取るを押してください。');
+        return;
+      }
+      console.warn('showDirectoryPicker失敗。file inputへ切替', e);
+      log('フォルダー選択APIで読み取れなかったため、従来方式に切り替えます。もう一度フォルダーを選んでください。');
+    }
+  }
   if(!input) return;
-  // 同じ保存復元フォルダを選び直した場合でも change が必ず発火するように、開く直前にリセットする。
-  // また、上部ボタン→下部ボタンの間接クリックではブラウザにブロックされることがあるため、各ボタンから直接この関数を呼ぶ。
   input.value = "";
   input.click();
 }
-$("readBundleBtn").addEventListener("click", openBundleFolderInput);
-$("bundleFolderInput").addEventListener("change", e => {
-  const files = e.target.files;
-  if(!files || !files.length){
-    log("保存復元フォルダの選択がキャンセルされたか、読み取れるファイルがありません。もう一度①フォルダー読取を押してください。");
-    return;
+function bindBundleReadButton(id){
+  const el=$(id);
+  if(!el || el.dataset.bundleReadBound === '1') return;
+  el.dataset.bundleReadBound = '1';
+  el.addEventListener("click", async ev => {
+    ev.preventDefault();
+    try{ await openBundleFolderInput(); }
+    catch(e){
+      console.error(e);
+      alert('フォルダー読み取りでエラーが出ました：' + (e.message || e));
+      log('フォルダー読み取りエラー：' + (e.message || e));
+    }
+  });
+}
+bindBundleReadButton("readBundleTopBtn");
+bindBundleReadButton("readBundleBtn");
+$("bundleFolderInput").addEventListener("change", async e => {
+  try{
+    const files = e.target.files;
+    if(!files || !files.length){
+      log("保存復元フォルダの選択がキャンセルされたか、読み取れるファイルがありません。もう一度①フォルダー読取を押してください。");
+      return;
+    }
+    if($('bundleReadSummary')) $('bundleReadSummary').textContent = 'フォルダーを読み取り中です…';
+    await setBundleFolderFiles(files);
+  }catch(err){
+    console.error(err);
+    alert('フォルダー読み取りでエラーが出ました：' + (err.message || err));
+    log('フォルダー読み取りエラー：' + (err.message || err));
+  }finally{
+    e.target.value = "";
   }
-  setBundleFolderFiles(files);
 });
 $("folderInput").addEventListener("change", e => setFiles(e.target.files));
 $("resultInput").addEventListener("change", e => setResultFiles(e.target.files));
@@ -7429,29 +7521,6 @@ document.addEventListener('DOMContentLoaded', function(){
   tabButtons.forEach(btn => btn.addEventListener('click', () => markActive(btn.getAttribute('data-pane'))));
   markActive('calendarPane');
 });
-</script>
-
-
-<script>
-(function(){
-  function setupTopReadBundleButton(){
-    const topBtn = document.getElementById('readBundleTopBtn');
-    if(!topBtn || topBtn.dataset.bound === '1') return;
-    topBtn.dataset.bound = '1';
-    topBtn.addEventListener('click', function(){
-      // 間接クリックにするとフォルダ選択が開かない環境があるため、入力欄を直接開く。
-      const input = document.getElementById('bundleFolderInput');
-      if(!input) return;
-      input.value = '';
-      input.click();
-    });
-  }
-  if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', setupTopReadBundleButton);
-  }else{
-    setupTopReadBundleButton();
-  }
-})();
 </script>
 
 
