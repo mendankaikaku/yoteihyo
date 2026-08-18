@@ -372,13 +372,6 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
   }
 }
 
-
-.manualPriorityBox{grid-column:1 / -1;border:1px solid #bfdbfe;background:#eff6ff;border-radius:10px;padding:10px;margin-top:10px;}
-.manualPriorityBox h3{margin:0 0 8px;font-size:14px;}
-.manualPriorityBox table{width:100%;border-collapse:collapse;background:#fff;}
-.manualPriorityBox th,.manualPriorityBox td{border:1px solid #cbd5e1;padding:6px 8px;font-size:12px;text-align:left;vertical-align:top;white-space:normal;}
-.manualPriorityBox th{background:#dbeafe;}
-
 </style>
 </head>
 <body>
@@ -392,28 +385,28 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
       <button id="readBundleTopBtn" class="ok primaryAction" type="button">① フォルダーを読み取る</button>
       <button id="mergeBtn" class="ok primaryAction">② 統合する</button>
       <button id="saveResultHistoryBtn" class="saveImportant primaryAction" type="button">③ 結果履歴を保存</button>
-      <button id="download2wBtn" class="outputAction">④ 2週間出力</button>
-      <button id="download1mBtn" class="outputAction">④ 1か月出力</button>
-      <button id="downloadBtn" class="outputAction">④ 期間指定出力</button>
-      <button id="downloadAllListBtn" class="outputAction">④ 全員分リスト</button>
-      <button id="downloadExamSubjectListBtn" class="outputAction">④ 科目リスト出力</button>
+      <button id="download2wBtn" class="outputAction" disabled>④ 2週間出力</button>
+      <button id="download1mBtn" class="outputAction" disabled>④ 1か月出力</button>
+      <button id="downloadBtn" class="outputAction" disabled>④ 期間指定出力</button>
+      <button id="downloadAllListBtn" class="outputAction" disabled>④ 全員分リスト</button>
+      <button id="downloadExamSubjectListBtn" class="outputAction" disabled>④ 科目リスト出力</button>
       <button id="downloadMonthlyPosterBtn" class="outputAction">④ 毎日掲示</button>
       <div id="dailyPosterTargetPreview" class="hint" style="margin-top:6px;line-height:1.55;white-space:pre-wrap;"></div>
       <button id="clearBtn" class="secondary">リセット</button>
     </div>
   </div>
-  <div id="outputButtonReason" class="outputBlockerNote">④ボタンは常に押せます。先に①フォルダー読取をすると、出力内容が入ります。</div>
+  <div id="outputButtonReason" class="outputBlockerNote">まだ保存復元フォルダーを読み込んでいません。</div>
 </header>
 
 <div class="wrap">
   <section class="controlGrid">
     <div class="card">
       <p class="cardTitle"><span class="step">①</span>フォルダーを読み取る</p>
-      <div class="hint" style="margin-bottom:10px;">「保存復元フォルダー」を選ぶだけで、json / 毎日更新 / 打ち込み結果 / 対応表 / 全員分リスト / 科目リスト / 全体予定表 / Comiru を自動で振り分けます。※画面では「保存復元フォルダー」という名前で統一しています。</div>
+      <div class="hint" style="margin-bottom:10px;">「まとめて復元」フォルダーを選ぶだけで、json / 毎日更新 / 打ち込み結果 / 対応表 / 全員分リスト / 毎日更新 / 全体予定表 を自動で振り分けます。</div>
       <div class="bundleActionGrid">
         <button id="readBundleBtn" class="ok primaryAction" type="button">① フォルダーを読み取る</button>
       </div>
-      <div class="safetyNote">出力前に③を押して、毎日更新.xlsxを result_history.json に退避します。押し忘れると、毎日更新.xlsxを次の日に上書きしたあと、過去結果を掲示へ戻せなくなる可能性があります。</div>
+      <div class="safetyNote">出力前に③を押して、毎日更新.xlsxを result_history.json に退避します。</div>
       <div id="bundleReadSummary" class="hint" style="margin-top:10px;white-space:pre-wrap;">まだ読み込んでいません</div>
       
 
@@ -452,8 +445,8 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
             <li>アプリとは関係なく毎日更新フォルダから毎日更新.xlsxに前日の結果を貼り付ける。</li>
             <li>毎日更新.xlsxを上書き保存して閉じる。</li>
             <li>このアプリで①フォルダー読取 → ②統合 → ③結果履歴を保存。</li>
-            <li>④毎日掲示を押して、出たExcelを開いて印刷。画面上部の「毎日掲示の対象」を見て、対象日が合っているか確認する。</li>
-            <li>毎日掲示.xlsxは「毎日掲示」フォルダーに保存</li>
+            <li>④毎日掲示を押して、出たExcelを開いて印刷。</li>
+            <li>毎日掲示.xlsxは毎日"掲示"フォルダに保存</li>
           </ol>
         </div>
 
@@ -489,20 +482,6 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
             <li>見出し行(1行目)は消さない。列の追加・並び替えはOK。</li>
           </ul>
         </div>
-      </div>
-
-
-
-      <div class="manualPriorityBox">
-        <h3>優先順位・上書きルール</h3>
-        <table>
-          <tr><th>内容</th><th>優先されるもの</th><th>注意</th></tr>
-          <tr><td>通常の予定・結果</td><td>入力用から出た個人Excelの具体値</td><td>同じ生徒・同じ予定が複数ある場合は新しいファイルを優先。空欄では上書きしない。</td></tr>
-          <tr><td>模試科目</td><td>科目リストフォルダー内の手修正Excel</td><td>入力用やComiruと違う場合、科目リストの手修正を優先する。</td></tr>
-          <tr><td>当日/後日/不受験・Comiru・備考</td><td>全員分リストフォルダー内の手修正Excel</td><td>フロントで聞いた内容を残すため、手修正をできるだけ維持する。</td></tr>
-          <tr><td>毎日掲示</td><td>アプリを開いた日の前日・開いた月</td><td>開きっぱなしで日付をまたいだ場合は、いったん開き直す。</td></tr>
-        </table>
-        <div class="manualMini">③結果履歴を保存は、毎日更新.xlsxを result_history.json に退避するためのボタンです。押し忘れると、毎日更新.xlsxを上書きした後に過去の掲示データを復元しにくくなります。</div>
       </div>
 
       <div class="manualMini">
@@ -625,11 +604,9 @@ const APP_OPENED_AT = new Date();
 
 const $ = id => document.getElementById(id);
 function setDownloadButtonsDisabled(disabled){
-  // v本番 出力条件解除版：④の出力ボタンは常に押せるようにする。
-  // データ不足時はボタンを無効化せず、押した後に理由をログ/ダイアログで案内する。
   ["downloadBtn","download2wBtn","download1mBtn","downloadAllListBtn","downloadExamSubjectListBtn"].forEach(id => {
     const el = $(id);
-    if(el) el.disabled = false;
+    if(el) el.disabled = disabled;
   });
 }
 function hasPlanOutputSource(){
@@ -646,9 +623,9 @@ function buildOutputButtonReasonText(){
   const hasPlanFiles = hasPlanOutputSource();
   const hasPosterFiles = hasDailyPosterSource();
   if(hasPlanFiles){
-    lines.push(`✅ 2週間・1か月・期間指定・全員分リスト・科目リスト：④は押せます（打ち込み結果 ${state.files.length}件）`);
+    lines.push(`✅ 2週間・1か月・期間指定・全員分リスト・科目リスト：出力できます（打ち込み結果 ${state.files.length}件）`);
   }else{
-    lines.push('ℹ 2週間・1か月・期間指定・全員分リスト・科目リスト：④は押せます。ただし保存復元フォルダー/打ち込み結果/ が空の場合、出力は空または対象なしになります。');
+    lines.push('⚠ 2週間・1か月・期間指定・全員分リスト・科目リスト：保存復元フォルダー/打ち込み結果/ に入力用で出した予定Excelがないため押せません。');
   }
   if(hasPosterFiles){
     const daily = Array.isArray(state.resultFiles) ? state.resultFiles.length : 0;
@@ -656,7 +633,7 @@ function buildOutputButtonReasonText(){
     const memory = (Array.isArray(state.resultRecords) ? state.resultRecords.length : 0) + (Array.isArray(state.resultHistoryRecords) ? state.resultHistoryRecords.length : 0);
     lines.push(`✅ 毎日掲示：出力できます（毎日更新.xlsx ${daily}件 / result_history.json ${hist}件 / 画面内履歴 ${memory}件）`);
   }else{
-    lines.push('ℹ 毎日掲示：④は押せます。ただし毎日更新.xlsx / result_history.json がない場合、対象なしになる可能性があります。');
+    lines.push('⚠ 毎日掲示：保存復元フォルダー/毎日更新/毎日更新.xlsx または 保存復元フォルダー/json/result_history.json がないため押せません。');
   }
   return lines.join('\n');
 }
@@ -664,14 +641,13 @@ function refreshOutputButtonReason(){
   const note = $('outputButtonReason');
   if(note){
     note.textContent = buildOutputButtonReasonText();
-    note.classList.toggle('ok', true);
+    note.classList.toggle('ok', hasPlanOutputSource() && hasDailyPosterSource());
   }
   const monthlyBtn = $('downloadMonthlyPosterBtn');
-  if(monthlyBtn) monthlyBtn.disabled = false;
-  setDownloadButtonsDisabled(false);
+  if(monthlyBtn) monthlyBtn.disabled = !hasDailyPosterSource();
 }
 function updateMainOutputButtons(){
-  // 保存復元フォルダーを読んだ時点で、上部の出力ボタンを押せるようにする。
+  // まとめて復元フォルダーを読んだ時点で、上部の出力ボタンを押せるようにする。
   // まだ統合プレビューを押していない場合は、出力ボタン側で自動的にプレビューを作成してから出力する。
   const hasPlanFiles = hasPlanOutputSource();
   setDownloadButtonsDisabled(!hasPlanFiles);
@@ -679,14 +655,15 @@ function updateMainOutputButtons(){
 }
 async function ensureWorkbookReadyForOutput(){
   if(state.workbookReady) return true;
-  // v本番 出力条件解除版：打ち込み結果がなくても、まず統合処理を走らせる。
-  // merge() 側も空の打ち込み結果を許可し、毎日更新/result_history/Comiru/手修正ファイルだけでも確認できるようにする。
-  await merge();
-  if(!state.workbookReady){
-    log('出力対象データが見つかりませんでした。④ボタンは押せますが、保存復元フォルダー/打ち込み結果/、毎日更新.xlsx、result_history.json のいずれも空の可能性があります。');
+  if(hasPlanOutputSource()){
+    await merge();
+    return !!state.workbookReady;
   }
+  const reason = '出力できません。\n保存復元フォルダー/打ち込み結果/ に入力用で出した予定Excelがありません。\n入力用で対象生徒を保存してから、統合用で①フォルダーを読み直してください。';
+  alert(reason);
+  log(reason);
   refreshOutputButtonReason();
-  return true;
+  return false;
 }
 function log(msg){ $("status").textContent = msg; }
 function esc(s){ return String(s ?? "").replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
@@ -803,28 +780,7 @@ function getHeaderMap(aoa){
 // ============================================================
 // 1. 対応表の読み取り・名前照合
 // ============================================================
-const ROSTER_COLUMNS = ["学年","生徒番号","生徒名","カナ","電話番号①","電話番号②","高校","担当助手名","備考"];
-function rosterLooksLikePhone(s){
-  const v = String(s ?? '').replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0)-0xFEE0)).trim();
-  return /(?:\d{2,4}[-ー−]?\d{2,4}[-ー−]?\d{3,4}|^0\d{8,10}$)/.test(v);
-}
-function normalizeSchoolForAllList(s){
-  let v = String(s ?? '').trim();
-  if(!v) return '';
-  v = v.replace(/[\s　]+/g,'');
-  v = v.replace(/^(大阪府立|兵庫県立|京都府立|奈良県立|滋賀県立|和歌山県立|府立|県立|市立|私立|国立)/,'');
-  v = v.replace(/高等学校$/,'').replace(/高校$/,'');
-  return v;
-}
-function normalizeGradeForAllList(g){
-  let s = String(g ?? '').replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0)-0xFEE0)).replace(/[\s　]+/g,'').trim();
-  if(!s) return '';
-  s = s.replace(/^高校([123])年?$/, '高$1').replace(/^([123])年?$/, '高$1');
-  s = s.replace(/^高一$/, '高1').replace(/^高二$/, '高2').replace(/^高三$/, '高3');
-  s = s.replace(/^中一$/, '中1').replace(/^中二$/, '中2').replace(/^中三$/, '中3');
-  if(/^(高[123]|中[123]|小[1-6]|浪人|既卒|高卒|学年未設定)$/.test(s)) return s;
-  return '';
-}
+const ROSTER_COLUMNS = ["生徒番号","学年","生徒名","読み仮名","担当","高校","備考"];
 function normalizeNameKey(s){ return String(s ?? "").replace(/[\s\u3000]+/g, "").trim(); }
 function normalizeStudentNoKey(s){
   let v = String(s ?? "")
@@ -855,7 +811,7 @@ function lookupRosterByStudentNo(studentNo){
   return null;
 }
 function emptyRoster(student=""){
-  return {"学年":"","生徒番号":"","生徒名":student,"カナ":"","読み仮名":"","電話番号①":"","電話番号②":"","高校":"","担当助手名":"","担当":"","備考":""};
+  return {"生徒番号":"","学年":"","生徒名":student,"読み仮名":"","担当":"","高校":"","備考":""};
 }
 function getRosterHeaderMap(aoa){
   const header = (aoa[0] || []).map(x => norm(x));
@@ -874,10 +830,8 @@ function getRosterHeaderMap(aoa){
     studentNo: find(["生徒番号","生徒No","生徒Ｎｏ","番号","ID","id"]),
     grade: find(["学年","学年名","grade"]),
     student: find(["生徒名","氏名","名前","生徒","name"]),
-    kana: find(["カナ","かな","読み仮名","よみがな","ふりがな","フリガナ","読み"]),
-    phone1: find(["電話番号①","電話番号1","電話1","電話①","電話番号","電話","TEL1","tel1","TEL"]),
-    phone2: find(["電話番号②","電話番号2","電話2","電話②","TEL2","tel2"]),
-    teacher: find(["担当助手名","担当助手","担任助手","助手","担当","担当者","担任"]),
+    kana: find(["読み仮名","よみがな","ふりがな","フリガナ","読み","かな"]),
+    teacher: find(["担当","担当者","担任"]),
     school: find(["高校","学校","高校名"]),
     note: find(["備考","メモ","その他","注意"])
   };
@@ -1130,39 +1084,24 @@ async function parseRosterFile(file){
   }
 
   function metaFromFixedColumns(row, sheetName=""){
-    const newLayout = !!(norm(row[7]) || norm(row[8]) || rosterLooksLikePhone(row[4]) || rosterLooksLikePhone(row[5]));
-    const kana = norm(row[3]);
-    const teacher = newLayout ? norm(row[7]) : norm(row[4]);
-    const school = newLayout ? norm(row[6]) : norm(row[5]);
-    const note = newLayout ? norm(row[8]) : norm(row[6]);
     return {
-      "学年": normalizeGradeForAllList(norm(row[0]) || (/^\d/.test(sheetName) ? sheetName : "")) || norm(row[0]) || (/^\d/.test(sheetName) ? sheetName : ""),
+      "学年": norm(row[0]) || (/^\d/.test(sheetName) ? sheetName : ""),
       "生徒番号": norm(row[1]),
       "生徒名": norm(row[2]),
-      "カナ": kana,
-      "読み仮名": kana,
-      "電話番号①": newLayout ? norm(row[4]) : "",
-      "電話番号②": newLayout ? norm(row[5]) : "",
-      "高校": school,
-      "担当助手名": teacher,
-      "担当": teacher,
-      "備考": note
+      "読み仮名": norm(row[3]),
+      "担当": norm(row[4]),
+      "高校": norm(row[5]),
+      "備考": norm(row[6])
     };
   }
 
   function metaFromHeader(row, h, sheetName=""){
-    const kana = h.kana >= 0 ? norm(row[h.kana]) : "";
-    const teacher = h.teacher >= 0 ? norm(row[h.teacher]) : "";
     return {
       "生徒番号": h.studentNo >= 0 ? norm(row[h.studentNo]) : "",
-      "学年": normalizeGradeForAllList(h.grade >= 0 ? norm(row[h.grade]) : (/^\d/.test(sheetName) ? sheetName : "")) || (h.grade >= 0 ? norm(row[h.grade]) : (/^\d/.test(sheetName) ? sheetName : "")),
+      "学年": h.grade >= 0 ? norm(row[h.grade]) : (/^\d/.test(sheetName) ? sheetName : ""),
       "生徒名": h.student >= 0 ? norm(row[h.student]) : "",
-      "カナ": kana,
-      "読み仮名": kana,
-      "電話番号①": h.phone1 >= 0 ? norm(row[h.phone1]) : "",
-      "電話番号②": h.phone2 >= 0 ? norm(row[h.phone2]) : "",
-      "担当助手名": teacher,
-      "担当": teacher,
+      "読み仮名": h.kana >= 0 ? norm(row[h.kana]) : "",
+      "担当": h.teacher >= 0 ? norm(row[h.teacher]) : "",
       "高校": h.school >= 0 ? norm(row[h.school]) : "",
       "備考": h.note >= 0 ? norm(row[h.note]) : ""
     };
@@ -1240,14 +1179,41 @@ async function parseRosterFile(file){
   return {count:map.size, message:`対応表読み込み: ${map.size}名\n${sheetLogs.join(" / ")}`};
 }
 function getStudentNameFromPath(file){
-  const mode = $("studentMode").value;
+  const mode = $("studentMode")?.value || "folder";
   const rel = file.webkitRelativePath || file.name;
   const parts = rel.split("/").filter(Boolean);
-  if(mode === "file") return file.name.replace(/\.(xlsx|xlsm|xls)$/i, "").replace(/[._-]?\d{1,4}[年月\/-].*$/u, "").trim() || file.name;
-  // folder mode: if root/student/file.xlsx, student is parts[1]. if student/file.xlsx, student is parts[0].
+  const baseName = (file.name || "").replace(/\.(xlsx|xlsm|xls)$/i, "").replace(/[._-]?\d{1,4}[年月\/-].*$/u, "").trim() || (file.name || "");
+  if(mode === "file") return baseName;
+
+  // 現行構造：保存復元/打ち込み結果/担任助手フォルダー/助手名/生徒名/生徒名.xxxx.xlsx
+  // この場合はファイル直前のフォルダー＝生徒名。旧版の parts[1] 固定だと「打ち込み結果」を生徒名扱いしてしまう。
+  if(parts.length >= 2){
+    const filePart = parts[parts.length - 1];
+    const parent = parts[parts.length - 2] || "";
+    if(filePart === file.name && parent && !/打ち込み結果|担任助手フォルダ|担任助手フォルダー|保存復元|全員分リスト|毎日更新|json|対応表|科目リスト|Comiru|コミル/i.test(parent)){
+      return parent;
+    }
+  }
+
+  // 旧構造の保険：root/student/file.xlsx または student/file.xlsx
   if(parts.length >= 3) return parts[1];
   if(parts.length >= 2) return parts[0];
-  return file.name.replace(/\.(xlsx|xlsm|xls)$/i, "");
+  return baseName;
+}
+
+function isGoukakuWorkbookFile(file){
+  const name = String(file?.name || '');
+  const rel = String(file?.webkitRelativePath || name || '');
+  return /合格\s*設計図|合格設計|設計図|アプリ編集済/i.test(name) || /合格\s*設計図|合格設計|設計図|アプリ編集済/i.test(rel);
+}
+
+function isYoteiInputWorkbookCandidate(file){
+  const name = String(file?.name || '');
+  if(!/\.(xlsx|xlsm|xls)$/i.test(name)) return false;
+  if(isGoukakuWorkbookFile(file)) return false;
+  if(/^~\$/.test(name) || /^\./.test(name)) return false;
+  // 入力用Excelは基本「生徒名.8月18日-8月24日.xlsx」。ただし古い手元ファイルもあるので、打ち込み結果配下で合格設計図でなければ候補に残す。
+  return true;
 }
 
 async function readFileAsArrayBuffer(file){
@@ -1259,7 +1225,7 @@ function shouldSkipFile(file){
 }
 function shouldSkipBundleFile(file){
   const name = String(file?.name || '');
-  // 保存復元フォルダーでは Excel / CSV / JSON を読む。
+  // まとめて復元フォルダーでは Excel / CSV / JSON を読む。
   // 以前は shouldSkipFile() を使っていたため、JSON と CSV がここで除外されていた。
   if(/^~\$/.test(name)) return true;
   if(/^\./.test(name)) return true;
@@ -2781,13 +2747,10 @@ function dedupeEventRecordsByLatest(records, logRows){
 
 async function merge(){
   const files = state.files.filter(f => !shouldSkipFile(f));
+  if(!files.length){ alert("Excelファイルを選択してください"); return; }
   $("mergeBtn").disabled = true;
-  setDownloadButtonsDisabled(false);
-  if(!files.length){
-    log(`読み込み中...\n対象Excel: 0件（打ち込み結果なし）\n毎日更新.xlsx: ${state.resultFiles.length}件\n※④ボタンは押せます。予定系の出力は空または対象なしになります。`);
-  }else{
-    log(`読み込み中...\n対象Excel: ${files.length}件\n毎日更新.xlsx: ${state.resultFiles.length}件`);
-  }
+  setDownloadButtonsDisabled(true);
+  log(`読み込み中...\n対象Excel: ${files.length}件\n毎日更新.xlsx: ${state.resultFiles.length}件`);
 
   let allRecords = [];
   let allExamRecords = [];
@@ -2854,9 +2817,7 @@ async function merge(){
   state.listAoa = out.listAoa;
   state.resultAoa = out.resultAoa;
   state.logAoa = out.logAoa;
-  // 打ち込み結果が0件でも、④ボタンは常に押せる。
-  // 実データがなければ空の出力/対象なし案内にする。
-  state.workbookReady = true;
+  state.workbookReady = allRecords.length > 0;
 
   renderAoa("calendarPane", state.calendarAoa, 300);
   renderAoa("listPane", state.listAoa, 300);
@@ -5138,8 +5099,10 @@ ${formatLogRowsForDailyDiagnosis(rawSheets.logRows, 40)}
 //     印刷はB4横向き・各学年1ページ想定
 // ============================================================
 function studentKeyForList(name, studentNo=''){
-  const no = normalizeStudentNoKey(studentNo || '');
-  if(no) return `no:${no}`;
+  let no = normalizeStudentNoKey(studentNo || '');
+  // 全員分リストでは、対応表が 00123、毎日更新.xlsx が 123 のように
+  // 先頭ゼロ違いでも同じ生徒として扱う。
+  if(no) return `no:${no.replace(/^0+(?=\d)/,'')}`;
   return `name:${normalizeNameKey(name || '')}`;
 }
 function addStudentToListMap(map, student, overrideMeta={}){
@@ -5149,32 +5112,24 @@ function addStudentToListMap(map, student, overrideMeta={}){
   const finalName = meta['生徒名'] || name;
   if(!finalName && !meta['生徒番号']) return;
   const key = studentKeyForList(finalName, meta['生徒番号']);
-  const grade = normalizeGradeForAllList(meta['学年'] || '');
-  const kana = meta['カナ'] || meta['読み仮名'] || '';
-  const teacher = meta['担当助手名'] || meta['担当'] || '';
-  const school = normalizeSchoolForAllList(meta['高校'] || '');
   if(!map.has(key)){
     map.set(key, {
-      grade,
+      grade: meta['学年'] || '',
       studentNo: meta['生徒番号'] || '',
       student: finalName || name,
-      kana,
-      phone1: meta['電話番号①'] || '',
-      phone2: meta['電話番号②'] || '',
-      teacher,
-      school,
+      kana: meta['読み仮名'] || '',
+      teacher: meta['担当'] || '',
+      school: meta['高校'] || '',
       note: meta['備考'] || ''
     });
   }else{
     const row = map.get(key);
-    row.grade = row.grade || grade || '';
+    row.grade = row.grade || meta['学年'] || '';
     row.studentNo = row.studentNo || meta['生徒番号'] || '';
     row.student = row.student || finalName || name;
-    row.kana = row.kana || kana || '';
-    row.phone1 = row.phone1 || meta['電話番号①'] || '';
-    row.phone2 = row.phone2 || meta['電話番号②'] || '';
-    row.teacher = row.teacher || teacher || '';
-    row.school = row.school || school || '';
+    row.kana = row.kana || meta['読み仮名'] || '';
+    row.teacher = row.teacher || meta['担当'] || '';
+    row.school = row.school || meta['高校'] || '';
     row.note = row.note || meta['備考'] || '';
   }
 }
@@ -5195,8 +5150,31 @@ function allListWindowDates(){
   });
 }
 function allListStudentKeyFromRecord(r){
-  const meta = rosterMetaForStudent(r.student || r.rawName || '');
-  return studentKeyForList(meta['生徒名'] || r.student || r.rawName || '', meta['生徒番号'] || r.studentNo || '');
+  const keys = allListStudentKeysFromRecord(r);
+  return keys[0] || '';
+}
+function allListStudentKeysFromRecord(r){
+  const keys = new Set();
+  const rawName = norm(r?.student || r?.rawName || '');
+  const rawNo = normalizeStudentNoKey(r?.studentNo || '');
+  const add = (name, no) => {
+    const k = studentKeyForList(name || '', no || '');
+    if(k && k !== 'name:') keys.add(k);
+  };
+  if(rawNo) add(rawName, rawNo);
+  const byNo = rawNo ? lookupRosterByStudentNo(rawNo) : null;
+  if(byNo){
+    add(byNo['生徒名'] || rawName, byNo['生徒番号'] || rawNo);
+    add(byNo['生徒名'] || rawName, rawNo);
+  }
+  const byName = rawName ? rosterMetaForStudent(rawName) : emptyRoster('');
+  if(byName && (byName['生徒名'] || byName['生徒番号'])){
+    add(byName['生徒名'] || rawName, byName['生徒番号'] || rawNo);
+    if(rawNo) add(byName['生徒名'] || rawName, rawNo);
+  }
+  if(rawName) add(rawName, '');
+  if(byName && byName['生徒名']) add(byName['生徒名'], '');
+  return [...keys];
 }
 function compactPlanLine(r){
   return [r.rowName, r.content].filter(Boolean).join('：');
@@ -5266,7 +5244,7 @@ function groupAllListStudentsByGrade(studentMap){
   );
   const byGrade = new Map();
   for(const s of students){
-    const grade = normalizeGradeForAllList(s.grade) || '学年未設定';
+    const grade = s.grade || '学年未設定';
     if(!byGrade.has(grade)) byGrade.set(grade, []);
     byGrade.get(grade).push(s);
   }
@@ -5878,19 +5856,25 @@ function buildPlanResultMapsForAllList(windowDates){
 
   for(const r of state.records || []){
     if(!dateKeys.has(r.dateKey)) continue;
-    const key = allListStudentKeyFromRecord(r);
-    if(!key) continue;
-    const mapKey = `${key}|${r.dateKey}`;
-    if(!planByStudentDate.has(mapKey)) planByStudentDate.set(mapKey, []);
-    planByStudentDate.get(mapKey).push(compactPlanLine(r));
+    const keys = allListStudentKeysFromRecord(r);
+    if(!keys.length) continue;
+    for(const key of keys){
+      const mapKey = `${key}|${r.dateKey}`;
+      if(!planByStudentDate.has(mapKey)) planByStudentDate.set(mapKey, []);
+      const line = compactPlanLine(r);
+      if(line && !planByStudentDate.get(mapKey).includes(line)) planByStudentDate.get(mapKey).push(line);
+    }
   }
   for(const r of state.resultRecords || []){
     if(!dateKeys.has(r.dateKey)) continue;
-    const key = allListStudentKeyFromRecord(r);
-    if(!key) continue;
-    const mapKey = `${key}|${r.dateKey}`;
-    if(!resultByStudentDate.has(mapKey)) resultByStudentDate.set(mapKey, []);
-    resultByStudentDate.get(mapKey).push(compactResultLine(r));
+    const keys = allListStudentKeysFromRecord(r);
+    if(!keys.length) continue;
+    for(const key of keys){
+      const mapKey = `${key}|${r.dateKey}`;
+      if(!resultByStudentDate.has(mapKey)) resultByStudentDate.set(mapKey, []);
+      const line = compactResultLine(r);
+      if(line && !resultByStudentDate.get(mapKey).includes(line)) resultByStudentDate.get(mapKey).push(line);
+    }
   }
   return {planByStudentDate, resultByStudentDate};
 }
@@ -5907,10 +5891,7 @@ function allListCanonicalHeader(h){
   const t = raw.replace(/\s+/g,'');
   if(['氏名','名前'].includes(t)) return '生徒名';
   if(['生徒No','生徒Ｎｏ','番号','生徒番号'].includes(t)) return '生徒番号';
-  if(['カナ','かな','よみがな','ふりがな','フリガナ','読み','読み仮名'].includes(t)) return 'カナ';
-  if(['電話番号①','電話番号1','電話1','電話①','電話番号'].includes(t)) return '電話番号①';
-  if(['電話番号②','電話番号2','電話2','電話②'].includes(t)) return '電話番号②';
-  if(['担当','担当者','担当助手','担当助手名','担任助手','助手','担任'].includes(t)) return '担当助手名';
+  if(['よみがな','ふりがな','フリガナ','読み'].includes(t)) return '読み仮名';
   // 旧版の「備考」は、入力用アプリと相互反映する欄として扱う。
   if(['備考','入力用備考','個別備考','面談備考'].includes(t)) return '入力用備考';
   // 全員分リスト内だけで保存復元するメモ欄。
@@ -6018,7 +5999,7 @@ function allListStudentNameFromRow(row, headerCanon){
   return idx >= 0 ? norm(row[idx]) : '';
 }
 function allListIsIdentityCanon(canon){
-  return ['学年','生徒番号','生徒名','名前','氏名','カナ','読み仮名','電話番号①','電話番号②','担当','担当助手名','高校','入力用備考'].includes(String(canon || ''));
+  return ['学年','生徒番号','生徒名','名前','氏名','読み仮名','担当','高校','入力用備考'].includes(String(canon || ''));
 }
 function allListIsManualPriorityHeader(headerText, canonText){
   const h = String(headerText || '').replace(/\s/g,'');
@@ -6073,9 +6054,6 @@ async function parseAllListRestoreFile(file){
     // 「更新ログ」は衝突確認専用シートなので、全員分リスト本体としては絶対に読まない。
     // ここを読んでしまうと、次回出力時にログ列（日時/区分/採用値/理由など）が本体表に混ざる。
     if(sn.includes('更新ログ') || sn.includes('衝突ログ') || sn.includes('差分ログ') || sn.includes('小規模模試イベント')) continue;
-    // 全員分リスト以外のブック（入力用の個人生徒Excelなど）を同じフォルダーに入れてしまっても、
-    // 生徒別シートを全員分リスト本体として復元しない。
-    if(/^(予定入力|模試確認|イベント確認|コメント確認|合格設計図|管理|設定)$/i.test(sn)) continue;
 
     const ws = wb.Sheets[sheetName];
     const aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:'', raw:false});
@@ -6642,7 +6620,7 @@ function buildAllStudentListAoaByGrade(examRecords=[], eventRecords=[]){
     for(let i=1;i<=maxSmallSlots;i++){
       extraHeaders.push(`${i}\n日付`, `${i}\n名称`, `${i}\n回答`, `${i}\nComiru`, `${i}\n備考`, `${i}\n科目リスト`, `${i}\n科目変更`);
     }
-    const header = ['学年','生徒番号','生徒名','カナ','電話番号①','電話番号②','高校','担当助手名','入力用備考','全員分リスト備考', ...extraHeaders, ...examGroups.map(g=>g.label), ...eventGroups.map(g=>g.label)];
+    const header = ['学年','生徒番号','生徒名','読み仮名','担当','高校','入力用備考','全員分リスト備考', ...extraHeaders, ...examGroups.map(g=>g.label), ...eventGroups.map(g=>g.label)];
     for(const d of windowDates){
       header.push(`${mmdd(d)}(${WEEK_JA[d.getDay()]})\n予定`);
       header.push(`${mmdd(d)}(${WEEK_JA[d.getDay()]})\n結果`);
@@ -6651,7 +6629,7 @@ function buildAllStudentListAoaByGrade(examRecords=[], eventRecords=[]){
     for(const st of students){
       const key = studentKeyForList(st.student, st.studentNo);
       const inputNote = inputNoteByStudent.get(key) || allListSmallBlockStrip(st.note || '');
-      const row = [st.grade, st.studentNo, st.student, st.kana, st.phone1 || '', st.phone2 || '', st.school, st.teacher, inputNote, ''];
+      const row = [st.grade, st.studentNo, st.student, st.kana, st.teacher, st.school, inputNote, ''];
       const smallItems = smallByStudent.get(key) || [];
       for(let i=0;i<maxSmallSlots;i++){
         const item = smallItems[i];
@@ -6695,13 +6673,11 @@ function styleAllStudentGradeSheet(ws, aoa){
     if(c===0) widths.push(5);          // 学年
     else if(c===1) widths.push(9);     // 生徒番号
     else if(c===2) widths.push(11);    // 生徒名
-    else if(c===3) widths.push(8);     // カナ
-    else if(c===4) widths.push(12);    // 電話番号①
-    else if(c===5) widths.push(12);    // 電話番号②
-    else if(c===6) widths.push(9);     // 高校（高等学校/高校は省略）
-    else if(c===7) widths.push(9);     // 担当助手名
-    else if(c===8) widths.push(16);    // 入力用備考
-    else if(c===9) widths.push(18);    // 全員分リスト備考
+    else if(c===3) widths.push(8);     // 読み仮名
+    else if(c===4) widths.push(9);     // 担当
+    else if(c===5) widths.push(10);    // 高校
+    else if(c===6) widths.push(16);    // 入力用備考
+    else if(c===7) widths.push(18);    // 全員分リスト備考
     else if(/(?:小規模\s*)?\d+\n日付$/.test(h)) widths.push(9);
     else if(/(?:小規模\s*)?\d+\n名称$/.test(h)) widths.push(16);
     else if(/(?:小規模\s*)?\d+\n回答$/.test(h)) widths.push(7);
@@ -6848,10 +6824,8 @@ function buildAllStudentPrintAoaFromFullAoa(grade, fullAoa){
   const canon = header.map(allListCanonicalHeader);
   const idxNo = allListPrintFindIndex(canon, ['生徒番号']);
   const idxName = allListPrintFindIndex(canon, ['生徒名']);
-  const idxPhone1 = allListPrintFindIndex(canon, ['電話番号①']);
-  const idxPhone2 = allListPrintFindIndex(canon, ['電話番号②']);
   const idxSchool = allListPrintFindIndex(canon, ['高校']);
-  const idxTeacher = allListPrintFindIndex(canon, ['担当助手名','担当']);
+  const idxTeacher = allListPrintFindIndex(canon, ['担当']);
   const idxInputNote = allListPrintFindIndex(canon, ['入力用備考','備考']);
   const idxAllListNote = allListPrintFindIndex(canon, ['全員分リスト備考','確認メモ']);
 
@@ -6893,7 +6867,7 @@ function buildAllStudentPrintAoaFromFullAoa(grade, fullAoa){
   // 手で追加した列を印刷用にも出す。
   // 標準列・小規模列・人数多い模試/イベント列・3日予定結果列以外を「手追加列」とみなす。
   const manualCols = [];
-  const identity = new Set(['学年','生徒番号','生徒名','カナ','読み仮名','電話番号①','電話番号②','担当','担当助手名','高校','入力用備考','全員分リスト備考']);
+  const identity = new Set(['学年','生徒番号','生徒名','読み仮名','担当','高校','入力用備考','全員分リスト備考']);
   for(let c=0;c<header.length;c++){
     const h = header[c];
     const hc = canon[c];
@@ -6905,7 +6879,7 @@ function buildAllStudentPrintAoaFromFullAoa(grade, fullAoa){
     manualCols.push({col:c, label:h.replace(/\n+/g, ' ')});
   }
 
-  const printHeader = ['生徒番号','名前','電話①','電話②','高校','担当','入力用備考','全員分リスト備考', ...manualCols.map(x => x.label || '書き込み欄')];
+  const printHeader = ['生徒番号','名前','高校','担当','入力用備考','全員分リスト備考', ...manualCols.map(x => x.label || '書き込み欄')];
   printHeader.push('模試イベント');
   planCols.forEach(x => printHeader.push(x.label || '予定'));
 
@@ -6960,8 +6934,6 @@ function buildAllStudentPrintAoaFromFullAoa(grade, fullAoa){
     const outRow = [
       allListPrintCell(row, idxNo),
       allListPrintCell(row, idxName),
-      allListPrintCell(row, idxPhone1),
-      allListPrintCell(row, idxPhone2),
       allListPrintCell(row, idxSchool),
       allListPrintCell(row, idxTeacher),
       allListPrintCell(row, idxInputNote),
@@ -7172,11 +7144,10 @@ function allListBuildAutoPrintWidths(aoa, manualCount, planCount){
       minW[c]=2.2; maxW[c]=3.2; weight[c]=0.05;
     }else if(c === 0){ minW[c]=4.5; maxW[c]=7; weight[c]=0.45; }          // 生徒番号
     else if(c === 1){ minW[c]=6.5; maxW[c]=10; weight[c]=0.75; }          // 名前
-    else if(c === 2 || c === 3){ minW[c]=7; maxW[c]=12; weight[c]=0.55; } // 電話番号
-    else if(c === 4){ minW[c]=3; maxW[c]=5; weight[c]=0.3; }              // 高校
-    else if(c === 5){ minW[c]=3; maxW[c]=5; weight[c]=0.3; }              // 担当
-    else if(c === 6 || c === 7){ minW[c]=7; maxW[c]=15; weight[c]=0.7; }  // 備考系
-    else if(c >= 8 && c < eventCol){ minW[c]=4; maxW[c]=10; weight[c]=0.45; } // 手追加列
+    else if(c === 2){ minW[c]=3; maxW[c]=5; weight[c]=0.3; }              // 高校
+    else if(c === 3){ minW[c]=3; maxW[c]=5; weight[c]=0.3; }              // 担当
+    else if(c === 4 || c === 5){ minW[c]=7; maxW[c]=15; weight[c]=0.7; }  // 備考系
+    else if(c >= 6 && c < eventCol){ minW[c]=4; maxW[c]=10; weight[c]=0.45; } // 手追加列
     else if(c === eventCol){ minW[c]=65; maxW[c]=105; weight[c]=2.2; }    // 模試イベント
     else { minW[c]=5; maxW[c]=11; weight[c]=0.55; }                       // 予定・結果
     // 見出しが予定/結果ならさらに小さめに保つ
@@ -7316,7 +7287,7 @@ function styleAllStudentPrintSheet(ws, aoa){
     if(R===0) style.fill = titleFill;
     else if(R===1) style.fill = headerFill;
     else if(C<=1) style.fill = nameFill;
-    else if(C>=8 && C<eventCol) style.fill = manualFill;
+    else if(C>=6 && C<eventCol) style.fill = manualFill;
     else if(C===eventCol) style.fill = hasBlankWritingField ? missingFill : eventFill;
     else if(C>eventCol) style.fill = planFill;
     if(hasBlankWritingField){
@@ -7338,6 +7309,68 @@ function styleAllStudentPrintSheet(ws, aoa){
   return ws;
 }
 
+async function refreshAllListInputFromSelectedSources(){
+  const beforePlans = (state.records || []).length;
+  const beforeExams = (state.examRecords || []).length;
+  const beforeEvents = (state.eventRecords || []).length;
+  const files = (state.files || []).filter(f => !shouldSkipFile(f) && isYoteiInputWorkbookCandidate(f));
+  const logs = [];
+  let plans = [];
+  let exams = [];
+  let events = [];
+  for(let i=0;i<files.length;i++){
+    const f = files[i];
+    const parsed = await parseExcelFile(f);
+    plans.push(...(parsed.records || []));
+    logs.push(...(parsed.logRows || []));
+    const ex = await parseExamFile(f);
+    exams.push(...(ex.records || []));
+    logs.push(...(ex.logRows || []));
+    const ev = await parseEventFile(f);
+    events.push(...(ev.records || []));
+    logs.push(...(ev.logRows || []));
+  }
+  if(plans.length){
+    plans = dedupePlanRecordsByLatest(plans, logs);
+    plans = filterRecords(plans);
+    state.records = plans;
+  }
+  if(exams.length) state.examRecords = dedupeExamRecordsByLatest(exams, logs);
+  if(events.length) state.eventRecords = dedupeEventRecordsByLatest(events, logs);
+  if(logs.length){
+    state.logAoa = (state.logAoa && state.logAoa.length ? state.logAoa : [["ファイル","結果","内容","シート名/詳細"]]).concat(logs);
+  }
+  if(typeof log === 'function'){
+    log(`全員分リスト用に予定入力Excelを再確認しました。
+予定records: ${beforePlans}→${(state.records||[]).length}件
+模試records: ${beforeExams}→${(state.examRecords||[]).length}件
+イベントrecords: ${beforeEvents}→${(state.eventRecords||[]).length}件
+対象Excel: ${files.length}件（合格設計図Excelは除外）`);
+  }
+  return {beforePlans, afterPlans:(state.records||[]).length, beforeExams, afterExams:(state.examRecords||[]).length, beforeEvents, afterEvents:(state.eventRecords||[]).length, files:files.length};
+}
+
+async function refreshAllListResultsFromSelectedSources(){
+  const before = (state.resultRecords || []).length;
+  let direct = [];
+  if(state.resultHistoryFiles && state.resultHistoryFiles.length){
+    const historyParsed = await loadSelectedResultHistory();
+    direct.push(...(historyParsed.records || []));
+  }
+  for(let i=0;i<(state.resultFiles || []).length;i++){
+    const parsed = await parseResultFile(state.resultFiles[i]);
+    direct.push(...(parsed.records || []));
+  }
+  if(direct.length){
+    state.resultRecords = filterResultRecords(mergeResultRecordsUnique([...(state.resultRecords || []), ...direct]));
+  }
+  const after = (state.resultRecords || []).length;
+  if(typeof log === 'function'){
+    log(`全員分リスト用に予定・結果を再確認しました。\n予定records: ${(state.records||[]).length}件\n結果records: ${before}→${after}件\n直接読込: result_history.json ${(state.resultHistoryFiles||[]).length}件 / 毎日更新.xlsx ${(state.resultFiles||[]).length}件`);
+  }
+  return {before, after, directCount:direct.length};
+}
+
 async function downloadAllStudentList(){
   try{
     if(!window.XLSX){ alert('Excel出力ライブラリが読み込めていません。libs/xlsx.bundle.js を確認してください。'); return; }
@@ -7347,6 +7380,11 @@ async function downloadAllStudentList(){
       alert('先に統合プレビューを作成してください');
       return;
     }
+
+    // 出力直前に、打ち込み結果の予定入力Excelも毎日更新/履歴も直接再読込する。
+    // 入力用の面談準備印刷では見えているのに、統合用の全員分リストだけ古いrecordsを使う事故を防ぐ。
+    const allListInputRefresh = await refreshAllListInputFromSelectedSources();
+    const allListResultRefresh = await refreshAllListResultsFromSelectedSources();
 
     state.allListUpdateLog = [["日時","区分","学年","生徒キー","生徒名","対象","列名","全員分リストの値","自動データの値","採用値","理由"]];
 
@@ -7383,6 +7421,10 @@ async function downloadAllStudentList(){
     const base = allListBaseDate();
     appendCommonUpdateLogSheet(wb, '全員分リスト', [
       ['基準日', ymd(base), '基準日の2日前・1日前・当日を出力'],
+      ['予定records', String((state.records || []).length), '入力用Excelから統合済み'],
+      ['結果records', String((state.resultRecords || []).length), `出力直前にJSON/毎日更新を再読込: ${allListResultRefresh.before}→${allListResultRefresh.after}件`],
+      ['選択中result_history.json', String((state.resultHistoryFiles || []).length), '全員分リスト出力直前に直接読込'],
+      ['選択中毎日更新.xlsx', String((state.resultFiles || []).length), '全員分リスト出力直前に直接読込'],
       ['模試レコード', String(exams.length), '期間指定がある場合はその期間で抽出'],
       ['イベントレコード', String(events.length), '期間指定がある場合はその期間で抽出'],
       ['学年別シート数', String(gradeAoas.length), '各学年の更新入力・印刷シートを作成'],
@@ -7392,7 +7434,7 @@ async function downloadAllStudentList(){
     XLSX.writeFile(wb, `全員分リスト_学年別_B4横_${ymd(base)}基準.xlsx`);
     if(typeof log === 'function'){
       const count = Math.max(0, (state.allListUpdateLog?.length || 1) - 1);
-      log(`全員分リストを出力しました。\n対象人数が少ない模試・イベントは、各生徒ごとの追加スロット列にまとめました。列数は学年内の最大対象数に合わせて自動で増えます。回答・Comiru・科目リスト・科目変更はプルダウンで更新できます。\n手修正・自動データの衝突ログ: ${count}件${count ? '\nExcel内の「更新ログ」シートを確認してください。' : ''}`);
+      log(`全員分リストを出力しました。\n予定records: ${(state.records||[]).length}件 / 結果records: ${(state.resultRecords||[]).length}件\nJSON/毎日更新の出力直前再読込: ${allListResultRefresh.before}→${allListResultRefresh.after}件\n対象人数が少ない模試・イベントは、各生徒ごとの追加スロット列にまとめました。列数は学年内の最大対象数に合わせて自動で増えます。回答・Comiru・科目リスト・科目変更はプルダウンで更新できます。\n手修正・自動データの衝突ログ: ${count}件${count ? '\nExcel内の「更新ログ」シートを確認してください。' : ''}`);
     }
   }catch(e){
     console.error('全員分リスト出力エラー', e);
@@ -7426,7 +7468,7 @@ function downloadWorkbookFromAoa(calendarAoa, listAoa, resultAoa, rosterAoa, log
   const calWidths = calendarAoa[0].map((_,i)=> i===0 ? 10 : i===1 ? 14 : i===2 ? 18 : i<=6 ? 16 : 30);
   const listWidths = [10,14,18,18,16,24,36,13,8,14,46,12,28,52,14,10,10];
   const resultWidths = [10,18,14,13,8,12,16,34,44,60,26,18];
-  const rosterWidths = [8,14,18,14,16,16,16,14,32];
+  const rosterWidths = [14,10,18,18,16,24,36];
   const logWidths = [58,12,48,22];
   const posterWidths = posterAoa[0].map((_,i)=> {
     if(i === 0) return {wch:9};                 // A列：学年
@@ -7635,7 +7677,10 @@ async function setBundleFolderFiles(fileList){
     else if(isCsv && (filePathIncludes(f, 'Comiru') || filePathIncludes(f, 'コミル') || /comiru|コミル/i.test(relLower))) comiruCsvs.push(f);
     // 掲示用手修正版を置く場合は「毎日掲示」フォルダだけを使う。
     else if(isExcel && filePathIncludes(f, '毎日掲示')) dailyPosters.push(f);
-    else if(isExcel && filePathIncludes(f, '打ち込み結果')) planned.push(f);
+    else if(isExcel && filePathIncludes(f, '打ち込み結果') && isYoteiInputWorkbookCandidate(f)) planned.push(f);
+    else if(isExcel && filePathIncludes(f, '打ち込み結果') && isGoukakuWorkbookFile(f)) {
+      // 生徒フォルダ直下の合格設計図Excelは入力用の復元/印刷専用。統合用の予定Excelとしては読まない。
+    }
     else if((isExcel || isCsv) && filePathIncludes(f, '対応表')) rosters.push(f);
   }
   state.files = planned;
@@ -7839,7 +7884,7 @@ document.addEventListener('DOMContentLoaded', function(){
 
     <h3 id="manual-int-flow">2. 普段の操作手順</h3>
     <div class="manualSpecBox"><h4>2週間予定表</h4>①→②→③→④2週間出力。手修正したExcelは全体予定表フォルダーへ戻す。</div>
-    <div class="manualSpecBox"><h4>全員分リスト</h4>①→②→③→④全員分リスト。フロント確認結果を手入力し、全員分リストフォルダーへ戻す。</div>
+    <div class="manualSpecBox"><h4>全員分リスト</h4>①→②→④全員分リスト。フロント確認結果を手入力し、全員分リストフォルダーへ戻す。</div>
     <div class="manualSpecBox"><h4>毎日掲示</h4>毎日更新.xlsxへ前日結果を貼る → ①→②→③→④毎日掲示。出たExcelを毎日掲示フォルダーへ保存。</div>
 
     <h3 id="manual-int-read">3. 何を読み取っているか</h3>
@@ -7855,13 +7900,11 @@ document.addEventListener('DOMContentLoaded', function(){
 
     <h3 id="manual-int-priority">4. 優先順位・上書きルール</h3>
     <div class="manualSpecBox">
-      <b>大原則：</b>具体値が勝つ。空欄は具体値を消さない。手修正は、次回も残す前提で復元する。<br>
-      <table><thead><tr><th>内容</th><th>優先</th><th>理由</th></tr></thead><tbody>
-        <tr><td>通常の予定・結果</td><td>入力用の個人Excel。重複時は新しい具体値。</td><td>担任助手が最後に保存した内容を使うため。</td></tr>
-        <tr><td>模試科目</td><td>科目リストフォルダー内の手修正Excel。</td><td>科目変更や聞き取り修正を残すため。</td></tr>
-        <tr><td>当日/後日/不受験・Comiru・備考</td><td>全員分リストフォルダー内の手修正Excel。</td><td>フロント確認や電話確認の結果を残すため。</td></tr>
-        <tr><td>毎日掲示</td><td>アプリを開いた日の前日・開いた月。</td><td>毎朝の掲示対象を固定するため。日付をまたいだら開き直す。</td></tr>
-      </tbody></table>
+      <b>基本：</b> 最新ファイルの具体値が勝つ。空欄は具体値を消さない。<br>
+      <b>個人Excel重複：</b> 同じ生徒・同じ予定なら更新日時が新しいものを優先。ただし空欄で上書きしない。<br>
+      <b>全員分リスト：</b> 手修正を維持する。回答・状態・Comiru・科目変更は消えにくい設計。<br>
+      <b>科目リスト：</b> 手修正された科目詳細を復元する。<br>
+      <b>毎日掲示：</b> 当月・前日など、出力ごとの日付ルールを優先する。
     </div>
 
     <h3 id="manual-int-output">5. 各出力の目的</h3>
