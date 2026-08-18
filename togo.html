@@ -787,7 +787,7 @@ function getHeaderMap(aoa){
 // ============================================================
 // 1. 対応表の読み取り・名前照合
 // ============================================================
-const ROSTER_COLUMNS = ["生徒番号","学年","生徒名","読み仮名","担当","高校","備考"];
+const ROSTER_COLUMNS = ["学年","生徒番号","氏名","カナ","高校","担当","備考"];
 function normalizeNameKey(s){ return String(s ?? "").replace(/[\s\u3000]+/g, "").trim(); }
 function normalizeStudentNoKey(s){
   let v = String(s ?? "")
@@ -818,7 +818,7 @@ function lookupRosterByStudentNo(studentNo){
   return null;
 }
 function emptyRoster(student=""){
-  return {"生徒番号":"","学年":"","生徒名":student,"読み仮名":"","担当":"","高校":"","備考":""};
+  return {"学年":"","生徒番号":"","氏名":student,"生徒名":student,"カナ":"","読み仮名":"","高校":"","担当":"","備考":""};
 }
 function getRosterHeaderMap(aoa){
   const header = (aoa[0] || []).map(x => norm(x));
@@ -837,8 +837,8 @@ function getRosterHeaderMap(aoa){
     studentNo: find(["生徒番号","生徒No","生徒Ｎｏ","番号","ID","id"]),
     grade: find(["学年","学年名","grade"]),
     student: find(["生徒名","氏名","名前","生徒","name"]),
-    kana: find(["読み仮名","よみがな","ふりがな","フリガナ","読み","かな"]),
-    teacher: find(["担当","担当者","担任"]),
+    kana: find(["カナ","かな","読み仮名","よみがな","ふりがな","フリガナ","読み"]),
+    teacher: find(["担当","担当者","担任","担当助手","担任助手"]),
     school: find(["高校","学校","高校名"]),
     note: find(["備考","メモ","その他","注意"])
   };
@@ -884,7 +884,7 @@ function canonicalStudentName(student){
 }
 function studentSortKey(student){
   const meta = rosterMetaForStudent(student);
-  return normalizeNameKey(meta["読み仮名"] || meta["生徒名"] || student);
+  return normalizeNameKey(meta["読み仮名"] || meta["カナ"] || meta["生徒名"] || meta["氏名"] || student);
 }
 function parseCsvText(text){
   const rows=[]; let row=[], cell="", q=false;
@@ -1091,25 +1091,34 @@ async function parseRosterFile(file){
   }
 
   function metaFromFixedColumns(row, sheetName=""){
+    // 対応表の標準列：A学年 / B生徒番号 / C氏名 / Dカナ / E高校 / F担当 / G備考
+    const name = norm(row[2]);
+    const kana = norm(row[3]);
     return {
       "学年": norm(row[0]) || (/^\d/.test(sheetName) ? sheetName : ""),
       "生徒番号": norm(row[1]),
-      "生徒名": norm(row[2]),
-      "読み仮名": norm(row[3]),
-      "担当": norm(row[4]),
-      "高校": normalizeSchoolDisplayName(row[5]),
+      "氏名": name,
+      "生徒名": name,
+      "カナ": kana,
+      "読み仮名": kana,
+      "高校": normalizeSchoolDisplayName(row[4]),
+      "担当": norm(row[5]),
       "備考": norm(row[6])
     };
   }
 
   function metaFromHeader(row, h, sheetName=""){
+    const name = h.student >= 0 ? norm(row[h.student]) : "";
+    const kana = h.kana >= 0 ? norm(row[h.kana]) : "";
     return {
-      "生徒番号": h.studentNo >= 0 ? norm(row[h.studentNo]) : "",
       "学年": h.grade >= 0 ? norm(row[h.grade]) : (/^\d/.test(sheetName) ? sheetName : ""),
-      "生徒名": h.student >= 0 ? norm(row[h.student]) : "",
-      "読み仮名": h.kana >= 0 ? norm(row[h.kana]) : "",
-      "担当": h.teacher >= 0 ? norm(row[h.teacher]) : "",
+      "生徒番号": h.studentNo >= 0 ? norm(row[h.studentNo]) : "",
+      "氏名": name,
+      "生徒名": name,
+      "カナ": kana,
+      "読み仮名": kana,
       "高校": h.school >= 0 ? normalizeSchoolDisplayName(row[h.school]) : "",
+      "担当": h.teacher >= 0 ? norm(row[h.teacher]) : "",
       "備考": h.note >= 0 ? norm(row[h.note]) : ""
     };
   }
@@ -1120,7 +1129,14 @@ async function parseRosterFile(file){
   const sheetLogs = [];
 
   function addMeta(meta){
-    if(meta) meta["高校"] = normalizeSchoolDisplayName(meta["高校"] || "");
+    if(!meta) return false;
+    const name = norm(meta["生徒名"] || meta["氏名"] || "");
+    const kana = norm(meta["読み仮名"] || meta["カナ"] || "");
+    meta["生徒名"] = name;
+    meta["氏名"] = name;
+    meta["読み仮名"] = kana;
+    meta["カナ"] = kana;
+    meta["高校"] = normalizeSchoolDisplayName(meta["高校"] || "");
     if(!meta["生徒名"]) return false;
     // 見出し行や説明行を誤登録しない
     if(["名前","生徒名","氏名"].includes(meta["生徒名"])) return false;
@@ -1160,7 +1176,7 @@ async function parseRosterFile(file){
       if(!aoa.length) continue;
 
       // 学年ごとにシートが分かれていて、左から
-      // 学年 / 生徒番号 / 名前 / よみがな / 担当 / 高校 / 備考
+      // 学年 / 生徒番号 / 氏名 / カナ / 高校 / 担当 / 備考
       // の順で並ぶ形式を標準として読む。
       // ただし1行目に見出しがある場合も対応する。
       let headerRow = -1;
@@ -1542,7 +1558,7 @@ async function parseExamFile(file){
         student,
         grade: meta['学年'] || '',
         studentNo: meta['生徒番号'] || '',
-        kana: meta['読み仮名'] || '',
+        kana: meta['読み仮名'] || meta['カナ'] || '',
         examName,
         examDate: examDateKey,
         examDateObj: examDateObj || new Date(2099,0,1),
@@ -1645,7 +1661,7 @@ async function parseEventFile(file){
         student,
         grade: meta['学年'] || rowGrade || '',
         studentNo: meta['生徒番号'] || '',
-        kana: meta['読み仮名'] || '',
+        kana: meta['読み仮名'] || meta['カナ'] || '',
         eventName,
         datetime: dtInfo.datetime,
         dateObj: dtInfo.dateObj,
@@ -4446,7 +4462,7 @@ function resultPosterStudentMeta(rec){
   return {
     grade: meta['学年'] || rec.grade || '',
     student: meta['生徒名'] || rec.student || rec.rawName || '',
-    kana: meta['読み仮名'] || '',
+    kana: meta['読み仮名'] || meta['カナ'] || '',
     studentNo: meta['生徒番号'] || rec.studentNo || ''
   };
 }
@@ -5125,10 +5141,10 @@ function studentKeyForList(name, studentNo=''){
   return `name:${normalizeNameKey(name || '')}`;
 }
 function addStudentToListMap(map, student, overrideMeta={}){
-  const name = norm(student || overrideMeta['生徒名'] || '');
+  const name = norm(student || overrideMeta['生徒名'] || overrideMeta['氏名'] || '');
   const resolved = name ? resolveRosterMeta(name) : {meta:emptyRoster('')};
   const meta = Object.assign({}, resolved.meta || emptyRoster(name), overrideMeta || {});
-  const finalName = meta['生徒名'] || name;
+  const finalName = meta['生徒名'] || meta['氏名'] || name;
   if(!finalName && !meta['生徒番号']) return;
   const key = studentKeyForList(finalName, meta['生徒番号']);
   if(!map.has(key)){
@@ -5136,7 +5152,7 @@ function addStudentToListMap(map, student, overrideMeta={}){
       grade: meta['学年'] || '',
       studentNo: meta['生徒番号'] || '',
       student: finalName || name,
-      kana: meta['読み仮名'] || '',
+      kana: meta['読み仮名'] || meta['カナ'] || '',
       teacher: meta['担当'] || '',
       school: normalizeSchoolDisplayName(meta['高校'] || ''),
       note: meta['備考'] || ''
@@ -5146,7 +5162,7 @@ function addStudentToListMap(map, student, overrideMeta={}){
     row.grade = row.grade || meta['学年'] || '';
     row.studentNo = row.studentNo || meta['生徒番号'] || '';
     row.student = row.student || finalName || name;
-    row.kana = row.kana || meta['読み仮名'] || '';
+    row.kana = row.kana || meta['読み仮名'] || meta['カナ'] || '';
     row.teacher = row.teacher || meta['担当'] || '';
     row.school = row.school || normalizeSchoolDisplayName(meta['高校'] || '');
     row.note = row.note || meta['備考'] || '';
@@ -5932,8 +5948,9 @@ function allListCanonicalHeader(h){
   const t = raw.replace(/\s+/g,'');
   if(['氏名','名前'].includes(t)) return '生徒名';
   if(['生徒No','生徒Ｎｏ','番号','生徒番号'].includes(t)) return '生徒番号';
-  if(['よみがな','ふりがな','フリガナ','読み'].includes(t)) return '読み仮名';
-  // 旧版の「備考」は、入力用アプリと相互反映する欄として扱う。
+  if(['カナ','かな','よみがな','ふりがな','フリガナ','読み'].includes(t)) return '読み仮名';
+  if(['電話','電話番号','電話番号①','電話番号②','TEL','ＴＥＬ'].includes(t)) return '電話番号';
+  // 新版では、対応表G列の「備考」を全員分リストの基本備考として扱う。
   if(['備考','入力用備考','個別備考','面談備考'].includes(t)) return '入力用備考';
   // 全員分リスト内だけで保存復元するメモ欄。
   if(['全員分リスト備考','全体備考','確認メモ','全員分備考'].includes(t)) return '全員分リスト備考';
@@ -6040,7 +6057,7 @@ function allListStudentNameFromRow(row, headerCanon){
   return idx >= 0 ? norm(row[idx]) : '';
 }
 function allListIsIdentityCanon(canon){
-  return ['学年','生徒番号','生徒名','名前','氏名','読み仮名','担当','高校','入力用備考'].includes(String(canon || ''));
+  return ['学年','生徒番号','生徒名','名前','氏名','読み仮名','カナ','担当','高校','入力用備考'].includes(String(canon || ''));
 }
 function allListIsManualPriorityHeader(headerText, canonText){
   const h = String(headerText || '').replace(/\s/g,'');
@@ -6051,7 +6068,7 @@ function allListIsManualPriorityHeader(headerText, canonText){
   // 基本情報は復元するが、衝突ログは原則出さない
   if(allListIsIdentityCanon(c)) return false;
   // 模試・イベント・確認欄・メモ欄は手修正優先
-  if(/模試|受験|当日|後日|不受験|Comiru|コミル|コメント|科目|イベント|参加|不参加|備考|メモ|確認|電話|共有|手動|担当者|最終確認/.test(h+c)) return true;
+  if(/模試|受験|当日|後日|不受験|Comiru|コミル|コメント|科目|イベント|参加|不参加|備考|メモ|確認|共有|手動|担当者|最終確認/.test(h+c)) return true;
   // 既存リストにだけある独自列も手修正優先
   return true;
 }
@@ -6225,6 +6242,7 @@ function mergeRestoredAllListAoa(grade, generatedAoa){
     const h = restoreHeader[i];
     const hc = restoreCanon[i];
     if(!h) continue;
+    if(hc === '電話番号' || /電話|TEL|ＴＥＬ/i.test(h)) continue;
     const genIdx = findUnusedGenIndexByRestoreHeader(h, hc, usedGen);
     if(genIdx >= 0){
       slots.push({type:'gen', genIndex:genIdx, restoreIndex:i, header:genHeader[genIdx], canon:genCanon[genIdx]});
@@ -6670,7 +6688,7 @@ function buildAllStudentListAoaByGrade(examRecords=[], eventRecords=[]){
     for(let i=1;i<=maxSmallSlots;i++){
       extraHeaders.push(`${i}\n日付`, `${i}\n名称`, `${i}\n回答`, `${i}\nComiru`, `${i}\n備考`, `${i}\n科目リスト`, `${i}\n科目変更`);
     }
-    const header = ['学年','生徒番号','生徒名','読み仮名','担当','高校','入力用備考','全員分リスト備考', ...extraHeaders, ...examGroups.map(g=>g.label), ...eventGroups.map(g=>g.label)];
+    const header = ['学年','生徒番号','氏名','カナ','高校','担当','備考','全員分リスト備考', ...extraHeaders, ...examGroups.map(g=>g.label), ...eventGroups.map(g=>g.label)];
     for(const d of windowDates){
       header.push(`${mmdd(d)}(${WEEK_JA[d.getDay()]})\n予定`);
       header.push(`${mmdd(d)}(${WEEK_JA[d.getDay()]})\n結果`);
@@ -6679,7 +6697,7 @@ function buildAllStudentListAoaByGrade(examRecords=[], eventRecords=[]){
     for(const st of students){
       const key = studentKeyForList(st.student, st.studentNo);
       const inputNote = inputNoteByStudent.get(key) || allListSmallBlockStrip(st.note || '');
-      const row = [st.grade, st.studentNo, st.student, st.kana, st.teacher, normalizeSchoolDisplayName(st.school), inputNote, ''];
+      const row = [st.grade, st.studentNo, st.student, st.kana, normalizeSchoolDisplayName(st.school), st.teacher, inputNote, ''];
       const smallItems = smallByStudent.get(key) || [];
       for(let i=0;i<maxSmallSlots;i++){
         const item = smallItems[i];
@@ -6723,10 +6741,10 @@ function styleAllStudentGradeSheet(ws, aoa){
     if(c===0) widths.push(5);          // 学年
     else if(c===1) widths.push(9);     // 生徒番号
     else if(c===2) widths.push(11);    // 生徒名
-    else if(c===3) widths.push(8);     // 読み仮名
-    else if(c===4) widths.push(9);     // 担当
-    else if(c===5) widths.push(10);    // 高校
-    else if(c===6) widths.push(16);    // 入力用備考
+    else if(c===3) widths.push(8);     // カナ
+    else if(c===4) widths.push(10);    // 高校
+    else if(c===5) widths.push(9);     // 担当
+    else if(c===6) widths.push(16);    // 備考
     else if(c===7) widths.push(18);    // 全員分リスト備考
     else if(/(?:小規模\s*)?\d+\n日付$/.test(h)) widths.push(9);
     else if(/(?:小規模\s*)?\d+\n名称$/.test(h)) widths.push(16);
@@ -6919,11 +6937,12 @@ function buildAllStudentPrintAoaFromFullAoa(grade, fullAoa){
   // 手で追加した列を印刷用にも出す。
   // 標準列・小規模列・人数多い模試/イベント列・3日予定結果列以外を「手追加列」とみなす。
   const manualCols = [];
-  const identity = new Set(['学年','生徒番号','生徒名','読み仮名','担当','高校','入力用備考','全員分リスト備考']);
+  const identity = new Set(['学年','生徒番号','生徒名','氏名','読み仮名','カナ','高校','担当','入力用備考','全員分リスト備考']);
   for(let c=0;c<header.length;c++){
     const h = header[c];
     const hc = canon[c];
     if(!h) continue;
+    if(hc === '電話番号' || /電話|TEL|ＴＥＬ/i.test(h)) continue;
     if(identity.has(hc)) continue;
     if(isAllListDateDynamicHeader(h)) continue;
     if(/^(?:小規模\s*)?[0-9０-９]+\s*\n(日付|名称|回答|Comiru|備考|科目変更|科目リスト)$/.test(h)) continue;
@@ -6931,7 +6950,7 @@ function buildAllStudentPrintAoaFromFullAoa(grade, fullAoa){
     manualCols.push({col:c, label:h.replace(/\n+/g, ' ')});
   }
 
-  const printHeader = ['生徒番号','名前','高校','担当','入力用備考','全員分リスト備考', ...manualCols.map(x => x.label || '書き込み欄')];
+  const printHeader = ['生徒番号','氏名','高校','担当','備考','全員分リスト備考', ...manualCols.map(x => x.label || '書き込み欄')];
   printHeader.push('模試イベント');
   planCols.forEach(x => printHeader.push(x.label || '予定'));
 
@@ -7520,7 +7539,7 @@ function downloadWorkbookFromAoa(calendarAoa, listAoa, resultAoa, rosterAoa, log
   const calWidths = calendarAoa[0].map((_,i)=> i===0 ? 10 : i===1 ? 14 : i===2 ? 18 : i<=6 ? 16 : 30);
   const listWidths = [10,14,18,18,16,24,36,13,8,14,46,12,28,52,14,10,10];
   const resultWidths = [10,18,14,13,8,12,16,34,44,60,26,18];
-  const rosterWidths = [14,10,18,18,16,24,36];
+  const rosterWidths = [8,12,18,14,16,14,30];
   const logWidths = [58,12,48,22];
   const posterWidths = posterAoa[0].map((_,i)=> {
     if(i === 0) return {wch:9};                 // A列：学年
