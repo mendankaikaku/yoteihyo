@@ -1091,7 +1091,7 @@ async function parseRosterFile(file){
   }
 
   function metaFromFixedColumns(row, sheetName=""){
-    // 対応表の標準列：A学年 / B生徒番号 / C氏名 / Dカナ / E高校 / F担当 / G備考
+    // 対応表の標準列：A学年 / B生徒番号 / C氏名 / Dカナ / E高校 / F担当 / G備考（電話番号列なし）
     const name = norm(row[2]);
     const kana = norm(row[3]);
     return {
@@ -1158,10 +1158,16 @@ async function parseRosterFile(file){
       renderAoa("rosterPane", state.rosterAoa, 300);
       return {count:0, message:"対応表が空です"};
     }
-    const hasHeader = isHeaderLikeRow(aoa[0]);
-    const h = hasHeader ? getRosterHeaderMap(aoa) : null;
+    // CSVもExcelと同じく、先頭数行のどこに見出しがあっても読む。
+    // 見出しなしの場合は A:G = 学年/生徒番号/氏名/カナ/高校/担当/備考 として読む。
+    let headerRow = -1;
+    for(let r=0; r<Math.min(5, aoa.length); r++){
+      if(isHeaderLikeRow(aoa[r])){ headerRow = r; break; }
+    }
+    const hasHeader = headerRow >= 0;
+    const h = hasHeader ? getRosterHeaderMap(aoa.slice(headerRow)) : null;
     let count = 0;
-    for(let r=hasHeader ? 1 : 0; r<aoa.length; r++){
+    for(let r=hasHeader ? headerRow + 1 : 0; r<aoa.length; r++){
       const row = aoa[r] || [];
       const meta = hasHeader ? metaFromHeader(row, h, "") : metaFromFixedColumns(row, "");
       if(addMeta(meta)) count++;
@@ -6274,6 +6280,32 @@ function mergeRestoredAllListAoa(grade, generatedAoa){
     insertMissingGeneratedSlot({type:'gen', genIndex:i, restoreIndex:-1, header:genHeader[i], canon:genCanon[i]});
   }
 
+  // 基本情報列は旧全員分リストの列順に引きずられないよう、必ず新版の順序へ固定する。
+  // A:学年 B:生徒番号 C:氏名 D:カナ E:高校 F:担当 G:備考 H:全員分リスト備考
+  // 旧版の「担当, 高校」順や電話番号列が残っている全員分リストを復元しても、
+  // 高校がF列へずれることを防ぐ。
+  (function enforceNewBasicColumnOrder(){
+    const basicGenCount = Math.min(8, genHeader.length);
+    const basic = [];
+    const usedSlot = new Set();
+    for(let gi=0; gi<basicGenCount; gi++){
+      let si = slots.findIndex((s,idx)=> !usedSlot.has(idx) && s.type === 'gen' && s.genIndex === gi);
+      if(si < 0){
+        const canon = genCanon[gi];
+        // 旧ヘッダー側に対応列があれば値を引き継ぐ。高校列は後段で末尾省略される。
+        const ri = restoreCanon.findIndex(h => h === canon);
+        basic.push({type:'gen', genIndex:gi, restoreIndex:ri, header:genHeader[gi], canon:genCanon[gi]});
+      }else{
+        usedSlot.add(si);
+        const s = slots[si];
+        basic.push({type:'gen', genIndex:gi, restoreIndex:s.restoreIndex ?? -1, header:genHeader[gi], canon:genCanon[gi]});
+      }
+    }
+    const rest = slots.filter((s,idx)=> !usedSlot.has(idx) && !(s.type === 'gen' && s.genIndex >= 0 && s.genIndex < basicGenCount));
+    slots.length = 0;
+    slots.push(...basic, ...rest);
+  })();
+
   const header = slots.map(x=>x.header);
   const headerCanon = slots.map(x=>x.canon);
   const out = [title, header];
@@ -7963,7 +7995,7 @@ document.addEventListener('DOMContentLoaded', function(){
       <tr><td>打ち込み結果</td><td>入力用が出した個人Excel</td><td>2週間/1か月/期間指定の予定表</td></tr>
       <tr><td>毎日更新</td><td>毎日更新.xlsx、過去の掲示手修正版</td><td>毎日掲示、結果履歴保存、手修正復元</td></tr>
       <tr><td>json</td><td>result_history.json</td><td>過去結果の保持・復元</td></tr>
-      <tr><td>対応表</td><td>生徒番号・氏名・学年・高校・担当</td><td>名寄せ、学年別出力、掲示の名前補正</td></tr>
+      <tr><td>対応表</td><td>A:G = 学年・生徒番号・氏名・カナ・高校・担当・備考</td><td>名寄せ、学年別出力、全員分リストの基本情報</td></tr>
       <tr><td>全員分リスト</td><td>手修正された回答・状態</td><td>全員分リストの前回修正維持</td></tr>
       <tr><td>科目リスト</td><td>模試科目の手修正</td><td>科目リスト出力の復元</td></tr>
       <tr><td>Comiru</td><td>CSV回答</td><td>模試・イベント回答の反映</td></tr>
