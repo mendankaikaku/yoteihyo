@@ -411,7 +411,7 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
       
 
       <!-- 下のinputは処理用に非表示で保持。 -->
-      <input id="bundleFolderInput" class="hidden" type="file" webkitdirectory directory multiple accept=".xlsx,.xls,.xlsm,.csv,.json" />
+      <input id="bundleFolderInput" class="hidden" type="file" webkitdirectory directory multiple />
       <input id="folderInput" class="hidden" type="file" webkitdirectory directory multiple accept=".xlsx,.xls,.xlsm" />
       <input id="rosterInput" class="hidden" type="file" accept=".xlsx,.xls,.xlsm,.csv" />
       <input id="resultInput" class="hidden" type="file" multiple accept=".xlsx,.xls,.xlsm" />
@@ -5927,23 +5927,28 @@ function buildSmallExamEventColumnMaps(examRecords=[], eventRecords=[]){
   }
   return {smallExamByStudent:examByStudent, smallEventByStudent:eventByStudent, smallPendingMap:pendingMap};
 }
+
+// 全員分リスト用の模試/イベント列グループ。過去版で関数名が分かれていたため、ここで明示的に接続する。
+function buildExamEventGroups(examRecords=[], eventRecords=[]){
+  const groups = buildSmallExamEventColumnGroups(examRecords, eventRecords);
+  return {examGroups:groups.smallExamGroups || [], eventGroups:groups.smallEventGroups || []};
+}
+function buildExamEventMaps(examRecords=[], eventRecords=[]){
+  const maps = buildSmallExamEventColumnMaps(examRecords, eventRecords);
+  return {examByStudent:maps.smallExamByStudent || new Map(), eventByStudent:maps.smallEventByStudent || new Map()};
+}
 function allListDropdownFormulaForHeader(headerText){
   const h = String(headerText || '').replace(/\r\n/g,'\n').replace(/\r/g,'\n').trim();
   const compact = h.replace(/[ 　]/g,'');
   // 全員分リストの更新欄は、模試・イベントで入力がばらつかないようにプルダウンを付ける。
-  // 小規模スロットの「回答」は模試/イベントが混在するため、実務で使う候補をまとめて許可する。
-  if(/(?:小規模\s*)?\d+\s*\n回答$/.test(compact)) return '"当日,後日,不受験,参加,不参加,未,〇,×"';
-  if(/(?:小規模\s*)?\d+\s*\nComiru$/.test(compact)) return '"〇,×"';
-  if(/(?:小規模\s*)?\d+\s*\n科目リスト$/.test(compact)) return '"入力済,未入力,不受験"';
-  if(/(?:小規模\s*)?\d+\s*\n科目変更$/.test(compact)) return '"〇,×"';
-
-  // 通常の模試・イベント列
-  if(/\n受験$/.test(compact)) return '"当日,後日,不受験,未"';
-  if(/\n参加$/.test(compact)) return '"〇,×,未,参加,不参加"';
-  if(/\n回答$/.test(compact)) return '"当日,後日,不受験,参加,不参加,未,〇,×"';
-  if(/\nComiru$/.test(compact)) return '"〇,×"';
-  if(/\n科目変更$/.test(compact)) return '"〇,×"';
-  if(/\n科目リスト$/.test(compact)) return '"入力済,未入力,不受験"';
+  // 改行入り見出し・旧版見出し・小規模スロットの表記ゆれを広めに拾う。
+  if(!compact) return null;
+  if(/(?:^|\n|\d)回答$/.test(compact) || /回答$/.test(compact)) return '"当日,後日,不受験,参加,不参加,未,〇,×"';
+  if(/(?:^|\n|\d)受験$/.test(compact) || /受験$/.test(compact)) return '"当日,後日,不受験,未"';
+  if(/(?:^|\n|\d)参加$/.test(compact) || /参加$/.test(compact)) return '"〇,×,未,参加,不参加"';
+  if(/Comiru$/i.test(compact) || /コミル$/.test(compact)) return '"〇,×"';
+  if(/科目変更$/.test(compact)) return '"〇,×"';
+  if(/科目リスト$/.test(compact)) return '"入力済,未入力,不受験"';
   return null;
 }
 
@@ -5951,27 +5956,22 @@ function allListDropdownFormulaForHeader(headerText){
   const h = String(headerText || '').replace(/\r\n/g,'\n').replace(/\r/g,'\n').trim();
   const compact = h.replace(/[ 　]/g,'');
   // 全員分リストの更新欄は、模試・イベントで入力がばらつかないようにプルダウンを付ける。
-  // 小規模スロットの「回答」は模試/イベントが混在するため、実務で使う候補をまとめて許可する。
-  if(/(?:小規模\s*)?\d+\s*\n回答$/.test(compact)) return '"当日,後日,不受験,参加,不参加,未,〇,×"';
-  if(/(?:小規模\s*)?\d+\s*\nComiru$/.test(compact)) return '"〇,×"';
-  if(/(?:小規模\s*)?\d+\s*\n科目リスト$/.test(compact)) return '"入力済,未入力,不受験"';
-  if(/(?:小規模\s*)?\d+\s*\n科目変更$/.test(compact)) return '"〇,×"';
-
-  // 通常の模試・イベント列
-  if(/\n受験$/.test(compact)) return '"当日,後日,不受験,未"';
-  if(/\n参加$/.test(compact)) return '"〇,×,未,参加,不参加"';
-  if(/\n回答$/.test(compact)) return '"当日,後日,不受験,参加,不参加,未,〇,×"';
-  if(/\nComiru$/.test(compact)) return '"〇,×"';
-  if(/\n科目変更$/.test(compact)) return '"〇,×"';
-  if(/\n科目リスト$/.test(compact)) return '"入力済,未入力,不受験"';
+  // 改行入り見出し・旧版見出し・小規模スロットの表記ゆれを広めに拾う。
+  if(!compact) return null;
+  if(/(?:^|\n|\d)回答$/.test(compact) || /回答$/.test(compact)) return '"当日,後日,不受験,参加,不参加,未,〇,×"';
+  if(/(?:^|\n|\d)受験$/.test(compact) || /受験$/.test(compact)) return '"当日,後日,不受験,未"';
+  if(/(?:^|\n|\d)参加$/.test(compact) || /参加$/.test(compact)) return '"〇,×,未,参加,不参加"';
+  if(/Comiru$/i.test(compact) || /コミル$/.test(compact)) return '"〇,×"';
+  if(/科目変更$/.test(compact)) return '"〇,×"';
+  if(/科目リスト$/.test(compact)) return '"入力済,未入力,不受験"';
   return null;
 }
 
 function allListApplyDropdowns(ws, aoa){
   const header = aoa[1] || [];
   // 手入力やコピー貼り付けが増えても入力規則が途中で切れないよう、実データ行より長めにかける。
-  // 1000行までかけておけば、後から生徒や行を増やしても候補が残りやすい。
-  const lastRow = Math.max(aoa.length + 80, 1000);
+  // 10000行までかけておけば、後から生徒や行を増やしても候補が残りやすい。
+  const lastRow = Math.max(aoa.length + 80, 10000);
   const validations = [];
   const addValidation=(c, formula, headerText)=>{
     if(!formula) return;
@@ -6005,11 +6005,156 @@ function allListApplyDropdowns(ws, aoa){
       ws['!dataValidations'] = validations;
       ws['!dataValidation'] = validations;
       ws['!validations'] = validations;
+      ws['!allListDropdownSpecs'] = validations.map(v => ({sqref:v.sqref || v.ref, formula:v.formula1 || (v.formulae && v.formulae[0]) || '', prompt:v.prompt || ''}));
       ws['!allListDropdownsApplied'] = validations.length;
       if(typeof log === 'function') log(`全員分リスト入力規則: ${validations.length}列にプルダウンを設定しました。`);
     }catch(e){
       console.warn('全員分リストのプルダウン設定をスキップしました', e);
     }
+  }
+}
+
+
+
+// SheetJSの通常プロパティだけでは、環境によってExcelの「データの入力規則」がxlsx内に書き出されないことがある。
+// 全員分リストだけは、xlsxを書き出す直前にワークシートXMLへ dataValidations を直接差し込む。
+function allListXmlEscapeText(s){return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function allListXmlEscapeAttr(s){return allListXmlEscapeText(s).replace(/"/g,'&quot;').replace(/'/g,'&apos;');}
+function allListBuildDataValidationXml(specs){
+  const arr = (specs || []).filter(v => v && v.sqref && v.formula);
+  if(!arr.length) return '';
+  const body = arr.map(v => {
+    const sqref = allListXmlEscapeAttr(v.sqref);
+    const formula = allListXmlEscapeText(v.formula);
+    return `<dataValidation type="list" allowBlank="1" showDropDown="0" showInputMessage="1" showErrorMessage="1" errorStyle="warning" sqref="${sqref}"><formula1>${formula}</formula1></dataValidation>`;
+  }).join('');
+  return `<dataValidations count="${arr.length}">${body}</dataValidations>`;
+}
+function allListPatchWorksheetXmlWithValidations(xml, specs){
+  const validationXml = allListBuildDataValidationXml(specs);
+  if(!validationXml) return xml;
+  let out = String(xml || '').replace(/<dataValidations[\s\S]*?<\/dataValidations>/g, '');
+  const insertBefore = out.search(/<pageMargins\b|<pageSetup\b|<headerFooter\b|<drawing\b|<legacyDrawing\b|<picture\b|<tableParts\b|<extLst\b|<\/worksheet>/);
+  if(insertBefore >= 0) return out.slice(0, insertBefore) + validationXml + out.slice(insertBefore);
+  return out + validationXml;
+}
+function allListCrc32Table(){
+  if(window.__allListCrc32Table) return window.__allListCrc32Table;
+  const table = new Uint32Array(256);
+  for(let n=0;n<256;n++){
+    let c=n;
+    for(let k=0;k<8;k++) c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+    table[n]=c>>>0;
+  }
+  window.__allListCrc32Table=table;
+  return table;
+}
+function allListCrc32(bytes){
+  const table = allListCrc32Table();
+  let crc = 0xffffffff;
+  for(let i=0;i<bytes.length;i++) crc = table[(crc ^ bytes[i]) & 0xff] ^ (crc >>> 8);
+  return (crc ^ 0xffffffff) >>> 0;
+}
+function allListReadU16(b,o){return b[o] | (b[o+1]<<8);}
+function allListReadU32(b,o){return (b[o] | (b[o+1]<<8) | (b[o+2]<<16) | (b[o+3]<<24)) >>> 0;}
+function allListWriteU16(b,o,v){b[o]=v&255;b[o+1]=(v>>>8)&255;}
+function allListWriteU32(b,o,v){b[o]=v&255;b[o+1]=(v>>>8)&255;b[o+2]=(v>>>16)&255;b[o+3]=(v>>>24)&255;}
+function allListParseStoredZip(arrayBuffer){
+  const bytes = new Uint8Array(arrayBuffer);
+  const dec = new TextDecoder();
+  const entries=[];
+  let o=0;
+  while(o + 30 <= bytes.length){
+    const sig = allListReadU32(bytes,o);
+    if(sig !== 0x04034b50) break;
+    const flags = allListReadU16(bytes,o+6);
+    const method = allListReadU16(bytes,o+8);
+    const crc = allListReadU32(bytes,o+14);
+    const compSize = allListReadU32(bytes,o+18);
+    const uncompSize = allListReadU32(bytes,o+22);
+    const nameLen = allListReadU16(bytes,o+26);
+    const extraLen = allListReadU16(bytes,o+28);
+    const nameStart = o + 30;
+    const name = dec.decode(bytes.slice(nameStart, nameStart + nameLen));
+    const dataStart = nameStart + nameLen + extraLen;
+    if(flags & 0x0008) throw new Error('ZIP data descriptor形式のため、入力規則XMLを直接追加できません。');
+    if(method !== 0) throw new Error('ZIPが圧縮形式のため、入力規則XMLを直接追加できません。');
+    const data = bytes.slice(dataStart, dataStart + compSize);
+    entries.push({name, data, crc, method, time:allListReadU16(bytes,o+10), date:allListReadU16(bytes,o+12), uncompSize});
+    o = dataStart + compSize;
+  }
+  return entries;
+}
+function allListBuildStoredZip(entries){
+  const enc = new TextEncoder();
+  const locals=[]; const centrals=[];
+  let offset=0;
+  for(const e of entries){
+    const nameBytes = enc.encode(e.name);
+    const data = e.data instanceof Uint8Array ? e.data : new Uint8Array(e.data || []);
+    const crc = allListCrc32(data);
+    const local = new Uint8Array(30 + nameBytes.length + data.length);
+    allListWriteU32(local,0,0x04034b50); allListWriteU16(local,4,20); allListWriteU16(local,6,0x0800); allListWriteU16(local,8,0);
+    allListWriteU16(local,10,e.time || 0); allListWriteU16(local,12,e.date || 0); allListWriteU32(local,14,crc);
+    allListWriteU32(local,18,data.length); allListWriteU32(local,22,data.length); allListWriteU16(local,26,nameBytes.length); allListWriteU16(local,28,0);
+    local.set(nameBytes,30); local.set(data,30+nameBytes.length);
+    locals.push(local);
+    const central = new Uint8Array(46 + nameBytes.length);
+    allListWriteU32(central,0,0x02014b50); allListWriteU16(central,4,20); allListWriteU16(central,6,20); allListWriteU16(central,8,0x0800); allListWriteU16(central,10,0);
+    allListWriteU16(central,12,e.time || 0); allListWriteU16(central,14,e.date || 0); allListWriteU32(central,16,crc);
+    allListWriteU32(central,20,data.length); allListWriteU32(central,24,data.length); allListWriteU16(central,28,nameBytes.length); allListWriteU16(central,30,0); allListWriteU16(central,32,0);
+    allListWriteU16(central,34,0); allListWriteU16(central,36,0); allListWriteU32(central,38,0); allListWriteU32(central,42,offset);
+    central.set(nameBytes,46);
+    centrals.push(central);
+    offset += local.length;
+  }
+  const centralStart = offset;
+  const centralSize = centrals.reduce((s,x)=>s+x.length,0);
+  const eocd = new Uint8Array(22);
+  allListWriteU32(eocd,0,0x06054b50); allListWriteU16(eocd,4,0); allListWriteU16(eocd,6,0); allListWriteU16(eocd,8,entries.length); allListWriteU16(eocd,10,entries.length);
+  allListWriteU32(eocd,12,centralSize); allListWriteU32(eocd,16,centralStart); allListWriteU16(eocd,20,0);
+  const total = centralStart + centralSize + eocd.length;
+  const out = new Uint8Array(total);
+  let pos=0;
+  for(const x of locals){out.set(x,pos); pos += x.length;}
+  for(const x of centrals){out.set(x,pos); pos += x.length;}
+  out.set(eocd,pos);
+  return out;
+}
+async function allListWriteFileWithDropdownXml(wb, filename){
+  try{
+    const arrayBuffer = XLSX.write(wb, {bookType:'xlsx', type:'array', compression:false});
+    const entries = allListParseStoredZip(arrayBuffer);
+    const dec = new TextDecoder();
+    const enc = new TextEncoder();
+    const sheetNames = wb.SheetNames || [];
+    let patchedCount=0;
+    for(let i=0;i<sheetNames.length;i++){
+      const ws = wb.Sheets[sheetNames[i]];
+      const specs = ws && ws['!allListDropdownSpecs'];
+      if(!specs || !specs.length) continue;
+      const path = `xl/worksheets/sheet${i+1}.xml`;
+      const entry = entries.find(e => e.name === path);
+      if(!entry) continue;
+      const xml = dec.decode(entry.data);
+      const patched = allListPatchWorksheetXmlWithValidations(xml, specs);
+      entry.data = enc.encode(patched);
+      patchedCount++;
+    }
+    if(!patchedCount) throw new Error('入力規則を付ける対象列が見つかりませんでした。');
+    const outBytes = allListBuildStoredZip(entries);
+    const blob = new Blob([outBytes], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();}, 1000);
+    if(typeof log === 'function') log(`全員分リスト入力規則: ${patchedCount}シートにExcel XMLとして確実に書き込みました。`);
+  }catch(e){
+    console.error('入力規則XML書き込みに失敗', e);
+    if(typeof log === 'function') log('入力規則XML書き込みに失敗したため通常保存に戻します: ' + (e && e.message ? e.message : e));
+    XLSX.writeFile(wb, filename);
   }
 }
 
@@ -6883,7 +7028,7 @@ async function downloadAllStudentList(){
       ['手修正衝突ログ', String(Math.max(0, (state.allListUpdateLog?.length || 1) - 1)), '更新ログシートを確認']
     ]);
     appendHiddenManagementIdSheet(wb, '全員分リスト');
-    XLSX.writeFile(wb, `全員分リスト_学年別_B4横_${ymd(base)}基準.xlsx`);
+    await allListWriteFileWithDropdownXml(wb, `全員分リスト_学年別_B4横_${ymd(base)}基準.xlsx`);
     if(typeof log === 'function'){
       const count = Math.max(0, (state.allListUpdateLog?.length || 1) - 1);
       log(`全員分リストを出力しました。\n予定records: ${(state.records||[]).length}件 / 結果records: ${(state.resultRecords||[]).length}件\nJSON/毎日更新の出力直前再読込: ${allListResultRefresh.before}→${allListResultRefresh.after}件\n対象人数が少ない模試・イベントは、各生徒ごとの追加スロット列にまとめました。列数は学年内の最大対象数に合わせて自動で増えます。回答・Comiru・科目リスト・科目変更はプルダウンで更新できます。\n手修正・自動データの衝突ログ: ${count}件${count ? '\nExcel内の「更新ログ」シートを確認してください。' : ''}`);
@@ -7197,8 +7342,23 @@ function setResultHistoryFiles(fileList){
   log(`結果履歴JSON選択完了\nJSONファイル: ${state.resultHistoryFiles.length}件\n毎日更新.xlsxを更新した日は「③ 結果履歴を保存」を押してから出力してください。`);
 }
 
-$("readBundleBtn").addEventListener("click", () => $("bundleFolderInput").click());
-$("bundleFolderInput").addEventListener("change", e => setBundleFolderFiles(e.target.files));
+function openBundleFolderInput(){
+  const input = $("bundleFolderInput");
+  if(!input) return;
+  // 同じ保存復元フォルダを選び直した場合でも change が必ず発火するように、開く直前にリセットする。
+  // また、上部ボタン→下部ボタンの間接クリックではブラウザにブロックされることがあるため、各ボタンから直接この関数を呼ぶ。
+  input.value = "";
+  input.click();
+}
+$("readBundleBtn").addEventListener("click", openBundleFolderInput);
+$("bundleFolderInput").addEventListener("change", e => {
+  const files = e.target.files;
+  if(!files || !files.length){
+    log("保存復元フォルダの選択がキャンセルされたか、読み取れるファイルがありません。もう一度①フォルダー読取を押してください。");
+    return;
+  }
+  setBundleFolderFiles(files);
+});
 $("folderInput").addEventListener("change", e => setFiles(e.target.files));
 $("resultInput").addEventListener("change", e => setResultFiles(e.target.files));
 $("resultHistoryInput").addEventListener("change", e => setResultHistoryFiles(e.target.files));
@@ -7276,11 +7436,14 @@ document.addEventListener('DOMContentLoaded', function(){
 (function(){
   function setupTopReadBundleButton(){
     const topBtn = document.getElementById('readBundleTopBtn');
-    const originalBtn = document.getElementById('readBundleBtn');
-    if(!topBtn || !originalBtn || topBtn.dataset.bound === '1') return;
+    if(!topBtn || topBtn.dataset.bound === '1') return;
     topBtn.dataset.bound = '1';
     topBtn.addEventListener('click', function(){
-      originalBtn.click();
+      // 間接クリックにするとフォルダ選択が開かない環境があるため、入力欄を直接開く。
+      const input = document.getElementById('bundleFolderInput');
+      if(!input) return;
+      input.value = '';
+      input.click();
     });
   }
   if(document.readyState === 'loading'){
