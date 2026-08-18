@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>予定統合アプリ1:12掲示背景薄赤・文字罫線黒版）</title>
+  <title>予定統合アプリ（掲示背景薄赤・文字罫線黒版）</title>
   <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
   <script src="./libs/xlsx.bundle.js"></script>
   <script>
@@ -4929,7 +4929,7 @@ function styleMonthlyPosterSheet(ws, aoa){
   const fontBase = {name:posterFontName, sz:15, bold:true, color:{rgb:'000000'}};
   setRangeStyle(ws, range, (R,C,cell)=>{
     const style = {font:fontBase, alignment:{vertical:'center', horizontal:'center', wrapText:true}, border};
-    if(R === 0){ style.font = fontTitle; style.fill = titleFill; style.alignment = {vertical:'center', horizontal:'center', wrapText:true}; }
+    if(R === 0){ style.font = fontTitle; style.fill = titleFill; style.alignment = {vertical:'center', horizontal:'center', wrapText:false, shrinkToFit:true}; }
     else if(R === 1){ style.font = fontHeader; style.fill = headerFill; style.alignment = {vertical:'center', horizontal:'center', wrapText:true}; }
     else if(C < 2){ style.fill = nameFill; }
     return style;
@@ -5073,7 +5073,8 @@ function styleHighSpeedRankingSheet(ws, aoa){
   const cleanAoa = posterMoveNoHitRowsToBottom(aoa || []).map(row => [row?.[0] ?? '', row?.[1] ?? '', row?.[2] ?? '', row?.[3] ?? '']);
   Object.keys(ws).forEach(k=>{ if(k[0] !== '!') delete ws[k]; });
   XLSX.utils.sheet_add_aoa(ws, cleanAoa, {origin:'A1'});
-  const widths = [8,10,24,14];
+  // 高速基礎ランキングはC列（氏名）を広めにし、タイトルの折り返しを防ぐ。
+  const widths = [8,10,42,14];
   const range = applyNiceSheetSettings(ws, cleanAoa, widths, {rows:{min:38,max:92,header:48,pxPerLine:24}});
   ws['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:3}}];
   ws['!freeze'] = {xSplit:0, ySplit:2};
@@ -6793,8 +6794,10 @@ function styleAllStudentGradeSheet(ws, aoa){
     const text = cell && cell.v != null ? String(cell.v) : cellText;
     const headerText = String(aoa[1]?.[C] || '');
     const isExtra = /(?:小規模\s*)?\d+\n/.test(headerText);
+    const isAllListDirectRedValue = R>1 && /^(×|不受験|未|未入力)$/.test(String(text || '').trim());
     const isMissing = R>1 && (
       isBangMissing ||
+      isAllListDirectRedValue ||
       (/\n科目リスト$/.test(headerText) && text === '未入力') ||
       (/\n(受験|参加|回答)$/.test(headerText) && text === '未') ||
       (/\nComiru$/.test(headerText) && text === '×') ||
