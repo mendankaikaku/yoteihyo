@@ -581,6 +581,7 @@ const state = {
   posterSettingsFiles: [],
   allListFiles: [],
   allListRestores: new Map(),
+  allListSmallRestores: {rowObjects:[]},
   dailyPosterFiles: [],
   dailyPosterRestores: new Map(),
   wholeScheduleFiles: [],
@@ -694,6 +695,161 @@ function sanitizeTeacherDisplayName(v, school){
   const raw = norm(v);
   if(!raw) return '';
   return looksLikeSchoolNameForTeacherColumn(raw, school) ? '' : raw;
+}
+
+
+// ============================================================
+// 全員分リスト復元：旧出力Excelから手入力欄を安全に引き継ぐ
+// ============================================================
+function normalizeAllListHeaderText(v){
+  return String(v ?? '').replace(/\r\n/g,'\n').replace(/\r/g,'\n').replace(/[ \t　]+/g,' ').trim();
+}
+function allListCanonicalHeader(v){
+  const raw = normalizeAllListHeaderText(v);
+  const t = raw.replace(/[\s\n\r　]+/g,'');
+  if(!t) return '';
+  if(t === '学年') return '学年';
+  if(t === '生徒番号' || t === '番号') return '生徒番号';
+  if(t === '氏名' || t === '生徒名' || t === '名前') return '生徒名';
+  if(t === 'カナ' || t === 'フリガナ' || t === '読み仮名') return '読み仮名';
+  if(t === '高校' || t === '学校' || t === '高校名') return '高校';
+  if(t === '担当' || t === '担当助手' || t === '担任助手' || t === '担任助手名') return '担当';
+  if(t === '全員分リスト備考' || t === '確認メモ') return '全員分リスト備考';
+  if(t === '備考') return '入力用備考';
+  return raw;
+}
+function allListHeaderIndexByCanon(header, canons){
+  const canon = (header || []).map(allListCanonicalHeader);
+  for(const c of canons){
+    const idx = canon.findIndex(x => x === c);
+    if(idx >= 0) return idx;
+  }
+  return -1;
+}
+function allListCellText(v){
+  if(v == null) return '';
+  if(typeof v === 'object'){
+    if(v.text != null) return norm(v.text);
+    if(v.v != null) return norm(v.v);
+    if(v.w != null) return norm(v.w);
+  }
+  return norm(v);
+}
+function allListRowKeyFromCells(row, header){
+  const h = (header || []).map(normalizeAllListHeaderText);
+  const idxNo = allListHeaderIndexByCanon(h, ['生徒番号']);
+  const idxName = allListHeaderIndexByCanon(h, ['生徒名']);
+  const no = idxNo >= 0 ? allListCellText(row?.[idxNo]) : '';
+  const name = idxName >= 0 ? allListCellText(row?.[idxName]) : '';
+  if(no) return `no:${String(no).replace(/\s+/g,'')}`;
+  if(name) return `name:${String(name).replace(/[\s　]+/g,'')}`;
+  return '';
+}
+function allListGradeKey(v){
+  const s = norm(v).replace(/[\s　]+/g,'');
+  if(!s) return '';
+  const m = s.match(/高?([123１２３])/);
+  if(m){
+    const n = String(m[1]).replace(/[１２３]/g, ch => String(ch.charCodeAt(0)-0xFF10));
+    return `高${n}`;
+  }
+  return s;
+}
+function findAllListRestoreForGrade(grade){
+  const key = allListGradeKey(grade);
+  return key ? state.allListRestores.get(key) : null;
+}
+function mergeRestoredAllListAoa(grade, generatedAoa){
+  const restored = findAllListRestoreForGrade(grade);
+  if(!restored || !generatedAoa || generatedAoa.length < 2) return generatedAoa;
+  const genHeader = (generatedAoa[1] || []).map(normalizeAllListHeaderText);
+  const genCanon = genHeader.map(allListCanonicalHeader);
+  const out = generatedAoa.map(r => Array.isArray(r) ? r.slice() : []);
+  const baseCanons = new Set(['学年','生徒番号','生徒名','読み仮名','高校','担当','入力用備考']);
+  for(let r=2; r<out.length; r++){
+    const row = out[r] || [];
+    const key = allListRowKeyFromCells(row, genHeader);
+    const oldRow = key ? restored.rows.get(key) : null;
+    if(!oldRow) continue;
+    for(let c=0; c<genHeader.length; c++){
+      const cc = genCanon[c];
+      if(baseCanons.has(cc)) continue;
+      const oldIdx = restored.headerCanon.findIndex((h,idx) => h === cc && normalizeAllListHeaderText(restored.header[idx]) === genHeader[c]);
+      let oi = oldIdx;
+      if(oi < 0) oi = restored.headerCanon.findIndex(h => h === cc && !baseCanons.has(h));
+      if(oi < 0) continue;
+      const oldVal = oldRow[oi];
+      if(oldVal !== undefined && allListCellText(oldVal) !== '') row[c] = oldVal;
+    }
+    out[r] = row;
+  }
+  return out;
+}
+async function parseAllListRestoreFile(file){
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, {type:'array', cellDates:true});
+  const logs = [];
+  for(const sheetName of wb.SheetNames || []){
+    const sname = String(sheetName || '');
+    if(/印刷|入力しない|管理ID|_rels|小規模模試イベント/i.test(sname)) continue;
+    const ws = wb.Sheets[sheetName];
+    const aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:'', raw:false});
+    if(!aoa || aoa.length < 2) continue;
+    let headerRow = -1;
+    for(let r=0; r<Math.min(8, aoa.length); r++){
+      const row = (aoa[r] || []).map(normalizeAllListHeaderText);
+      const canon = row.map(allListCanonicalHeader);
+      if(canon.includes('生徒番号') && canon.includes('生徒名')){ headerRow = r; break; }
+    }
+    if(headerRow < 0) continue;
+    const header = (aoa[headerRow] || []).map(normalizeAllListHeaderText);
+    const headerCanon = header.map(allListCanonicalHeader);
+    const idxGrade = headerCanon.findIndex(h => h === '学年');
+    const rows = new Map();
+    let gradeKey = allListGradeKey(sname);
+    for(let r=headerRow+1; r<aoa.length; r++){
+      const row = aoa[r] || [];
+      if(!row.some(v => allListCellText(v))) continue;
+      const key = allListRowKeyFromCells(row, header);
+      if(!key) continue;
+      if(!gradeKey && idxGrade >= 0) gradeKey = allListGradeKey(row[idxGrade]);
+      rows.set(key, row.slice());
+    }
+    if(rows.size && gradeKey){
+      const cur = state.allListRestores.get(gradeKey) || {header, headerCanon, rows:new Map(), source:[]};
+      // 新しいファイルほど後勝ち。今回のファイル内では後で読んだ値を優先。
+      cur.header = header;
+      cur.headerCanon = headerCanon;
+      for(const [k,v] of rows) cur.rows.set(k,v);
+      cur.source.push(`${file.name || '全員分リスト'}:${sheetName}`);
+      state.allListRestores.set(gradeKey, cur);
+      logs.push(`${gradeKey}: ${rows.size}行（${sheetName}）`);
+    }
+  }
+  return logs;
+}
+async function loadAllListRestoreFiles(files=[]){
+  state.allListRestores = new Map();
+  state.allListSmallRestores = {rowObjects:[]};
+  const logs=[];
+  for(const file of files || []){
+    try{
+      const gs = await parseAllListRestoreFile(file);
+      if(gs.length) logs.push(`${file.name}: ${gs.join(' / ')}`);
+      try{
+        const small = await parseSmallAllListRestoreFile(file);
+        if(small && small.rowObjects && small.rowObjects.length){
+          state.allListSmallRestores.rowObjects.push(...small.rowObjects);
+          logs.push(`${file.name}: 小規模 ${small.rowObjects.length}件`);
+        }
+      }catch(e2){ console.warn('小規模復元の読取をスキップ', file.name, e2); }
+    }catch(e){
+      console.warn('全員分リスト復元読取失敗', file && file.name, e);
+      logs.push(`${file.name || '全員分リスト'}: 読取失敗 ${e && e.message ? e.message : e}`);
+    }
+  }
+  if(!logs.length) return files && files.length ? [`全員分リスト候補 ${files.length}件。ただし復元対象シートは見つかりませんでした。`] : [];
+  return logs;
 }
 function allListEnforceTeacherColumnSanity(aoa){
   if(!aoa || aoa.length < 2) return aoa;
@@ -7479,7 +7635,7 @@ $("downloadAllListBtn").addEventListener("click", async () => {
 $("downloadMonthlyPosterBtn").addEventListener("click", downloadMonthlyPosterResultWorkbook);
 refreshOutputButtonReason();
 $("clearBtn").addEventListener("click", () => {
-  state.files=[]; state.resultFiles=[]; state.resultHistoryFiles=[]; state.posterSettingsFiles=[]; state.allListFiles=[]; state.allListRestores=new Map(); state.dailyPosterFiles=[]; state.dailyPosterRestores=new Map(); state.wholeScheduleFiles=[]; state.wholeScheduleRestores=new Map(); state.resultHistoryRecords=[]; state.records=[]; state.resultRecords=[]; state.examRecords=[]; state.eventRecords=[]; state.calendarAoa=[]; state.listAoa=[]; state.resultAoa=[]; state.logAoa=[]; state.rosterAoa=[]; state.rosterMap=new Map(); state.rosterNoMap=new Map(); state.workbookReady=false;
+  state.files=[]; state.resultFiles=[]; state.resultHistoryFiles=[]; state.posterSettingsFiles=[]; state.allListFiles=[]; state.allListRestores=new Map(); state.allListSmallRestores={rowObjects:[]}; state.dailyPosterFiles=[]; state.dailyPosterRestores=new Map(); state.wholeScheduleFiles=[]; state.wholeScheduleRestores=new Map(); state.resultHistoryRecords=[]; state.records=[]; state.resultRecords=[]; state.examRecords=[]; state.eventRecords=[]; state.calendarAoa=[]; state.listAoa=[]; state.resultAoa=[]; state.logAoa=[]; state.rosterAoa=[]; state.rosterMap=new Map(); state.rosterNoMap=new Map(); state.workbookReady=false;
   $("bundleFolderInput").value="";
   $("folderInput").value="";
   $("rosterInput").value="";
