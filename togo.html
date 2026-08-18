@@ -6320,6 +6320,61 @@ async function allListWriteFileWithDropdownXml(wb, filename){
   }
 }
 
+function buildSmallSlotObjectsByStudent(examRecords=[], eventRecords=[]){
+  const subjectStatusIndex = buildAllListSubjectStatusIndex(examRecords);
+  const examCounts = allListGroupTargetCountByBase(examRecords, examKeyOf, allListExamStillVisible);
+  const eventCounts = allListGroupTargetCountByBase(eventRecords, eventKeyOf, null);
+  const rowObjects = new Map();
+
+  function put(obj, source='auto'){
+    if(!obj || !obj.studentKey || !obj.name) return;
+    obj._source = source;
+    const dedupeKey = allListSmallDedupeKey(obj);
+    if(!dedupeKey) return;
+    const old = rowObjects.get(dedupeKey);
+    rowObjects.set(dedupeKey, allListSmallMergeRestoredOverAuto(old, obj));
+  }
+
+  for(const r of examRecords || []){
+    if(!allListExamStillVisible(r)) continue;
+    const baseKey=examKeyOf(r);
+    const count=examCounts.get(baseKey) || 0;
+    if(!allListIsSmallTargetCount(count)) continue;
+    const meta=rosterMetaForStudent(r.student);
+    const stuKey=studentKeyForList(meta['生徒名'] || r.student, meta['生徒番号'] || r.studentNo || '');
+    put({kind:'模試',date:r.examDate || '',name:r.examName || '',count,grade:meta['学年'] || r.grade || '',studentNo:meta['生徒番号'] || r.studentNo || '',student:meta['生徒名'] || r.student || '',status:allListExamStatusFull(r.status),subject:r.subjectChanged ? 'あり' : '',subjectChanged:!!r.subjectChanged,subjectList:allListSubjectListStatusForRecord(r, subjectStatusIndex, stuKey),comiru:r.comiruAnswered ? '済' : '未聞き取り',comiruAnswered:!!r.comiruAnswered,note:r.note || '',machineKey:baseKey,studentKey:stuKey}, 'auto');
+  }
+  for(const r of eventRecords || []){
+    const baseKey=eventKeyOf(r);
+    const count=eventCounts.get(baseKey) || 0;
+    if(!allListIsSmallTargetCount(count)) continue;
+    const meta=rosterMetaForStudent(r.student);
+    const stuKey=studentKeyForList(meta['生徒名'] || r.student, meta['生徒番号'] || r.studentNo || '');
+    put({kind:'イベント',date:r.datetime || '',name:r.eventName || '',count,grade:meta['学年'] || r.grade || '',studentNo:meta['生徒番号'] || r.studentNo || '',student:meta['生徒名'] || r.student || '',status:norm(r.status || '') || '未聞き取り',subject:'',subjectChanged:false,subjectList:'',comiru:r.comiruAnswered ? '済' : '未聞き取り',comiruAnswered:!!r.comiruAnswered,note:r.note || '',machineKey:baseKey,studentKey:stuKey}, 'auto');
+  }
+
+  // 読み込んだ全員分リストの手修正を最後に入れて、同一イベント/模試は1件に統合する。
+  const manual=state.allListSmallRestores;
+  if(manual && manual.rowObjects && manual.rowObjects.length){
+    for(const obj of manual.rowObjects) put(obj, 'restore');
+  }
+
+  const byStudent=new Map();
+  const pendingMap=new Map();
+  const rows=[...rowObjects.values()].sort((a,b)=>
+    String(allListSmallDedupeDateKey(a.date || '')).localeCompare(String(allListSmallDedupeDateKey(b.date || ''))) ||
+    String(a.kind || '').localeCompare(String(b.kind || ''),'ja') ||
+    String(a.name || '').localeCompare(String(b.name || ''),'ja')
+  );
+  for(const obj of rows){
+    if(!byStudent.has(obj.studentKey)) byStudent.set(obj.studentKey, []);
+    const arr = byStudent.get(obj.studentKey);
+    if(!arr.some(x => allListSmallDedupeKey(x) === allListSmallDedupeKey(obj))) arr.push(obj);
+    if(allListSmallRowObjectPending(obj)) pendingMap.set(obj.studentKey,true);
+  }
+  return {smallByStudent:byStudent, smallPendingMap:pendingMap};
+}
+
 function buildAllStudentListAoaByGrade(examRecords=[], eventRecords=[]){
   const studentMap = buildAllListStudentMap(examRecords, eventRecords);
   const byGrade = groupAllListStudentsByGrade(studentMap);
