@@ -977,7 +977,7 @@ body .prepCompactCard .prepDetails summary{min-height:28px!important;font-size:1
 
   <section class="card">
     <p class="sectionTitle">模試マスタ</p>
-    <div class="masterGridHint">模試名・日付・対象学年/生徒を登録します。対象学年/生徒が未選択の模試は、生徒の入力欄にも印刷にも表示しません。模試マスタでは週開始日から3週間以内の模試だけ表示し、科目型だけを選択します。生徒入力欄・面談準備印刷・統合用の科目リストでは、その科目型から科目チェックを自動表示します。</div>
+    <div class="masterGridHint">模試名・日付・対象学年/高校/担任助手/生徒を登録します。高校/助手は対象生徒名へ一括追加するためだけに使い、対象生徒名が未選択の模試は生徒の入力欄にも印刷にも表示しません。模試マスタでは週開始日から3週間以内の模試だけ表示し、科目型だけを選択します。生徒入力欄・面談準備印刷・統合用の科目リストでは、その科目型から科目チェックを自動表示します。</div>
     <details class="advanced">
       <summary>模試マスタを編集</summary>
       <div id="examMasterPanel"></div>
@@ -991,7 +991,7 @@ body .prepCompactCard .prepDetails summary{min-height:28px!important;font-size:1
     <details class="advanced">
       <summary>科目型マスタを編集</summary>
       <div class="field"><label>編集する科目型</label><select id="subjectTemplateSelect"></select></div>
-      <div class="actions"><button class="secondary small" id="loadSubjectTemplate" type="button">選択中の科目型を読み込み</button></div>
+      <div class="actions"><button class="secondary small" id="loadSubjectTemplate" type="button">選択中の科目型を読み込み</button><button class="secondary small" id="newSubjectTemplate" type="button">新しい科目型を作る</button></div>
       <div class="field"><label>科目型名</label><input id="subjectTemplateName" placeholder="例：共テ型、冠模試型、私大型"></div>
       <div class="field"><label>基本科目チェック</label><div id="subjectTemplateChecks" class="checkRow"></div></div>
       <div class="field"><label>追加科目</label><textarea id="subjectTemplateCustom" placeholder="チェック欄にない科目を、読点または改行区切りで入力。例：面接、小論文"></textarea></div>
@@ -1498,12 +1498,8 @@ function studentsForAssistants(assistants){
   const keys=new Set((assistants||[]).map(profileKey).filter(Boolean));
   if(!keys.size)return [];
   const out=[]; const seen=new Set();
-  // まずアプリ内の正式な入力用表示名リスト（苗字だけ/同姓は下一文字つき）を優先する。
-  keys.forEach(k=>{
-    const hitKey=Object.keys(ASSISTANT_STUDENT_MAP_FOR_INPUT||{}).find(a=>profileKey(a)===k);
-    if(hitKey)(ASSISTANT_STUDENT_MAP_FOR_INPUT[hitKey]||[]).forEach(n=>addTargetStudentNameOnce(out, seen, n));
-  });
-  // 対応表がフルネームでも、inputTargetDisplayName で入力用表示名へ寄せて重複を消す。
+  // マスタの「担任助手から追加」は固定名簿を使わない。
+  // 対応表と現在画面上の生徒データだけを見て、対象生徒名へ追加する。
   (ROSTER_PROFILE_CACHE.profiles||[]).forEach(p=>{
     if(keys.has(profileKey(p.assistant)) && p.name) addTargetStudentNameOnce(out, seen, p.name);
   });
@@ -1520,10 +1516,10 @@ function appendUniqueTargetStudents(current, additions){
 }
 async function expandMasterTargetStudents(row, kind){
   await refreshRosterProfilesFromShared(false);
-  const prefix=kind==='comment'?'comment':'event';
-  const schoolEl=row.querySelector(`[data-${prefix}-master-schools]`);
-  const assistantEl=row.querySelector(`[data-${prefix}-master-assistants]`);
-  const studentsEl=row.querySelector(`[data-${prefix}-master-students]`);
+  const prefix=kind==='comment'?'comment':(kind==='exam'?'master':'event');
+  const schoolEl=row.querySelector(`[data-${prefix}-schools]`) || row.querySelector(`[data-${prefix}-master-schools]`);
+  const assistantEl=row.querySelector(`[data-${prefix}-assistants]`) || row.querySelector(`[data-${prefix}-master-assistants]`);
+  const studentsEl=row.querySelector(`[data-${prefix}-students]`) || row.querySelector(`[data-${prefix}-master-students]`);
   const schools=splitTargetText(schoolEl?.value||'');
   const assistants=splitTargetText(assistantEl?.value||'');
   const schoolAdds=studentsForSchools(schools);
@@ -1885,7 +1881,12 @@ function visibleEventMastersForStudent(name){
     const targets=Array.isArray(ev.grades)?ev.grades.filter(Boolean):[];
     if(targets.length && !targets.includes(grade)) return false;
     const targetNames=Array.isArray(ev.students)?ev.students:splitTargetNames(ev.studentNames||'');
-    if(!studentMatchesTargetProfile(name,ev)) return false;
+    const targetSchools=Array.isArray(ev.schools)?ev.schools.filter(Boolean):splitTargetText(ev.schoolNames||'');
+    const targetAssistants=Array.isArray(ev.assistants)?ev.assistants.filter(Boolean):splitTargetText(ev.assistantNames||'');
+    // 対象高校・対象担任助手は、対象生徒名へ一括追加するためだけに使う。
+    // 高校/助手だけ指定して対象生徒名が空のイベントは表示しない。
+    // 全員向けイベントは対象高校・対象担任助手・対象生徒名をすべて空欄にする。
+    if(!targetNames.length && (targetSchools.length || targetAssistants.length)) return false;
     return examTargetNameMatch(name,targetNames);
   });
 }
@@ -2745,21 +2746,22 @@ function examSubjectsText(subjects){
 function examMasterExplicitTargets(ex){
   const targetGrades = Array.isArray(ex?.grades) ? ex.grades.filter(Boolean) : [];
   const targetNames = Array.isArray(ex?.students) ? ex.students.filter(Boolean) : splitTargetNames(ex?.studentNames || '');
-  return {targetGrades, targetNames, hasTarget: targetGrades.length > 0 || targetNames.length > 0};
+  const targetSchools = Array.isArray(ex?.schools) ? ex.schools.filter(Boolean) : splitTargetText(ex?.schoolNames || '');
+  const targetAssistants = Array.isArray(ex?.assistants) ? ex.assistants.filter(Boolean) : splitTargetText(ex?.assistantNames || '');
+  return {targetGrades, targetNames, targetSchools, targetAssistants, hasTarget: targetGrades.length > 0 || targetNames.length > 0 || targetSchools.length > 0 || targetAssistants.length > 0};
 }
 function examMasterTargetsStudent(ex, name){
   const data = ensureStudent(name);
   const grade = data.grade || '';
-  const {targetGrades, targetNames, hasTarget} = examMasterExplicitTargets(ex);
-  // 対象学年も対象生徒も未選択の模試マスタは、入力欄にも印刷にも出さない。
-  if(!hasTarget) return false;
+  const {targetGrades, targetNames} = examMasterExplicitTargets(ex);
+  // 模試マスタの実表示は「対象生徒名」に残っている生徒だけ。
+  // 対象高校・対象担任助手は、対象生徒名へ一括追加するための検索条件としてだけ使う。
+  // 対象学年は、対象生徒名に入れた生徒をさらに絞る条件としてだけ使う。
+  if(!targetNames.length) return false;
   if(targetGrades.length){
     if(!grade || !targetGrades.includes(grade)) return false;
   }
-  if(targetNames.length){
-    return examTargetNameMatch(name, targetNames);
-  }
-  return true;
+  return examTargetNameMatch(name, targetNames);
 }
 function visibleExamIdSetForStudent(name){
   return new Set(visibleExamMastersForStudent(name).map(ex => examId(ex)));
@@ -2840,7 +2842,11 @@ function visibleCommentMastersForStudent(name){
       if(!targets.includes(grade)) return false;
     }
     const targetNames=Array.isArray(cm.students)?cm.students:splitTargetNames(cm.studentNames||'');
-    if(!studentMatchesTargetProfile(name,cm)) return false;
+    const targetSchools=Array.isArray(cm.schools)?cm.schools.filter(Boolean):splitTargetText(cm.schoolNames||'');
+    const targetAssistants=Array.isArray(cm.assistants)?cm.assistants.filter(Boolean):splitTargetText(cm.assistantNames||'');
+    // 対象高校・対象担任助手は、対象生徒名へ一括追加するためだけに使う。
+    // 高校/助手だけ指定して対象生徒名が空のコメントは表示しない。
+    if(!targetNames.length && (targetSchools.length || targetAssistants.length)) return false;
     return examTargetNameMatch(name,targetNames);
   });
 }
@@ -2909,15 +2915,15 @@ function saveExamTargetHistory(list){
 }
 function updateExamTargetHistoryFromMasters(rows){
   const current=(rows||[])
-    .filter(ex=>ex&&ex.name&&((ex.grades||[]).length||(ex.students||[]).length))
-    .map(ex=>({name:ex.name,grades:ex.grades||[],students:ex.students||[],savedAt:new Date().toISOString()}));
+    .filter(ex=>ex&&ex.name&&itemHasAnyTarget(ex))
+    .map(ex=>({name:ex.name,grades:ex.grades||[],schools:ex.schools||[],assistants:ex.assistants||[],students:ex.students||[],savedAt:new Date().toISOString()}));
   saveExamTargetHistory([...current,...getExamTargetHistory()]);
 }
 function findSimilarExamTarget(name, rowsForSearch=[]){
   const key=normalizeExamNameForTarget(name);
   if(!key)return null;
   const candidates=[...(rowsForSearch||[]),...getExamMaster(),...getExamTargetHistory()]
-    .filter(ex=>ex&&ex.name&&normalizeExamNameForTarget(ex.name)!==key&&((ex.grades||[]).length||(ex.students||[]).length));
+    .filter(ex=>ex&&ex.name&&normalizeExamNameForTarget(ex.name)!==key&&itemHasAnyTarget(ex));
   let best=null;
   for(const ex of candidates){
     const k=normalizeExamNameForTarget(ex.name);
@@ -2937,7 +2943,7 @@ function commonExamNameCoreMatch(a,b){
 function applyPreviousExamTargetsWithConfirm(rows){
   return (rows||[]).map((ex,idx)=>{
     if(!ex||!ex.name)return ex;
-    const hasTarget=(ex.grades&&ex.grades.length)||(ex.students&&ex.students.length);
+    const hasTarget=itemHasAnyTarget(ex);
     if(hasTarget)return ex;
     const previous=findSimilarExamTarget(ex.name, rows.slice(0,idx));
     if(!previous)return ex;
@@ -2945,7 +2951,7 @@ function applyPreviousExamTargetsWithConfirm(rows){
     const studentText=(previous.students||[]).join('、')||'指定なし';
     const ok=confirm(`前回の「${previous.name}」の対象を「${ex.name}」にも反映しますか？\n\n対象学年：${gradeText}\n対象生徒：${studentText}`);
     if(!ok)return ex;
-    return Object.assign({},ex,{grades:[...(previous.grades||[])],students:[...(previous.students||[])]});
+    return Object.assign({},ex,{grades:[...(previous.grades||[])],schools:[...(previous.schools||[])],assistants:[...(previous.assistants||[])],students:[...(previous.students||[])]});
   });
 }
 function renderExamMasterPanel(){
@@ -2963,11 +2969,14 @@ function renderExamMasterPanel(){
       <div><label>科目型</label><select data-master-template>${examTemplateOptions(tmpl,type)}</select></div>
       <div><button type="button" class="small secondary" data-delete-master="${i}">削除</button></div>
       <div><label>対象学年</label><div class="checkRow">${examGradeCheckboxes(ex.grades||[])}</div></div>
-      <div style="grid-column:2/-1"><label>対象生徒名</label><textarea data-master-students placeholder="未選択なら生徒欄・印刷には表示しません。例：生徒A、生徒B">${escapeHtml(targetNames)}</textarea></div>
-      <div style="grid-column:1/-1"><div class="hint">模試マスタ編集欄は、週開始日から3週間以内の模試だけ表示します。表示されていない過去/遠い未来の模試も保存データには残ります。</div></div>
+      <div><label>対象高校</label><textarea data-master-schools placeholder="例：〇〇高校、△△高校">${escapeHtml((ex.schools||[]).join('、'))}</textarea></div>
+      <div><label>対象担任助手</label><textarea data-master-assistants placeholder="例：武内、今道">${escapeHtml((ex.assistants||[]).join('、'))}</textarea></div>
+      <div style="grid-column:1/-1"><label>対象生徒名</label><textarea data-master-students placeholder="高校/助手から追加後、ここに残っている生徒だけ表示。例：生徒A、生徒B">${escapeHtml(targetNames)}</textarea></div>
+      <div style="grid-column:1/-1"><button type="button" class="small secondary" data-expand-exam-targets="${i}">高校/助手から追加</button><div class="hint" style="margin-top:6px">対象高校・対象担任助手は、対象生徒名へ一括追加するためだけに使います。実際に生徒欄・印刷に出るのは「対象生徒名」に残っている生徒だけです。模試マスタ編集欄は、週開始日から3週間以内の模試だけ表示します。</div></div>
     </div>`;
   }).join('')||'<div class="empty">3週間以内に編集対象の模試はありません。必要なら「模試を追加」してください。</div>';
   $$('[data-delete-master]').forEach(btn=>btn.onclick=()=>{const arr=getExamMaster();arr.splice(Number(btn.dataset.deleteMaster),1);saveExamMasterData(arr);renderExamMasterPanel();renderStudents()});
+  $$('[data-expand-exam-targets]').forEach(btn=>btn.onclick=async()=>{await expandMasterTargetStudents(btn.closest('.examMasterRow'),'exam');});
   $$('.examMasterRow [data-master-type]').forEach(sel=>{
     sel.onchange=()=>{
       const row=sel.closest('.examMasterRow');
@@ -3006,7 +3015,7 @@ function mergeVisibleExamMasterRowsForSave(editedRows){
     if(Number.isInteger(idx) && idx>=0 && idx<all.length) all[idx]=clean;
     else all.push(clean);
   });
-  return all.filter(x=>x.name||x.date||(x.grades||[]).length||(x.students||[]).length||x.subjectTemplate);
+  return all.filter(x=>x.name||x.date||(x.grades||[]).length||(x.schools||[]).length||(x.assistants||[]).length||(x.students||[]).length||x.subjectTemplate);
 }
 
 function collectExamMasterFromPanel(){return $$('.examMasterRow').map(row=>{
@@ -3019,11 +3028,13 @@ function collectExamMasterFromPanel(){return $$('.examMasterRow').map(row=>{
     type,
     subjectTemplate,
     grades:Array.from(row.querySelectorAll('[data-master-grade]:checked')).map(x=>x.value),
+    schools:splitTargetNames(row.querySelector('[data-master-schools]')?.value||''),
+    assistants:splitTargetNames(row.querySelector('[data-master-assistants]')?.value||''),
     students:splitTargetNames(row.querySelector('[data-master-students]')?.value||''),
     // 模試マスタでは科目を個別に持たず、科目型から自動展開する。
     subjects:[]
   };
-}).filter(x=>x.name||x.date||x.grades.length||x.students.length||x.subjectTemplate)}
+}).filter(x=>x.name||x.date||x.grades.length||x.schools.length||x.assistants.length||x.students.length||x.subjectTemplate)}
 function addExamMasterRow(){
   const arr=collectExamMasterFromPanel();
   // 空の模試名だと mergeDefaultExamMaster() 側で保存対象から落ちるため、
@@ -3130,8 +3141,8 @@ function renderEventMasterPanel(){
     <div><label>対象学年</label><div class="checkRow">${gradeCheckboxes(ev.grades||[])}</div></div>
     <div><label>対象高校</label><textarea data-event-master-schools placeholder="例：〇〇高校、△△高校">${escapeHtml((ev.schools||[]).join('、'))}</textarea></div>
     <div><label>対象担任助手</label><textarea data-event-master-assistants placeholder="例：助手A、助手B">${escapeHtml((ev.assistants||[]).join('、'))}</textarea></div>
-    <div><label>対象生徒名</label><textarea data-event-master-students placeholder="空欄なら全員。例：生徒A、生徒B">${escapeHtml(targetNames)}</textarea></div>
-    <div><button type="button" class="small secondary" data-expand-event-targets="${i}">高校/助手から追加</button><button type="button" class="small secondary" data-delete-event-master="${i}">削除</button></div>
+    <div><label>対象生徒名</label><textarea data-event-master-students placeholder="全員向けは高校/助手/生徒名をすべて空欄。個別指定はここに残った生徒だけ。例：生徒A、生徒B">${escapeHtml(targetNames)}</textarea></div>
+    <div><button type="button" class="small secondary" data-expand-event-targets="${i}">高校/助手から追加</button><button type="button" class="small secondary" data-delete-event-master="${i}">削除</button><div class="hint" style="margin-top:6px">対象高校・対象担任助手は、対象生徒名へ一括追加するためだけに使います。実際に表示されるのは「対象生徒名」に残っている生徒だけです。</div></div>
   </div>`;
   }).join('')||'<div class="empty">まだイベントマスタがありません。</div>';
   $$('[data-delete-event-master]').forEach(btn=>btn.onclick=()=>{const arr=getEventMaster();arr.splice(Number(btn.dataset.deleteEventMaster),1);saveEventMasterData(arr);renderEventMasterPanel();renderStudents()});
@@ -3204,8 +3215,8 @@ function renderCommentMasterPanel(){
     <div><label>対象学年</label><div class="checkRow">${gradeCheckboxes(cm.grades||[])}</div></div>
     <div><label>対象高校</label><textarea data-comment-master-schools placeholder="例：〇〇高校、△△高校">${escapeHtml((cm.schools||[]).join('、'))}</textarea></div>
     <div><label>対象担任助手</label><textarea data-comment-master-assistants placeholder="例：助手A、助手B">${escapeHtml((cm.assistants||[]).join('、'))}</textarea></div>
-    <div><label>対象生徒名</label><textarea data-comment-master-students placeholder="空欄なら全員。例：生徒A、生徒B">${escapeHtml(targetNames)}</textarea></div>
-    <div><button type="button" class="small secondary" data-expand-comment-targets="${i}">高校/助手から追加</button><button type="button" class="small secondary" data-delete-comment-master="${i}">削除</button></div>
+    <div><label>対象生徒名</label><textarea data-comment-master-students placeholder="全員向けは高校/助手/生徒名をすべて空欄。個別指定はここに残った生徒だけ。例：生徒A、生徒B">${escapeHtml(targetNames)}</textarea></div>
+    <div><button type="button" class="small secondary" data-expand-comment-targets="${i}">高校/助手から追加</button><button type="button" class="small secondary" data-delete-comment-master="${i}">削除</button><div class="hint" style="margin-top:6px">対象高校・対象担任助手は、対象生徒名へ一括追加するためだけに使います。実際に表示されるのは「対象生徒名」に残っている生徒だけです。</div></div>
   </div>`;
   }).join('')||'<div class="empty">まだコメントマスタがありません。</div>';
   $$('[data-delete-comment-master]').forEach(btn=>btn.onclick=()=>{const arr=getCommentMaster();arr.splice(Number(btn.dataset.deleteCommentMaster),1);saveCommentMasterData(arr);renderCommentMasterPanel();renderStudents()});
@@ -3255,6 +3266,15 @@ function loadSubjectTemplateToEditor(){
   $('#subjectTemplateName').value=t.name;
   $('#subjectTemplateCustom').value=(t.subjects||[]).filter(x=>!SUBJECT_POOL.includes(x)).join('、');
   renderSubjectTemplateEditor();
+}
+function newSubjectTemplateInEditor(){
+  const nameInput=$('#subjectTemplateName');
+  const custom=$('#subjectTemplateCustom');
+  if(nameInput) nameInput.value='';
+  if(custom) custom.value='';
+  $$('[data-template-subject]').forEach(ch=>{ch.checked=false;});
+  setTimeout(()=>nameInput&&nameInput.focus(),0);
+  showSaveInfo('新しい科目型を作る準備をしました。科目型名を入れて、必要な科目を選び、「科目型を保存」を押してください。');
 }
 function saveSubjectTemplateFromEditor(){
   const name=($('#subjectTemplateName')?.value||'').trim();
@@ -6808,6 +6828,7 @@ function bindGlobalEvents(){
   const acm=$('#addCommentMaster'); if(acm)acm.onclick=addCommentMasterRow;
   const scm=$('#saveCommentMaster'); if(scm)scm.onclick=saveCommentMasterFromPanel;
   const lts=$('#loadSubjectTemplate'); if(lts)lts.onclick=loadSubjectTemplateToEditor;
+  const nts=$('#newSubjectTemplate'); if(nts)nts.onclick=newSubjectTemplateInEditor;
   const sts=$('#saveSubjectTemplate'); if(sts)sts.onclick=saveSubjectTemplateFromEditor; const dts=$('#deleteSubjectTemplate'); if(dts)dts.onclick=deleteSubjectTemplateFromEditor;
   const clear=$('#clearAll'); if(clear)clear.onclick=()=>{if(confirm('入力内容をすべて消しますか？')){localStorage.removeItem(groupKey()); students.forEach(n=>localStorage.removeItem(indivKey(n))); location.reload()}};
 }
