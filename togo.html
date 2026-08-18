@@ -668,6 +668,13 @@ async function ensureWorkbookReadyForOutput(){
 function log(msg){ $("status").textContent = msg; }
 function esc(s){ return String(s ?? "").replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
 function norm(s){ return String(s ?? "").replace(/\r\n/g,"\n").replace(/\r/g,"\n").trim(); }
+function normalizeSchoolDisplayName(s){
+  const v = norm(s);
+  if(!v) return "";
+  // 全員分リスト上では、高校名の末尾表記を短くする。
+  // 例：北野高等学校 → 北野、豊中高校 → 豊中
+  return v.replace(/[\s\u3000]*(?:高等学校|高校)$/u, "").trim();
+}
 function pad2(n){ return String(n).padStart(2,"0"); }
 function ymd(d){ return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`; }
 function mmdd(d){ return `${d.getMonth()+1}/${d.getDate()}`; }
@@ -1090,7 +1097,7 @@ async function parseRosterFile(file){
       "生徒名": norm(row[2]),
       "読み仮名": norm(row[3]),
       "担当": norm(row[4]),
-      "高校": norm(row[5]),
+      "高校": normalizeSchoolDisplayName(row[5]),
       "備考": norm(row[6])
     };
   }
@@ -1102,7 +1109,7 @@ async function parseRosterFile(file){
       "生徒名": h.student >= 0 ? norm(row[h.student]) : "",
       "読み仮名": h.kana >= 0 ? norm(row[h.kana]) : "",
       "担当": h.teacher >= 0 ? norm(row[h.teacher]) : "",
-      "高校": h.school >= 0 ? norm(row[h.school]) : "",
+      "高校": h.school >= 0 ? normalizeSchoolDisplayName(row[h.school]) : "",
       "備考": h.note >= 0 ? norm(row[h.note]) : ""
     };
   }
@@ -1113,6 +1120,7 @@ async function parseRosterFile(file){
   const sheetLogs = [];
 
   function addMeta(meta){
+    if(meta) meta["高校"] = normalizeSchoolDisplayName(meta["高校"] || "");
     if(!meta["生徒名"]) return false;
     // 見出し行や説明行を誤登録しない
     if(["名前","生徒名","氏名"].includes(meta["生徒名"])) return false;
@@ -2837,6 +2845,17 @@ Comiru CSV回答行: ${comiruCsvInfo.records.length}`);
 }
 
 function aoaToSheet(aoa){ return XLSX.utils.aoa_to_sheet(aoa); }
+function setWorksheetFreezePane(ws, xSplit, ySplit, topLeftCell, activePane){
+  if(!ws) return;
+  const xs = Number(xSplit || 0);
+  const ys = Number(ySplit || 0);
+  const tl = topLeftCell || XLSX.utils.encode_cell({r:ys, c:xs});
+  const pane = activePane || (xs && ys ? 'bottomRight' : (ys ? 'bottomLeft' : 'topRight'));
+  // 出力環境によって参照されるプロパティが違うことがあるため、両方へ入れる。
+  // これでExcel/Sheets系で開いたとき、下スクロール時に見出し行を固定しやすくする。
+  ws['!freeze'] = {xSplit:xs, ySplit:ys, topLeftCell:tl, activePane:pane, state:'frozen'};
+  ws['!views'] = [{state:'frozen', xSplit:xs, ySplit:ys, topLeftCell:tl, activePane:pane}];
+}
 function setRangeStyle(ws, range, styleFn){
   if(!range) return;
   for(let R=range.s.r; R<=range.e.r; R++){
@@ -5119,7 +5138,7 @@ function addStudentToListMap(map, student, overrideMeta={}){
       student: finalName || name,
       kana: meta['読み仮名'] || '',
       teacher: meta['担当'] || '',
-      school: meta['高校'] || '',
+      school: normalizeSchoolDisplayName(meta['高校'] || ''),
       note: meta['備考'] || ''
     });
   }else{
@@ -5129,7 +5148,7 @@ function addStudentToListMap(map, student, overrideMeta={}){
     row.student = row.student || finalName || name;
     row.kana = row.kana || meta['読み仮名'] || '';
     row.teacher = row.teacher || meta['担当'] || '';
-    row.school = row.school || meta['高校'] || '';
+    row.school = row.school || normalizeSchoolDisplayName(meta['高校'] || '');
     row.note = row.note || meta['備考'] || '';
   }
 }
@@ -6092,6 +6111,8 @@ async function parseAllListRestoreFile(file){
     const order = [];
     for(let r=headerRow+1; r<aoa.length; r++){
       const row = (aoa[r] || []).map(v => norm(v));
+      const schoolIdx = headerCanon.findIndex(h => h === '高校');
+      if(schoolIdx >= 0) row[schoolIdx] = normalizeSchoolDisplayName(row[schoolIdx]);
       const key = allListRowKeyFromCells(row, header);
       const isBlank = !row.some(v => norm(v));
       rawRows.push({row, key, isBlank, sourceRowNumber:r+1});
@@ -6235,7 +6256,10 @@ function mergeRestoredAllListAoa(grade, generatedAoa){
       const manualRow = Array(header.length).fill('');
       for(let c=0;c<slots.length;c++){
         const ri = slots[c].restoreIndex;
-        if(ri >= 0) manualRow[c] = restored[ri] || '';
+        if(ri >= 0){
+          manualRow[c] = restored[ri] || '';
+          if(slots[c].canon === '高校') manualRow[c] = normalizeSchoolDisplayName(manualRow[c]);
+        }
       }
       out.push(manualRow);
       continue;
@@ -6282,6 +6306,7 @@ function mergeRestoredAllListAoa(grade, generatedAoa){
       }
 
       newRow[c] = restoredVal !== '' ? restoredVal : autoVal;
+      if(canon === '高校') newRow[c] = normalizeSchoolDisplayName(newRow[c]);
     }
 
     out.push(newRow);
@@ -6294,7 +6319,10 @@ function mergeRestoredAllListAoa(grade, generatedAoa){
     const newRow = Array(header.length).fill('');
     for(let c=0;c<slots.length;c++){
       const slot = slots[c];
-      if(slot.type === 'gen') newRow[c] = row[slot.genIndex] || '';
+      if(slot.type === 'gen'){
+        newRow[c] = row[slot.genIndex] || '';
+        if(slot.canon === '高校') newRow[c] = normalizeSchoolDisplayName(newRow[c]);
+      }
     }
     const studentName = allListStudentNameFromRow(row, genCanon);
     out.push(newRow);
@@ -6629,7 +6657,7 @@ function buildAllStudentListAoaByGrade(examRecords=[], eventRecords=[]){
     for(const st of students){
       const key = studentKeyForList(st.student, st.studentNo);
       const inputNote = inputNoteByStudent.get(key) || allListSmallBlockStrip(st.note || '');
-      const row = [st.grade, st.studentNo, st.student, st.kana, st.teacher, st.school, inputNote, ''];
+      const row = [st.grade, st.studentNo, st.student, st.kana, st.teacher, normalizeSchoolDisplayName(st.school), inputNote, ''];
       const smallItems = smallByStudent.get(key) || [];
       for(let i=0;i<maxSmallSlots;i++){
         const item = smallItems[i];
@@ -6696,7 +6724,9 @@ function styleAllStudentGradeSheet(ws, aoa){
   }
   const range = applyNiceSheetSettings(ws, aoa, widths, {rows:{min:18,max:78,header:38,pxPerLine:13}});
   ws['!rows'][0] = {hpt:28};
-  ws['!freeze'] = {xSplit:3, ySplit:2};
+  // 助手用の更新入力シートは、下にスクロールしても1行目タイトル・2行目見出しを固定する。
+  // さらに左3列も固定して、生徒名を見失わないようにする。
+  setWorksheetFreezePane(ws, 3, 2, 'D3', 'bottomRight');
   ws['!pageSetup'] = {orientation:'landscape', paperSize:12, fitToWidth:1, fitToHeight:1};
   ws['!margins'] = {left:0.12, right:0.12, top:0.20, bottom:0.20, header:0.05, footer:0.05};
   if(colCount > 1){
@@ -6934,7 +6964,7 @@ function buildAllStudentPrintAoaFromFullAoa(grade, fullAoa){
     const outRow = [
       allListPrintCell(row, idxNo),
       allListPrintCell(row, idxName),
-      allListPrintCell(row, idxSchool),
+      normalizeSchoolDisplayName(allListPrintCell(row, idxSchool)),
       allListPrintCell(row, idxTeacher),
       allListPrintCell(row, idxInputNote),
       allListPrintCell(row, idxAllListNote),
