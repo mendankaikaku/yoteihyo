@@ -6296,8 +6296,8 @@ function buildMeetingPrepPrintHtml(resultRecords, weeklyHtml){
         if(sw<=1 || sh<=1 || cw<=1 || ch<=1) return;
         // 合格設計図は A1:CA330 を対象にし、印刷時は見やすさ優先で
         // 横2.5倍・縦1.8倍の倍率をかける。はみ出した部分はA4枠内で切る。
-        var scaleX=(cw/sw) * 2.5;
-        var scaleY=(ch/sh) * 1.8;
+        var scaleX=(cw/sw) * 20;
+        var scaleY=(ch/sh) * 2;
         if(!isFinite(scaleX) || scaleX<=0) scaleX=1;
         if(!isFinite(scaleY) || scaleY<=0) scaleY=1;
         scaleX=Math.max(0.02, Math.min(20, scaleX));
