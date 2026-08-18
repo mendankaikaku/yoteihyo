@@ -977,7 +977,7 @@ body .prepCompactCard .prepDetails summary{min-height:28px!important;font-size:1
 
   <section class="card">
     <p class="sectionTitle">模試マスタ</p>
-    <div class="masterGridHint">模試名・日付・対象学年/高校/担任助手/生徒を登録します。高校/助手は対象生徒名へ一括追加するためだけに使い、対象生徒名が未選択の模試は生徒の入力欄にも印刷にも表示しません。模試マスタでは週開始日から3週間以内の模試だけ表示し、科目型だけを選択します。生徒入力欄・面談準備印刷・統合用の科目リストでは、その科目型から科目チェックを自動表示します。</div>
+    <div class="masterGridHint">模試名・日付・対象学年/高校/担任助手/生徒を登録します。対象学年だけならその学年全員に表示します。高校/助手は対象生徒名へ一括追加するためだけに使います。模試マスタでは週開始日から3週間以内の模試だけ表示し、科目型だけを選択します。生徒入力欄・面談準備印刷・統合用の科目リストでは、その科目型から科目チェックを自動表示します。</div>
     <details class="advanced">
       <summary>模試マスタを編集</summary>
       <div id="examMasterPanel"></div>
@@ -1883,9 +1883,10 @@ function visibleEventMastersForStudent(name){
     const targetNames=Array.isArray(ev.students)?ev.students:splitTargetNames(ev.studentNames||'');
     const targetSchools=Array.isArray(ev.schools)?ev.schools.filter(Boolean):splitTargetText(ev.schoolNames||'');
     const targetAssistants=Array.isArray(ev.assistants)?ev.assistants.filter(Boolean):splitTargetText(ev.assistantNames||'');
+    // 対象学年だけ指定：その学年全員に表示。
     // 対象高校・対象担任助手は、対象生徒名へ一括追加するためだけに使う。
     // 高校/助手だけ指定して対象生徒名が空のイベントは表示しない。
-    // 全員向けイベントは対象高校・対象担任助手・対象生徒名をすべて空欄にする。
+    // 全員向けイベントは対象学年・対象高校・対象担任助手・対象生徒名をすべて空欄にする。
     if(!targetNames.length && (targetSchools.length || targetAssistants.length)) return false;
     return examTargetNameMatch(name,targetNames);
   });
@@ -2861,15 +2862,18 @@ function examMasterExplicitTargets(ex){
 function examMasterTargetsStudent(ex, name){
   const data = ensureStudent(name);
   const grade = data.grade || '';
-  const {targetGrades, targetNames} = examMasterExplicitTargets(ex);
-  // 模試マスタの実表示は「対象生徒名」に残っている生徒だけ。
+  const {targetGrades, targetNames, targetSchools, targetAssistants, hasTarget} = examMasterExplicitTargets(ex);
+  // 模試マスタは「何かしら対象指定がある模試」だけ表示する。
+  // 対象学年だけ指定：その学年全員に表示。
+  // 対象生徒名あり：対象生徒名に残っている生徒だけ表示（対象学年があればさらに絞る）。
   // 対象高校・対象担任助手は、対象生徒名へ一括追加するための検索条件としてだけ使う。
-  // 対象学年は、対象生徒名に入れた生徒をさらに絞る条件としてだけ使う。
-  if(!targetNames.length) return false;
+  if(!hasTarget) return false;
   if(targetGrades.length){
     if(!grade || !targetGrades.includes(grade)) return false;
   }
-  return examTargetNameMatch(name, targetNames);
+  if(targetNames.length) return examTargetNameMatch(name, targetNames);
+  if(targetSchools.length || targetAssistants.length) return false;
+  return targetGrades.length > 0;
 }
 function visibleExamIdSetForStudent(name){
   return new Set(visibleExamMastersForStudent(name).map(ex => examId(ex)));
@@ -2952,6 +2956,7 @@ function visibleCommentMastersForStudent(name){
     const targetNames=Array.isArray(cm.students)?cm.students:splitTargetNames(cm.studentNames||'');
     const targetSchools=Array.isArray(cm.schools)?cm.schools.filter(Boolean):splitTargetText(cm.schoolNames||'');
     const targetAssistants=Array.isArray(cm.assistants)?cm.assistants.filter(Boolean):splitTargetText(cm.assistantNames||'');
+    // 対象学年だけ指定：その学年全員に表示。
     // 対象高校・対象担任助手は、対象生徒名へ一括追加するためだけに使う。
     // 高校/助手だけ指定して対象生徒名が空のコメントは表示しない。
     if(!targetNames.length && (targetSchools.length || targetAssistants.length)) return false;
@@ -3079,8 +3084,8 @@ function renderExamMasterPanel(){
       <div><label>対象学年</label><div class="checkRow">${examGradeCheckboxes(ex.grades||[])}</div></div>
       <div><label>対象高校</label><textarea data-master-schools placeholder="例：〇〇高校、△△高校">${escapeHtml((ex.schools||[]).join('、'))}</textarea></div>
       <div><label>対象担任助手</label><textarea data-master-assistants placeholder="例：武内、今道">${escapeHtml((ex.assistants||[]).join('、'))}</textarea></div>
-      <div style="grid-column:1/-1"><label>対象生徒名</label><textarea data-master-students placeholder="高校/助手から追加後、ここに残っている生徒だけ表示。例：生徒A、生徒B">${escapeHtml(targetNames)}</textarea></div>
-      <div style="grid-column:1/-1"><button type="button" class="small secondary" data-expand-exam-targets="${i}">高校/助手から追加</button><div class="hint" style="margin-top:6px">対象高校・対象担任助手は、対象生徒名へ一括追加するためだけに使います。実際に生徒欄・印刷に出るのは「対象生徒名」に残っている生徒だけです。模試マスタ編集欄は、週開始日から3週間以内の模試だけ表示します。</div></div>
+      <div style="grid-column:1/-1"><label>対象生徒名</label><textarea data-master-students placeholder="個別指定するときだけ入力。空欄でも対象学年だけならその学年全員に表示。例：生徒A、生徒B">${escapeHtml(targetNames)}</textarea></div>
+      <div style="grid-column:1/-1"><button type="button" class="small secondary" data-expand-exam-targets="${i}">高校/助手から追加</button><div class="hint" style="margin-top:6px">対象学年だけならその学年全員に表示します。対象高校・対象担任助手は、対象生徒名へ一括追加するためだけに使います。高校/助手だけ指定して対象生徒名が空の場合は表示しません。模試マスタ編集欄は、週開始日から3週間以内の模試だけ表示します。</div></div>
     </div>`;
   }).join('')||'<div class="empty">3週間以内に編集対象の模試はありません。必要なら「模試を追加」してください。</div>';
   $$('[data-delete-master]').forEach(btn=>btn.onclick=()=>{const arr=getExamMaster();arr.splice(Number(btn.dataset.deleteMaster),1);saveExamMasterData(arr);renderExamMasterPanel();renderStudents()});
@@ -3249,8 +3254,8 @@ function renderEventMasterPanel(){
     <div><label>対象学年</label><div class="checkRow">${gradeCheckboxes(ev.grades||[])}</div></div>
     <div><label>対象高校</label><textarea data-event-master-schools placeholder="例：〇〇高校、△△高校">${escapeHtml((ev.schools||[]).join('、'))}</textarea></div>
     <div><label>対象担任助手</label><textarea data-event-master-assistants placeholder="例：助手A、助手B">${escapeHtml((ev.assistants||[]).join('、'))}</textarea></div>
-    <div><label>対象生徒名</label><textarea data-event-master-students placeholder="全員向けは高校/助手/生徒名をすべて空欄。個別指定はここに残った生徒だけ。例：生徒A、生徒B">${escapeHtml(targetNames)}</textarea></div>
-    <div><button type="button" class="small secondary" data-expand-event-targets="${i}">高校/助手から追加</button><button type="button" class="small secondary" data-delete-event-master="${i}">削除</button><div class="hint" style="margin-top:6px">対象高校・対象担任助手は、対象生徒名へ一括追加するためだけに使います。実際に表示されるのは「対象生徒名」に残っている生徒だけです。</div></div>
+    <div><label>対象生徒名</label><textarea data-event-master-students placeholder="全員向けは学年/高校/助手/生徒名をすべて空欄。対象学年だけならその学年全員。個別指定はここに残った生徒だけ。例：生徒A、生徒B">${escapeHtml(targetNames)}</textarea></div>
+    <div><button type="button" class="small secondary" data-expand-event-targets="${i}">高校/助手から追加</button><button type="button" class="small secondary" data-delete-event-master="${i}">削除</button><div class="hint" style="margin-top:6px">対象学年だけならその学年全員に表示します。対象高校・対象担任助手は、対象生徒名へ一括追加するためだけに使います。高校/助手だけ指定して対象生徒名が空の場合は表示しません。</div></div>
   </div>`;
   }).join('')||'<div class="empty">まだイベントマスタがありません。</div>';
   $$('[data-delete-event-master]').forEach(btn=>btn.onclick=()=>{const arr=getEventMaster();arr.splice(Number(btn.dataset.deleteEventMaster),1);saveEventMasterData(arr);renderEventMasterPanel();renderStudents()});
@@ -3323,8 +3328,8 @@ function renderCommentMasterPanel(){
     <div><label>対象学年</label><div class="checkRow">${gradeCheckboxes(cm.grades||[])}</div></div>
     <div><label>対象高校</label><textarea data-comment-master-schools placeholder="例：〇〇高校、△△高校">${escapeHtml((cm.schools||[]).join('、'))}</textarea></div>
     <div><label>対象担任助手</label><textarea data-comment-master-assistants placeholder="例：助手A、助手B">${escapeHtml((cm.assistants||[]).join('、'))}</textarea></div>
-    <div><label>対象生徒名</label><textarea data-comment-master-students placeholder="全員向けは高校/助手/生徒名をすべて空欄。個別指定はここに残った生徒だけ。例：生徒A、生徒B">${escapeHtml(targetNames)}</textarea></div>
-    <div><button type="button" class="small secondary" data-expand-comment-targets="${i}">高校/助手から追加</button><button type="button" class="small secondary" data-delete-comment-master="${i}">削除</button><div class="hint" style="margin-top:6px">対象高校・対象担任助手は、対象生徒名へ一括追加するためだけに使います。実際に表示されるのは「対象生徒名」に残っている生徒だけです。</div></div>
+    <div><label>対象生徒名</label><textarea data-comment-master-students placeholder="全員向けは学年/高校/助手/生徒名をすべて空欄。対象学年だけならその学年全員。個別指定はここに残った生徒だけ。例：生徒A、生徒B">${escapeHtml(targetNames)}</textarea></div>
+    <div><button type="button" class="small secondary" data-expand-comment-targets="${i}">高校/助手から追加</button><button type="button" class="small secondary" data-delete-comment-master="${i}">削除</button><div class="hint" style="margin-top:6px">対象学年だけならその学年全員に表示します。対象高校・対象担任助手は、対象生徒名へ一括追加するためだけに使います。高校/助手だけ指定して対象生徒名が空の場合は表示しません。</div></div>
   </div>`;
   }).join('')||'<div class="empty">まだコメントマスタがありません。</div>';
   $$('[data-delete-comment-master]').forEach(btn=>btn.onclick=()=>{const arr=getCommentMaster();arr.splice(Number(btn.dataset.deleteCommentMaster),1);saveCommentMasterData(arr);renderCommentMasterPanel();renderStudents()});
@@ -6211,7 +6216,7 @@ function meetingPrepCurrentPlanHtml(name){
   // 面談準備資料の2ページ目は「これから今週分を打ち込むための白紙」にする。
   // 画面上の復元内容は消さず、印刷時だけ予定・下段・備考を空欄表示にする。
   // 模試・イベントは確認用なので、現在表示されている対象があればそのまま載せる。
-  // ただし、対象学年/対象生徒が未選択の模試マスタは印刷にも出さない。
+  // 模試・イベントは確認用なので、対象学年だけ指定の模試もその学年の生徒には印刷に載せる。
   const data=ensureStudent(name), dates=getMeetingPrepCurrentDates();
   const exams=filterVisibleExamRowsForStudent(name, data.exams||[]).filter(ex=>ex.name||ex.status||ex.comiruAnswered||ex.subjectChanged||(ex.subjects||[]).length);
   const events=(data.events||[]).filter(ev=>ev.name||ev.status||ev.comiruAnswered||ev.note||ev.datetime);
