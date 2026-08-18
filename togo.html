@@ -417,7 +417,7 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
 
       <!-- フォルダー読取は昔から安定していた webkitdirectory 方式を正にする。
            上のボタンでも、予備ラベルでも、この input を直接開く。 -->
-      <input id="bundleFolderInput" class="visuallyHiddenFileInput" type="file" webkitdirectory directory multiple />
+      <input id="bundleFolderInput" class="hidden" type="file" webkitdirectory directory multiple accept=".xlsx,.xls,.xlsm,.csv,.json" />
       <input id="folderInput" class="hidden" type="file" webkitdirectory directory multiple accept=".xlsx,.xls,.xlsm" />
       <input id="rosterInput" class="hidden" type="file" accept=".xlsx,.xls,.xlsm,.csv" />
       <input id="resultInput" class="hidden" type="file" multiple accept=".xlsx,.xls,.xlsm" />
@@ -7777,7 +7777,7 @@ async function setBundleFolderFiles(fileList){
     const isCsv = /\.csv$/i.test(name);
     const isJson = /\.json$/i.test(name);
     const parts = pathPartsOfFile(f).map(p => p.toLowerCase());
-    const relLower = normalizePickedFilePath(f).toLowerCase();
+    const relLower = String(f.webkitRelativePath || f.name || '').toLowerCase();
 
     // 現在の運用：
     // 保存復元フォルダ/毎日更新/毎日更新.xlsx は「結果データ」。
@@ -7793,8 +7793,8 @@ async function setBundleFolderFiles(fileList){
     else if(isCsv && (filePathIncludes(f, 'Comiru') || filePathIncludes(f, 'コミル') || /comiru|コミル/i.test(relLower))) comiruCsvs.push(f);
     // 掲示用手修正版を置く場合は「毎日掲示」フォルダだけを使う。
     else if(isExcel && filePathIncludes(f, '毎日掲示')) dailyPosters.push(f);
-    else if(isExcel && isYoteiInputAreaFile(f) && isYoteiInputWorkbookCandidate(f)) planned.push(f);
-    else if(isExcel && isYoteiInputAreaFile(f) && isGoukakuWorkbookFile(f)) {
+    else if(isExcel && filePathIncludes(f, '打ち込み結果') && isYoteiInputWorkbookCandidate(f)) planned.push(f);
+    else if(isExcel && filePathIncludes(f, '打ち込み結果') && isGoukakuWorkbookFile(f)) {
       // 生徒フォルダ直下の合格設計図Excelは入力用の復元/印刷専用。統合用の予定Excelとしては読まない。
     }
     else if((isExcel || isCsv) && filePathIncludes(f, '対応表')) rosters.push(f);
@@ -7859,72 +7859,36 @@ function setResultHistoryFiles(fileList){
   log(`結果履歴JSON選択完了\nJSONファイル: ${state.resultHistoryFiles.length}件\n毎日更新.xlsxを更新した日は「③ 結果履歴を保存」を押してから出力してください。`);
 }
 
-async function collectFilesFromDirectoryHandle(dirHandle, prefix=""){
-  const out=[];
-  for await (const [name, handle] of dirHandle.entries()){
-    if(!name || /^\./.test(name)) continue;
-    const rel = prefix ? `${prefix}/${name}` : name;
-    if(handle.kind === "file"){
-      try{
-        const file = await handle.getFile();
-        // showDirectoryPicker で得た File には webkitRelativePath がないため、
-        // 既存の自動振り分け処理がそのまま動くように相対パスを付与する。
-        try{ Object.defineProperty(file, "webkitRelativePath", {value:rel, configurable:true}); }catch(_){ file._relativePath = rel; }
-        out.push(file);
-      }catch(e){
-        console.warn("ファイル取得失敗", rel, e);
-      }
-    }else if(handle.kind === "directory"){
-      out.push(...await collectFilesFromDirectoryHandle(handle, rel));
-    }
-  }
-  return out;
-}
-function normalizePickedFilePath(file){
-  return String(file?.webkitRelativePath || file?._relativePath || file?.name || '');
-}
-// 既存処理は webkitRelativePath を見るので、File System Access API 用の予備パスもここで吸収する。
-const __originalPathPartsOfFile = pathPartsOfFile;
-pathPartsOfFile = function(file){
-  return normalizePickedFilePath(file).split(/[\/]+/).filter(Boolean);
-};
-async function openBundleFolderInput(){
+function openBundleFolderByOldInput(){
   const input = $("bundleFolderInput");
   if(!input){
-    log('フォルダー読取用inputが見つかりません。HTMLを最新版に差し替えてください。');
+    alert('フォルダー読取用の入力部品が見つかりません。HTMLを最新版に差し替えてください。');
     return;
   }
-  // 読み取れていた時代と同じ webkitdirectory 方式に戻す。
-  // showDirectoryPicker は環境差があり、権限や非同期タイミングで無反応になることがあるため使わない。
   input.value = "";
-  if($('bundleReadSummary')) $('bundleReadSummary').textContent = 'フォルダー選択画面を開きます。保存復元フォルダーを選んでください。';
-  log('フォルダー選択画面を開きます。保存復元フォルダーを選んでください。');
+  if($("bundleReadSummary")) $("bundleReadSummary").textContent = "フォルダー選択画面を開きます。保存復元フォルダーを選んでください。";
+  log("フォルダー選択画面を開きます。保存復元フォルダーを選んでください。");
   input.click();
 }
-function bindBundleReadButton(id){
-  const el=$(id);
-  if(!el || el.dataset.bundleReadBound === '1') return;
-  el.dataset.bundleReadBound = '1';
-  el.addEventListener("click", async ev => {
+function bindOldBundleReadButton(id){
+  const el = $(id);
+  if(!el || el.dataset.oldBundleReadBound === '1') return;
+  el.dataset.oldBundleReadBound = '1';
+  el.addEventListener("click", ev => {
     ev.preventDefault();
-    try{ await openBundleFolderInput(); }
-    catch(e){
-      console.error(e);
-      alert('フォルダー読み取りでエラーが出ました：' + (e.message || e));
-      log('フォルダー読み取りエラー：' + (e.message || e));
-    }
+    openBundleFolderByOldInput();
   });
 }
-bindBundleReadButton("readBundleTopBtn");
-bindBundleReadButton("readBundleBtn");
+bindOldBundleReadButton("readBundleBtn");
+bindOldBundleReadButton("readBundleTopBtn");
 if($("bundleFolderInput")) $("bundleFolderInput").addEventListener("change", async e => {
   try{
     const files = e.target.files;
     if(!files || !files.length){
-      log("保存復元フォルダの選択がキャンセルされたか、読み取れるファイルがありません。もう一度①フォルダー読取を押してください。");
+      log("保存復元フォルダーの選択がキャンセルされたか、読み取れるファイルがありません。もう一度①フォルダー読取を押してください。");
       return;
     }
-    if($('bundleReadSummary')) $('bundleReadSummary').textContent = 'フォルダーを読み取り中です…';
+    if($("bundleReadSummary")) $("bundleReadSummary").textContent = "フォルダーを読み取り中です…";
     await setBundleFolderFiles(files);
   }catch(err){
     console.error(err);
@@ -7941,12 +7905,14 @@ $("saveResultHistoryBtn").addEventListener("click", saveResultHistoryJson);
 $("rosterInput").addEventListener("change", async e => {
   try{
     const res = await parseRosterFile(e.target.files[0]);
-    log(`${res.message}\n予定表フォルダーも選んでから「統合プレビュー作成」を押してください。`);
+    log(`${res.message}
+予定表フォルダーも選んでから「統合プレビュー作成」を押してください。`);
   }catch(err){
     alert(err.message || String(err));
     log("対応表の読み込みでエラーが出ました。");
   }
 });
+
 $("mergeBtn").addEventListener("click", merge);
 $("download2wBtn").addEventListener("click", () => downloadWithRange("2w"));
 $("download1mBtn").addEventListener("click", () => downloadWithRange("1m"));
