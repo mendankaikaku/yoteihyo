@@ -979,7 +979,7 @@ body .prepCompactCard .prepDetails summary{min-height:28px!important;font-size:1
     <details class="advanced">
       <summary>模試マスタを編集</summary>
       <div id="examMasterPanel"></div>
-      <div class="actions"><button class="secondary" id="addExamMaster" type="button">模試を追加</button><button class="secondary" id="saveExamMaster" type="button">模試マスタを保存</button></div>
+      <div class="actions"><button class="secondary" id="addExamMaster" type="button">模試を追加</button><button class="secondary" id="saveExamMaster" type="button">模試マスタを保存</button><button class="dangerLite" id="resetExamMaster" type="button">模試マスタ全削除</button></div>
     </details>
   </section>
 
@@ -1007,7 +1007,7 @@ body .prepCompactCard .prepDetails summary{min-height:28px!important;font-size:1
     <details class="advanced">
       <summary>イベントマスタを編集</summary>
       <div id="eventMasterPanel"></div>
-      <div class="actions"><button class="secondary" id="addEventMaster" type="button">イベントを追加</button><button class="secondary" id="saveEventMaster" type="button">イベントマスタを保存</button></div>
+      <div class="actions"><button class="secondary" id="addEventMaster" type="button">イベントを追加</button><button class="secondary" id="saveEventMaster" type="button">イベントマスタを保存</button><button class="dangerLite" id="resetEventMaster" type="button">イベントマスタ全削除</button></div>
     </details>
   </section>
 
@@ -7713,6 +7713,57 @@ async function expandAssistantStudentsToStudentField(){
   const btn=document.getElementById('expandAssistantStudents');
   if(btn) btn.onclick=expandAssistantStudentsToStudentField;
 })();
+
+// =========================================================
+// 模試・イベント完全リセット対応：初期模試の自動復活を禁止
+// =========================================================
+function defaultToshinExamRows(){ return []; }
+function examMasterNeedsDefaultRows(rows){ return false; }
+function mergeDefaultExamMaster(saved){
+  return (Array.isArray(saved) ? saved : []).filter(row => row && !looksMojibakeExamRow(row));
+}
+function getExamMaster(){
+  try{
+    const saved = JSON.parse(localStorage.getItem(EXAM_MASTER_KEY) || '[]');
+    const rows = Array.isArray(saved) ? saved : [];
+    localStorage.setItem(EXAM_MASTER_KEY + ':targetVersion', String(MASTER_TARGET_RESTORE_VERSION));
+    localStorage.setItem(EXAM_MASTER_DEFAULT_VERSION_KEY, DEFAULT_TOSHIN_EXAM_VERSION);
+    return rows.filter(row => row && !looksMojibakeExamRow(row));
+  }catch(e){
+    return [];
+  }
+}
+function saveExamMasterData(rows){
+  const clean = (Array.isArray(rows) ? rows : []).filter(row => row && !looksMojibakeExamRow(row));
+  localStorage.setItem(EXAM_MASTER_KEY, JSON.stringify(clean));
+  localStorage.setItem(EXAM_MASTER_DEFAULT_VERSION_KEY, DEFAULT_TOSHIN_EXAM_VERSION);
+  localStorage.setItem(EXAM_MASTER_KEY + ':targetVersion', String(MASTER_TARGET_RESTORE_VERSION));
+}
+async function resetExamMasterCompletely(){
+  if(!confirm('模試マスタを全削除しますか？\n入力済みの予定や教材は消しません。')) return;
+  saveExamMasterData([]);
+  if(typeof saveExamTargetHistory === 'function') saveExamTargetHistory([]);
+  if(typeof renderExamMasterPanel === 'function') renderExamMasterPanel();
+  if(typeof renderStudents === 'function') renderStudents();
+  try{ if(typeof saveMasterSettingsToShared === 'function') await saveMasterSettingsToShared(false); }catch(e){ console.warn(e); }
+  alert('模試マスタを全削除して保存復元フォルダー直下の json/settings_exam_master.json に反映しました。');
+}
+async function resetEventMasterCompletely(){
+  if(!confirm('イベントマスタを全削除しますか？\n入力済みの予定や教材は消しません。')) return;
+  if(typeof saveEventMasterData === 'function') saveEventMasterData([]);
+  if(typeof saveEventTargetHistory === 'function') saveEventTargetHistory([]);
+  if(typeof renderEventMasterPanel === 'function') renderEventMasterPanel();
+  if(typeof renderStudents === 'function') renderStudents();
+  try{ if(typeof saveMasterSettingsToShared === 'function') await saveMasterSettingsToShared(false); }catch(e){ console.warn(e); }
+  alert('イベントマスタを全削除して保存復元フォルダー直下の json/settings_exam_master.json に反映しました。');
+}
+(function bindMasterResetButtons(){
+  const b1 = document.getElementById('resetExamMaster');
+  if(b1) b1.onclick = resetExamMasterCompletely;
+  const b2 = document.getElementById('resetEventMaster');
+  if(b2) b2.onclick = resetEventMasterCompletely;
+})();
+
 </script>
 
 </body>
