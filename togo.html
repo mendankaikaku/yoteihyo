@@ -419,7 +419,7 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
 
       <!-- フォルダー読取は昔から安定していた webkitdirectory 方式を正にする。
            上のボタンでも、予備ラベルでも、この input を直接開く。 -->
-      <input id="bundleFolderInput" class="visuallyHiddenFileInput" type="file" webkitdirectory directory multiple accept=".xlsx,.xls,.xlsm,.csv,.json" />
+      <input id="bundleFolderInput" class="hidden" type="file" webkitdirectory directory multiple accept=".xlsx,.xls,.xlsm,.csv,.json" />
       <input id="folderInput" class="hidden" type="file" webkitdirectory directory multiple accept=".xlsx,.xls,.xlsm" />
       <input id="rosterInput" class="hidden" type="file" accept=".xlsx,.xls,.xlsm,.csv" />
       <input id="resultInput" class="hidden" type="file" multiple accept=".xlsx,.xls,.xlsm" />
@@ -3385,7 +3385,10 @@ function dedupeEventRecordsByLatest(records, logRows){
 
 async function merge(){
   const files = state.files.filter(f => !shouldSkipFile(f));
-  if(!files.length){ alert("Excelファイルを選択してください"); return; }
+  if(!files.length){
+    alert("打ち込み結果の予定Excelが見つかっていません。\n①フォルダー読取で、保存復元フォルダー本体、または 打ち込み結果 / 担任助手フォルダー / 助手名フォルダー を選び直してください。");
+    return;
+  }
   $("mergeBtn").disabled = true;
   setDownloadButtonsDisabled(true);
   log(`読み込み中...\n対象Excel: ${files.length}件\n毎日更新.xlsx: ${state.resultFiles.length}件`);
@@ -8288,11 +8291,8 @@ function downloadWorkbookFromAoa(calendarAoa, listAoa, resultAoa, rosterAoa, log
 // 9. 画面イベント
 // ============================================================
 
-function bundleRelativePathOfFile(file){
-  return String(file?.__relativePath || file?.webkitRelativePath || file?.name || '');
-}
 function pathPartsOfFile(file){
-  return bundleRelativePathOfFile(file).split(/[\/]+/).filter(Boolean);
+  return String(file.webkitRelativePath || file.name || '').split(/[\/]+/).filter(Boolean);
 }
 function filePathIncludes(file, keyword){
   return pathPartsOfFile(file).some(p => p.includes(keyword));
@@ -8377,7 +8377,7 @@ async function setBundleFolderFiles(fileList){
     const isCsv = /\.csv$/i.test(name);
     const isJson = /\.json$/i.test(name);
     const parts = pathPartsOfFile(f).map(p => p.toLowerCase());
-    const relLower = bundleRelativePathOfFile(f).toLowerCase();
+    const relLower = String(f.webkitRelativePath || f.name || '').toLowerCase();
 
     // 現在の運用：
     // 保存復元フォルダ/毎日更新/毎日更新.xlsx は「結果データ」。
@@ -8398,9 +8398,11 @@ async function setBundleFolderFiles(fileList){
     else if(isCsv && (filePathIncludes(f, 'Comiru') || filePathIncludes(f, 'コミル') || /comiru|コミル/i.test(relLower))) comiruCsvs.push(f);
     // 掲示用手修正版を置く場合は「毎日掲示」フォルダだけを使う。
     else if(isExcel && filePathIncludes(f, '毎日掲示')) dailyPosters.push(f);
-    else if(isExcel && filePathIncludes(f, '打ち込み結果') && isYoteiInputWorkbookCandidate(f)) planned.push(f);
-    else if(isExcel && filePathIncludes(f, '打ち込み結果') && isGoukakuWorkbookFile(f)) {
+    else if(isExcel && isYoteiInputAreaFile(f) && isYoteiInputWorkbookCandidate(f)) planned.push(f);
+    else if(isExcel && isYoteiInputAreaFile(f) && isGoukakuWorkbookFile(f)) {
       // 生徒フォルダ直下の合格設計図Excelは入力用の復元/印刷専用。統合用の予定Excelとしては読まない。
+      // 重要：フォルダー選択位置が「保存復元」本体ではなく、
+      // 「打ち込み結果」「担任助手フォルダー」「助手名」配下でも同じ判定で除外する。
     }
     else if((isExcel || isCsv) && filePathIncludes(f, '対応表')) rosters.push(f);
   }
@@ -8696,50 +8698,7 @@ async function cleanupOldFilesFromSaveRestoreFolder(){
   alert('古いものをZIPでダウンロードし、保存復元フォルダーから削除しました。\n次回の①フォルダー読取では整理済みの古いファイルは使われません。');
 }
 
-async function collectFilesFromDirectoryHandleForBundle(dirHandle, basePath='', out=[]){
-  if(!dirHandle || !dirHandle.entries) return out;
-  for await (const [name, handle] of dirHandle.entries()){
-    const path = basePath ? `${basePath}/${name}` : name;
-    try{
-      if(handle.kind === 'directory'){
-        await collectFilesFromDirectoryHandleForBundle(handle, path, out);
-      }else if(handle.kind === 'file'){
-        const file = await handle.getFile();
-        try{ Object.defineProperty(file, '__relativePath', {value:path, configurable:true}); }catch(e){ file.__relativePath = path; }
-        out.push(file);
-      }
-    }catch(e){
-      console.warn('folder read skip', path, e);
-    }
-  }
-  return out;
-}
-async function openBundleFolderByOldInput(){
-  // 第一候補：File System Access APIで直接フォルダーを読む。
-  // webkitdirectoryのchangeが環境によって発火しない場合の読取失敗を避けるため。
-  if('showDirectoryPicker' in window){
-    try{
-      if($("bundleReadSummary")) $("bundleReadSummary").textContent = "フォルダー選択画面を開きます。保存復元フォルダーを選んでください。";
-      log("フォルダー選択画面を開きます。保存復元フォルダーを選んでください。");
-      const dir = await window.showDirectoryPicker({mode:'read'});
-      if($("bundleReadSummary")) $("bundleReadSummary").textContent = "フォルダーを読み取り中です…";
-      const files = await collectFilesFromDirectoryHandleForBundle(dir, dir.name || '', []);
-      if(!files.length){
-        log("選択フォルダー内に読み取れるファイルがありません。保存復元フォルダー本体を選んでください。");
-        alert("選択フォルダー内に読み取れるファイルがありません。保存復元フォルダー本体を選んでください。");
-        return;
-      }
-      await setBundleFolderFiles(files);
-      return;
-    }catch(e){
-      if(e && e.name === 'AbortError'){
-        log("保存復元フォルダーの選択をキャンセルしました。");
-        return;
-      }
-      console.warn('showDirectoryPicker read failed, fallback to input', e);
-      // 下の旧方式へフォールバック
-    }
-  }
+function openBundleFolderByOldInput(){
   const input = $("bundleFolderInput");
   if(!input){
     alert('フォルダー読取用の入力部品が見つかりません。HTMLを最新版に差し替えてください。');
