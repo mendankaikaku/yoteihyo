@@ -7209,36 +7209,15 @@ function buildAllStudentPrintAoaFromFullAoa(grade, fullAoa){
 }
 
 function applyCompactPrintRows(ws, aoa, widths){
-  const rowWidthChars = widths.map(w => {
-    if(typeof w === "object" && w !== null){
-      if(w.wch) return w.wch;
-      if(w.wpx) return Math.max(8, Math.round(w.wpx / 7));
-      return 18;
-    }
-    return w;
-  });
-
-  const header = aoa?.[1] || [];
-  const planResultStartCol = header.findIndex(h => String(h || '').includes('予定'));
-  const planResultWidthMultiplier = 3.0; // 予定・結果は小さい文字なので、高さ計算では横幅をかなり広めに見積もり、無駄な行高を減らす
-
+  // 全員分リストの印刷用は、各学年B4横2ページに収める前提で固定行高に寄せる。
+  // Excelの行高はpt指定。20.6px ≒ 15.45pt。
+  // 可変行高にすると、長文セルだけが伸びて2ページに収まりにくくなるため、
+  // 本文行は20.6px相当で固定し、文字は縮小表示でセル内に収める。
+  const DATA_ROW_HPT = 15.45;
   ws['!rows'] = (aoa || []).map((row, r) => {
-    if(r === 0) return {hpt:14};
-    if(r === 1) return {hpt:13};
-    let lines = 1;
-    (row || []).forEach((v, c) => {
-      const headerText = String(header[c] || '');
-      // 生徒番号・氏名・カナは印刷でも1行に縮小表示するため、行高計算で折り返し扱いにしない。
-      if(isAllListOneLineIdentityHeader(headerText, c)) return;
-      const isPlanResultCol = planResultStartCol >= 0 && c >= planResultStartCol;
-      const effectiveWidth = isPlanResultCol
-        ? (rowWidthChars[c] || 18) * planResultWidthMultiplier
-        : (rowWidthChars[c] || 18);
-
-      lines = Math.max(lines, textLineCount(v, effectiveWidth));
-    });
-    // B4横1ページに収めるため、印刷用だけ行高をさらに圧縮する。
-    return {hpt:Math.max(5.8, Math.min(50, 0.5 + lines * 4.2))};
+    if(r === 0) return {hpt:17.5};
+    if(r === 1) return {hpt:15.45};
+    return {hpt:DATA_ROW_HPT};
   });
 }
 
@@ -7291,9 +7270,22 @@ function setHighSpeedRankingPrintAreaTop10(wb, sheetName){
   setWorkbookPrintArea(wb, sheetName, '$A$1:$D$12');
 }
 
+function setWorkbookPrintTitleRows(wb, sheetName, rowsRef){
+  if(!wb || !sheetName || !rowsRef) return;
+  wb.Workbook = wb.Workbook || {};
+  wb.Workbook.Names = wb.Workbook.Names || [];
+  const sheetIndex = (wb.SheetNames || []).indexOf(sheetName);
+  if(sheetIndex < 0) return;
+  const ref = `${allListSheetQuotedName(sheetName)}!${rowsRef}`;
+  // 同じシートの古い印刷タイトルがあれば置き換える。
+  wb.Workbook.Names = wb.Workbook.Names.filter(n => !(n && n.Name === '_xlnm.Print_Titles' && n.Sheet === sheetIndex));
+  wb.Workbook.Names.push({Name:'_xlnm.Print_Titles', Sheet:sheetIndex, Ref:ref});
+}
+
 function allListApplyB4LandscapeOnePagePrintSettings(ws){
   if(!ws) return;
-  // B4横・各学年2ページ縮小をできるだけ強くExcelに渡す。
+  // B4横・各学年「横1ページ×縦2ページ」に収める設定。
+  // 2ページ目にも1〜2行目の見出しを繰り返す。
   // SheetJS系の環境差に備えて、数値属性と明示属性を両方含める。
   ws['!pageSetup'] = {
     paperSize: 12,              // 12 = B4(JIS)
@@ -7513,7 +7505,7 @@ function styleAllStudentPrintSheet(ws, aoa){
   allListAdjustPrintWidthsToB4LandscapeAspect(ws, widths);
   setWorksheetFreezePane(ws, 2, 2, 'C3', 'bottomRight');
   allListSetInitialOpenZoom(ws, aoa, {targetWch:112, minZoom:45, maxZoom:100});
-  // 印刷用はB4横・1枚に収める。値がある範囲だけを印刷範囲にし、上下左右中央寄せ。
+  // 印刷用はB4横・横1ページ×縦2ページに収める。
   allListApplyB4LandscapeOnePagePrintSettings(ws);
   if((aoa[1] || []).length > 1){
     ws['!merges'] = ws['!merges'] || [];
@@ -7529,9 +7521,9 @@ function styleAllStudentPrintSheet(ws, aoa){
   const missingFill = {fgColor:{rgb:'FECACA'}};
   const fontTitle = {name:'Yu Gothic', sz:14, bold:true, color:{rgb:'000000'}};
   const fontHeader = {name:'Yu Gothic', sz:6.5, bold:true, color:{rgb:'000000'}};
-  const fontBase = {name:'Yu Gothic', sz:7.2, color:{rgb:'000000'}};
-  const fontBaseMid = {name:'Yu Gothic', sz:6.2, color:{rgb:'000000'}};
-  const fontBaseTiny = {name:'Yu Gothic', sz:5.5, color:{rgb:'000000'}};
+  const fontBase = {name:'Yu Gothic', sz:6.8, color:{rgb:'000000'}};
+  const fontBaseMid = {name:'Yu Gothic', sz:5.9, color:{rgb:'000000'}};
+  const fontBaseTiny = {name:'Yu Gothic', sz:5.2, color:{rgb:'000000'}};
   // 赤セル文字は名前/通常文字と同じサイズ。
   const fontMissing = {name:'Yu Gothic', sz:6.2, bold:true, color:{rgb:'000000'}};
   const fontPlanResultSmall = {name:'Yu Gothic', sz:6.4, color:{rgb:'000000'}};
@@ -7694,6 +7686,8 @@ async function downloadAllStudentList(){
       allListApplyB4LandscapeOnePagePrintSettings(wsPrint);
       // 印刷用シートだけ、値が入っている最終行・最終列までを印刷範囲に固定する。
       allListSetPrintAreaToUsedRange(wb, printSheetName, wsPrint);
+      // 2ページ目にもタイトル行・見出し行を印刷する。
+      setWorkbookPrintTitleRows(wb, printSheetName, '$1:$2');
     }
 
     if(state.allListUpdateLog && state.allListUpdateLog.length > 1){
