@@ -589,6 +589,8 @@ const state = {
   masterJsonFiles: [],
   examMasterRows: [],
   eventMasterRows: [],
+  masterJsonLoaded: false,
+  strictMasterOnlyExamEvent: true,
   wholeScheduleRestores: new Map(),
   examSubjectListRestores: new Map(),
   resultHistoryRecords: [],
@@ -1994,6 +1996,7 @@ async function loadMasterJsonFiles(files=[]){
   const examRows=[];
   const eventRows=[];
   const logs=[];
+  state.masterJsonLoaded = (files || []).length > 0;
   for(const file of files || []){
     try{
       const txt = await file.text();
@@ -2021,14 +2024,24 @@ async function loadMasterJsonFiles(files=[]){
   }
   state.examMasterRows = dedupe(examRows, normalizeExamMasterRow);
   state.eventMasterRows = dedupe(eventRows, normalizeEventMasterRow);
+  if(!(files || []).length){
+    logs.push('マスタJSON未検出: 模試/イベントは全員分リストへ出しません');
+  }else if(!(state.examMasterRows || []).length && !(state.eventMasterRows || []).length){
+    logs.push('マスタJSONは読めましたが模試0件/イベント0件: 模試/イベントは全員分リストへ出しません');
+  }
   return logs;
 }
 function masterIndexHasRows(kind){
   return kind === 'exam' ? (state.examMasterRows || []).length > 0 : (state.eventMasterRows || []).length > 0;
 }
+function masterStrictModeActive(){
+  // 「模試マスタ・イベントマスタにあるものだけ」を正本にする。
+  // ここを true にしておくと、マスタが空なら模試/イベントは全員分リストへ一切出さない。
+  return state.strictMasterOnlyExamEvent !== false;
+}
 function examRecordAllowedByMaster(r){
   const masters = state.examMasterRows || [];
-  if(!masters.length) return true;
+  if(!masters.length) return masterStrictModeActive() ? false : true;
   const recName = masterNormalizeNameForMatch(r?.examName || r?.name || '');
   const recDate = masterDateKeyForMatch(r?.examDate || r?.datetime || r?.date || '');
   if(!recName) return false;
@@ -2042,7 +2055,7 @@ function examRecordAllowedByMaster(r){
 }
 function eventRecordAllowedByMaster(r){
   const masters = state.eventMasterRows || [];
-  if(!masters.length) return true;
+  if(!masters.length) return masterStrictModeActive() ? false : true;
   const recName = masterNormalizeNameForMatch(r?.eventName || r?.name || '');
   const recDate = masterDateKeyForMatch(r?.datetime || r?.date || '');
   if(!recName) return false;
@@ -2057,26 +2070,34 @@ function eventRecordAllowedByMaster(r){
 function smallRestoreObjectAllowedByMaster(obj){
   if(!obj || !obj.kind) return true;
   if(obj.kind === '模試'){
-    if(!masterIndexHasRows('exam')) return true;
     return examRecordAllowedByMaster({examName:obj.name, examDate:obj.date});
   }
   if(obj.kind === 'イベント'){
-    if(!masterIndexHasRows('event')) return true;
     return eventRecordAllowedByMaster({eventName:obj.name, datetime:obj.date});
   }
   return true;
 }
+function filterAllListSmallRestoresByCurrentMasters(){
+  const manual = state.allListSmallRestores;
+  if(!manual || !Array.isArray(manual.rowObjects)) return {before:0, after:0, removed:0};
+  const before = manual.rowObjects.length;
+  manual.rowObjects = manual.rowObjects.filter(smallRestoreObjectAllowedByMaster);
+  const after = manual.rowObjects.length;
+  return {before, after, removed:before-after};
+}
 function filterExamEventRecordsByCurrentMasters(examRecords=[], eventRecords=[], logRows=[]){
   const beforeExam=(examRecords || []).length;
   const beforeEvent=(eventRecords || []).length;
-  const filteredExams = (state.examMasterRows || []).length ? (examRecords || []).filter(examRecordAllowedByMaster) : (examRecords || []);
-  const filteredEvents = (state.eventMasterRows || []).length ? (eventRecords || []).filter(eventRecordAllowedByMaster) : (eventRecords || []);
+  const filteredExams = (examRecords || []).filter(examRecordAllowedByMaster);
+  const filteredEvents = (eventRecords || []).filter(eventRecordAllowedByMaster);
+  const small = filterAllListSmallRestoresByCurrentMasters();
   const removedExam = beforeExam - filteredExams.length;
   const removedEvent = beforeEvent - filteredEvents.length;
   if(logRows){
-    const exMsg = (state.examMasterRows || []).length ? `模試マスタ${state.examMasterRows.length}件で絞り込み、旧模試${removedExam}件を除外` : '模試マスタ未読込のため模試は絞り込みなし';
-    const evMsg = (state.eventMasterRows || []).length ? `イベントマスタ${state.eventMasterRows.length}件で絞り込み、旧イベント${removedEvent}件を除外` : 'イベントマスタ未読込のためイベントは絞り込みなし';
-    logRows.push(['マスタ絞り込み','情報',`${exMsg} / ${evMsg}`,'全員分リスト・科目リスト・イベント出力には、現在のマスタに残っている模試/イベントだけを使います']);
+    const exMsg = masterIndexHasRows('exam') ? `模試マスタ${state.examMasterRows.length}件だけ採用、旧模試${removedExam}件を除外` : `模試マスタ0件のため、模試${removedExam}件を全除外`;
+    const evMsg = masterIndexHasRows('event') ? `イベントマスタ${state.eventMasterRows.length}件だけ採用、旧イベント${removedEvent}件を除外` : `イベントマスタ0件のため、イベント${removedEvent}件を全除外`;
+    const smMsg = small.before ? `全員分リスト旧小規模復元 ${small.before}→${small.after}件` : '全員分リスト旧小規模復元なし';
+    logRows.push(['マスタ絞り込み','情報',`${exMsg} / ${evMsg} / ${smMsg}`,'現在のsettings_exam_master.json / exam_master.json / event_master.jsonを正本にします。マスタに無い模試・イベントは、個人Excel・古い全員分リスト・科目リストに残っていても復活させません。']);
   }
   return {examRecords:filteredExams, eventRecords:filteredEvents, removedExam, removedEvent};
 }
@@ -8098,7 +8119,7 @@ $("downloadAllListBtn").addEventListener("click", async () => {
 $("downloadMonthlyPosterBtn").addEventListener("click", downloadMonthlyPosterResultWorkbook);
 refreshOutputButtonReason();
 $("clearBtn").addEventListener("click", () => {
-  state.files=[]; state.resultFiles=[]; state.resultHistoryFiles=[]; state.posterSettingsFiles=[]; state.allListFiles=[]; state.allListRestores=new Map(); state.allListSmallRestores={rowObjects:[]}; state.dailyPosterFiles=[]; state.dailyPosterRestores=new Map(); state.wholeScheduleFiles=[]; state.wholeScheduleRestores=new Map(); state.comiruCsvFiles=[]; state.masterJsonFiles=[]; state.examMasterRows=[]; state.eventMasterRows=[]; state.resultHistoryRecords=[]; state.records=[]; state.resultRecords=[]; state.examRecords=[]; state.eventRecords=[]; state.calendarAoa=[]; state.listAoa=[]; state.resultAoa=[]; state.logAoa=[]; state.rosterAoa=[]; state.rosterMap=new Map(); state.rosterNoMap=new Map(); state.workbookReady=false;
+  state.files=[]; state.resultFiles=[]; state.resultHistoryFiles=[]; state.posterSettingsFiles=[]; state.allListFiles=[]; state.allListRestores=new Map(); state.allListSmallRestores={rowObjects:[]}; state.dailyPosterFiles=[]; state.dailyPosterRestores=new Map(); state.wholeScheduleFiles=[]; state.wholeScheduleRestores=new Map(); state.comiruCsvFiles=[]; state.masterJsonFiles=[]; state.examMasterRows=[]; state.eventMasterRows=[]; state.masterJsonLoaded=false; state.strictMasterOnlyExamEvent=true; state.resultHistoryRecords=[]; state.records=[]; state.resultRecords=[]; state.examRecords=[]; state.eventRecords=[]; state.calendarAoa=[]; state.listAoa=[]; state.resultAoa=[]; state.logAoa=[]; state.rosterAoa=[]; state.rosterMap=new Map(); state.rosterNoMap=new Map(); state.workbookReady=false;
   $("bundleFolderInput").value="";
   $("folderInput").value="";
   $("rosterInput").value="";
