@@ -396,6 +396,7 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
       <button id="downloadAllListBtn" class="outputAction" disabled>④ 全員分リスト</button>
       <button id="downloadExamSubjectListBtn" class="outputAction" disabled>④ 科目リスト出力</button>
       <button id="downloadMonthlyPosterBtn" class="outputAction">④ 毎日掲示</button>
+      <button id="cleanupOldFilesBtn" class="secondary" type="button">⑤ 古いもの整理</button>
       <div id="dailyPosterTargetPreview" class="hint" style="margin-top:6px;line-height:1.55;white-space:pre-wrap;"></div>
       <button id="clearBtn" class="secondary">リセット</button>
     </div>
@@ -1478,6 +1479,39 @@ function isYoteiInputWorkbookCandidate(file){
   if(/^~\$/.test(name) || /^\./.test(name)) return false;
   // 入力用Excelは基本「生徒名.8月18日-8月24日.xlsx」。ただし古い手元ファイルもあるので、打ち込み結果配下で合格設計図でなければ候補に残す。
   return true;
+}
+
+function yoteiFastStudentKey(file){
+  const name = normalizeNameKey(getStudentNameFromPath(file) || '');
+  if(name) return name;
+  const parts = pathPartsOfFile(file);
+  return normalizeNameKey(parts.slice(0,-1).join('/')) || normalizeNameKey(file?.name || 'unknown');
+}
+function selectLatestYoteiInputFilesPerStudent(files, limit=2){
+  const map = new Map();
+  for(const f of files || []){
+    const key = yoteiFastStudentKey(f);
+    if(!map.has(key)) map.set(key, []);
+    map.get(key).push(f);
+  }
+  const selected = [];
+  const detail = [];
+  for(const [key, arr] of map.entries()){
+    arr.sort((a,b)=>(b.lastModified-a.lastModified)||String(b.name).localeCompare(String(a.name),'ja'));
+    selected.push(...arr.slice(0, limit));
+    if(arr.length > limit) detail.push(`${key}:${arr.length}→${Math.min(limit, arr.length)}`);
+  }
+  selected.sort((a,b)=>String(normalizePickedFilePath(a)).localeCompare(String(normalizePickedFilePath(b)),'ja'));
+  return {files:selected, before:(files||[]).length, after:selected.length, skipped:Math.max(0,(files||[]).length-selected.length), detail};
+}
+function isResultHistoryJsonFile(file){
+  const name = String(file?.name || '');
+  const rel = String(file?.webkitRelativePath || name || '').toLowerCase();
+  return /^result[_-]?history\.json$/i.test(name) || /result[_-]?history|結果履歴/.test(rel);
+}
+function isPersonalOrGroupJsonFile(file){
+  const name = String(file?.name || '');
+  return /^(student|group)_.*\.json$/i.test(name);
 }
 
 async function readFileAsArrayBuffer(file){
@@ -8287,11 +8321,12 @@ function bundleCheckLine(label, files, required=false){
 function bundleSamplePaths(files, limit=18){
   return [...(files||[])].slice(0,limit).map(f => '・' + normalizePickedFilePath(f)).join('\n');
 }
-function buildBundleDiagnostics({rawCount,usableCount,skippedCount,allExcelFiles,planned,results,histories,allLists,dailyPosters,wholeSchedules,examSubjectLists,comiruCsvs,masterJsons,rosters,rosterMsg,restoreLogs}){
+function buildBundleDiagnostics({rawCount,usableCount,skippedCount,allExcelFiles,planned,results,histories,allLists,dailyPosters,wholeSchedules,examSubjectLists,comiruCsvs,masterJsons,rosters,rosterMsg,restoreLogs, speedupSummary}){
   const lines=[];
   lines.push('--- 読み取り診断 ---');
   lines.push(`選択ファイル総数: ${rawCount||0}件 / 読取対象: ${usableCount||0}件 / 除外: ${skippedCount||0}件`);
   lines.push(bundleCheckLine('打ち込み結果', planned, true));
+  if(speedupSummary) lines.push(speedupSummary);
   lines.push(bundleCheckLine('毎日更新.xlsx', results, false));
   lines.push(bundleCheckLine('result_history.json', histories, false));
   lines.push(bundleCheckLine('対応表', rosters, false));
@@ -8347,7 +8382,11 @@ async function setBundleFolderFiles(fileList){
     const isDailyResultWorkbook = isExcel && name === '毎日更新.xlsx' && filePathIncludes(f, '毎日更新') && !filePathIncludes(f, '毎日掲示');
 
     if(isJson && masterJsonPathLooksLikeMaster(f)) masterJsons.push(f);
-    else if(isJson && (parts.some(p => p === 'json' || p.includes('json') || p.includes('履歴')) || /result[_-]?history|結果履歴/.test(relLower))) histories.push(f);
+    else if(isJson && isResultHistoryJsonFile(f)) histories.push(f);
+    else if(isJson && isPersonalOrGroupJsonFile(f)) {
+      // 高速化：統合用は個人JSON/group JSONを正本にしない。
+      // 必要な予定は打ち込み結果Excelから読み、古い個人JSONで模試・イベントが復活する事故も防ぐ。
+    }
     // 毎日更新フォルダ内のExcelは、掲示用ではなく結果データとして読む。
     else if(isDailyResultWorkbook) results.push(f);
     else if(isExcel && (filePathIncludes(f, '全員分リスト') || filePathIncludes(f, '全員リスト'))) allLists.push(f);
@@ -8362,6 +8401,13 @@ async function setBundleFolderFiles(fileList){
     }
     else if((isExcel || isCsv) && filePathIncludes(f, '対応表')) rosters.push(f);
   }
+  const plannedAll = planned.slice();
+  const plannedFast = selectLatestYoteiInputFilesPerStudent(plannedAll, 2);
+  planned.length = 0;
+  planned.push(...plannedFast.files);
+  const speedupSummary = plannedFast.skipped
+    ? `⚡ 高速化: 打ち込み結果Excelは生徒ごとに最新2件だけ採用（${plannedFast.before}→${plannedFast.after}件、除外${plannedFast.skipped}件）`
+    : `⚡ 高速化: 打ち込み結果Excelは生徒ごとに最新2件まで採用（${plannedFast.after}件）`;
   state.files = planned;
   state.resultFiles = results;
   state.resultHistoryFiles = histories;
@@ -8391,7 +8437,7 @@ async function setBundleFolderFiles(fileList){
   updateStats(state.files, [], [], [], state.resultRecords);
   const summary = `読み取り完了
 ${buildBundleDiagnostics({
-    rawCount, usableCount, skippedCount, allExcelFiles, planned, results, histories, allLists, dailyPosters, wholeSchedules, examSubjectLists, comiruCsvs, masterJsons, rosters, rosterMsg,
+    rawCount, usableCount, skippedCount, allExcelFiles, planned, results, histories, allLists, dailyPosters, wholeSchedules, examSubjectLists, comiruCsvs, masterJsons, rosters, rosterMsg, speedupSummary,
     restoreLogs:{
       '全員分リスト': allListRestoreLogs,
       '毎日掲示': dailyPosterRestoreLogs,
@@ -8423,6 +8469,228 @@ function setResultHistoryFiles(fileList){
   state.workbookReady = false;
   updateMainOutputButtons();
   log(`結果履歴JSON選択完了\nJSONファイル: ${state.resultHistoryFiles.length}件\n毎日更新.xlsxを更新した日は「③ 結果履歴を保存」を押してから出力してください。`);
+}
+
+
+// ============================================================
+// ⑤ 古いもの整理
+// - 保存復元フォルダーから古い打ち込み結果Excel / student・group JSONをZIP退避して削除
+// - 毎日更新・result_history・掲示系はランキング/履歴に必要なので触らない
+// - マスタJSON内の終了済み模試/イベントだけ、ZIPに控えを入れてから現在JSONから外す
+// ============================================================
+function cleanupYmd(d){
+  return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+}
+function cleanupArchiveFileName(){
+  return `古いもの整理_${cleanupYmd(new Date())}.zip`;
+}
+function cleanupSafeZipPath(path){
+  return String(path||'')
+    .replace(/^[\\/]+/,'')
+    .replace(/\.\.(?:[\\/]|$)/g,'_')
+    .replace(/[\\]+/g,'/');
+}
+function cleanupPathHasPart(path, keywords){
+  const parts = String(path||'').split(/[\\/]+/).filter(Boolean);
+  return parts.some(p => keywords.some(k => p.includes(k)));
+}
+function cleanupIsProtectedPath(path){
+  // 毎日更新は毎日掲示ランキングで1か月分が必要なので整理対象外。
+  // result_history.jsonも履歴の正本なので対象外。
+  return cleanupPathHasPart(path, ['毎日更新','毎日掲示','result_history','結果履歴','全員分リスト','全員リスト','科目リスト','対応表','Comiru','コミル','全体予定表']);
+}
+function cleanupShouldArchiveFile(path, file, cutoffMs){
+  const name = String(file?.name || '');
+  if(!name || /^~\$/.test(name) || /^\./.test(name)) return false;
+  if(cleanupIsProtectedPath(path)) return false;
+  const lm = Number(file?.lastModified || 0);
+  if(!lm || lm >= cutoffMs) return false;
+  const lower = name.toLowerCase();
+  if(/\.json$/i.test(name) && /^(student|group)_.*\.json$/i.test(name)) return true;
+  if(/\.(xlsx|xlsm|xls)$/i.test(name) && cleanupPathHasPart(path, ['打ち込み結果','担任助手フォルダー','担任助手フォルダ'])){
+    const fake = {name, webkitRelativePath:path};
+    if(isGoukakuWorkbookFile(fake)) return false;
+    return isYoteiInputWorkbookCandidate(fake);
+  }
+  return false;
+}
+async function cleanupWalkDirectory(dirHandle, basePath='', out=[]){
+  for await (const [name, handle] of dirHandle.entries()){
+    const path = basePath ? `${basePath}/${name}` : name;
+    if(handle.kind === 'directory'){
+      if(cleanupPathHasPart(path, ['古いもの','archive','Archive','アーカイブ'])) continue;
+      await cleanupWalkDirectory(handle, path, out);
+    }else if(handle.kind === 'file'){
+      out.push({path, name, parent:dirHandle, handle});
+    }
+  }
+  return out;
+}
+function cleanupDateFromMasterRow(row, kind){
+  const r = row || {};
+  const raw = r.raw || {};
+  const candidates = kind === 'event'
+    ? [r.displayEnd, raw.displayEnd, r.datetime, raw.datetime, r.date, raw.date]
+    : [r.date, raw.date, r.examDate, raw.examDate, r.datetime, raw.datetime];
+  for(const v of candidates){
+    const d = parseDateLoose(v);
+    if(d) return d;
+  }
+  return null;
+}
+function cleanupSplitMasterRows(rows, kind, cutoffDate){
+  const keep=[];
+  const old=[];
+  for(const row of rows || []){
+    const d = cleanupDateFromMasterRow(row, kind);
+    if(d && d < cutoffDate) old.push(row);
+    else keep.push(row);
+  }
+  return {keep, old};
+}
+async function cleanupReadJsonFile(dirHandle, fileName){
+  try{
+    const fh = await dirHandle.getFileHandle(fileName);
+    const file = await fh.getFile();
+    return {handle:fh, file, json:JSON.parse(await file.text())};
+  }catch(e){
+    return null;
+  }
+}
+async function cleanupWriteJsonFile(fileHandle, json){
+  const writable = await fileHandle.createWritable();
+  await writable.write(new Blob([JSON.stringify(json, null, 2)], {type:'application/json'}));
+  await writable.close();
+}
+async function cleanupOldMasterRows(rootHandle, cutoffDate, zipEntries){
+  let removedExam=0, removedEvent=0;
+  let jsonDir;
+  try{ jsonDir = await rootHandle.getDirectoryHandle('json', {create:false}); }catch(e){ return {removedExam, removedEvent, notes:['jsonフォルダーなし']}; }
+  const archived = {examMaster:[], eventMaster:[], savedAt:new Date().toISOString(), cutoff:ymd(cutoffDate)};
+
+  const settings = await cleanupReadJsonFile(jsonDir, 'settings_exam_master.json');
+  if(settings && settings.json && typeof settings.json === 'object'){
+    if(Array.isArray(settings.json.examMaster)){
+      const sp = cleanupSplitMasterRows(settings.json.examMaster, 'exam', cutoffDate);
+      settings.json.examMaster = sp.keep; archived.examMaster.push(...sp.old); removedExam += sp.old.length;
+    }
+    if(Array.isArray(settings.json.eventMaster)){
+      const sp = cleanupSplitMasterRows(settings.json.eventMaster, 'event', cutoffDate);
+      settings.json.eventMaster = sp.keep; archived.eventMaster.push(...sp.old); removedEvent += sp.old.length;
+    }
+    settings.json.savedAt = new Date().toISOString();
+    settings.json.cleanupNote = `⑤古いもの整理：${ymd(cutoffDate)}より前の終了済み模試/イベントをZIP退避`;
+    await cleanupWriteJsonFile(settings.handle, settings.json);
+  }
+
+  const examOnly = await cleanupReadJsonFile(jsonDir, 'exam_master.json');
+  if(examOnly && examOnly.json && typeof examOnly.json === 'object'){
+    const key = Array.isArray(examOnly.json.examMaster) ? 'examMaster' : (Array.isArray(examOnly.json.rows) ? 'rows' : null);
+    if(key){
+      const sp = cleanupSplitMasterRows(examOnly.json[key], 'exam', cutoffDate);
+      examOnly.json[key] = sp.keep;
+      archived.examMaster.push(...sp.old);
+      examOnly.json.savedAt = new Date().toISOString();
+      await cleanupWriteJsonFile(examOnly.handle, examOnly.json);
+    }
+  }
+
+  const eventOnly = await cleanupReadJsonFile(jsonDir, 'event_master.json');
+  if(eventOnly && eventOnly.json && typeof eventOnly.json === 'object'){
+    const key = Array.isArray(eventOnly.json.eventMaster) ? 'eventMaster' : (Array.isArray(eventOnly.json.rows) ? 'rows' : null);
+    if(key){
+      const sp = cleanupSplitMasterRows(eventOnly.json[key], 'event', cutoffDate);
+      eventOnly.json[key] = sp.keep;
+      archived.eventMaster.push(...sp.old);
+      eventOnly.json.savedAt = new Date().toISOString();
+      await cleanupWriteJsonFile(eventOnly.handle, eventOnly.json);
+    }
+  }
+
+  // ZIPには重複をある程度残しても安全側。復元時に参照できる控えとして保持する。
+  if((archived.examMaster.length || archived.eventMaster.length) && zipEntries){
+    zipEntries.push({
+      name:'古い模試イベントマスタ/終了済み模試イベント控え.json',
+      data:new TextEncoder().encode(JSON.stringify(archived, null, 2))
+    });
+  }
+  return {removedExam, removedEvent, notes:[]};
+}
+async function cleanupDownloadZip(entries, fileName){
+  if(!entries.length) return false;
+  const bytes = allListBuildStoredZip(entries.map(e => ({name:cleanupSafeZipPath(e.name), data:e.data})));
+  const blob = new Blob([bytes], {type:'application/zip'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();}, 1500);
+  return true;
+}
+async function cleanupOldFilesFromSaveRestoreFolder(){
+  if(!window.showDirectoryPicker){
+    alert('このブラウザではフォルダー整理に必要な機能が使えません。Chrome/Edgeで開いてください。');
+    return;
+  }
+  const ok = confirm('保存復元フォルダーから、3週間より古い打ち込み結果Excel・student/group JSONをZIPに退避して削除します。\n毎日更新・result_history・全員分リスト・科目リスト・対応表・Comiru・全体予定表は触りません。\n実行しますか？');
+  if(!ok) return;
+  let rootHandle;
+  try{
+    rootHandle = await window.showDirectoryPicker({mode:'readwrite'});
+  }catch(e){
+    log('古いもの整理：キャンセルしました。');
+    return;
+  }
+  const now = new Date();
+  const cutoffDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 21, 0,0,0,0);
+  const cutoffMs = cutoffDate.getTime();
+  if($('bundleReadSummary')) $('bundleReadSummary').textContent = '⑤古いもの整理中です…ZIP作成後に古いファイルを削除します。';
+  log('⑤古いもの整理中です…');
+  const entries=[];
+  const files = await cleanupWalkDirectory(rootHandle);
+  const targets=[];
+  for(const item of files){
+    const file = await item.handle.getFile();
+    if(cleanupShouldArchiveFile(item.path, file, cutoffMs)) targets.push({...item, file});
+  }
+  for(const item of targets){
+    try{
+      const buf = await item.file.arrayBuffer();
+      entries.push({name:`古いファイル/${item.path}`, data:new Uint8Array(buf)});
+    }catch(e){
+      console.warn('archive read failed', item.path, e);
+    }
+  }
+  let masterResult={removedExam:0, removedEvent:0, notes:[]};
+  try{
+    masterResult = await cleanupOldMasterRows(rootHandle, cutoffDate, entries);
+  }catch(e){
+    console.warn('master cleanup failed', e);
+    masterResult.notes = [`マスタ整理失敗: ${e.message || e}`];
+  }
+  if(!entries.length){
+    const msg = `整理対象なし：${ymd(cutoffDate)}より前の古い打ち込み結果Excel・student/group JSON・終了済みマスタは見つかりませんでした。`;
+    if($('bundleReadSummary')) $('bundleReadSummary').textContent = msg;
+    log(msg);
+    alert(msg);
+    return;
+  }
+  await cleanupDownloadZip(entries, cleanupArchiveFileName());
+  let deleted=0, failed=0;
+  for(const item of targets){
+    try{
+      await item.parent.removeEntry(item.name);
+      deleted++;
+    }catch(e){
+      console.warn('delete failed', item.path, e);
+      failed++;
+    }
+  }
+  const msg = `⑤古いもの整理完了\n基準: ${ymd(cutoffDate)}より前\nZIP退避: ${entries.length}件\n削除: ${deleted}件 / 失敗: ${failed}件\n終了済みマスタ整理: 模試${masterResult.removedExam||0}件 / イベント${masterResult.removedEvent||0}件\n※毎日更新・result_history・全員分リスト・科目リスト・対応表・Comiru・全体予定表は触っていません。`;
+  if($('bundleReadSummary')) $('bundleReadSummary').textContent = msg;
+  log(msg);
+  alert('古いものをZIPでダウンロードし、保存復元フォルダーから削除しました。\n次回の①フォルダー読取では整理済みの古いファイルは使われません。');
 }
 
 function openBundleFolderByOldInput(){
@@ -8494,6 +8762,7 @@ $("downloadAllListBtn").addEventListener("click", async () => {
   }
 });
 $("downloadMonthlyPosterBtn").addEventListener("click", downloadMonthlyPosterResultWorkbook);
+if($("cleanupOldFilesBtn")) $("cleanupOldFilesBtn").addEventListener("click", cleanupOldFilesFromSaveRestoreFolder);
 refreshOutputButtonReason();
 $("clearBtn").addEventListener("click", () => {
   state.files=[]; state.resultFiles=[]; state.resultHistoryFiles=[]; state.posterSettingsFiles=[]; state.allListFiles=[]; state.allListRestores=new Map(); state.allListSmallRestores={rowObjects:[]}; state.dailyPosterFiles=[]; state.dailyPosterRestores=new Map(); state.wholeScheduleFiles=[]; state.wholeScheduleRestores=new Map(); state.comiruCsvFiles=[]; state.masterJsonFiles=[]; state.examMasterRows=[]; state.eventMasterRows=[]; state.masterJsonLoaded=false; state.strictMasterOnlyExamEvent=true; state.resultHistoryRecords=[]; state.records=[]; state.resultRecords=[]; state.examRecords=[]; state.eventRecords=[]; state.calendarAoa=[]; state.listAoa=[]; state.resultAoa=[]; state.logAoa=[]; state.rosterAoa=[]; state.rosterMap=new Map(); state.rosterNoMap=new Map(); state.workbookReady=false;
