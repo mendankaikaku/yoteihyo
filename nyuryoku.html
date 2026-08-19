@@ -3554,6 +3554,39 @@ async function loadOne(name){
   showSaveInfo(`${name}を復元しました（${savedAt} / ${place}）`);
   alert(`${name}の前回内容を読み込みました。`);
 }
+
+function inputAppBadSaveRootFolderNames(){
+  return new Set(['json','打ち込み結果','担任助手フォルダ','担任助手フォルダー','毎日更新','全員分リスト','全体予定表','科目リスト','Comiru','コミル','対応表']);
+}
+async function inputAppLooksLikeSaveRestoreRoot(dir){
+  if(!dir) return false;
+  const name=String(dir.name||'');
+  if(/保存.*復元|復元.*保存/.test(name)) return true;
+  const rootMarkers=new Set(['json','打ち込み結果','対応表','毎日更新','全員分リスト','全体予定表','科目リスト','Comiru','コミル']);
+  try{
+    if(dir.values){
+      for await(const entry of dir.values()){
+        if(entry && entry.kind==='directory' && rootMarkers.has(String(entry.name||''))) return true;
+      }
+    }
+  }catch(e){}
+  return false;
+}
+async function validateInputAppSaveRootFolder(dir){
+  if(!dir) return false;
+  const name=String(dir.name||'');
+  if(inputAppBadSaveRootFolderNames().has(name)){
+    alert(`「${name}」フォルダーではなく、保存復元フォルダー本体を選んでください。\n\n例：保存復元フォルダー/json や 保存復元フォルダー/打ち込み結果/担任助手フォルダー ではなく、いちばん上の「保存復元フォルダー」を選択`);
+    return false;
+  }
+  const ok=await inputAppLooksLikeSaveRestoreRoot(dir);
+  if(!ok){
+    alert(`「${name}」は保存復元フォルダー本体として確認できませんでした。\n\n保存復元フォルダー本体には通常、json / 打ち込み結果 / 対応表 / 毎日更新 / 全員分リスト などのフォルダーがあります。\n担任助手名フォルダーや生徒名フォルダーを選ぶと、その直下にjsonが作られるため保存を止めました。`);
+    return false;
+  }
+  return true;
+}
+
 async function pickSaveRootFolder(forcePick=false){
   if(!window.showDirectoryPicker){
     alert('このブラウザではフォルダへの直接保存・復元が使えません。ChromeまたはEdgeで、GitHub Pagesなどのhttpsページから開いてください。');
@@ -3562,9 +3595,11 @@ async function pickSaveRootFolder(forcePick=false){
   if(!forcePick && sharedDirHandle) return sharedDirHandle;
   try{
     const dir = await window.showDirectoryPicker({mode:'readwrite'});
-    // 保存用フォルダを選ぶ。
+    // 保存復元フォルダー本体以外を選んだ場合は、jsonを誤った階層へ作らない。
+    if(!(await validateInputAppSaveRootFolder(dir))) return null;
+    // 保存復元フォルダーを選ぶ。
     // 復元用JSON・模試/イベント/コメントマスタは直下の「json」フォルダに保存し、
-    // Excelはこの下の担任助手フォルダ→各生徒名フォルダへ保存する。
+    // Excelはこの下の打ち込み結果/担任助手フォルダー/各生徒名フォルダへ保存する。
     sharedDirHandle = dir;
     excelOutputDirHandle = null;
     extraStudentCandidatesLoadedFromFolder = false;
@@ -3628,6 +3663,7 @@ async function buildInputRestoreDiagnostics(rootDir, names=[]){
   const groupJsonCount=[...jsonFiles,...rootJsonFiles].filter(f=>/^group_/i.test(f.name)).length;
   const studentJsonCount=[...jsonFiles,...rootJsonFiles].filter(f=>/^student_/i.test(f.name)).length;
   lines.push(`${jsonDir ? '✅' : '⚠'} json: ${jsonDir ? jsonFiles.length + '件' : 'フォルダーなし'}（group ${groupJsonCount}件 / student ${studentJsonCount}件）`);
+  lines.push('⚡ 高速化: 復元時は group JSON は完全一致優先＋最新3件だけ互換確認、個人JSONは生徒ごとに最新1件だけ優先読込。');
 
   const allDir=await getDirectoryIfExists(rootDir,'全員分リスト');
   const allFiles=allDir ? await listFilesInDirectoryByRegex(allDir,/\.(xlsx|xlsm|xls)$/i) : [];
@@ -4374,6 +4410,9 @@ async function saveAllToExistingStudentFolders(options={}){
    9. 保存用フォルダの読み書き
 ========================================================= */
 let sharedDirHandle = null;
+let sharedJsonFileHandleCache = null;
+
+function clearSharedJsonFileCache(){ sharedJsonFileHandleCache = null; }
 
 function sharedSupported(){
   return !!window.showDirectoryPicker;
@@ -4393,14 +4432,9 @@ async function pickSharedFolder(){
     return null;
   }
   const dir = await window.showDirectoryPicker({mode:'readwrite'});
-  const badNames = new Set(['json','打ち込み結果','担任助手フォルダ','担任助手フォルダー','毎日更新','全員分リスト','全体予定表','科目リスト','Comiru','コミル','対応表']);
-  if(badNames.has(String(dir.name || ''))){
-    alert(`「${dir.name}」フォルダーではなく、保存復元フォルダー本体を選んでください。
-
-例：保存復元フォルダー/json ではなく「保存復元フォルダー」を選択`);
-    return null;
-  }
+  if(!(await validateInputAppSaveRootFolder(dir))) return null;
   sharedDirHandle = dir;
+  clearSharedJsonFileCache();
   showSaveInfo('保存復元フォルダーを選択しました。このページを開いている間、この保存復元フォルダー直下の json に復元用データ・マスタを保存/反映できます。');
   return sharedDirHandle;
 }
@@ -4461,6 +4495,7 @@ async function writeJsonToShared(filename, data){
   const writable = await handle.createWritable();
   await writable.write(JSON.stringify(data, null, 2));
   await writable.close();
+  clearSharedJsonFileCache();
 }
 async function readJsonFromShared(filename){
   const rootDir = await ensureSharedFolder();
@@ -4497,22 +4532,43 @@ async function readJsonFromShared(filename){
 
 async function listJsonFilesFromShared(){
   const rootDir = await ensureSharedFolder();
+  if(!rootDir || !rootDir.values) return [];
+  if(sharedJsonFileHandleCache) return sharedJsonFileHandleCache;
   const out=[];
-  if(!rootDir || !rootDir.values) return out;
+  const seen=new Set();
+  function add(entry){
+    if(!entry || entry.kind !== 'file' || !/\.json$/i.test(entry.name)) return;
+    const key=String(entry.name||'').toLowerCase();
+    if(seen.has(key)) return;
+    seen.add(key);
+    out.push(entry);
+  }
 
   // 新仕様：jsonフォルダ内を優先して検索。
   const jsonDir = await getSharedJsonDir(false);
   if(jsonDir && jsonDir.values){
-    for await (const entry of jsonDir.values()){
-      if(entry.kind === 'file' && /\.json$/i.test(entry.name)) out.push(entry);
-    }
+    for await (const entry of jsonDir.values()) add(entry);
   }
 
   // 旧仕様からの移行用：直下のJSONも検索対象に残す。
-  for await (const entry of rootDir.values()){
-    if(entry.kind === 'file' && /\.json$/i.test(entry.name)) out.push(entry);
-  }
+  for await (const entry of rootDir.values()) add(entry);
+  sharedJsonFileHandleCache = out;
   return out;
+}
+async function jsonHandleLastModified(handle){
+  try{ const f=await handle.getFile(); return f.lastModified || 0; }catch(e){ return 0; }
+}
+function inputJsonNameKeyFromStudentFile(name){
+  return String(name||'').replace(/^student_/i,'').replace(/\.json$/i,'').replace(/_/g,'').replace(/[\s\u3000]+/g,'');
+}
+function inputJsonNameKey(s){
+  return String(s||'').replace(/[\s\u3000_]+/g,'');
+}
+async function latestJsonHandlesByFileName(handles, limit=1){
+  const withTime=[];
+  for(const handle of handles || []) withTime.push({handle, lastModified:await jsonHandleLastModified(handle)});
+  withTime.sort((a,b)=>(b.lastModified-a.lastModified)||String(b.handle.name).localeCompare(String(a.handle.name),'ja'));
+  return withTime.slice(0,limit).map(x=>x.handle);
 }
 function sameNameSet(a,b){
   const aa=(a||[]).map(x=>String(x||'').trim()).filter(Boolean).sort();
@@ -4520,38 +4576,51 @@ function sameNameSet(a,b){
   return aa.length===bb.length && aa.every((v,i)=>v===bb[i]);
 }
 async function readGroupJsonFromSharedByNames(names){
-  // 1. まず従来の完全一致ファイル名を探す
+  // 1. まず従来の完全一致ファイル名を探す。通常運用はこれだけで終わるので高速。
   const exact=await readJsonFromShared(sharedGroupFileName(names));
   if(exact) return {mem:exact, source:`${sharedGroupFileName(names)}（完全一致）`, sourceModified:inputTimeMillis(exact.savedAt)};
 
-  // 2. 名前順が違っても拾えるよう、group_*.json を全部見て中身の names で照合する
+  // 2. 互換用フォールバック。group_*.json 全件を読むと遅くなるため、更新日時が新しいものだけ確認する。
   const files=await listJsonFilesFromShared();
-  for(const handle of files){
-    if(!/^group_.*\.json$/i.test(handle.name)) continue;
+  const groupFiles=(files||[]).filter(handle=>/^group_.*\.json$/i.test(handle.name));
+  const latestHandles=await latestJsonHandlesByFileName(groupFiles, 3);
+  for(const handle of latestHandles){
     try{
       const file=await handle.getFile();
       const mem=JSON.parse(await file.text());
-      if(sameNameSet(mem.names || [], names)) return {mem, source:`${handle.name}（名前集合一致）`, sourceModified:file.lastModified||inputTimeMillis(mem.savedAt)};
+      if(sameNameSet(mem.names || [], names)) return {mem, source:`${handle.name}（最新group JSONから名前集合一致）`, sourceModified:file.lastModified||inputTimeMillis(mem.savedAt)};
     }catch(e){}
   }
   return {mem:null, source:''};
 }
 async function readStudentJsonFromSharedByName(name){
-  // 1. まず従来の student_名前.json を探す
+  // 1. まず従来の student_名前.json を探す。通常運用はこれだけで終わるので高速。
   const exact=await readJsonFromShared(sharedStudentFileName(name));
   if(exact) return {mem:exact, source:`${sharedStudentFileName(name)}（完全一致）`, sourceModified:inputTimeMillis(exact.savedAt)};
 
-  // 2. 念のため student_*.json を全部見て studentName またはファイル名で照合する
+  // 2. ファイル名から対象生徒を絞り、同じ生徒の個人JSONが複数ある場合は最新1件だけ読む。
   const files=await listJsonFilesFromShared();
-  for(const handle of files){
-    if(!/^student_.*\.json$/i.test(handle.name)) continue;
+  const key=inputJsonNameKey(name);
+  const studentFiles=(files||[]).filter(handle=>/^student_.*\.json$/i.test(handle.name));
+  const namedCandidates=studentFiles.filter(handle=>inputJsonNameKeyFromStudentFile(handle.name)===key);
+  const latestNamed=await latestJsonHandlesByFileName(namedCandidates, 1);
+  for(const handle of latestNamed){
     try{
       const file=await handle.getFile();
       const mem=JSON.parse(await file.text());
-      const fileBase=handle.name.replace(/^student_/,'').replace(/\.json$/i,'').replace(/_/g,'');
-      const key=String(name||'').replace(/[\s\u3000_]+/g,'');
-      const memName=String(mem.studentName||'').replace(/[\s\u3000_]+/g,'');
-      if(memName===key || fileBase===key) return {mem, source:`${handle.name}（個人JSON）`, sourceModified:file.lastModified||inputTimeMillis(mem.savedAt)};
+      return {mem, source:`${handle.name}（個人JSON最新1件）`, sourceModified:file.lastModified||inputTimeMillis(mem.savedAt)};
+    }catch(e){}
+  }
+
+  // 3. 旧ファイル名の互換用。全件読まず、更新日時が新しい個人JSONだけ中身照合する。
+  const latestFallback=await latestJsonHandlesByFileName(studentFiles, 30);
+  for(const handle of latestFallback){
+    try{
+      const file=await handle.getFile();
+      const mem=JSON.parse(await file.text());
+      const fileBase=inputJsonNameKeyFromStudentFile(handle.name);
+      const memName=inputJsonNameKey(mem.studentName||'');
+      if(memName===key || fileBase===key) return {mem, source:`${handle.name}（最新個人JSONから照合）`, sourceModified:file.lastModified||inputTimeMillis(mem.savedAt)};
     }catch(e){}
   }
   return {mem:null, source:''};
