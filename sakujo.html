@@ -7,8 +7,8 @@
 <style>
 :root{--bg:#f4f6fb;--card:#fff;--line:#d8deea;--text:#172033;--muted:#667085;--accent:#2563eb;--ok:#16a34a;--warn:#dc2626;--soft:#eef4ff;}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI","Noto Sans JP",sans-serif;}
-header{background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:10} .inner{max-width:1100px;margin:0 auto;padding:16px}h1{font-size:22px;margin:0 0 4px}.hint{font-size:13px;color:var(--muted);line-height:1.6}.wrap{max-width:1100px;margin:0 auto;padding:16px}.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0;box-shadow:0 4px 16px rgba(15,23,42,.05)}
-.btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}button{border:0;border-radius:10px;padding:11px 14px;font-weight:900;cursor:pointer;background:var(--accent);color:#fff;font-size:14px}button.ok{background:var(--ok)}button.warn{background:var(--warn)}button.secondary{background:#475467}button:disabled{opacity:.45;cursor:not-allowed}.danger{background:#fff7f7;border:1px solid #fecaca;color:#991b1b;border-radius:10px;padding:12px;line-height:1.7;font-size:13px}.okbox{background:#f0fdf4;border:1px solid #bbf7d0;color:#166534;border-radius:10px;padding:12px;line-height:1.7;font-size:13px}#log{white-space:pre-wrap;background:#0f172a;color:#e5e7eb;border-radius:10px;padding:12px;min-height:260px;max-height:520px;overflow:auto;font-size:12px;line-height:1.55}.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.stat{background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:10px}.stat b{display:block;font-size:24px;margin-top:2px}.small{font-size:12px;color:var(--muted)}code{background:#eef2ff;border:1px solid #dbeafe;border-radius:6px;padding:1px 5px;color:#1e3a8a}@media(max-width:760px){.stats{grid-template-columns:1fr 1fr}}
+header{background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:10}.inner{max-width:1120px;margin:0 auto;padding:16px}h1{font-size:22px;margin:0 0 4px}.hint{font-size:13px;color:var(--muted);line-height:1.65}.wrap{max-width:1120px;margin:0 auto;padding:16px}.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0;box-shadow:0 4px 16px rgba(15,23,42,.05)}
+.btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}button{border:0;border-radius:10px;padding:11px 14px;font-weight:900;cursor:pointer;background:var(--accent);color:#fff;font-size:14px}button.ok{background:var(--ok)}button.warn{background:var(--warn)}button.secondary{background:#475467}button.ghost{background:#eef2ff;color:#1e40af}button:disabled{opacity:.45;cursor:not-allowed}.danger{background:#fff7f7;border:1px solid #fecaca;color:#991b1b;border-radius:10px;padding:12px;line-height:1.7;font-size:13px}.okbox{background:#f0fdf4;border:1px solid #bbf7d0;color:#166534;border-radius:10px;padding:12px;line-height:1.7;font-size:13px}.warnbox{background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:10px;padding:12px;line-height:1.7;font-size:13px}#log{white-space:pre-wrap;background:#0f172a;color:#e5e7eb;border-radius:10px;padding:12px;min-height:260px;max-height:520px;overflow:auto;font-size:12px;line-height:1.55}.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.stat{background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:10px}.stat b{display:block;font-size:24px;margin-top:2px}.small{font-size:12px;color:var(--muted)}code{background:#eef2ff;border:1px solid #dbeafe;border-radius:6px;padding:1px 5px;color:#1e3a8a}.hiddenInput{position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0}.modeTitle{font-weight:900;margin:0 0 6px}@media(max-width:760px){.stats{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
@@ -24,31 +24,57 @@ header{background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0
     ・result_history.json、毎日更新履歴
   </div>
 
+  <div class="card warnbox">
+    <b>今回の安定版</b><br>
+    フォルダー読み取りは、統合用でうまくいった旧方式 <code>webkitdirectory</code> をメインにしました。<br>
+    この方式はブラウザの制限で直接上書きできないので、<b>削除済みJSON＋バックアップ入りZIP</b>をダウンロードします。ZIPを展開して <code>json</code> フォルダーに戻してください。<br>
+    Chrome/Edgeで直接上書きできる環境だけ、下の「直接削除モード」も使えます。
+  </div>
+
   <div class="card">
     <div class="stats">
       <div class="stat"><span class="small">JSON件数</span><b id="statFiles">0</b></div>
       <div class="stat"><span class="small">変更対象</span><b id="statTargets">0</b></div>
-      <div class="stat"><span class="small">削除した模試欄</span><b id="statExams">0</b></div>
-      <div class="stat"><span class="small">削除したイベント欄</span><b id="statEvents">0</b></div>
+      <div class="stat"><span class="small">削除する模試件数</span><b id="statExams">0</b></div>
+      <div class="stat"><span class="small">削除するイベント件数</span><b id="statEvents">0</b></div>
     </div>
-    <div class="btns">
-      <button id="pickBtn" class="ok" type="button">① 保存復元フォルダー / jsonフォルダーを選ぶ</button>
-      <button id="dryRunBtn" class="secondary" type="button" disabled>② 削除対象を確認する</button>
-      <button id="runBtn" class="warn" type="button" disabled>③ バックアップして削除する</button>
+
+    <div class="card" style="margin:14px 0 0;background:#fbfdff;box-shadow:none;">
+      <p class="modeTitle">おすすめ：旧方式で読み取って、削除済みZIPを作る</p>
+      <div class="hint">いつもの保存復元フォルダー、またはその中の json フォルダーを選んでください。</div>
+      <div class="btns">
+        <button id="pickOldBtn" class="ok" type="button">① フォルダーを読み取る</button>
+        <button id="dryRunOldBtn" class="secondary" type="button" disabled>② 削除対象を確認する</button>
+        <button id="zipBtn" class="warn" type="button" disabled>③ 削除済みJSONのZIPを作る</button>
+      </div>
     </div>
-    <p class="hint">Chrome / Edgeで使ってください。③を押すと、まず <code>json_backup_exam_event_cleanup_日時</code> フォルダーに元JSONをコピーしてから上書きします。</p>
+
+    <div class="card" style="margin:14px 0 0;background:#fff;box-shadow:none;">
+      <p class="modeTitle">予備：直接削除モード</p>
+      <div class="hint">もし上の方式でZIP置き換えが面倒なら使えます。ただし環境によってはフォルダー選択が動きません。</div>
+      <div class="btns">
+        <button id="pickDirectBtn" class="ghost" type="button">直接削除用にフォルダーを選ぶ</button>
+        <button id="dryRunDirectBtn" class="secondary" type="button" disabled>直接削除の対象確認</button>
+        <button id="runDirectBtn" class="warn" type="button" disabled>バックアップして直接削除</button>
+      </div>
+    </div>
+
+    <input id="oldFolderInput" class="hiddenInput" type="file" webkitdirectory directory multiple accept=".json">
   </div>
 
   <div class="card okbox">
-    使い方：このHTMLを開く → ①でいつもの「保存復元フォルダー」か、その中の「json」フォルダーを選ぶ → ②で対象確認 → ③で削除。
+    ZIP方式の使い方：①フォルダー読取 → ②確認 → ③ZIP作成 → ZIPを展開 → 中の <code>json</code> フォルダーを保存復元フォルダーの <code>json</code> に上書き。<br>
+    ZIP内には <code>json_backup_exam_event_cleanup_日時</code> も入るので、元JSONも残ります。
   </div>
 
   <div class="card"><div id="log">待機中</div></div>
 </div>
 <script>
-let pickedRoot=null;
-let jsonDir=null;
-let scanned=[];
+let directRoot=null;
+let directJsonDir=null;
+let directScanned=[];
+let oldFiles=[];
+let oldScanned=[];
 let lastSummary={files:0,targets:0,exams:0,events:0};
 const $=id=>document.getElementById(id);
 function pad2(n){return String(n).padStart(2,'0')}
@@ -57,6 +83,137 @@ function log(s){$('log').textContent=s}
 function addLog(s){$('log').textContent += '\n' + s}
 function updateStats(x){lastSummary=x||lastSummary;$('statFiles').textContent=lastSummary.files||0;$('statTargets').textContent=lastSummary.targets||0;$('statExams').textContent=lastSummary.exams||0;$('statEvents').textContent=lastSummary.events||0}
 function isObj(x){return x && typeof x==='object' && !Array.isArray(x)}
+function clearArrayProp(obj,key){if(!isObj(obj)) return 0; if(Array.isArray(obj[key])){const n=obj[key].length; obj[key]=[]; return n;} return 0;}
+function cleanupJsonData(data, filename){
+  let exams=0, events=0, changed=false;
+  const isStudentFile=/^student_.*\.json$/i.test(filename) || !!data.studentName;
+  const isGroupFile=/^group_.*\.json$/i.test(filename) || isObj(data.studentData);
+  if(isStudentFile){const e=clearArrayProp(data,'exams'); const v=clearArrayProp(data,'events'); if(e || v){exams+=e; events+=v; changed=true;}}
+  if(isGroupFile && isObj(data.studentData)){
+    for(const stu of Object.values(data.studentData)){
+      if(!isObj(stu)) continue;
+      const e=clearArrayProp(stu,'exams'); const v=clearArrayProp(stu,'events');
+      if(e || v){exams+=e; events+=v; changed=true;}
+    }
+  }
+  if(changed){
+    data.cleanedExamEventHistoryAt=new Date().toISOString();
+    data.cleanedExamEventHistoryNote='個人別のexams/eventsのみ削除。examMaster/eventMaster/targetHistory/comment等は保持。';
+  }
+  return {changed,exams,events,isStudentFile,isGroupFile};
+}
+function jsonPathParts(file){return String(file.webkitRelativePath || file.name || '').split(/[\\/]+/).filter(Boolean)}
+function isBackupLikePath(parts){return parts.some(p=>/^json_backup_exam_event_cleanup_/i.test(p) || /^backup/i.test(p))}
+function isCandidateJsonFile(file){
+  const name=file.name || '';
+  if(!/\.json$/i.test(name)) return false;
+  if(/^result_history\.json$/i.test(name)) return false;
+  const parts=jsonPathParts(file);
+  if(isBackupLikePath(parts)) return false;
+  const lower=parts.map(p=>p.toLowerCase());
+  const jsonIdx=lower.lastIndexOf('json');
+  if(jsonIdx >= 0){
+    // jsonフォルダー直下のJSONだけ対象。バックアップ配下や深いサブフォルダーは対象外。
+    return parts.length === jsonIdx + 2;
+  }
+  // jsonフォルダーそのものを選んだ場合は root/jsonfile になる。
+  return parts.length <= 2;
+}
+function oldRelativeName(file){
+  const parts=jsonPathParts(file);
+  const lower=parts.map(p=>p.toLowerCase());
+  const jsonIdx=lower.lastIndexOf('json');
+  if(jsonIdx >= 0 && parts[jsonIdx+1]) return parts[jsonIdx+1];
+  return file.name;
+}
+function summarizeRows(rows, rootName, modeName){
+  const targets=rows.filter(r=>r.result?.changed).length;
+  const exams=rows.reduce((s,r)=>s+(r.result?.exams||0),0);
+  const events=rows.reduce((s,r)=>s+(r.result?.events||0),0);
+  const errors=rows.filter(r=>r.error).length;
+  updateStats({files:rows.length,targets,exams,events});
+  const changedRows=rows.filter(r=>r.result?.changed);
+  let msg=`${modeName}\n選択フォルダー: ${rootName || ''}\n\nJSON件数: ${rows.length}\n変更対象: ${targets}\n削除予定 exams件数: ${exams}\n削除予定 events件数: ${events}\n読み取りエラー: ${errors}`;
+  msg += '\n\n--- 変更対象 ---';
+  msg += changedRows.length ? '\n' + changedRows.map(r=>`・${r.name}  exams:${r.result.exams} / events:${r.result.events}`).join('\n') : '\nなし';
+  if(errors) msg += '\n\n--- エラー ---\n' + rows.filter(r=>r.error).map(r=>`・${r.name}: ${r.error.message||r.error}`).join('\n');
+  log(msg);
+}
+async function scanOldFiles(){
+  if(!oldFiles.length) throw new Error('先にフォルダーを選んでください。');
+  const candidates=oldFiles.filter(isCandidateJsonFile).sort((a,b)=>oldRelativeName(a).localeCompare(oldRelativeName(b),'ja'));
+  const rows=[];
+  for(const file of candidates){
+    const name=oldRelativeName(file);
+    try{
+      const text=await file.text();
+      const data=JSON.parse(text);
+      const result=cleanupJsonData(JSON.parse(JSON.stringify(data)), name);
+      rows.push({file,name,text,data,result,error:null});
+    }catch(e){ rows.push({file,name,error:e}); }
+  }
+  oldScanned=rows;
+  const root=jsonPathParts(oldFiles[0]||{})[0] || '';
+  summarizeRows(rows, root, '旧方式フォルダー読取');
+  if(!rows.length){
+    const examples=oldFiles.slice(0,10).map(f=>f.webkitRelativePath||f.name).join('\n');
+    addLog('\n\nJSON候補が見つかりません。保存復元フォルダー、または json フォルダーを選んでください。\n\n選択ファイル例:\n'+examples);
+  }
+  return rows;
+}
+$('pickOldBtn').onclick=()=>{ const inp=$('oldFolderInput'); inp.value=''; inp.click(); };
+$('oldFolderInput').addEventListener('change', async (ev)=>{
+  oldFiles=Array.from(ev.target.files||[]);
+  $('dryRunOldBtn').disabled=!oldFiles.length;
+  $('zipBtn').disabled=!oldFiles.length;
+  updateStats({files:0,targets:0,exams:0,events:0});
+  const root=jsonPathParts(oldFiles[0]||{})[0] || '';
+  log(`フォルダーを選択しました。\n選択ファイル総数: ${oldFiles.length}\n先頭フォルダー: ${root}\n\n次に「② 削除対象を確認する」を押してください。`);
+});
+$('dryRunOldBtn').onclick=async()=>{try{await scanOldFiles()}catch(e){log('確認エラー: '+(e.message||e))}};
+
+// --- ZIP writer: 無圧縮ZIPをブラウザだけで作る ---
+const crcTable=(()=>{let c, table=[]; for(let n=0;n<256;n++){c=n; for(let k=0;k<8;k++) c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1); table[n]=c>>>0;} return table;})();
+function crc32(bytes){let c=0xffffffff; for(let i=0;i<bytes.length;i++) c=crcTable[(c^bytes[i])&0xff]^(c>>>8); return (c^0xffffffff)>>>0;}
+function u16(n){return [n&255,(n>>>8)&255]}
+function u32(n){return [n&255,(n>>>8)&255,(n>>>16)&255,(n>>>24)&255]}
+function dosTimeDate(d=new Date()){const time=((d.getHours()&31)<<11)|((d.getMinutes()&63)<<5)|((Math.floor(d.getSeconds()/2))&31); const date=(((d.getFullYear()-1980)&127)<<9)|(((d.getMonth()+1)&15)<<5)|(d.getDate()&31); return {time,date};}
+function concatUint8(arrs){let len=arrs.reduce((s,a)=>s+a.length,0); let out=new Uint8Array(len); let off=0; for(const a of arrs){out.set(a,off); off+=a.length;} return out;}
+function makeZip(entries){
+  const enc=new TextEncoder(); const locals=[]; const centrals=[]; let offset=0; const dt=dosTimeDate();
+  for(const ent of entries){
+    const nameBytes=enc.encode(ent.name.replace(/^\/+/,'')); const dataBytes=typeof ent.text==='string' ? enc.encode(ent.text) : ent.bytes;
+    const crc=crc32(dataBytes); const size=dataBytes.length;
+    const local=concatUint8([new Uint8Array([...u32(0x04034b50),...u16(20),...u16(0),...u16(0),...u16(dt.time),...u16(dt.date),...u32(crc),...u32(size),...u32(size),...u16(nameBytes.length),...u16(0)]), nameBytes, dataBytes]);
+    locals.push(local);
+    const central=concatUint8([new Uint8Array([...u32(0x02014b50),...u16(20),...u16(20),...u16(0),...u16(0),...u16(dt.time),...u16(dt.date),...u32(crc),...u32(size),...u32(size),...u16(nameBytes.length),...u16(0),...u16(0),...u16(0),...u16(0),...u32(0),...u32(offset)]), nameBytes]);
+    centrals.push(central); offset += local.length;
+  }
+  const centralSize=centrals.reduce((s,a)=>s+a.length,0);
+  const end=new Uint8Array([...u32(0x06054b50),...u16(0),...u16(0),...u16(entries.length),...u16(entries.length),...u32(centralSize),...u32(offset),...u16(0)]);
+  return concatUint8([...locals,...centrals,end]);
+}
+function downloadBlob(blob, filename){const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(url); a.remove();},1000);}
+$('zipBtn').onclick=async()=>{
+  try{
+    const rows=await scanOldFiles();
+    const targets=rows.filter(r=>r.result?.changed && !r.error);
+    if(!targets.length){addLog('\n\n削除対象がないのでZIPは作っていません。');return;}
+    const ok=confirm(`削除済みJSONのZIPを作ります。\n対象JSON: ${targets.length}件\n削除予定 exams: ${lastSummary.exams}\n削除予定 events: ${lastSummary.events}\n\nZIP内には元JSONバックアップも入れます。作成しますか？`);
+    if(!ok){addLog('\n\nキャンセルしました。');return;}
+    const stamp=nowStamp(); const backupName='json_backup_exam_event_cleanup_'+stamp; const entries=[];
+    for(const r of targets){
+      const cleaned=JSON.parse(JSON.stringify(r.data)); cleanupJsonData(cleaned,r.name);
+      entries.push({name:`json/${r.name}`, text:JSON.stringify(cleaned,null,2)});
+      entries.push({name:`json/${backupName}/${r.name}`, text:r.text});
+    }
+    const zipBytes=makeZip(entries);
+    downloadBlob(new Blob([zipBytes],{type:'application/zip'}), `cleaned_json_exam_event_${stamp}.zip`);
+    addLog(`\n\nZIPを作成しました。\nファイル名: cleaned_json_exam_event_${stamp}.zip\n\n展開して、中の json フォルダーを保存復元フォルダーの json に上書きしてください。\nバックアップも json/${backupName}/ に入っています。`);
+  }catch(e){log('ZIP作成エラー: '+(e.message||e));}
+};
+
+// --- Direct write mode ---
 async function getDirIfExists(parent,name){try{return await parent.getDirectoryHandle(name,{create:false})}catch(e){return null}}
 async function findDirByNameRecursive(dir,name,depth=4){
   if(!dir || depth<0 || !dir.values) return null;
@@ -70,127 +227,26 @@ async function findDirByNameRecursive(dir,name,depth=4){
   }
   return null;
 }
-async function resolveJsonDir(root){
-  if(String(root.name||'').toLowerCase()==='json') return root;
-  const direct=await getDirIfExists(root,'json');
-  if(direct) return direct;
-  return await findDirByNameRecursive(root,'json',5);
-}
-async function listJsonFileHandles(dir){
-  const out=[];
-  for await(const entry of dir.values()){
-    if(entry.kind==='file' && /\.json$/i.test(entry.name)) out.push(entry);
-  }
-  out.sort((a,b)=>a.name.localeCompare(b.name,'ja'));
-  return out;
-}
-function clearArrayProp(obj,key){
-  if(!isObj(obj)) return 0;
-  if(Array.isArray(obj[key])){const n=obj[key].length; obj[key]=[]; return n;}
-  return 0;
-}
-function cleanupJsonData(data, filename){
-  let exams=0, events=0, changed=false;
-  const isStudentFile=/^student_.*\.json$/i.test(filename) || !!data.studentName;
-  const isGroupFile=/^group_.*\.json$/i.test(filename) || isObj(data.studentData);
-
-  if(isStudentFile){
-    const e=clearArrayProp(data,'exams');
-    const v=clearArrayProp(data,'events');
-    if(e || v){exams+=e; events+=v; changed=true;}
-  }
-  if(isGroupFile && isObj(data.studentData)){
-    for(const [name,stu] of Object.entries(data.studentData)){
-      if(!isObj(stu)) continue;
-      const e=clearArrayProp(stu,'exams');
-      const v=clearArrayProp(stu,'events');
-      if(e || v){exams+=e; events+=v; changed=true;}
-    }
-  }
-  if(changed){
-    data.cleanedExamEventHistoryAt=new Date().toISOString();
-    data.cleanedExamEventHistoryNote='個人別のexams/eventsのみ削除。examMaster/eventMaster/targetHistory/comment等は保持。';
-  }
-  return {changed,exams,events,isStudentFile,isGroupFile};
-}
-async function scan(dryOnly=true){
-  if(!jsonDir) throw new Error('先にフォルダーを選んでください。');
-  const handles=await listJsonFileHandles(jsonDir);
-  const rows=[];
-  let targets=0, exams=0, events=0, errors=0;
+async function resolveJsonDir(root){if(String(root.name||'').toLowerCase()==='json') return root; const direct=await getDirIfExists(root,'json'); if(direct) return direct; return await findDirByNameRecursive(root,'json',5);}
+async function listJsonFileHandles(dir){const out=[]; for await(const entry of dir.values()){ if(entry.kind==='file' && /\.json$/i.test(entry.name) && !/^result_history\.json$/i.test(entry.name)) out.push(entry); } out.sort((a,b)=>a.name.localeCompare(b.name,'ja')); return out;}
+async function scanDirect(){
+  if(!directJsonDir) throw new Error('先に直接削除用フォルダーを選んでください。');
+  const handles=await listJsonFileHandles(directJsonDir); const rows=[];
   for(const handle of handles){
-    try{
-      const file=await handle.getFile();
-      const text=await file.text();
-      const data=JSON.parse(text);
-      const result=cleanupJsonData(JSON.parse(JSON.stringify(data)), handle.name);
-      if(result.changed){targets++; exams+=result.exams; events+=result.events;}
-      rows.push({handle,name:handle.name,file,text,data,result,error:null});
-    }catch(e){
-      errors++;
-      rows.push({handle,name:handle.name,error:e});
-    }
+    try{const file=await handle.getFile(); const text=await file.text(); const data=JSON.parse(text); const result=cleanupJsonData(JSON.parse(JSON.stringify(data)), handle.name); rows.push({handle,name:handle.name,file,text,data,result,error:null});}
+    catch(e){rows.push({handle,name:handle.name,error:e});}
   }
-  scanned=rows;
-  updateStats({files:handles.length,targets,exams,events});
-  const changedRows=rows.filter(r=>r.result?.changed);
-  let msg=`選択フォルダー: ${pickedRoot?.name||''}\nJSONフォルダー: ${jsonDir?.name||''}\n\nJSON件数: ${handles.length}\n変更対象: ${targets}\n削除予定 exams件数: ${exams}\n削除予定 events件数: ${events}\n読み取りエラー: ${errors}`;
-  msg += '\n\n--- 変更対象 ---';
-  msg += changedRows.length ? '\n' + changedRows.map(r=>`・${r.name}  exams:${r.result.exams} / events:${r.result.events}`).join('\n') : '\nなし';
-  if(errors){
-    msg += '\n\n--- エラー ---\n' + rows.filter(r=>r.error).map(r=>`・${r.name}: ${r.error.message||r.error}`).join('\n');
-  }
-  log(msg);
-  return rows;
+  directScanned=rows; summarizeRows(rows, directRoot?.name || '', '直接削除モード'); return rows;
 }
-async function backupOriginals(rows){
-  const backupName='json_backup_exam_event_cleanup_'+nowStamp();
-  const backupDir=await jsonDir.getDirectoryHandle(backupName,{create:true});
-  for(const r of rows){
-    if(!r.result?.changed || r.error) continue;
-    const bh=await backupDir.getFileHandle(r.name,{create:true});
-    const w=await bh.createWritable();
-    await w.write(r.text);
-    await w.close();
-  }
-  return backupName;
-}
-async function writeCleaned(rows){
-  let count=0;
-  for(const r of rows){
-    if(!r.result?.changed || r.error) continue;
-    const cleaned=JSON.parse(JSON.stringify(r.data));
-    cleanupJsonData(cleaned,r.name);
-    const w=await r.handle.createWritable();
-    await w.write(JSON.stringify(cleaned,null,2));
-    await w.close();
-    count++;
-  }
-  return count;
-}
-$('pickBtn').onclick=async()=>{
-  if(!window.showDirectoryPicker){alert('このブラウザでは使えません。ChromeまたはEdgeで開いてください。');return;}
-  try{
-    pickedRoot=await window.showDirectoryPicker({mode:'readwrite'});
-    jsonDir=await resolveJsonDir(pickedRoot);
-    if(!jsonDir){log('jsonフォルダーが見つかりません。保存復元フォルダー、または json フォルダー自体を選んでください。');$('dryRunBtn').disabled=true;$('runBtn').disabled=true;return;}
-    $('dryRunBtn').disabled=false;
-    $('runBtn').disabled=false;
-    log(`フォルダーを選択しました。\n選択: ${pickedRoot.name}\nJSON: ${jsonDir.name}\n\n次に「② 削除対象を確認する」を押してください。`);
-  }catch(e){log('フォルダー選択をキャンセルしました。')}
+async function backupOriginalsDirect(rows){const backupName='json_backup_exam_event_cleanup_'+nowStamp(); const backupDir=await directJsonDir.getDirectoryHandle(backupName,{create:true}); for(const r of rows){if(!r.result?.changed || r.error) continue; const bh=await backupDir.getFileHandle(r.name,{create:true}); const w=await bh.createWritable(); await w.write(r.text); await w.close();} return backupName;}
+async function writeCleanedDirect(rows){let count=0; for(const r of rows){if(!r.result?.changed || r.error) continue; const cleaned=JSON.parse(JSON.stringify(r.data)); cleanupJsonData(cleaned,r.name); const w=await r.handle.createWritable(); await w.write(JSON.stringify(cleaned,null,2)); await w.close(); count++;} return count;}
+$('pickDirectBtn').onclick=async()=>{
+  if(!window.showDirectoryPicker){alert('このブラウザでは直接削除モードは使えません。上の旧方式ZIP作成を使ってください。');return;}
+  try{directRoot=await window.showDirectoryPicker({mode:'readwrite'}); directJsonDir=await resolveJsonDir(directRoot); if(!directJsonDir){log('jsonフォルダーが見つかりません。保存復元フォルダー、または json フォルダー自体を選んでください。');$('dryRunDirectBtn').disabled=true;$('runDirectBtn').disabled=true;return;} $('dryRunDirectBtn').disabled=false; $('runDirectBtn').disabled=false; log(`直接削除用フォルダーを選択しました。\n選択: ${directRoot.name}\nJSON: ${directJsonDir.name}\n\n次に「直接削除の対象確認」を押してください。`);}catch(e){log('フォルダー選択をキャンセルしました。')}
 };
-$('dryRunBtn').onclick=async()=>{try{await scan(true)}catch(e){log('確認エラー: '+(e.message||e))}};
-$('runBtn').onclick=async()=>{
-  try{
-    const rows=await scan(true);
-    const targets=rows.filter(r=>r.result?.changed);
-    if(!targets.length){addLog('\n\n削除対象がないので何も変更していません。');return;}
-    const ok=confirm(`個人JSONの模試・イベント履歴だけを削除します。\n対象JSON: ${targets.length}件\n削除予定 exams: ${lastSummary.exams}\n削除予定 events: ${lastSummary.events}\n\n先にバックアップを作ってから上書きします。実行しますか？`);
-    if(!ok){addLog('\n\nキャンセルしました。');return;}
-    const backupName=await backupOriginals(rows);
-    const written=await writeCleaned(rows);
-    addLog(`\n\n完了しました。\nバックアップ: json/${backupName}/\n上書きしたJSON: ${written}件\n\n次回、入力用アプリで復元すると個人別の模試・イベント履歴だけ空になります。`);
-  }catch(e){log('削除エラー: '+(e.message||e));}
+$('dryRunDirectBtn').onclick=async()=>{try{await scanDirect()}catch(e){log('確認エラー: '+(e.message||e))}};
+$('runDirectBtn').onclick=async()=>{
+  try{const rows=await scanDirect(); const targets=rows.filter(r=>r.result?.changed); if(!targets.length){addLog('\n\n削除対象がないので何も変更していません。');return;} const ok=confirm(`個人JSONの模試・イベント履歴だけを直接削除します。\n対象JSON: ${targets.length}件\n削除予定 exams: ${lastSummary.exams}\n削除予定 events: ${lastSummary.events}\n\n先にバックアップを作ってから上書きします。実行しますか？`); if(!ok){addLog('\n\nキャンセルしました。');return;} const backupName=await backupOriginalsDirect(rows); const written=await writeCleanedDirect(rows); addLog(`\n\n完了しました。\nバックアップ: json/${backupName}/\n上書きしたJSON: ${written}件`);}catch(e){log('直接削除エラー: '+(e.message||e));}
 };
 updateStats({files:0,targets:0,exams:0,events:0});
 </script>
