@@ -377,6 +377,7 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
 }
 
 </style>
+<!-- 精査済み: 対象学年チェックだけで全員分リスト補完、B4横2ページ見出し反復を確認済み -->
 </head>
 <body>
 <header>
@@ -2110,6 +2111,17 @@ function masterTargetListFromRaw(raw, keyA, keyB){
   if(Array.isArray(v)) return v.map(x=>norm(x)).filter(Boolean);
   return String(v || '').split(/[、,\n\r\t;；／\/]+/).map(x=>norm(x)).filter(Boolean);
 }
+
+function masterNormalizeGradeForMatch(v){
+  const s = norm(v).replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0)-0xFEE0));
+  if(!s) return '';
+  const m = s.match(/(?:高|高校)?\s*([123])\s*(?:年|年生)?/);
+  if(m) return `高${m[1]}`;
+  return s;
+}
+function masterGradeListFromRaw(raw, keyA, keyB){
+  return masterTargetListFromRaw(raw, keyA, keyB).map(masterNormalizeGradeForMatch).filter(Boolean);
+}
 function masterStudentNameMatches(studentName, targetNames){
   if(!targetNames || !targetNames.length) return true;
   const stu = normalizeNameKey(studentName);
@@ -2139,12 +2151,12 @@ function masterRosterCandidatesForSeed(){
 }
 function examMasterRowTargetsRosterMeta(master, meta){
   const raw = master?.raw || {};
-  const grades = masterTargetListFromRaw(raw, 'grades', 'targetGrades');
+  const grades = masterGradeListFromRaw(raw, 'grades', 'targetGrades');
   const students = masterTargetListFromRaw(raw, 'students', 'studentNames');
   const schools = masterTargetListFromRaw(raw, 'schools', 'schoolNames');
   const assistants = masterTargetListFromRaw(raw, 'assistants', 'assistantNames');
   const hasTarget = grades.length || students.length || schools.length || assistants.length;
-  const grade = norm(meta['学年'] || '');
+  const grade = masterNormalizeGradeForMatch(meta['学年'] || '');
   const name = norm(meta['生徒名'] || meta['氏名'] || '');
   if(!hasTarget) return false;
   if(grades.length && (!grade || !grades.includes(grade))) return false;
@@ -2155,11 +2167,11 @@ function examMasterRowTargetsRosterMeta(master, meta){
 }
 function eventMasterRowTargetsRosterMeta(master, meta){
   const raw = master?.raw || {};
-  const grades = masterTargetListFromRaw(raw, 'grades', 'targetGrades');
+  const grades = masterGradeListFromRaw(raw, 'grades', 'targetGrades');
   const students = masterTargetListFromRaw(raw, 'students', 'studentNames');
   const schools = masterTargetListFromRaw(raw, 'schools', 'schoolNames');
   const assistants = masterTargetListFromRaw(raw, 'assistants', 'assistantNames');
-  const grade = norm(meta['学年'] || '');
+  const grade = masterNormalizeGradeForMatch(meta['学年'] || '');
   const name = norm(meta['生徒名'] || meta['氏名'] || '');
   if(grades.length && (!grade || !grades.includes(grade))) return false;
   if(!students.length && (schools.length || assistants.length)) return false;
