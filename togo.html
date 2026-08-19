@@ -2102,6 +2102,131 @@ function filterExamEventRecordsByCurrentMasters(examRecords=[], eventRecords=[],
   return {examRecords:filteredExams, eventRecords:filteredEvents, removedExam, removedEvent};
 }
 
+
+// マスタ登録だけで全員分リストに出るように、マスタ対象者分の確認レコードを補完する。
+// 既存の個人Excelに同じ模試/イベントがある場合は、そちらの回答を優先して、足りない対象者だけ「未」で追加する。
+function masterTargetListFromRaw(raw, keyA, keyB){
+  const v = raw ? (raw[keyA] ?? raw[keyB] ?? '') : '';
+  if(Array.isArray(v)) return v.map(x=>norm(x)).filter(Boolean);
+  return String(v || '').split(/[、,\n\r\t;；／\/]+/).map(x=>norm(x)).filter(Boolean);
+}
+function masterStudentNameMatches(studentName, targetNames){
+  if(!targetNames || !targetNames.length) return true;
+  const stu = normalizeNameKey(studentName);
+  return targetNames.some(n => {
+    const key = normalizeNameKey(n);
+    return key && (stu === key || stu.startsWith(key) || key.startsWith(stu));
+  });
+}
+function masterRosterCandidatesForSeed(){
+  const map = new Map();
+  function add(meta){
+    if(!meta) return;
+    const name = norm(meta['生徒名'] || meta['氏名'] || '');
+    const no = norm(meta['生徒番号'] || '');
+    if(!name && !no) return;
+    const key = studentKeyForList(name, no);
+    if(!map.has(key)) map.set(key, Object.assign({}, emptyRoster(name), meta));
+  }
+  if(state.rosterMap && state.rosterMap.size){
+    for(const meta of state.rosterMap.values()) add(meta);
+  }
+  for(const r of state.records || []){
+    const resolved = rosterMetaForStudent(r.student);
+    add(Object.assign({}, resolved, {'生徒名':resolved['生徒名'] || r.student, '生徒番号':resolved['生徒番号'] || r.studentNo || '', '学年':resolved['学年'] || r.grade || ''}));
+  }
+  return [...map.values()];
+}
+function examMasterRowTargetsRosterMeta(master, meta){
+  const raw = master?.raw || {};
+  const grades = masterTargetListFromRaw(raw, 'grades', 'targetGrades');
+  const students = masterTargetListFromRaw(raw, 'students', 'studentNames');
+  const schools = masterTargetListFromRaw(raw, 'schools', 'schoolNames');
+  const assistants = masterTargetListFromRaw(raw, 'assistants', 'assistantNames');
+  const hasTarget = grades.length || students.length || schools.length || assistants.length;
+  const grade = norm(meta['学年'] || '');
+  const name = norm(meta['生徒名'] || meta['氏名'] || '');
+  if(!hasTarget) return false;
+  if(grades.length && (!grade || !grades.includes(grade))) return false;
+  if(students.length) return masterStudentNameMatches(name, students);
+  // 入力用と同じ扱い：高校/助手だけ指定は「対象生徒名へ一括追加するためだけ」なので、単独では出さない。
+  if(schools.length || assistants.length) return false;
+  return grades.length > 0;
+}
+function eventMasterRowTargetsRosterMeta(master, meta){
+  const raw = master?.raw || {};
+  const grades = masterTargetListFromRaw(raw, 'grades', 'targetGrades');
+  const students = masterTargetListFromRaw(raw, 'students', 'studentNames');
+  const schools = masterTargetListFromRaw(raw, 'schools', 'schoolNames');
+  const assistants = masterTargetListFromRaw(raw, 'assistants', 'assistantNames');
+  const grade = norm(meta['学年'] || '');
+  const name = norm(meta['生徒名'] || meta['氏名'] || '');
+  if(grades.length && (!grade || !grades.includes(grade))) return false;
+  if(!students.length && (schools.length || assistants.length)) return false;
+  return masterStudentNameMatches(name, students);
+}
+function masterRecordStudentKeyForSeed(r){
+  const meta = rosterMetaForStudent(r.student || '');
+  return studentKeyForList(meta['生徒名'] || r.student || '', meta['生徒番号'] || r.studentNo || '');
+}
+function seedExamEventRecordsFromMasters(examRecords=[], eventRecords=[], logRows=[]){
+  const candidates = masterRosterCandidatesForSeed();
+  const exams = (examRecords || []).slice();
+  const events = (eventRecords || []).slice();
+  if(!candidates.length){
+    if(logRows) logRows.push(['マスタ対象補完','注意','対応表/予定入力から生徒候補を作れないため、マスタ登録分を全員分リストへ補完できませんでした','対応表を保存復元フォルダーに入れてから①読み取りしてください。']);
+    return {examRecords:exams, eventRecords:events, addedExam:0, addedEvent:0};
+  }
+  const examKeys = new Set(exams.map(r => [masterRecordStudentKeyForSeed(r), masterNormalizeNameForMatch(r.examName || ''), masterDateKeyForMatch(r.examDate || r.date || '')].join('|')));
+  const eventKeys = new Set(events.map(r => [masterRecordStudentKeyForSeed(r), masterNormalizeNameForMatch(r.eventName || ''), masterDateKeyForMatch(r.datetime || r.date || '')].join('|')));
+  let addedExam=0, addedEvent=0;
+  for(const m of state.examMasterRows || []){
+    const name = norm(m.name || '');
+    const date = masterDateKeyForMatch(m.date || m.raw?.date || m.raw?.examDate || '');
+    if(!name) continue;
+    const dateObj = date ? parseDateLoose(date) : null;
+    for(const meta of candidates){
+      if(!examMasterRowTargetsRosterMeta(m, meta)) continue;
+      const student = norm(meta['生徒名'] || meta['氏名'] || '');
+      const no = norm(meta['生徒番号'] || '');
+      const sk = studentKeyForList(student, no);
+      const key = [sk, masterNormalizeNameForMatch(name), date].join('|');
+      if(examKeys.has(key)) continue;
+      examKeys.add(key);
+      exams.push({
+        student, studentNo:no, grade:norm(meta['学年'] || ''), kana:norm(meta['読み仮名'] || meta['カナ'] || ''),
+        examName:name, examDate:date, examDateObj:dateObj, type:m.raw?.type || 'common',
+        status:'未', comiruAnswered:false, subjectChanged:false, subjects:[], subjectList:'未入力',
+        sourceFile:'模試マスタ', sourcePath:'保存復元フォルダー/json', sourceModified:0
+      });
+      addedExam++;
+    }
+  }
+  for(const m of state.eventMasterRows || []){
+    const name = norm(m.name || '');
+    const date = masterDateKeyForMatch(m.date || m.raw?.datetime || m.raw?.date || '');
+    if(!name) continue;
+    const dateObj = date ? parseDateLoose(date) : null;
+    for(const meta of candidates){
+      if(!eventMasterRowTargetsRosterMeta(m, meta)) continue;
+      const student = norm(meta['生徒名'] || meta['氏名'] || '');
+      const no = norm(meta['生徒番号'] || '');
+      const sk = studentKeyForList(student, no);
+      const key = [sk, masterNormalizeNameForMatch(name), date].join('|');
+      if(eventKeys.has(key)) continue;
+      eventKeys.add(key);
+      events.push({
+        student, studentNo:no, grade:norm(meta['学年'] || ''), kana:norm(meta['読み仮名'] || meta['カナ'] || ''),
+        eventName:name, datetime:date, dateObj, status:'未', comiruAnswered:false, note:'',
+        sourceFile:'イベントマスタ', sourcePath:'保存復元フォルダー/json', sourceModified:0
+      });
+      addedEvent++;
+    }
+  }
+  if(logRows) logRows.push(['マスタ対象補完','情報',`模試マスタから${addedExam}件 / イベントマスタから${addedEvent}件を補完`,`個人Excelに未保存でも、現在のマスタ対象者には全員分リストの確認欄を出します。既存の回答は上書きしません。`]);
+  return {examRecords:exams, eventRecords:events, addedExam, addedEvent};
+}
+
 // ============================================================
 // 3. 毎日更新.xlsxの読み取り
 // ============================================================
@@ -3220,7 +3345,10 @@ async function merge(){
   const masterFiltered = filterExamEventRecordsByCurrentMasters(allExamRecords, allEventRecords, allLogs);
   allExamRecords = masterFiltered.examRecords;
   allEventRecords = masterFiltered.eventRecords;
-  allLogs.push(['個人Excel重複解決','情報',`予定 ${planRecordCountBeforeDedupe}→${allRecords.length}件 / 模試 ${examRecordCountBeforeDedupe}→${allExamRecords.length}件 / イベント ${eventRecordCountBeforeDedupe}→${allEventRecords.length}件`,'同じ生徒・同じ日付/模試/イベントは、空欄では消さず、具体値どうしの衝突は更新日時が新しい個人Excelを採用。さらに現在の模試マスタ/イベントマスタに残っているものだけ採用']);
+  const masterSeeded = seedExamEventRecordsFromMasters(allExamRecords, allEventRecords, allLogs);
+  allExamRecords = masterSeeded.examRecords;
+  allEventRecords = masterSeeded.eventRecords;
+  allLogs.push(['個人Excel重複解決','情報',`予定 ${planRecordCountBeforeDedupe}→${allRecords.length}件 / 模試 ${examRecordCountBeforeDedupe}→${allExamRecords.length}件 / イベント ${eventRecordCountBeforeDedupe}→${allEventRecords.length}件`,'同じ生徒・同じ日付/模試/イベントは、空欄では消さず、具体値どうしの衝突は更新日時が新しい個人Excelを採用。さらに現在の模試マスタ/イベントマスタに残っているものだけ採用し、マスタ対象者に未保存の確認欄は未入力として補完します。']);
 
   let comiruCsvInfo = {records:[], logs:[]};
   if(state.comiruCsvFiles && state.comiruCsvFiles.length){
@@ -6189,7 +6317,7 @@ function buildSmallExamEventColumnGroups(examRecords=[], eventRecords=[]){
   for(const r of examRecords || []){
     if(!allListExamStillVisible(r)) continue;
     const baseKey=examKeyOf(r);
-    if(!allListIsSmallTargetCount(examCounts.get(baseKey) || 0)) continue;
+    // マスタ対象が学年全員など15人超でも、全員分リストには確認列を出す。
     if(seenExam.has(baseKey)) continue;
     seenExam.add(baseKey);
     const name=r.examName || '模試';
@@ -6200,7 +6328,7 @@ function buildSmallExamEventColumnGroups(examRecords=[], eventRecords=[]){
   }
   for(const r of eventRecords || []){
     const baseKey=eventKeyOf(r);
-    if(!allListIsSmallTargetCount(eventCounts.get(baseKey) || 0)) continue;
+    // マスタ対象が学年全員など15人超でも、全員分リストには確認列を出す。
     if(seenEvent.has(baseKey)) continue;
     seenEvent.add(baseKey);
     const name=r.eventName || 'イベント';
@@ -6228,7 +6356,7 @@ function buildSmallExamEventColumnMaps(examRecords=[], eventRecords=[]){
   for(const r of examRecords || []){
     if(!allListExamStillVisible(r)) continue;
     const baseKey=examKeyOf(r);
-    if(!allListIsSmallTargetCount(examCounts.get(baseKey) || 0)) continue;
+    // マスタ対象が学年全員など15人超でも、全員分リストには確認列を出す。
     const meta=rosterMetaForStudent(r.student);
     const key=studentKeyForList(meta['生徒名'] || r.student, meta['生徒番号'] || r.studentNo || '');
     setMap(examByStudent,key,`${baseKey}|status`,allListExamStatusFull(r.status));
@@ -6238,7 +6366,7 @@ function buildSmallExamEventColumnMaps(examRecords=[], eventRecords=[]){
   }
   for(const r of eventRecords || []){
     const baseKey=eventKeyOf(r);
-    if(!allListIsSmallTargetCount(eventCounts.get(baseKey) || 0)) continue;
+    // マスタ対象が学年全員など15人超でも、全員分リストには確認列を出す。
     const meta=rosterMetaForStudent(r.student);
     const key=studentKeyForList(meta['生徒名'] || r.student, meta['生徒番号'] || r.studentNo || '');
     setMap(eventByStudent,key,`${baseKey}|status`,allListEventStatusMark(r.status));
@@ -7604,8 +7732,9 @@ async function refreshAllListInputFromSelectedSources(){
   let dedupedExams = dedupeExamRecordsByLatest(exams, logs);
   let dedupedEvents = dedupeEventRecordsByLatest(events, logs);
   const masterFilteredForAllListRefresh = filterExamEventRecordsByCurrentMasters(dedupedExams, dedupedEvents, logs);
-  state.examRecords = masterFilteredForAllListRefresh.examRecords || [];
-  state.eventRecords = masterFilteredForAllListRefresh.eventRecords || [];
+  const masterSeededForAllListRefresh = seedExamEventRecordsFromMasters(masterFilteredForAllListRefresh.examRecords || [], masterFilteredForAllListRefresh.eventRecords || [], logs);
+  state.examRecords = masterSeededForAllListRefresh.examRecords || [];
+  state.eventRecords = masterSeededForAllListRefresh.eventRecords || [];
   if(logs.length){
     state.logAoa = (state.logAoa && state.logAoa.length ? state.logAoa : [["ファイル","結果","内容","シート名/詳細"]]).concat(logs);
   }
@@ -7664,8 +7793,9 @@ async function downloadAllStudentList(){
     // 最終遮断：全員分リストを作る直前にも、マスタに無い模試/イベントを必ず除外する。
     // これで、個人Excel・旧全員分リスト・科目リスト・出力直前再読込のどこから来ても復活しない。
     const masterFilteredForAllListOutput = filterExamEventRecordsByCurrentMasters(exams, events, state.logAoa || []);
-    exams = masterFilteredForAllListOutput.examRecords || [];
-    events = masterFilteredForAllListOutput.eventRecords || [];
+    const masterSeededForAllListOutput = seedExamEventRecordsFromMasters(masterFilteredForAllListOutput.examRecords || [], masterFilteredForAllListOutput.eventRecords || [], state.logAoa || []);
+    exams = masterSeededForAllListOutput.examRecords || [];
+    events = masterSeededForAllListOutput.eventRecords || [];
     state.examRecords = exams;
     state.eventRecords = events;
     const gradeAoas = buildAllStudentListAoaByGrade(exams, events);
