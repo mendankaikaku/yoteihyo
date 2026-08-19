@@ -6286,14 +6286,63 @@ function goukakuPrintExcelColCount(model){
   const rowMax=Math.max(1, ...(model?.rows || []).map(r=>(r||[]).length));
   return Math.max(1, Number(model?.printCols || rowMax || 1));
 }
+
+// 面談準備印刷では、合格設計図Excelの全体ではなく、見やすい中心範囲だけをA4最大表示する。
+// 指定範囲：B列〜CA列、17行目〜48行目（Excelの1始まり表記）。
+const GOUKAKU_MEETING_PRINT_RANGE = {s:{r:16,c:1}, e:{r:47,c:78}, label:'B17:CA48'};
+function goukakuBlankPrintCell(){ return {text:'', style:'', raw:null}; }
+function goukakuBuildMeetingPrintRangeModel(model){
+  if(!model || !Array.isArray(model.rows)) return model;
+  const absStartR = GOUKAKU_MEETING_PRINT_RANGE.s.r;
+  const absStartC = GOUKAKU_MEETING_PRINT_RANGE.s.c;
+  const absEndR = GOUKAKU_MEETING_PRINT_RANGE.e.r;
+  const absEndC = GOUKAKU_MEETING_PRINT_RANGE.e.c;
+  const baseR = model?.range?.s?.r || 0;
+  const baseC = model?.range?.s?.c || 0;
+  const startR = absStartR - baseR;
+  const startC = absStartC - baseC;
+  const endR = absEndR - baseR;
+  const endC = absEndC - baseC;
+  const rows=[];
+  for(let r=startR; r<=endR; r++){
+    const srcRow = (model.rows || [])[r] || [];
+    const outRow=[];
+    for(let c=startC; c<=endC; c++){
+      const cell = srcRow[c];
+      outRow.push(cell ? Object.assign({}, cell) : goukakuBlankPrintCell());
+    }
+    rows.push(outRow);
+  }
+  const cols=[];
+  for(let c=startC; c<=endC; c++) cols.push((model.cols || [])[c] || '');
+  const rowHeights=[];
+  for(let r=startR; r<=endR; r++) rowHeights.push((model.rowHeights || [])[r] || '');
+  const merges=(model.merges || []).map(m=>{
+    const rs=Math.max(m.s.r, startR), re=Math.min(m.e.r, endR);
+    const cs=Math.max(m.s.c, startC), ce=Math.min(m.e.c, endC);
+    if(rs>re || cs>ce) return null;
+    return {s:{r:rs-startR,c:cs-startC}, e:{r:re-startR,c:ce-startC}};
+  }).filter(Boolean);
+  return {
+    rows, merges, cols, rowHeights,
+    range:{s:{r:absStartR,c:absStartC},e:{r:absEndR,c:absEndC}},
+    originalRef:model.originalRef || '',
+    usedRef:GOUKAKU_MEETING_PRINT_RANGE.label,
+    printRows:absEndR-absStartR+1,
+    printCols:absEndC-absStartC+1,
+    printableFound:true,
+    meetingPrepCrop:true
+  };
+}
 function goukakuPrintExcelHtml(item){
   const model=item?.model;
   if(!model) return '';
-  const rows=goukakuPrintExcelRowCount(model);
-  const cols=goukakuPrintExcelColCount(model);
-  const rangeText=model?.usedRef || ('A1:' + colName(cols) + rows);
+  const printModel=goukakuBuildMeetingPrintRangeModel(model);
+  const rows=goukakuPrintExcelRowCount(printModel);
+  const cols=goukakuPrintExcelColCount(printModel);
+  const rangeText=printModel?.usedRef || ('A1:' + colName(cols) + rows);
   return '<div class="goukakuPrintExcelWrap" data-goukaku-fit-excel="1" data-print-range="' + escapeHtml(rangeText) + '"><div class="goukakuPrintExcelFitInner">' +
-    goukakuExcelModelToHtml(model, rows, cols, false, {showHeaders:false, forceRowCount:true, forceColCount:true}) +
+    goukakuExcelModelToHtml(printModel, rows, cols, false, {showHeaders:false, forceRowCount:true, forceColCount:true}) +
     '</div></div>';
 }
 function meetingPrepGoukakuDesignHtml(name){
@@ -6314,7 +6363,7 @@ function meetingPrepGoukakuDesignHtml(name){
     let html = `<div class="muted">${esc(item.fileName || '合格設計図.xlsx')} ${item.sheetName ? '/ ' + esc(item.sheetName) : ''}</div>`;
     if(item.model){
       html += goukakuPrintExcelHtml(item);
-      html += '<div class="muted">PDFがないため、Excelの実データ範囲をA4内に自動フィットして印刷します。</div>';
+      html += '<div class="muted">PDFがないため、ExcelのB列〜CA列・17〜48行目だけをA4最大で印刷します。</div>';
     }else{
       html += '<table class="prepTable goukakuPrintTable"><tbody>';
       const rows = (item.aoa || []).slice(0,55);
@@ -6438,7 +6487,7 @@ function buildMeetingPrepPrintHtml(resultRecords, weeklyHtml){
     .prepTable{border-collapse:collapse;width:100%;font-size:10px;margin:4px 0 7px;}.prepTable th,.prepTable td{border:1px solid #9ca3af;padding:3px 4px;vertical-align:top;word-break:break-word;}.prepTable th{background:#f3f4f6;text-align:center;font-weight:800;}.prepTable ul{margin:0;padding-left:1.1em;}.prepTable li{margin:0 0 1px;}.listenTable th{background:#eef2ff}.listenTable td{font-size:11px;line-height:1.45}.twoCols{display:grid;grid-template-columns:1fr 1fr;gap:7px;align-items:start}.examConfirmBlock,.eventConfirmBlock{margin-top:4px;break-inside:avoid;page-break-inside:avoid}.examConfirmTable{table-layout:fixed;width:100%;font-size:9.2px;line-height:1.22}.examConfirmTable th:first-child,.examConfirmTable td:first-child{width:27mm}.examConfirmTable th,.examConfirmTable td{padding:2px 3px}.examPrintDetail{line-height:1.23}.examPrintLine{margin:0 0 1px}.subjectWrap{display:flex;flex-wrap:wrap;gap:1px 5px;align-items:flex-start}.printCheck{display:inline-block;white-space:nowrap;min-width:13mm}.smallChecks{font-size:9px}.eventConfirmTable{font-size:9.2px;line-height:1.25;table-layout:fixed;width:100%}.eventConfirmTable th:first-child,.eventConfirmTable td:first-child{width:34mm}.weekly{font-size:9px}.weekly th,.weekly td{padding:3px;}.blankTable td{height:12mm}.blankLines div{height:6mm;border-bottom:1px solid #d1d5db}.blankBox{height:24mm}
     .prevResultPage{padding:5mm;overflow:hidden}.fitPageShell{width:100%;height:270mm;overflow:hidden;position:relative}.fitPageInner{transform-origin:top left;width:100%;}.prevResultPage h1{font-size:17px}.prevResultPage h2{font-size:13px;margin:6px 0 4px}.prevResultPage h3{font-size:11.5px;margin:4px 0 3px}.prevResultPage .prepTable{font-size:9.8px;margin:3px 0 5px}.prevResultPage .prepTable th,.prevResultPage .prepTable td{padding:2.4px 3.4px}.prevResultPage .box{padding:4.5px}
     .weeklyPage{padding:5mm;}
-    .goukakuPrintPage{padding:4mm;overflow:hidden;display:flex;flex-direction:column;height:282mm!important;max-height:282mm!important}.goukakuPrintPage h1{font-size:10px;margin:0 0 .3mm;flex:0 0 auto}.goukakuPrintPage h2{font-size:8px;margin:0 0 .5mm;flex:0 0 auto;border-left:2px solid #2563eb;padding-left:3px}.goukakuPrintPage .muted{font-size:7px;margin-top:.5mm;flex:0 0 auto}.goukakuPrintPdf{height:auto;width:100%;flex:1 1 auto;min-height:0;border:1px solid #9ca3af;background:#f8fafc;overflow:hidden;position:relative;display:flex;align-items:center;justify-content:center}.goukakuPrintPdf iframe{width:100%;height:100%;border:0;background:#fff}.goukakuPrintPdf canvas.goukakuAllPagesCanvas{max-width:100%;max-height:100%;width:auto;height:auto;display:block;background:#fff}.goukakuPdfRenderStatus{position:absolute;left:4mm;right:4mm;bottom:4mm;padding:2mm;background:rgba(255,255,255,.92);border:1px solid #d1d5db;border-radius:4px;font-size:9px;color:#475569;text-align:center}.goukakuPrintPdf.rendered .goukakuFallbackPdf,.goukakuPrintPdf.rendered .goukakuPdfRenderStatus{display:none}.goukakuPrintPdf.fallback .goukakuPdfRenderStatus{background:#fff7ed;color:#9a3412;border-color:#fed7aa}.goukakuStyledSheetTable{border-collapse:collapse;width:max-content;min-width:100%;font-size:10px;line-height:1.2;table-layout:auto}.goukakuStyledSheetTable th,.goukakuStyledSheetTable td{border:1px solid #d0d5dd;padding:2px 4px;min-width:26px;max-width:180px;white-space:pre-wrap;word-break:break-word;vertical-align:middle}.goukakuStyledSheetTable .goukakuColHeader th,.goukakuStyledSheetTable .goukakuRowHeader{background:#f2f4f7;color:#475569;font-weight:800;text-align:center}.goukakuPrintExcelWrap{flex:1 1 auto;min-height:0;overflow:hidden;border:1px solid #9ca3af;background:#fff;position:relative;width:100%;height:auto}.goukakuPrintExcelFitInner{transform-origin:top left;width:max-content}.goukakuPrintExcelWrap .goukakuStyledSheetTable{width:max-content;min-width:0;font-size:7.6px;line-height:1.0;table-layout:auto}.goukakuPrintExcelWrap .goukakuStyledSheetTable th,.goukakuPrintExcelWrap .goukakuStyledSheetTable td{padding:.16mm .28mm;max-width:none;min-width:10px;white-space:pre-wrap;word-break:break-word}.goukakuPrintExcelWrap[data-fitted="1"]::after{content:"Excel実データ範囲をA4実寸で全面フィット";position:absolute;right:1.5mm;bottom:1.5mm;font-size:7px;color:#64748b;background:rgba(255,255,255,.78);padding:.4mm 1mm;border:1px solid #e5e7eb;border-radius:999px}.goukakuPrintTable{font-size:6.8px;table-layout:fixed;width:100%;line-height:1.12}.goukakuPrintTable th,.goukakuPrintTable td{padding:1px 2px;min-width:0;max-width:none;white-space:normal;word-break:break-word;}
+    .goukakuPrintPage{padding:2mm;overflow:hidden;display:flex;flex-direction:column;height:282mm!important;max-height:282mm!important}.goukakuPrintPage h1{font-size:7px;margin:0;line-height:1;flex:0 0 auto}.goukakuPrintPage h2{font-size:7px;margin:0 0 .3mm;line-height:1;flex:0 0 auto;border-left:1px solid #2563eb;padding-left:2px}.goukakuPrintPage .muted{font-size:6px;margin-top:.3mm;flex:0 0 auto}.goukakuPrintPdf{height:auto;width:100%;flex:1 1 auto;min-height:0;border:1px solid #9ca3af;background:#f8fafc;overflow:hidden;position:relative;display:flex;align-items:center;justify-content:center}.goukakuPrintPdf iframe{width:100%;height:100%;border:0;background:#fff}.goukakuPrintPdf canvas.goukakuAllPagesCanvas{max-width:100%;max-height:100%;width:auto;height:auto;display:block;background:#fff}.goukakuPdfRenderStatus{position:absolute;left:4mm;right:4mm;bottom:4mm;padding:2mm;background:rgba(255,255,255,.92);border:1px solid #d1d5db;border-radius:4px;font-size:9px;color:#475569;text-align:center}.goukakuPrintPdf.rendered .goukakuFallbackPdf,.goukakuPrintPdf.rendered .goukakuPdfRenderStatus{display:none}.goukakuPrintPdf.fallback .goukakuPdfRenderStatus{background:#fff7ed;color:#9a3412;border-color:#fed7aa}.goukakuStyledSheetTable{border-collapse:collapse;width:max-content;min-width:100%;font-size:10px;line-height:1.2;table-layout:auto}.goukakuStyledSheetTable th,.goukakuStyledSheetTable td{border:1px solid #d0d5dd;padding:2px 4px;min-width:26px;max-width:180px;white-space:pre-wrap;word-break:break-word;vertical-align:middle}.goukakuStyledSheetTable .goukakuColHeader th,.goukakuStyledSheetTable .goukakuRowHeader{background:#f2f4f7;color:#475569;font-weight:800;text-align:center}.goukakuPrintExcelWrap{flex:1 1 auto;min-height:0;overflow:hidden;border:1px solid #9ca3af;background:#fff;position:relative;width:100%;height:auto}.goukakuPrintExcelFitInner{transform-origin:top left;width:max-content}.goukakuPrintExcelWrap .goukakuStyledSheetTable{width:max-content;min-width:0;font-size:7.6px;line-height:1.0;table-layout:auto}.goukakuPrintExcelWrap .goukakuStyledSheetTable th,.goukakuPrintExcelWrap .goukakuStyledSheetTable td{padding:.16mm .28mm;max-width:none;min-width:10px;white-space:pre-wrap;word-break:break-word}.goukakuPrintExcelWrap[data-fitted="1"]::after{content:"B17:CA48をA4最大フィット";position:absolute;right:1.5mm;bottom:1.5mm;font-size:7px;color:#64748b;background:rgba(255,255,255,.78);padding:.4mm 1mm;border:1px solid #e5e7eb;border-radius:999px}.goukakuPrintTable{font-size:6.8px;table-layout:fixed;width:100%;line-height:1.12}.goukakuPrintTable th,.goukakuPrintTable td{padding:1px 2px;min-width:0;max-width:none;white-space:normal;word-break:break-word;}
     @media print{.printGuide{display:none!important}.page{break-after:auto!important;page-break-after:auto!important;}.page + .page{break-before:page!important;page-break-before:always!important;}}
   </style><script src="./libs/pdf.min.js"><\/script></head><body><div class="printGuide">印刷設定：A4／縦／両面印刷オン／長辺とじ。各生徒はA4両面2枚：1枚目 表=前週確認、裏=今週記入、2枚目 表=面談フロー、裏=合格設計図。</div>${body}<script>
     function base64ToUint8Array(base64){
