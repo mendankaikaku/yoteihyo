@@ -6119,6 +6119,8 @@ function buildSmallExamEventNoteMaps(examRecords=[], eventRecords=[]){
   const manual = state.allListSmallRestores;
   if(manual && manual.rowObjects && manual.rowObjects.length){
     for(const obj of manual.rowObjects){
+      // 旧全員分リストの小規模復元も、現在マスタ外なら備考/復元用シートへ戻さない。
+      if(!smallRestoreObjectAllowedByMaster(obj)) continue;
       putRowObject(obj);
     }
   }
@@ -7605,8 +7607,13 @@ async function refreshAllListInputFromSelectedSources(){
     plans = filterRecords(plans);
     state.records = plans;
   }
-  if(exams.length) state.examRecords = dedupeExamRecordsByLatest(exams, logs);
-  if(events.length) state.eventRecords = dedupeEventRecordsByLatest(events, logs);
+  // ここが原因対策：全員分リスト出力直前の再読込でも、必ず現在マスタで再フィルタする。
+  // 以前はここで dedupe した古い模試/イベントを state に戻してしまい、merge時のマスタ除外を上書きしていた。
+  let dedupedExams = dedupeExamRecordsByLatest(exams, logs);
+  let dedupedEvents = dedupeEventRecordsByLatest(events, logs);
+  const masterFilteredForAllListRefresh = filterExamEventRecordsByCurrentMasters(dedupedExams, dedupedEvents, logs);
+  state.examRecords = masterFilteredForAllListRefresh.examRecords || [];
+  state.eventRecords = masterFilteredForAllListRefresh.eventRecords || [];
   if(logs.length){
     state.logAoa = (state.logAoa && state.logAoa.length ? state.logAoa : [["ファイル","結果","内容","シート名/詳細"]]).concat(logs);
   }
@@ -7660,8 +7667,15 @@ async function downloadAllStudentList(){
 
     const from = $('fromDate').value ? new Date($('fromDate').value + 'T00:00:00') : null;
     const to = $('toDate').value ? new Date($('toDate').value + 'T23:59:59') : null;
-    const exams = (state.examRecords || []).filter(r => (!from || r.examDateObj >= from) && (!to || r.examDateObj <= to));
-    const events = (state.eventRecords || []).filter(r => (!from || r.dateObj >= from) && (!to || r.dateObj <= to));
+    let exams = (state.examRecords || []).filter(r => (!from || r.examDateObj >= from) && (!to || r.examDateObj <= to));
+    let events = (state.eventRecords || []).filter(r => (!from || r.dateObj >= from) && (!to || r.dateObj <= to));
+    // 最終遮断：全員分リストを作る直前にも、マスタに無い模試/イベントを必ず除外する。
+    // これで、個人Excel・旧全員分リスト・科目リスト・出力直前再読込のどこから来ても復活しない。
+    const masterFilteredForAllListOutput = filterExamEventRecordsByCurrentMasters(exams, events, state.logAoa || []);
+    exams = masterFilteredForAllListOutput.examRecords || [];
+    events = masterFilteredForAllListOutput.eventRecords || [];
+    state.examRecords = exams;
+    state.eventRecords = events;
     const gradeAoas = buildAllStudentListAoaByGrade(exams, events);
     if(!gradeAoas.length){ alert('出力する生徒が見つかりません'); return; }
 
