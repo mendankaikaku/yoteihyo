@@ -788,7 +788,6 @@ body .prepCompactCard .prepDetails summary{min-height:28px!important;font-size:1
   }
 }
 </style>
-<!-- 精査済み: 個人JSON復元・旧json場所読取救済版 -->
 </head>
 <body>
 
@@ -3573,25 +3572,6 @@ async function inputAppLooksLikeSaveRestoreRoot(dir){
   }catch(e){}
   return false;
 }
-async function inputAppLooksLikeLegacyJsonReadFolder(dir){
-  // 復元だけは旧保存先も読む。ここでは絶対に json を作成しない。
-  if(!dir) return false;
-  const name=String(dir.name||'');
-  if(name==='json') return true;
-  try{
-    if(dir.values){
-      for await(const entry of dir.values()){
-        if(entry.kind==='file' && /^(student_|group_|settings_exam_master|exam_master|event_master|comment_master).*\.json$/i.test(entry.name)) return true;
-        if(entry.kind==='directory' && String(entry.name||'')==='json') return true;
-      }
-    }
-  }catch(e){}
-  try{
-    const foundJson = await findDirectoryByNameRecursive(dir, 'json', 5);
-    if(foundJson) return true;
-  }catch(e){}
-  return true; // JSONが無い場合でも診断を出すため、復元では選択自体は許可する。
-}
 async function validateInputAppSaveRootFolder(dir){
   if(!dir) return false;
   const name=String(dir.name||'');
@@ -3605,30 +3585,6 @@ async function validateInputAppSaveRootFolder(dir){
     return false;
   }
   return true;
-}
-async function pickRestoreRootFolder(){
-  if(!window.showDirectoryPicker){
-    alert('このブラウザではフォルダ復元が使えません。ChromeまたはEdgeで開いてください。');
-    return null;
-  }
-  try{
-    const dir = await window.showDirectoryPicker({mode:'readwrite'});
-    const isSaveRoot = await inputAppLooksLikeSaveRestoreRoot(dir);
-    const canReadLegacy = isSaveRoot || await inputAppLooksLikeLegacyJsonReadFolder(dir);
-    if(!canReadLegacy) return null;
-    sharedDirHandle = dir;
-    sharedDirHandleVerifiedSaveRoot = !!isSaveRoot && !inputAppBadSaveRootFolderNames().has(String(dir.name||''));
-    clearSharedJsonFileCache();
-    extraStudentCandidatesLoadedFromFolder = false;
-    await refreshDynamicStudentNameCandidatesFromFolder(dir);
-    await refreshRosterProfilesFromShared(true);
-    if(!sharedDirHandleVerifiedSaveRoot){
-      showSaveInfo(`復元用として「${dir.name}」を読み込みます。保存は必ず保存復元フォルダー本体を選び直してください。`);
-    }
-    return dir;
-  }catch(e){
-    return null;
-  }
 }
 
 async function pickSaveRootFolder(forcePick=false){
@@ -3645,7 +3601,6 @@ async function pickSaveRootFolder(forcePick=false){
     // 復元用JSON・模試/イベント/コメントマスタは直下の「json」フォルダに保存し、
     // Excelはこの下の打ち込み結果/担任助手フォルダー/各生徒名フォルダへ保存する。
     sharedDirHandle = dir;
-    sharedDirHandleVerifiedSaveRoot = true;
     excelOutputDirHandle = null;
     extraStudentCandidatesLoadedFromFolder = false;
     await refreshDynamicStudentNameCandidatesFromFolder(dir);
@@ -4028,7 +3983,7 @@ async function loadGroup(){
   // 1) group_*.json を完全一致・名前集合一致で探す
   // 2) 見つからなければ student_*.json を人数分集める
   // 3) それでもなければ最後にブラウザ内保存へフォールバック
-  const dir = await pickRestoreRootFolder();
+  const dir = await pickSaveRootFolder(true);
   if(dir){
     try{
       await applySharedSettingsIfAny();
@@ -4455,7 +4410,6 @@ async function saveAllToExistingStudentFolders(options={}){
    9. 保存用フォルダの読み書き
 ========================================================= */
 let sharedDirHandle = null;
-let sharedDirHandleVerifiedSaveRoot = false;
 let sharedJsonFileHandleCache = null;
 
 function clearSharedJsonFileCache(){ sharedJsonFileHandleCache = null; }
@@ -4480,7 +4434,6 @@ async function pickSharedFolder(){
   const dir = await window.showDirectoryPicker({mode:'readwrite'});
   if(!(await validateInputAppSaveRootFolder(dir))) return null;
   sharedDirHandle = dir;
-  sharedDirHandleVerifiedSaveRoot = true;
   clearSharedJsonFileCache();
   showSaveInfo('保存復元フォルダーを選択しました。このページを開いている間、この保存復元フォルダー直下の json に復元用データ・マスタを保存/反映できます。');
   return sharedDirHandle;
@@ -4518,9 +4471,6 @@ async function findFileByNameRecursive(dir, fileName, maxDepth=5, depth=0){
 async function getSharedJsonDir(create=false){
   const dir = await ensureSharedFolder();
   if(!dir) return null;
-  if(create && !sharedDirHandleVerifiedSaveRoot){
-    throw new Error('保存するときは保存復元フォルダー本体を選択してください。復元用に選んだjson/担任助手/生徒フォルダー直下にはjsonを作成しません。');
-  }
 
   // 標準：保存復元フォルダー直下の json フォルダを使う。
   // json フォルダーそのものや担任助手/生徒フォルダー直下へ保存すると統合用が読めなくなるため、
@@ -4586,31 +4536,22 @@ async function listJsonFilesFromShared(){
   if(sharedJsonFileHandleCache) return sharedJsonFileHandleCache;
   const out=[];
   const seen=new Set();
-  function add(entry, pathLabel=''){
+  function add(entry){
     if(!entry || entry.kind !== 'file' || !/\.json$/i.test(entry.name)) return;
-    const key=(pathLabel ? pathLabel + '/' : '') + String(entry.name||'').toLowerCase();
+    const key=String(entry.name||'').toLowerCase();
     if(seen.has(key)) return;
     seen.add(key);
     out.push(entry);
   }
-  async function walkJsonFiles(dir, depth=0, pathParts=[]){
-    if(!dir || !dir.values || depth>5) return;
-    for await (const entry of dir.values()){
-      if(entry.kind==='file') add(entry, pathParts.join('/'));
-      else if(entry.kind==='directory'){
-        const n=String(entry.name||'');
-        const next=[...pathParts,n];
-        if(n==='json' || depth<5) await walkJsonFiles(entry, depth+1, next);
-      }
-    }
-  }
 
-  // 新仕様：保存復元フォルダー/json を優先。旧バグで別階層にできたjsonも救済で読む。
+  // 新仕様：jsonフォルダ内を優先して検索。
   const jsonDir = await getSharedJsonDir(false);
   if(jsonDir && jsonDir.values){
-    for await (const entry of jsonDir.values()) add(entry, 'json');
+    for await (const entry of jsonDir.values()) add(entry);
   }
-  try{ await walkJsonFiles(rootDir, 0, []); }catch(e){}
+
+  // 旧仕様からの移行用：直下のJSONも検索対象に残す。
+  for await (const entry of rootDir.values()) add(entry);
   sharedJsonFileHandleCache = out;
   return out;
 }
