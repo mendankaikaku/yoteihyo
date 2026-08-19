@@ -586,6 +586,9 @@ const state = {
   dailyPosterRestores: new Map(),
   wholeScheduleFiles: [],
   comiruCsvFiles: [],
+  masterJsonFiles: [],
+  examMasterRows: [],
+  eventMasterRows: [],
   wholeScheduleRestores: new Map(),
   examSubjectListRestores: new Map(),
   resultHistoryRecords: [],
@@ -1930,6 +1933,154 @@ async function parseEventFile(file){
   return {records, logRows};
 }
 
+
+// ============================================================
+// 2.7 模試マスタ・イベントマスタによる現在有効データの絞り込み
+// ============================================================
+function masterJsonPathLooksLikeMaster(file){
+  const rel = String(file?.webkitRelativePath || file?.name || '').toLowerCase();
+  const name = String(file?.name || '').toLowerCase();
+  return /settings[_-]?exam[_-]?master|exam[_-]?master|event[_-]?master|master[_-]?settings|マスタ/.test(rel) ||
+    /settings[_-]?exam[_-]?master|exam[_-]?master|event[_-]?master/.test(name);
+}
+function extractMasterRowsFromObject(obj, key){
+  if(!obj) return [];
+  if(Array.isArray(obj)) return obj;
+  if(Array.isArray(obj[key])) return obj[key];
+  if(Array.isArray(obj.rows)) return obj.rows;
+  return [];
+}
+function masterRowHasContent(row, kind){
+  if(!row || typeof row !== 'object') return false;
+  const name = norm(row.name || row.examName || row.eventName || row.title || '');
+  const date = kind === 'exam'
+    ? norm(row.date || row.examDate || row.datetime || '')
+    : norm(row.datetime || row.date || row.eventDate || '');
+  return !!(name || date);
+}
+function masterNormalizeNameForMatch(s){
+  return String(s ?? '')
+    .replace(/[０-９Ａ-Ｚａ-ｚ]/g, ch => String.fromCharCode(ch.charCodeAt(0)-0xFEE0))
+    .replace(/[\s　\r\n]+/g,'')
+    .replace(/[【】\[\]（）()「」『』"'“”‘’・:：／\/\\|｜,，.．。_-]/g,'')
+    .toLowerCase();
+}
+function masterDateKeyForMatch(v){
+  const dt = parseDateTimeLoose(v) || parseDateLoose(v);
+  if(dt && !isNaN(dt)) return ymd(dt);
+  const s = norm(v);
+  const m = s.match(/^(\d{4}-\d{1,2}-\d{1,2})/);
+  if(m){
+    const d = parseDateLoose(m[1]);
+    if(d) return ymd(d);
+  }
+  return '';
+}
+function normalizeExamMasterRow(row){
+  return {
+    name:norm(row?.name || row?.examName || row?.title || ''),
+    date:masterDateKeyForMatch(row?.date || row?.examDate || row?.datetime || ''),
+    raw:row || {}
+  };
+}
+function normalizeEventMasterRow(row){
+  return {
+    name:norm(row?.name || row?.eventName || row?.title || ''),
+    date:masterDateKeyForMatch(row?.datetime || row?.date || row?.eventDate || ''),
+    raw:row || {}
+  };
+}
+async function loadMasterJsonFiles(files=[]){
+  const examRows=[];
+  const eventRows=[];
+  const logs=[];
+  for(const file of files || []){
+    try{
+      const txt = await file.text();
+      if(!txt || !txt.trim()) continue;
+      const clean = txt.replace(/^\uFEFF/, '');
+      const obj = JSON.parse(clean);
+      const ex = extractMasterRowsFromObject(obj, 'examMaster').filter(r => masterRowHasContent(r, 'exam'));
+      const ev = extractMasterRowsFromObject(obj, 'eventMaster').filter(r => masterRowHasContent(r, 'event'));
+      examRows.push(...ex);
+      eventRows.push(...ev);
+      logs.push(`${file.name}: 模試${ex.length}件 / イベント${ev.length}件`);
+    }catch(e){
+      logs.push(`${file.name}: 読み込み失敗 ${e.message || e}`);
+    }
+  }
+  function dedupe(rows, normalizer){
+    const map=new Map();
+    for(const r of rows){
+      const n=normalizer(r);
+      const key=`${masterNormalizeNameForMatch(n.name)}|${n.date || ''}`;
+      if(!masterNormalizeNameForMatch(n.name) && !n.date) continue;
+      map.set(key, n);
+    }
+    return [...map.values()];
+  }
+  state.examMasterRows = dedupe(examRows, normalizeExamMasterRow);
+  state.eventMasterRows = dedupe(eventRows, normalizeEventMasterRow);
+  return logs;
+}
+function masterIndexHasRows(kind){
+  return kind === 'exam' ? (state.examMasterRows || []).length > 0 : (state.eventMasterRows || []).length > 0;
+}
+function examRecordAllowedByMaster(r){
+  const masters = state.examMasterRows || [];
+  if(!masters.length) return true;
+  const recName = masterNormalizeNameForMatch(r?.examName || r?.name || '');
+  const recDate = masterDateKeyForMatch(r?.examDate || r?.datetime || r?.date || '');
+  if(!recName) return false;
+  return masters.some(m => {
+    const mn = masterNormalizeNameForMatch(m.name);
+    if(!mn || mn !== recName) return false;
+    if(m.date && recDate && m.date !== recDate) return false;
+    if(m.date && !recDate) return false;
+    return true;
+  });
+}
+function eventRecordAllowedByMaster(r){
+  const masters = state.eventMasterRows || [];
+  if(!masters.length) return true;
+  const recName = masterNormalizeNameForMatch(r?.eventName || r?.name || '');
+  const recDate = masterDateKeyForMatch(r?.datetime || r?.date || '');
+  if(!recName) return false;
+  return masters.some(m => {
+    const mn = masterNormalizeNameForMatch(m.name);
+    if(!mn || mn !== recName) return false;
+    if(m.date && recDate && m.date !== recDate) return false;
+    if(m.date && !recDate) return false;
+    return true;
+  });
+}
+function smallRestoreObjectAllowedByMaster(obj){
+  if(!obj || !obj.kind) return true;
+  if(obj.kind === '模試'){
+    if(!masterIndexHasRows('exam')) return true;
+    return examRecordAllowedByMaster({examName:obj.name, examDate:obj.date});
+  }
+  if(obj.kind === 'イベント'){
+    if(!masterIndexHasRows('event')) return true;
+    return eventRecordAllowedByMaster({eventName:obj.name, datetime:obj.date});
+  }
+  return true;
+}
+function filterExamEventRecordsByCurrentMasters(examRecords=[], eventRecords=[], logRows=[]){
+  const beforeExam=(examRecords || []).length;
+  const beforeEvent=(eventRecords || []).length;
+  const filteredExams = (state.examMasterRows || []).length ? (examRecords || []).filter(examRecordAllowedByMaster) : (examRecords || []);
+  const filteredEvents = (state.eventMasterRows || []).length ? (eventRecords || []).filter(eventRecordAllowedByMaster) : (eventRecords || []);
+  const removedExam = beforeExam - filteredExams.length;
+  const removedEvent = beforeEvent - filteredEvents.length;
+  if(logRows){
+    const exMsg = (state.examMasterRows || []).length ? `模試マスタ${state.examMasterRows.length}件で絞り込み、旧模試${removedExam}件を除外` : '模試マスタ未読込のため模試は絞り込みなし';
+    const evMsg = (state.eventMasterRows || []).length ? `イベントマスタ${state.eventMasterRows.length}件で絞り込み、旧イベント${removedEvent}件を除外` : 'イベントマスタ未読込のためイベントは絞り込みなし';
+    logRows.push(['マスタ絞り込み','情報',`${exMsg} / ${evMsg}`,'全員分リスト・科目リスト・イベント出力には、現在のマスタに残っている模試/イベントだけを使います']);
+  }
+  return {examRecords:filteredExams, eventRecords:filteredEvents, removedExam, removedEvent};
+}
+
 // ============================================================
 // 3. 毎日更新.xlsxの読み取り
 // ============================================================
@@ -3045,7 +3196,10 @@ async function merge(){
   allRecords = dedupePlanRecordsByLatest(allRecords, allLogs);
   allExamRecords = dedupeExamRecordsByLatest(allExamRecords, allLogs);
   allEventRecords = dedupeEventRecordsByLatest(allEventRecords, allLogs);
-  allLogs.push(['個人Excel重複解決','情報',`予定 ${planRecordCountBeforeDedupe}→${allRecords.length}件 / 模試 ${examRecordCountBeforeDedupe}→${allExamRecords.length}件 / イベント ${eventRecordCountBeforeDedupe}→${allEventRecords.length}件`,'同じ生徒・同じ日付/模試/イベントは、空欄では消さず、具体値どうしの衝突は更新日時が新しい個人Excelを採用']);
+  const masterFiltered = filterExamEventRecordsByCurrentMasters(allExamRecords, allEventRecords, allLogs);
+  allExamRecords = masterFiltered.examRecords;
+  allEventRecords = masterFiltered.eventRecords;
+  allLogs.push(['個人Excel重複解決','情報',`予定 ${planRecordCountBeforeDedupe}→${allRecords.length}件 / 模試 ${examRecordCountBeforeDedupe}→${allExamRecords.length}件 / イベント ${eventRecordCountBeforeDedupe}→${allEventRecords.length}件`,'同じ生徒・同じ日付/模試/イベントは、空欄では消さず、具体値どうしの衝突は更新日時が新しい個人Excelを採用。さらに現在の模試マスタ/イベントマスタに残っているものだけ採用']);
 
   let comiruCsvInfo = {records:[], logs:[]};
   if(state.comiruCsvFiles && state.comiruCsvFiles.length){
@@ -6075,6 +6229,7 @@ function buildSmallExamEventColumnMaps(examRecords=[], eventRecords=[]){
   if(manual && manual.rowObjects && manual.rowObjects.length){
     for(const obj of manual.rowObjects){
       if(!obj || !obj.studentKey || !obj.machineKey) continue;
+      if(!smallRestoreObjectAllowedByMaster(obj)) continue;
       if(obj.kind === '模試'){
         setMap(examByStudent,obj.studentKey,`${obj.machineKey}|status`,allListExamStatusFull(obj.status));
         setMap(examByStudent,obj.studentKey,`${obj.machineKey}|subject`,obj.subjectChanged===true || norm(obj.subject).includes('あり') ? '〇' : '×');
@@ -6631,7 +6786,10 @@ function buildSmallSlotObjectsByStudent(examRecords=[], eventRecords=[]){
   // 読み込んだ全員分リストの手修正を最後に入れて、同一イベント/模試は1件に統合する。
   const manual=state.allListSmallRestores;
   if(manual && manual.rowObjects && manual.rowObjects.length){
-    for(const obj of manual.rowObjects) put(obj, 'restore');
+    for(const obj of manual.rowObjects){
+      if(!smallRestoreObjectAllowedByMaster(obj)) continue;
+      put(obj, 'restore');
+    }
   }
 
   const byStudent=new Map();
@@ -7731,7 +7889,7 @@ function bundleCheckLine(label, files, required=false){
 function bundleSamplePaths(files, limit=18){
   return [...(files||[])].slice(0,limit).map(f => '・' + normalizePickedFilePath(f)).join('\n');
 }
-function buildBundleDiagnostics({rawCount,usableCount,skippedCount,allExcelFiles,planned,results,histories,allLists,dailyPosters,wholeSchedules,examSubjectLists,comiruCsvs,rosters,rosterMsg,restoreLogs}){
+function buildBundleDiagnostics({rawCount,usableCount,skippedCount,allExcelFiles,planned,results,histories,allLists,dailyPosters,wholeSchedules,examSubjectLists,comiruCsvs,masterJsons,rosters,rosterMsg,restoreLogs}){
   const lines=[];
   lines.push('--- 読み取り診断 ---');
   lines.push(`選択ファイル総数: ${rawCount||0}件 / 読取対象: ${usableCount||0}件 / 除外: ${skippedCount||0}件`);
@@ -7740,6 +7898,8 @@ function buildBundleDiagnostics({rawCount,usableCount,skippedCount,allExcelFiles
   lines.push(bundleCheckLine('result_history.json', histories, false));
   lines.push(bundleCheckLine('対応表', rosters, false));
   lines.push(bundleCheckLine('Comiru CSV', comiruCsvs, false));
+  lines.push(bundleCheckLine('模試/イベントマスタJSON', masterJsons, false));
+  lines.push(`現在マスタ: 模試 ${(state.examMasterRows||[]).length}件 / イベント ${(state.eventMasterRows||[]).length}件`);
   lines.push(bundleCheckLine('全員分リスト手修正', allLists, false));
   lines.push(bundleCheckLine('科目リスト手修正', examSubjectLists, false));
   lines.push(bundleCheckLine('全体予定表手修正', wholeSchedules, false));
@@ -7773,6 +7933,7 @@ async function setBundleFolderFiles(fileList){
   const wholeSchedules = [];
   const examSubjectLists = [];
   const comiruCsvs = [];
+  const masterJsons = [];
   const allExcelFiles = files.filter(f => /\.(xlsx|xlsm|xls)$/i.test(f.name || ''));
   for(const f of files){
     const name = f.name || '';
@@ -7787,7 +7948,8 @@ async function setBundleFolderFiles(fileList){
     // 掲示用Excelは毎日更新フォルダには入れない。
     const isDailyResultWorkbook = isExcel && name === '毎日更新.xlsx' && filePathIncludes(f, '毎日更新') && !filePathIncludes(f, '毎日掲示');
 
-    if(isJson && (parts.some(p => p === 'json' || p.includes('json') || p.includes('履歴')) || /result[_-]?history|結果履歴/.test(relLower))) histories.push(f);
+    if(isJson && masterJsonPathLooksLikeMaster(f)) masterJsons.push(f);
+    else if(isJson && (parts.some(p => p === 'json' || p.includes('json') || p.includes('履歴')) || /result[_-]?history|結果履歴/.test(relLower))) histories.push(f);
     // 毎日更新フォルダ内のExcelは、掲示用ではなく結果データとして読む。
     else if(isDailyResultWorkbook) results.push(f);
     else if(isExcel && (filePathIncludes(f, '全員分リスト') || filePathIncludes(f, '全員リスト'))) allLists.push(f);
@@ -7811,6 +7973,8 @@ async function setBundleFolderFiles(fileList){
   state.wholeScheduleFiles = wholeSchedules;
   state.examSubjectListFiles = examSubjectLists;
   state.comiruCsvFiles = comiruCsvs;
+  state.masterJsonFiles = masterJsons;
+  const masterJsonLogs = await loadMasterJsonFiles(masterJsons);
   const allListRestoreLogs = await loadAllListRestoreFiles(allLists);
   const dailyPosterRestoreLogs = await loadDailyPosterRestoreFiles(dailyPosters);
   const wholeScheduleRestoreLogs = await loadWholeScheduleRestoreFiles(wholeSchedules);
@@ -7829,12 +7993,13 @@ async function setBundleFolderFiles(fileList){
   updateStats(state.files, [], [], [], state.resultRecords);
   const summary = `読み取り完了
 ${buildBundleDiagnostics({
-    rawCount, usableCount, skippedCount, allExcelFiles, planned, results, histories, allLists, dailyPosters, wholeSchedules, examSubjectLists, comiruCsvs, rosters, rosterMsg,
+    rawCount, usableCount, skippedCount, allExcelFiles, planned, results, histories, allLists, dailyPosters, wholeSchedules, examSubjectLists, comiruCsvs, masterJsons, rosters, rosterMsg,
     restoreLogs:{
       '全員分リスト': allListRestoreLogs,
       '毎日掲示': dailyPosterRestoreLogs,
       '全体予定表': wholeScheduleRestoreLogs,
-      '科目リスト': examSubjectListRestoreLogs
+      '科目リスト': examSubjectListRestoreLogs,
+      '模試/イベントマスタ': masterJsonLogs
     }
   })}`;
   if($("bundleReadSummary")) $("bundleReadSummary").textContent = summary;
@@ -7933,7 +8098,7 @@ $("downloadAllListBtn").addEventListener("click", async () => {
 $("downloadMonthlyPosterBtn").addEventListener("click", downloadMonthlyPosterResultWorkbook);
 refreshOutputButtonReason();
 $("clearBtn").addEventListener("click", () => {
-  state.files=[]; state.resultFiles=[]; state.resultHistoryFiles=[]; state.posterSettingsFiles=[]; state.allListFiles=[]; state.allListRestores=new Map(); state.allListSmallRestores={rowObjects:[]}; state.dailyPosterFiles=[]; state.dailyPosterRestores=new Map(); state.wholeScheduleFiles=[]; state.wholeScheduleRestores=new Map(); state.resultHistoryRecords=[]; state.records=[]; state.resultRecords=[]; state.examRecords=[]; state.eventRecords=[]; state.calendarAoa=[]; state.listAoa=[]; state.resultAoa=[]; state.logAoa=[]; state.rosterAoa=[]; state.rosterMap=new Map(); state.rosterNoMap=new Map(); state.workbookReady=false;
+  state.files=[]; state.resultFiles=[]; state.resultHistoryFiles=[]; state.posterSettingsFiles=[]; state.allListFiles=[]; state.allListRestores=new Map(); state.allListSmallRestores={rowObjects:[]}; state.dailyPosterFiles=[]; state.dailyPosterRestores=new Map(); state.wholeScheduleFiles=[]; state.wholeScheduleRestores=new Map(); state.comiruCsvFiles=[]; state.masterJsonFiles=[]; state.examMasterRows=[]; state.eventMasterRows=[]; state.resultHistoryRecords=[]; state.records=[]; state.resultRecords=[]; state.examRecords=[]; state.eventRecords=[]; state.calendarAoa=[]; state.listAoa=[]; state.resultAoa=[]; state.logAoa=[]; state.rosterAoa=[]; state.rosterMap=new Map(); state.rosterNoMap=new Map(); state.workbookReady=false;
   $("bundleFolderInput").value="";
   $("folderInput").value="";
   $("rosterInput").value="";
