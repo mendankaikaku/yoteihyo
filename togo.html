@@ -8406,7 +8406,10 @@ function downloadWorkbookFromAoa(calendarAoa, listAoa, resultAoa, rosterAoa, log
 // ============================================================
 
 function pathPartsOfFile(file){
-  return String(file.webkitRelativePath || file.name || '').split(/[\/]+/).filter(Boolean);
+  return String(file?.webkitRelativePath || file?._relativePath || file?.name || '').split(/[\/]+/).filter(Boolean);
+}
+function normalizePickedFilePath(file){
+  return String(file?.webkitRelativePath || file?._relativePath || file?.name || '');
 }
 function filePathIncludes(file, keyword){
   return pathPartsOfFile(file).some(p => p.includes(keyword));
