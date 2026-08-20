@@ -377,7 +377,7 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
 }
 
 </style>
-<!-- 精査済み: 入力用行高32pt_XML最終固定・模試志望校登録チェック追加版 -->
+<!-- 精査済み: 入力用行高32pt_XML最終固定・志望校登録は2段見出し内のみ版 -->
 <!-- 精査済み: 模試 志望校登録チェック追加版 -->
 </head>
 <body>
@@ -7407,7 +7407,7 @@ function buildAllStudentListAoaByGrade(examRecords=[], eventRecords=[]){
     }
     const extraHeaders = [];
     for(let i=1;i<=maxSmallSlots;i++){
-      extraHeaders.push(`${i}\n日付`, `${i}\n名称`, `${i}\n回答`, `${i}\nComiru`, `${i}\n配布`, `${i}\n回収`, `${i}\n反映`, `${i}\n志望校登録`, `${i}\n備考`, `${i}\n科目リスト`, `${i}\n科目変更`);
+      extraHeaders.push(`${i}\n日付`, `${i}\n名称`, `${i}\n回答`, `${i}\nComiru`, `${i}\n配布`, `${i}\n回収`, `${i}\n反映`, `${i}\n備考`, `${i}\n科目リスト`, `${i}\n科目変更`);
     }
     const header = ['学年','生徒番号','氏名','カナ','高校','担当','備考','全員分リスト備考', ...extraHeaders, ...examGroups.map(g=>g.label), ...eventGroups.map(g=>g.label)];
     for(const d of windowDates){
@@ -7423,9 +7423,9 @@ function buildAllStudentListAoaByGrade(examRecords=[], eventRecords=[]){
       for(let i=0;i<maxSmallSlots;i++){
         const item = smallItems[i];
         if(item){
-          row.push(allListSlotDateDisplay(item.date || ''), allListSlotDisplayName(item), allListSmallSlotAnswer(item), allListSmallSlotComiru(item), allListCheckMark(!!item.distributed), allListCheckMark(!!item.collected), item.kind === '模試' ? allListCheckMark(!!item.supportReflected) : allListCheckMark(!!item.listReflected), item.kind === '模試' ? allListCheckMark(!!item.aspirationRegistered) : '', item.note || '', item.kind === '模試' ? allListSmallSlotSubjectListStatus(item, subjectStatusIndex) : '', item.kind === '模試' ? (allListSmallSlotSubjectChanged(item) ? '〇' : '×') : '');
+          row.push(allListSlotDateDisplay(item.date || ''), allListSlotDisplayName(item), allListSmallSlotAnswer(item), allListSmallSlotComiru(item), allListCheckMark(!!item.distributed), allListCheckMark(!!item.collected), item.kind === '模試' ? allListCheckMark(!!item.supportReflected) : allListCheckMark(!!item.listReflected), item.note || '', item.kind === '模試' ? allListSmallSlotSubjectListStatus(item, subjectStatusIndex) : '', item.kind === '模試' ? (allListSmallSlotSubjectChanged(item) ? '〇' : '×') : '');
         }else{
-          row.push('', '', '', '', '', '', '', '', '', '', '');
+          row.push('', '', '', '', '', '', '', '', '', '');
         }
       }
       for(const g of examGroups){
