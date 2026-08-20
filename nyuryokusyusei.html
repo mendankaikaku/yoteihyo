@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>面談予定入力アプ　（2026-08-20 22:01 出力）</title>
+<title>面談予定入力アプリ（2026-08-20 22:17 出力）</title>
 <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
 <script src="./libs/xlsx.bundle.js"></script>
 <script></script>
@@ -63,16 +63,18 @@ table{width:100%;border-collapse:collapse;background:#fff}th,td{border:1px solid
 .goukakuPlanActions{display:flex;gap:7px;flex-wrap:wrap}.goukakuPlanActions button{min-height:30px;padding:6px 9px;font-size:12px;border-radius:9px}
 .goukakuPlanNotice{font-size:12px;color:#475569;background:#fff7ed;border-bottom:1px solid #fed7aa;padding:8px 10px;line-height:1.55}
 .goukakuPlanWrap{overflow:auto;max-height:620px;background:#fff;padding:8px}
-.goukakuBookLayout{display:flex;flex-direction:column;align-items:flex-start;width:max-content;min-width:100%;gap:12px}
+.goukakuBookLayout{display:flex;flex-direction:column;align-items:flex-start;width:max-content;min-width:100%;gap:0}
 .goukakuBookSection{width:max-content;min-width:100%}.goukakuBookSectionLabel{position:sticky;left:0;width:max-content;font-size:11px;font-weight:900;color:#334155;background:#f8fafc;border:1px solid #cbd5e1;border-bottom:0;border-radius:7px 7px 0 0;padding:4px 8px}
+.goukakuBookBlankRows{width:100%;min-width:100%;background:#fff;flex:none}.goukakuBookBlankRow{width:100%;background:#fff}
 .goukakuExcelRangeTable .planTitleCell{background:#e0f2fe}.goukakuExcelRangeTable .planHeaderCell{background:#f1f5f9}
 .goukakuExcelRangeTable .planFormLabel{font-weight:900;text-align:left;background:#f8fafc}.goukakuExcelRangeTable .planFormCell{text-align:center}
 .goukakuBookMissing{width:100%;box-sizing:border-box;border:1px dashed #cbd5e1;background:#f8fafc;color:#64748b;padding:8px;font-size:11px}
 .goukakuPlanTable{border-collapse:collapse;width:max-content;min-width:100%;font-size:11px;background:#fff;table-layout:fixed}
-.goukakuPlanTable th,.goukakuPlanTable td{border:1px solid #9ca3af;padding:4px 5px;min-width:24px;white-space:pre-wrap;word-break:break-word;vertical-align:middle;text-align:center;line-height:1.25}
+.goukakuPlanTable th,.goukakuPlanTable td{border:1px solid #9ca3af;padding:4px 5px;min-width:0;white-space:pre-wrap;word-break:break-word;vertical-align:middle;text-align:center;line-height:1.25}
 .goukakuPlanTable .planTitleCell{font-size:15px;font-weight:900;text-align:left;background:#dbeafe}
 .goukakuPlanTable .planHeaderCell{font-weight:900;background:#eef2ff}.goukakuPlanTable .planPeriodCell{font-weight:900;background:#ecfdf5;color:#14532d}
 .goukakuPlanTable .planLeftCell{text-align:left;font-weight:800}.goukakuPlanTable .planCourseName{text-align:left;font-weight:800}
+.goukakuPlanTable .planEventCell{font-size:11px;font-weight:800;background:#f8fafc;cursor:default}
 .goukakuPlanTable .planNumberCell{font-weight:900;font-size:15px;cursor:text;outline:none;background:#fff}
 .goukakuPlanTable .planNumberCell:focus{background:#fffbea!important;box-shadow:inset 0 0 0 2px #f59e0b}.goukakuPlanTable .goukakuDirtyCell{background:#eff6ff!important;box-shadow:inset 0 0 0 2px #2563eb}
 .goukakuPlanEmpty{padding:10px;color:#64748b;font-size:12px;line-height:1.6}
@@ -2347,9 +2349,20 @@ function planBuild(model){
   if(headerRows.length<3) return null;
   const cols=planFindHeaderCols(model,titleRow+1,startCol,endCol);
   if(cols.codeCol<0 && cols.nameCol<0) return null;
+  const eventCell=planFindTextCell(model,'行事予定');
+  const highCell=planFindTextCell(model,'高速マスター基礎力養成講座学習計画');
+  const eventRow=(eventCell&&eventCell.r>titleRow&&eventCell.r<(highCell?.r??Number.MAX_SAFE_INTEGER))?eventCell.r:null;
+  let endRow=eventRow??(highCell?Math.max(titleRow+2,highCell.r-2):Math.min((model.rows||[]).length-1,titleRow+50));
+  if(eventRow!=null){
+    (model.merges||[]).forEach(m=>{
+      if(m.s.r<=eventRow&&m.e.r>=eventRow&&m.e.c>=startCol&&m.s.c<=endCol)endRow=Math.max(endRow,m.e.r);
+    });
+  }
+  endRow=Math.min(endRow,Math.max(titleRow+2,(model.rows||[]).length-1));
   const courseRows=[];
-  for(let r=titleRow+3;r<(model.rows||[]).length;r++) if(planIsCourseRow(model,r,cols)) courseRows.push(r);
-  const displayRows=[...headerRows,...courseRows];
+  const courseScanEnd=eventRow??(highCell?highCell.r:endRow+1);
+  for(let r=titleRow+3;r<courseScanEnd;r++) if(planIsCourseRow(model,r,cols)) courseRows.push(r);
+  const displayRows=Array.from({length:endRow-titleRow+1},(_,i)=>titleRow+i);
   const rowMap=new Map(displayRows.map((r,i)=>[r,i]));
   const merges=[];
   (model.merges||[]).forEach(m=>{
@@ -2358,7 +2371,7 @@ function planBuild(model){
     if(sC>endCol || eC<startCol || sC>eC) return;
     merges.push({s:{r:rowMap.get(m.s.r),c:sC-startCol},e:{r:rowMap.get(m.e.r),c:eC-startCol}});
   });
-  return {titleRow,startCol,endCol,displayRows,headerRows,courseRows,cols,merges,colCount:endCol-startCol+1};
+  return {titleRow,startCol,endCol,displayRows,headerRows,courseRows,cols,merges,eventRow,eventEndRow:endRow,colCount:endCol-startCol+1};
 }
 function planFindTextCell(model,needle){
   const target=planNorm(needle);
@@ -2410,12 +2423,15 @@ function planCellClass(info,displayRi,originalC){
   if(displayRi===0) return 'planTitleCell';
   if(displayRi===1) return 'planHeaderCell';
   if(displayRi===2) return 'planPeriodCell';
+  const originalR=info.displayRows[displayRi];
+  if(info.eventRow!=null&&originalR>=info.eventRow)return 'planEventCell';
   if(originalC===info.cols.nameCol) return 'planCourseCell planCourseName';
   if(originalC<=info.cols.komaCol) return 'planCourseCell planLeftCell';
   return 'planCourseCell planNumberCell';
 }
 function planEditable(info,displayRi,originalC){
-  return displayRi>=3 && originalC>=info.cols.firstMonthCol;
+  const originalR=info.displayRows[displayRi];
+  return displayRi>=3 && info.courseRows.includes(originalR) && originalC>=info.cols.firstMonthCol;
 }
 function goukakuCoursePlanHtml(item,name,options={}){
   const model=item?.model;
@@ -2458,7 +2474,7 @@ function goukakuCoursePlanHtml(item,name,options={}){
     html+='</tr>';
   });
   html+='</tbody></table>';
-  if(options.showSummary!==false) html+=`<div class="hint" style="padding:7px 2px 0">見出し3行＋講座行${info.courseRows.length}行 / 元Excelの${colName(info.startCol+1)}〜${colName(info.endCol+1)}列を維持</div>`;
+  if(options.showSummary!==false) html+=`<div class="hint" style="padding:7px 2px 0">元Excelの${info.titleRow+1}〜${info.eventEndRow+1}行（行事予定ブロックまで）/ ${colName(info.startCol+1)}〜${colName(info.endCol+1)}列を連続維持</div>`;
   return html;
 }
 function goukakuRangeTableHtml(item,name,range,options={}){
@@ -2513,14 +2529,30 @@ function goukakuRangeTableHtml(item,name,range,options={}){
   if(options.showSummary)html+=`<div class="hint" style="padding:7px 2px 0">元Excelの${range.startRow+1}〜${range.endRow+1}行 / ${colName(range.startCol+1)}〜${colName(range.endCol+1)}列を維持</div>`;
   return html;
 }
+function goukakuBookBlankRowsHtml(model,startRow,endRow){
+  if(startRow>endRow)return '';
+  let html='<div class="goukakuBookBlankRows" aria-hidden="true">';
+  for(let r=startRow;r<=endRow;r++){
+    const height=model?.rowHeights?.[r]||'20px';
+    html+=`<div class="goukakuBookBlankRow" style="height:${escapeHtml(height)}"></div>`;
+  }
+  return html+'</div>';
+}
 function goukakuBookLayoutHtml(item,name,options={}){
   const book=planBuildBookSections(item?.model);
   if(!book)return '<div class="goukakuPlanEmpty">合格設計図の学習計画表を見つけられませんでした。</div>';
   let html='<div class="goukakuBookLayout">';
   html+='<div class="goukakuBookSection">'+goukakuCoursePlanHtml(item,name,{editable:!!options.editable,showSummary:false})+'</div>';
-  if(book.highRange)html+='<div class="goukakuBookSection">'+goukakuRangeTableHtml(item,name,book.highRange)+'</div>';
+  if(book.highRange){
+    html+=goukakuBookBlankRowsHtml(item.model,book.course.eventEndRow+1,book.highRange.startRow-1);
+    html+='<div class="goukakuBookSection">'+goukakuRangeTableHtml(item,name,book.highRange)+'</div>';
+  }
   else html+='<div class="goukakuBookMissing">高速マスター基礎力養成講座学習計画は見つかりませんでした。</div>';
-  if(book.bottomRange)html+='<div class="goukakuBookSection">'+goukakuRangeTableHtml(item,name,book.bottomRange)+'</div>';
+  if(book.bottomRange){
+    const previousEnd=book.highRange?book.highRange.endRow:book.course.eventEndRow;
+    html+=goukakuBookBlankRowsHtml(item.model,previousEnd+1,book.bottomRange.startRow-1);
+    html+='<div class="goukakuBookSection">'+goukakuRangeTableHtml(item,name,book.bottomRange)+'</div>';
+  }
   else html+='<div class="goukakuBookMissing">学校での科目選択・学習時期／週間予定は見つかりませんでした。</div>';
   html+='</div>';
   if(options.showSummary!==false){
@@ -2538,7 +2570,7 @@ function goukakuPanelHtml(name){
   if(item.error) return `<div class="goukakuPlanBox"><div class="goukakuPlanHead"><span>合格設計図：読み込み失敗</span></div><div class="goukakuPlanEmpty" style="color:#dc2626">${escapeHtml(item.error)}</div></div>`;
   if(item.kind==='pdf') return `<div class="goukakuPlanBox"><div class="goukakuPlanHead"><div><div class="goukakuPlanTitle">合格設計図PDF</div><div class="goukakuPlanMeta">${escapeHtml(item.fileName||'')}</div></div><div class="goukakuPlanActions"><button type="button" class="secondary small" data-open-goukaku="${escapeHtml(name)}">開く</button></div></div><div class="goukakuPlanEmpty">PDFは学習計画表の抽出対象外です。Excel形式の合格設計図を置くと4表を表示できます。</div></div>`;
   const cnt=goukakuEditedCount(item);
-  return `<div class="goukakuPlanBox"><div class="goukakuPlanHead"><div><div class="goukakuPlanTitle">合格設計図 学習計画${cnt?`<span class="goukakuDirtyBadge">編集 ${cnt}セル</span>`:''}</div><div class="goukakuPlanMeta">${escapeHtml(item.fileName||'')} / ${escapeHtml(item.sheetName||'')}</div></div><div class="goukakuPlanActions"><button type="button" class="secondary small" data-open-goukaku="${escapeHtml(name)}">拡大</button><button type="button" class="secondary small" data-print-goukaku-plan="${escapeHtml(name)}">印刷</button><button type="button" class="secondary small" data-save-goukaku-excel="${escapeHtml(name)}">編集済みExcelを保存</button></div></div><div class="goukakuPlanNotice">4つの表をBook1と同じ上下・左右配置で表示します。全表でB〜CA列の座標と結合セルを共通維持し、通期講座の月別数字欄だけ編集できます。</div><div class="goukakuPlanWrap">${goukakuBookLayoutHtml(item,name,{editable:true})}</div></div>`;
+  return `<div class="goukakuPlanBox"><div class="goukakuPlanHead"><div><div class="goukakuPlanTitle">合格設計図 学習計画${cnt?`<span class="goukakuDirtyBadge">編集 ${cnt}セル</span>`:''}</div><div class="goukakuPlanMeta">${escapeHtml(item.fileName||'')} / ${escapeHtml(item.sheetName||'')}</div></div><div class="goukakuPlanActions"><button type="button" class="secondary small" data-open-goukaku="${escapeHtml(name)}">拡大</button><button type="button" class="secondary small" data-print-goukaku-plan="${escapeHtml(name)}">印刷</button><button type="button" class="secondary small" data-save-goukaku-excel="${escapeHtml(name)}">編集済みExcelを保存</button></div></div><div class="goukakuPlanNotice">通期講座受講計画は17行目から行事予定ブロックの末尾までを連続表示し、その下へ残り3表をBook1と同じ配置で並べます。B〜CA列の座標と結合セルを共通維持します。</div><div class="goukakuPlanWrap">${goukakuBookLayoutHtml(item,name,{editable:true})}</div></div>`;
 }
 function renderGoukakuPanel(name){
   const host=document.querySelector(`[data-goukaku-panel="${cssEscape(name)}"]`);
@@ -2573,7 +2605,7 @@ function openGoukakuModal(name){
   if(item.kind === 'pdf'){
     $('#goukakuModalBody').innerHTML=`<div class="hint" style="padding:8px 0">PDFは学習計画表の抽出対象外です。Excel形式の合格設計図を生徒フォルダに置いてください。</div><div class="goukakuPdfWrap"><iframe class="goukakuPdfFrame" src="${escapeHtml(item.pdfUrl||'')}"></iframe></div>`;
   }else{
-    $('#goukakuModalBody').innerHTML='<div class="goukakuPlanNotice">Book1の4表を、B〜CA列の座標と結合セルを揃えて拡大表示します。通期講座の月別数字欄だけ編集できます。</div><div class="goukakuPlanActions" style="padding:8px 0"><button type="button" class="secondary small" data-print-goukaku-plan="'+escapeHtml(name)+'">4表を印刷</button><button type="button" class="secondary small" data-save-goukaku-excel="'+escapeHtml(name)+'">編集済みExcelを保存</button><button type="button" class="secondary small" data-clear-goukaku-edits="'+escapeHtml(name)+'">編集をクリア</button></div><div class="goukakuPlanWrap" style="max-height:none">'+goukakuBookLayoutHtml(item,name,{editable:true})+'</div>';
+    $('#goukakuModalBody').innerHTML='<div class="goukakuPlanNotice">通期講座受講計画は行事予定ブロックまでを連続表示し、その下の3表もB〜CA列の座標と結合セルを揃えて表示します。入力済み講座の月別数字欄だけ編集できます。</div><div class="goukakuPlanActions" style="padding:8px 0"><button type="button" class="secondary small" data-print-goukaku-plan="'+escapeHtml(name)+'">4表を印刷</button><button type="button" class="secondary small" data-save-goukaku-excel="'+escapeHtml(name)+'">編集済みExcelを保存</button><button type="button" class="secondary small" data-clear-goukaku-edits="'+escapeHtml(name)+'">編集をクリア</button></div><div class="goukakuPlanWrap" style="max-height:none">'+goukakuBookLayoutHtml(item,name,{editable:true})+'</div>';
     setTimeout(bindGoukakuButtons,0);
   }
   $('#goukakuModal').classList.add('open');
@@ -2585,7 +2617,7 @@ function printGoukakuPlan(name){
   const table=goukakuBookLayoutHtml(item,name,{editable:false,showSummary:false});
   const w=window.open('','_blank','noopener,width=1200,height=800');
   if(!w) return alert('印刷画面を開けませんでした。ポップアップブロックを確認してください。');
-  w.document.write(`<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>${escapeHtml(name)} 合格設計図 学習計画</title><style>body{font-family:"Yu Gothic","Noto Sans JP",sans-serif;margin:6mm;color:#111827}.meta,.hint{font-size:8px;color:#475569;margin-bottom:4px}.goukakuBookLayout{display:flex;flex-direction:column;align-items:flex-start;width:max-content;gap:5px}.goukakuBookSection{width:max-content}.goukakuPlanTable{border-collapse:collapse;width:max-content;font-size:7px;table-layout:fixed}.goukakuPlanTable th,.goukakuPlanTable td{border:1px solid #6b7280;padding:1px 2px;min-width:12px;white-space:pre-wrap;word-break:break-word;text-align:center;vertical-align:middle;line-height:1.05}.planTitleCell{font-size:9px!important;font-weight:900;text-align:left!important;background:#dbeafe}.planHeaderCell{font-weight:900;background:#eef2ff}.planPeriodCell{font-weight:900;background:#ecfdf5}.planCourseName,.planLeftCell,.planFormLabel{text-align:left!important;font-weight:800}.planNumberCell{font-size:9px!important;font-weight:900}@page{size:A4 portrait;margin:5mm}@media print{body{margin:0}}</style></head><body><div class="meta">${escapeHtml(name)} / ${escapeHtml(item.fileName||'')} / ${escapeHtml(item.sheetName||'')}</div>${table}</body></html>`);
+  w.document.write(`<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>${escapeHtml(name)} 合格設計図 学習計画</title><style>body{font-family:"Yu Gothic","Noto Sans JP",sans-serif;margin:5mm;color:#111827}.meta,.hint{font-size:7px;color:#475569;margin-bottom:2px}.goukakuBookLayout{display:flex;flex-direction:column;align-items:flex-start;width:max-content;gap:0}.goukakuBookSection{width:max-content}.goukakuBookBlankRows,.goukakuBookBlankRow{width:100%;background:#fff}.goukakuPlanTable{border-collapse:collapse;width:max-content;font-size:7px;table-layout:fixed}.goukakuPlanTable th,.goukakuPlanTable td{border:1px solid #6b7280;padding:1px;min-width:0;white-space:pre-wrap;word-break:break-word;text-align:center;vertical-align:middle;line-height:1.03}.planTitleCell{font-size:9px!important;font-weight:900;text-align:left!important;background:#dbeafe}.planHeaderCell{font-weight:900;background:#eef2ff}.planPeriodCell{font-weight:900;background:#ecfdf5}.planCourseName,.planLeftCell,.planFormLabel{text-align:left!important;font-weight:800}.planNumberCell{font-size:9px!important;font-weight:900}@page{size:A4 portrait;margin:4mm}@media print{body{margin:0}}</style></head><body><div class="meta">${escapeHtml(name)} / ${escapeHtml(item.fileName||'')} / ${escapeHtml(item.sheetName||'')}</div>${table}</body></html>`);
   w.document.close();
   setTimeout(()=>{w.focus();w.print();},300);
 }
@@ -2804,7 +2836,7 @@ async function loadGoukakuDesignsFromRoot(root, names=students){
         goukakuDesignSheets[name]={kind:'excel',fileName:excelHit.name,sheetName:parsed.sheetName,aoa:parsed.aoa,model:parsed.model,workbook:parsed.workbook,fileHandle:excelHit.handle,dirHandle:studentDir,path:dirs[0].label,dirty:false,editedCells:{},printPdf};
         const planInfo=planBuildBookSections(parsed.model);
         const tableCount=planInfo ? 1+(planInfo.highRange?1:0)+(planInfo.school?1:0)+(planInfo.weekly?1:0) : 0;
-        const label=planInfo ? `${excelHit.isEdited?'編集済みExcel':'Excel読込OK'}・合格設計図${tableCount}/4表OK（講座${planInfo.course.courseRows.length}行 / ${colName(planInfo.startCol+1)}〜${colName(planInfo.endCol+1)}列）` : 'Excel読込OK・合格設計図表抽出NG';
+        const label=planInfo ? `${excelHit.isEdited?'編集済みExcel':'Excel読込OK'}・合格設計図${tableCount}/4表OK（通期${planInfo.course.titleRow+1}〜${planInfo.course.eventEndRow+1}行 / ${colName(planInfo.startCol+1)}〜${colName(planInfo.endCol+1)}列）` : 'Excel読込OK・合格設計図表抽出NG';
         loaded.push(`${name}: ${dirs[0].label} / ${excelHit.name}（${label}）`);
         renderGoukakuPanel(name);
         continue;
@@ -2879,7 +2911,7 @@ async function loadGoukakuDesignsFromStudentParent(studentParentDir, names=stude
         goukakuDesignSheets[name]={kind:'excel',fileName:excelHit.name,sheetName:parsed.sheetName,aoa:parsed.aoa,model:parsed.model,workbook:parsed.workbook,fileHandle:excelHit.handle,dirHandle:found.dir,path:found.label,dirty:false,editedCells:{},printPdf};
         const planInfo=planBuildBookSections(parsed.model);
         const tableCount=planInfo ? 1+(planInfo.highRange?1:0)+(planInfo.school?1:0)+(planInfo.weekly?1:0) : 0;
-        const label=planInfo ? `${excelHit.isEdited?'編集済みExcel':'Excel読込OK'}・合格設計図${tableCount}/4表OK（講座${planInfo.course.courseRows.length}行 / ${colName(planInfo.startCol+1)}〜${colName(planInfo.endCol+1)}列）` : 'Excel読込OK・合格設計図表抽出NG';
+        const label=planInfo ? `${excelHit.isEdited?'編集済みExcel':'Excel読込OK'}・合格設計図${tableCount}/4表OK（通期${planInfo.course.titleRow+1}〜${planInfo.course.eventEndRow+1}行 / ${colName(planInfo.startCol+1)}〜${colName(planInfo.endCol+1)}列）` : 'Excel読込OK・合格設計図表抽出NG';
         loaded.push(`${name}: ${found.label} / ${excelHit.name}（${label}）`);
         renderGoukakuPanel(name);
         continue;
@@ -6978,7 +7010,7 @@ function meetingPrepGoukakuDesignHtml(name){
   }
   const meta=`${esc(item.fileName||'合格設計図.xlsx')}${item.sheetName?' / '+esc(item.sheetName):''}`;
   const table=goukakuBookLayoutHtml(item,name,{editable:false,showSummary:false});
-  return `<div class="muted">${meta}</div><div class="goukakuPlanPrintNotice">通期講座・高速マスター・学校科目/学習時期・週間予定を、Book1と同じ上下左右配置・B〜CA列座標で表示しています。</div><div class="goukakuPrintExcelWrap goukakuCoursePlanPrintWrap" data-goukaku-fit-excel="1"><div class="goukakuPrintExcelFitInner">${table}</div></div>`;
+  return `<div class="muted">${meta}</div><div class="goukakuPlanPrintNotice">通期講座は行事予定ブロックまでを連続表示し、高速マスター・学校科目/学習時期・週間予定をBook1と同じ上下左右配置・B〜CA列座標で表示しています。</div><div class="goukakuPrintExcelWrap goukakuCoursePlanPrintWrap" data-goukaku-fit-excel="1"><div class="goukakuPrintExcelFitInner">${table}</div></div>`;
 }
 
 function arrayBufferToBase64(buffer){
@@ -7083,7 +7115,7 @@ function buildMeetingPrepPrintHtml(resultRecords, weeklyHtml){
     .prepTable{border-collapse:collapse;width:100%;font-size:10px;margin:4px 0 7px;}.prepTable th,.prepTable td{border:1px solid #9ca3af;padding:3px 4px;vertical-align:top;word-break:break-word;}.prepTable th{background:#f3f4f6;text-align:center;font-weight:800;}.prepTable ul{margin:0;padding-left:1.1em;}.prepTable li{margin:0 0 1px;}.listenTable th{background:#eef2ff}.listenTable td{font-size:11px;line-height:1.45}.twoCols{display:grid;grid-template-columns:1fr 1fr;gap:7px;align-items:start}.examConfirmBlock,.eventConfirmBlock{margin-top:4px;break-inside:avoid;page-break-inside:avoid}.examConfirmTable{table-layout:fixed;width:100%;font-size:9.2px;line-height:1.22}.examConfirmTable th:first-child,.examConfirmTable td:first-child{width:27mm}.examConfirmTable th,.examConfirmTable td{padding:2px 3px}.examPrintDetail{line-height:1.23}.examPrintLine{margin:0 0 1px}.subjectWrap{display:flex;flex-wrap:wrap;gap:1px 5px;align-items:flex-start}.printCheck{display:inline-block;white-space:nowrap;min-width:13mm}.smallChecks{font-size:9px}.eventConfirmTable{font-size:9.2px;line-height:1.25;table-layout:fixed;width:100%}.eventConfirmTable th:first-child,.eventConfirmTable td:first-child{width:34mm}.weekly{font-size:9px}.weekly th,.weekly td{padding:3px;}.blankTable td{height:12mm}.blankLines div{height:6mm;border-bottom:1px solid #d1d5db}.blankBox{height:24mm}
     .prevResultPage{padding:5mm;overflow:hidden}.fitPageShell{width:100%;height:270mm;overflow:hidden;position:relative}.fitPageInner{transform-origin:top left;width:100%;}.prevResultPage h1{font-size:17px}.prevResultPage h2{font-size:13px;margin:6px 0 4px}.prevResultPage h3{font-size:11.5px;margin:4px 0 3px}.prevResultPage .prepTable{font-size:9.8px;margin:3px 0 5px}.prevResultPage .prepTable th,.prevResultPage .prepTable td{padding:2.4px 3.4px}.prevResultPage .box{padding:4.5px}
     .weeklyPage{padding:5mm;}
-    .goukakuPrintPage{padding:4mm;overflow:hidden;display:flex;flex-direction:column;height:282mm!important;max-height:282mm!important}.goukakuPrintPage h1{font-size:10px;margin:0 0 .3mm;flex:0 0 auto}.goukakuPrintPage h2{font-size:8px;margin:0 0 .5mm;flex:0 0 auto;border-left:2px solid #2563eb;padding-left:3px}.goukakuPrintPage .muted{font-size:7px;margin:0 0 .4mm;flex:0 0 auto}.goukakuPlanPrintNotice{font-size:7px;color:#475569;margin:0 0 .5mm;flex:0 0 auto}.goukakuPrintExcelWrap{flex:1 1 auto;min-height:0;overflow:hidden;border:1px solid #9ca3af;background:#fff;position:relative;width:100%;height:auto}.goukakuPrintExcelFitInner{transform-origin:top left;width:max-content}.goukakuCoursePlanPrintWrap .goukakuBookLayout{display:flex;flex-direction:column;align-items:flex-start;width:max-content;gap:7px}.goukakuCoursePlanPrintWrap .goukakuBookSection{width:max-content}.goukakuCoursePlanPrintWrap .goukakuPlanTable{border-collapse:collapse;width:max-content;min-width:0;font-size:10px;line-height:1.1;table-layout:fixed;background:#fff}.goukakuCoursePlanPrintWrap .goukakuPlanTable th,.goukakuCoursePlanPrintWrap .goukakuPlanTable td{border:1px solid #6b7280;padding:2px 3px;min-width:18px;white-space:pre-wrap;word-break:break-word;text-align:center;vertical-align:middle}.goukakuCoursePlanPrintWrap .planTitleCell{font-size:14px;font-weight:900;text-align:left;background:#dbeafe}.goukakuCoursePlanPrintWrap .planHeaderCell{font-weight:900;background:#eef2ff}.goukakuCoursePlanPrintWrap .planPeriodCell{font-weight:900;background:#ecfdf5}.goukakuCoursePlanPrintWrap .planCourseName,.goukakuCoursePlanPrintWrap .planLeftCell,.goukakuCoursePlanPrintWrap .planFormLabel{text-align:left;font-weight:800}.goukakuCoursePlanPrintWrap .planNumberCell{font-size:13px;font-weight:900}.goukakuPrintExcelWrap[data-fitted="1"]::after{content:"合格設計図4表を4枚目へ全面フィット";position:absolute;right:1.5mm;bottom:1.5mm;font-size:7px;color:#64748b;background:rgba(255,255,255,.78);padding:.4mm 1mm;border:1px solid #e5e7eb;border-radius:999px}
+    .goukakuPrintPage{padding:2mm;overflow:hidden;display:flex;flex-direction:column;height:282mm!important;max-height:282mm!important}.goukakuPrintPage h1{font-size:8px;margin:0;flex:0 0 auto}.goukakuPrintPage h2{font-size:7px;margin:0 0 .2mm;flex:0 0 auto;border-left:2px solid #2563eb;padding-left:2px}.goukakuPrintPage .muted{font-size:6px;margin:0;flex:0 0 auto}.goukakuPlanPrintNotice{font-size:6px;color:#475569;margin:0 0 .2mm;flex:0 0 auto}.goukakuPrintExcelWrap{flex:1 1 auto;min-height:0;overflow:hidden;border:0;background:#fff;position:relative;width:100%;height:auto}.goukakuPrintExcelFitInner{transform-origin:top left;width:max-content}.goukakuCoursePlanPrintWrap .goukakuBookLayout{display:flex;flex-direction:column;align-items:flex-start;width:max-content;gap:0}.goukakuCoursePlanPrintWrap .goukakuBookSection{width:max-content}.goukakuCoursePlanPrintWrap .goukakuBookBlankRows,.goukakuCoursePlanPrintWrap .goukakuBookBlankRow{width:100%;background:#fff;flex:none}.goukakuCoursePlanPrintWrap .goukakuPlanTable{border-collapse:collapse;width:max-content;min-width:0;font-size:10px;line-height:1.05;table-layout:fixed;background:#fff}.goukakuCoursePlanPrintWrap .goukakuPlanTable th,.goukakuCoursePlanPrintWrap .goukakuPlanTable td{border:1px solid #6b7280;padding:1px;min-width:0;white-space:pre-wrap;word-break:break-word;text-align:center;vertical-align:middle}.goukakuCoursePlanPrintWrap .planTitleCell{font-size:13px;font-weight:900;text-align:left;background:#dbeafe}.goukakuCoursePlanPrintWrap .planHeaderCell{font-weight:900;background:#eef2ff}.goukakuCoursePlanPrintWrap .planPeriodCell{font-weight:900;background:#ecfdf5}.goukakuCoursePlanPrintWrap .planCourseName,.goukakuCoursePlanPrintWrap .planLeftCell,.goukakuCoursePlanPrintWrap .planFormLabel{text-align:left;font-weight:800}.goukakuCoursePlanPrintWrap .planNumberCell{font-size:12px;font-weight:900}.goukakuPrintExcelWrap[data-fitted="1"]::after{content:"";display:none}
     @media print{.printGuide{display:none!important}.page{break-after:auto!important;page-break-after:auto!important;}.page + .page{break-before:page!important;page-break-before:always!important;}}
   </style><script src="./libs/pdf.min.js"><\/script></head><body><div class="printGuide">印刷設定：A4／縦／両面印刷オン／長辺とじ。各生徒は4ページ：前週確認、今週記入、面談フロー、合格設計図の4表。</div>${body}<script>
     function base64ToUint8Array(base64){
@@ -7181,8 +7213,8 @@ function buildMeetingPrepPrintHtml(resultRecords, weeklyHtml){
         // 親画面では印刷用iframeを画面外に置くため、印刷前の測定値が1px近くになることがある。
         // その小さい値で倍率計算すると、印刷プレビューで左上に極小表示される。
         // A4縦・余白4mmの合格設計図枠として実寸相当の値を補正してからフィットする。
-        if(cw < 200) cw = mmToPx(202);  // 210mm - 左右余白4mmずつ
-        if(ch < 300) ch = mmToPx(266);  // 297mm - 上下余白/見出し分
+        if(cw < 200) cw = mmToPx(194);  // A4縦：@page左右6mm＋4枚目左右2mm
+        if(ch < 300) ch = mmToPx(276);  // A4縦：上下余白・最小見出しを除いた最大枠
 
         if(sw<=1 || sh<=1 || cw<=1 || ch<=1) return;
         // Book1の縦横比を崩さず、4表全体がA4の合格設計図枠内へ収まる倍率にする。
