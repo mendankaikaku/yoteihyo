@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>予定統合アプリ（掲示背景薄赤・文字罫線黒版）</title>
+  <title>予定統合アプリ（2026-08-20 19:20 出力 / 個人groupJSON全員分リスト除外版）</title>
   <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
   <script src="./libs/xlsx.bundle.js"></script>
   <script>
@@ -3559,7 +3559,11 @@ function dedupeEventRecordsByLatest(records, logRows){
 
 async function merge(){
   const files = state.files.filter(f => !shouldSkipFile(f));
-  const jsonFiles = Array.isArray(state.inputStudentJsonFiles) ? state.inputStudentJsonFiles : [];
+  const ignoredPersonalGroupJsonCount = Array.isArray(state.inputStudentJsonFiles) ? state.inputStudentJsonFiles.length : 0;
+  // 最終方針：個人JSON / group JSON は、全員分リストの模試・イベント正本にしない。
+  // 理由：個人JSONやgroup JSONに古い模試・イベントが残っていると、マスタ削除後に復活する事故が起きるため。
+  // 全員分リストへ出す模試・イベントは、予定Excelの確認シートを読んだ後、現在の模試マスタ/イベントマスタで通過したものだけ。
+  const jsonFiles = [];
   if(!files.length){
     alert("打ち込み結果の予定Excelが見つかっていません。\n①フォルダー読取で、保存復元フォルダー本体、または 打ち込み結果 / 担任助手フォルダー / 助手名フォルダー を選び直してください。");
     return;
@@ -3584,13 +3588,8 @@ async function merge(){
     allEventRecords.push(...eventParsed.records);
     allLogs.push(...eventParsed.logRows);
   }
-  for(let i=0;i<jsonFiles.length;i++){
-    log(`読み込み中 生徒JSON ${i+1}/${jsonFiles.length}\n${jsonFiles[i].webkitRelativePath || jsonFiles[i].name}`);
-    const parsed = await parseInputStudentJsonFile(jsonFiles[i]);
-    allRecords.push(...(parsed.records||[]));
-    allExamRecords.push(...(parsed.examRecords||[]));
-    allEventRecords.push(...(parsed.eventRecords||[]));
-    allLogs.push(...(parsed.logRows||[]));
+  if(ignoredPersonalGroupJsonCount){
+    allLogs.push(['個人/group JSON', '無視', `個人JSON/group JSON ${ignoredPersonalGroupJsonCount}件は全員分リストの模試・イベント正本に使いません`, '現在の模試マスタ/イベントマスタに無い古い項目が復活しないよう、全員分リストは予定Excel確認シート＋マスタ掲載分だけで作成します。']);
   }
   const planRecordCountBeforeDedupe = allRecords.length;
   const examRecordCountBeforeDedupe = allExamRecords.length;
@@ -8993,6 +8992,8 @@ async function setBundleFolderFiles(fileList){
     else if((isExcel || isCsv) && filePathIncludes(f, '対応表')) rosters.push(f);
   }
   state.files = planned;
+  // 個人JSON / group JSONは読んでも全員分リストの模試・イベントに使わない。
+  // マスタから削除したものを絶対に復活させないため、ここでは保持しない。
   state.inputStudentJsonFiles = [];
   state.resultFiles = results;
   state.resultHistoryFiles = histories;
