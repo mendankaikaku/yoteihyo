@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>面談予定入力アプリ_対応表プロフィール復元強化版_2026-08-20 18:42出力</title>
+<title>面談予定入力アプリ（2026-08-20 18:55 出力）</title>
 <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
 <script src="./libs/xlsx.bundle.js"></script>
 <script></script>
@@ -8347,6 +8347,451 @@ async function expandMasterTargetStudents(row, kind){
   showSaveInfo(lines.join('\n'));
 }
 
+</script>
+
+
+<script>
+/* =========================================================
+   2026-08-20 18:55 精査修正
+   - 復元時プロフィール優先順位を明確化：JSON → 個人Excel → 対応表
+   - 対応表の読取場所を 保存復元直下 / 対応表フォルダー の両方へ拡張
+   - 同姓複数候補は自動補完せずログ化
+   - 古いZIP出力関数を安全停止
+========================================================= */
+const INPUT_PROFILE_RESTORE_AUDIT_VERSION = '2026-08-20 18:55';
+let LAST_PROFILE_RESTORE_LOGS = [];
+let LAST_ROSTER_PROFILE_WARNINGS = [];
+
+function auditPush(line){
+  try{ if(line) LAST_PROFILE_RESTORE_LOGS.push(String(line)); }catch(e){}
+}
+function uniqueBy(arr, keyFn){
+  const out=[]; const seen=new Set();
+  (arr||[]).forEach(x=>{ const k=keyFn(x); if(k && !seen.has(k)){ seen.add(k); out.push(x); } });
+  return out;
+}
+function profileFilledCount(p){
+  return ['studentNo','grade','school','assistant'].reduce((n,k)=>n+(String(p&&p[k]||'').trim()?1:0),0);
+}
+function profileLabel(p){
+  return `${p?.name||p?.fullName||''}${p?.studentNo?`/${p.studentNo}`:''}${p?.grade?`/${p.grade}`:''}${p?.school?`/${p.school}`:''}${p?.assistant?`/${p.assistant}`:''}`;
+}
+function studentFolderCandidateKey(s){return String(s||'').replace(/[\s\u3000]+/g,'').trim();}
+function rosterProfileUniqueKey(p){
+  const no=String(p?.studentNo||'').trim();
+  const nm=profileKey(p?.name||p?.fullName||p?.inputName||'');
+  return no ? `no:${no}` : (nm ? `name:${nm}` : '');
+}
+
+async function getRosterCandidateDirectoriesFromShared(){
+  const dirs=[]; const seen=new Set();
+  const add=(dir,label)=>{ if(dir && !seen.has(dir)){ seen.add(dir); dirs.push({dir,label}); } };
+  if(!sharedDirHandle) return dirs;
+  add(sharedDirHandle, `${sharedDirHandle.name||'選択フォルダー'}直下`);
+  try{
+    const d=await getDirectoryIfExists(sharedDirHandle,'対応表');
+    if(d) add(d,'対応表フォルダー');
+  }catch(e){}
+  try{
+    for await (const [entryName, handle] of sharedDirHandle.entries()){
+      if(handle.kind==='directory' && /対応表|名簿|生徒.*情報/.test(String(entryName||''))){
+        add(handle, entryName);
+      }
+    }
+  }catch(e){}
+  return dirs;
+}
+async function listRosterFilesFromSharedRobust(){
+  const out=[]; const seen=new Set();
+  const dirs=await getRosterCandidateDirectoriesFromShared();
+  for(const item of dirs){
+    try{
+      const files=await listFilesInDirectoryByRegex(item.dir,/\.(xlsx|xlsm|xls|csv)$/i);
+      for(const file of files){
+        if(/^~\$/i.test(file.name||'')) continue;
+        if(!/対応表|名簿|生徒|student|roster|一覧/i.test(file.name||'') && item.label.includes('直下')) continue;
+        const key=`${item.label}/${file.name}/${file.lastModified||0}`;
+        if(!seen.has(key)){ seen.add(key); out.push({file, label:item.label}); }
+      }
+    }catch(e){}
+  }
+  return out;
+}
+
+async function refreshRosterProfilesFromShared(force=false){
+  if(!force && ROSTER_PROFILE_CACHE.loaded) return ROSTER_PROFILE_CACHE;
+  if(ROSTER_PROFILE_CACHE.loading) return ROSTER_PROFILE_CACHE.loading;
+  ROSTER_PROFILE_CACHE.loading=(async()=>{
+    ROSTER_PROFILE_CACHE.loaded=false;
+    ROSTER_PROFILE_CACHE.profiles=[];
+    ROSTER_PROFILE_CACHE.byName=new Map();
+    ROSTER_PROFILE_CACHE.byNo=new Map();
+    ROSTER_PROFILE_CACHE.source='';
+    ROSTER_PROFILE_CACHE.diagnostics=[];
+    if(!sharedDirHandle){ ROSTER_PROFILE_CACHE.loaded=true; ROSTER_PROFILE_CACHE.loading=null; return ROSTER_PROFILE_CACHE; }
+    const entries=await listRosterFilesFromSharedRobust();
+    const sourceNames=[];
+    for(const ent of entries){
+      const file=ent.file;
+      sourceNames.push(`${ent.label}/${file.name}`);
+      try{
+        if(/\.csv$/i.test(file.name)){
+          const rows=simpleCsvRows(await file.text());
+          ROSTER_PROFILE_CACHE.diagnostics.push(diagnoseRosterAoa(rows,`${ent.label}/${file.name}`));
+          parseRosterAoa(rows,`${ent.label}/${file.name}`).forEach(p=>{ addRosterProfile(p); ROSTER_PROFILE_CACHE.profiles.push(p); });
+        }else if(window.XLSX){
+          const wb=await readWorkbookFromFileRobust(file);
+          for(const sh of wb.SheetNames||[]){
+            const rows=sheetToAoaRobust(wb.Sheets[sh],false);
+            if(!rows.length) continue;
+            const src=`${ent.label}/${file.name}/${sh}`;
+            ROSTER_PROFILE_CACHE.diagnostics.push(diagnoseRosterAoa(rows,src));
+            parseRosterAoa(rows,src).forEach(p=>{ addRosterProfile(p); ROSTER_PROFILE_CACHE.profiles.push(p); });
+          }
+        }
+      }catch(e){
+        ROSTER_PROFILE_CACHE.diagnostics.push({source:`${ent.label}/${file.name}`, rowCount:0, headerRow:-1, header:[], idx:{}, profileCount:0, schoolCount:0, assistantCount:0, schoolExamples:[], assistantExamples:[], nameExamples:[], warning:`読込失敗: ${e?.message||e}`});
+      }
+    }
+    ROSTER_PROFILE_CACHE.profiles=uniqueBy(ROSTER_PROFILE_CACHE.profiles, rosterProfileUniqueKey);
+    ROSTER_PROFILE_CACHE.source=sourceNames.join('、');
+    ROSTER_PROFILE_CACHE.loaded=true;
+    ROSTER_PROFILE_CACHE.loading=null;
+    return ROSTER_PROFILE_CACHE;
+  })();
+  return ROSTER_PROFILE_CACHE.loading;
+}
+
+function rosterProfileCandidatesForInputName(name, data=null){
+  const rawKey=profileKey(name);
+  if(!rawKey) return [];
+  const no=String(data?.studentNo||'').trim();
+  if(no){
+    const byNo=ROSTER_PROFILE_CACHE.byNo.get(`no:${no}`);
+    if(byNo) return [byNo];
+  }
+  const direct=ROSTER_PROFILE_CACHE.byName.get(rawKey);
+  if(direct) return [direct];
+  const candidates=[]; const seen=new Set();
+  (ROSTER_PROFILE_CACHE.profiles||[]).forEach(p=>{
+    const fullKey=profileKey(p.name || p.fullName || '');
+    const inputKey=profileKey(p.inputName || '');
+    if(!fullKey && !inputKey) return;
+    const matched = fullKey===rawKey || inputKey===rawKey ||
+      (rawKey.length>=2 && fullKey.startsWith(rawKey)) ||
+      (inputKey.length>=2 && rawKey===inputKey);
+    if(matched){
+      const unique=rosterProfileUniqueKey(p) || fullKey || inputKey;
+      if(!seen.has(unique)){ seen.add(unique); candidates.push(p); }
+    }
+  });
+  return candidates;
+}
+function findRosterProfileForInputName(name, data=null){
+  const candidates=rosterProfileCandidatesForInputName(name,data);
+  if(candidates.length===1) return candidates[0];
+  return null;
+}
+function getKnownStudentProfile(name){
+  const data=studentData && studentData[name] ? studentData[name] : null;
+  const p=findRosterProfileForInputName(name, data);
+  const mapAssistant=Object.entries(ASSISTANT_STUDENT_MAP_FOR_INPUT||{}).find(([a,list])=>(list||[]).some(st=>profileKey(st)===profileKey(name)))?.[0]||'';
+  return Object.assign({}, p||{}, {
+    name,
+    studentNo:String(data?.studentNo||'').trim() || p?.studentNo || '',
+    grade:String(data?.grade||'').trim() || p?.grade || '',
+    school:String(data?.school||'').trim() || p?.school || '',
+    assistant:String(data?.assistant||'').trim() || p?.assistant || mapAssistant || ''
+  });
+}
+function mergeRosterProfileIntoStudentData(name, data){
+  const d=normalizeStudentData(data||{});
+  const candidates=rosterProfileCandidatesForInputName(name,d);
+  if(candidates.length>1){
+    return {data:d, changed:[], matched:false, ambiguous:true, candidates};
+  }
+  const p=candidates[0] || null;
+  if(!p) return {data:d, changed:[], matched:false, ambiguous:false, candidates:[]};
+  const changed=[];
+  if(!String(d.studentNo||'').trim() && String(p.studentNo||'').trim()){ d.studentNo=String(p.studentNo).trim(); changed.push('生徒番号'); }
+  if(!String(d.grade||'').trim() && String(p.grade||'').trim()){ d.grade=String(p.grade).trim(); changed.push('学年'); }
+  if(!String(d.school||'').trim() && String(p.school||'').trim()){ d.school=String(p.school).trim(); changed.push('高校'); }
+  if(!String(d.assistant||'').trim() && String(p.assistant||'').trim()){ d.assistant=String(p.assistant).trim(); changed.push('担任助手'); }
+  return {data:d, changed, matched:true, ambiguous:false, profile:p};
+}
+function applyRosterProfilesToStudents(names){
+  const filled=[]; const noMatch=[]; const ambiguous=[];
+  LAST_ROSTER_PROFILE_WARNINGS=[];
+  (names||students||[]).forEach(name=>{
+    const current=ensureStudent(name);
+    const res=mergeRosterProfileIntoStudentData(name,current);
+    studentData[name]=res.data;
+    if(res.changed && res.changed.length) filled.push(`${name}: ${res.changed.join('・')}`);
+    else if(res.ambiguous){
+      const cand=(res.candidates||[]).map(profileLabel).filter(Boolean);
+      ambiguous.push(`${name}: 対応表に複数候補あり → 自動補完なし（${cand.join(' / ')}）`);
+    }else if(!res.matched) noMatch.push(name);
+  });
+  LAST_ROSTER_PROFILE_WARNINGS=ambiguous;
+  return {filled,noMatch,ambiguous};
+}
+
+function personalExcelProfileHeaderMap(row){
+  const header=(row||[]).map(x=>norm(x));
+  const find=(names)=>{
+    for(const n of names){const idx=header.findIndex(h=>h===n); if(idx>=0) return idx;}
+    for(let i=0;i<header.length;i++){const h=header[i]; if(names.some(n=>h.includes(n))) return i;}
+    return -1;
+  };
+  return {
+    studentNo:find(['生徒番号','生徒No','番号','ID']),
+    name:find(['生徒名','氏名','名前','フルネーム']),
+    grade:find(['学年']),
+    school:find(['高校','高校名','学校','学校名','在籍校','所属校','在学校']),
+    assistant:find(['担任助手','担当','助手','担任','担当者'])
+  };
+}
+function personalExcelLooksLikeProfileHeader(row){
+  const joined=(row||[]).map(v=>norm(v)).join('|');
+  return /生徒番号|生徒No|氏名|生徒名|学年|高校|学校|担任助手|担当/.test(joined);
+}
+function profileFromKeyValueRows(aoa){
+  const p={studentNo:'',grade:'',school:'',assistant:''};
+  (aoa||[]).forEach(row=>{
+    for(let c=0;c<(row||[]).length-1;c++){
+      const k=norm(row[c]); const v=norm(row[c+1]);
+      if(!v) continue;
+      if(/生徒番号|生徒No|^番号$|^ID$/.test(k) && !p.studentNo) p.studentNo=v;
+      if(/学年/.test(k) && !p.grade) p.grade=v;
+      if(/高校|高校名|学校|学校名|在籍校|所属校|在学校/.test(k) && !p.school) p.school=v;
+      if(/担任助手|担当|助手|担任|担当者/.test(k) && !p.assistant) p.assistant=v;
+    }
+  });
+  return p;
+}
+function extractProfileFromWorkbookForInputStudent(wb, studentName){
+  const merged={studentNo:'',grade:'',school:'',assistant:''};
+  const target=profileKey(studentName);
+  const merge=(p)=>{
+    ['studentNo','grade','school','assistant'].forEach(k=>{ if(!String(merged[k]||'').trim() && String(p&&p[k]||'').trim()) merged[k]=String(p[k]).trim(); });
+  };
+  for(const sheetName of wb.SheetNames||[]){
+    const ws=wb.Sheets[sheetName];
+    const aoa=sheetToAoaRobust(ws,false);
+    if(!aoa.length) continue;
+    merge(profileFromKeyValueRows(aoa));
+    for(let r=0;r<Math.min(15,aoa.length);r++){
+      if(!personalExcelLooksLikeProfileHeader(aoa[r])) continue;
+      const idx=personalExcelProfileHeaderMap(aoa[r]);
+      if(idx.grade<0 && idx.school<0 && idx.assistant<0 && idx.studentNo<0) continue;
+      for(let rr=r+1; rr<aoa.length; rr++){
+        const row=aoa[rr]||[];
+        if(!row.some(v=>norm(v))) continue;
+        const rowName=idx.name>=0 ? norm(row[idx.name]) : '';
+        const rowNo=idx.studentNo>=0 ? norm(row[idx.studentNo]) : '';
+        const nameMatches=!rowName || !target || profileKey(rowName)===target || profileKey(rowName).includes(target) || target.includes(profileKey(rowName));
+        // 生徒名列が無いシートや本人Excelでは、先頭のデータ行を本人情報として読む。
+        if(nameMatches){
+          merge({
+            studentNo:idx.studentNo>=0?rowNo:'',
+            grade:idx.grade>=0?norm(row[idx.grade]):'',
+            school:idx.school>=0?norm(row[idx.school]):'',
+            assistant:idx.assistant>=0?norm(row[idx.assistant]):''
+          });
+          break;
+        }
+      }
+    }
+  }
+  return profileFilledCount(merged) ? merged : null;
+}
+function isPersonalInputExcelFileName(fileName){
+  const n=String(fileName||'');
+  if(/^~\$/.test(n) || !/\.(xlsx|xlsm|xls)$/i.test(n)) return false;
+  if(/合格設計図|科目リスト|全員分|毎日更新|対応表|模試マスタ|イベントマスタ|settings|master/i.test(n)) return false;
+  return true;
+}
+async function findSingleStudentDirectoryFromSharedForInput(name){
+  if(!sharedDirHandle) return {dir:null, status:'保存復元フォルダー未選択'};
+  const matches=await findStudentFoldersRecursive(sharedDirHandle,name,5);
+  if(matches.length===1) return {dir:matches[0].dir, status:matches[0].label};
+  if(matches.length>1) return {dir:null, status:`生徒フォルダー候補が複数: ${matches.map(m=>m.label).slice(0,6).join(' / ')}`};
+  return {dir:null, status:'生徒フォルダーなし'};
+}
+async function readPersonalExcelProfileForInputStudent(name){
+  const found=await findSingleStudentDirectoryFromSharedForInput(name);
+  if(!found.dir) return {profile:null, msg:`${name}: 個人Excel未読込（${found.status}）`};
+  const candidates=[];
+  try{
+    for await (const [entryName, handle] of found.dir.entries()){
+      if(handle.kind!=='file' || !isPersonalInputExcelFileName(entryName)) continue;
+      const file=await handle.getFile();
+      candidates.push({file, name:entryName, modified:file.lastModified||0, label:found.status});
+    }
+  }catch(e){ return {profile:null, msg:`${name}: 個人Excel一覧取得失敗 ${e?.message||e}`}; }
+  candidates.sort((a,b)=>Number(b.modified||0)-Number(a.modified||0));
+  for(const c of candidates.slice(0,5)){
+    try{
+      const wb=await readWorkbookFromFileRobust(c.file);
+      const profile=extractProfileFromWorkbookForInputStudent(wb,name);
+      if(profile) return {profile, msg:`${name}: 個人Excelから補完候補 ${c.label}/${c.name}`};
+    }catch(e){ /* 次候補へ */ }
+  }
+  return {profile:null, msg:`${name}: 個人Excelにプロフィール値なし`};
+}
+async function applyPersonalExcelProfilesToStudents(names){
+  const filled=[]; const logs=[];
+  for(const name of (names||students||[])){
+    const data=ensureStudent(name);
+    // JSONに値があるものは絶対に上書きしない。空欄だけ個人Excelで埋める。
+    if(String(data.studentNo||'').trim() && String(data.grade||'').trim() && String(data.school||'').trim() && String(data.assistant||'').trim()) continue;
+    const res=await readPersonalExcelProfileForInputStudent(name);
+    if(res.msg) logs.push(res.msg);
+    const p=res.profile;
+    if(!p) continue;
+    const changed=[];
+    if(!String(data.studentNo||'').trim() && String(p.studentNo||'').trim()){ data.studentNo=String(p.studentNo).trim(); changed.push('生徒番号'); }
+    if(!String(data.grade||'').trim() && String(p.grade||'').trim()){ data.grade=String(p.grade).trim(); changed.push('学年'); }
+    if(!String(data.school||'').trim() && String(p.school||'').trim()){ data.school=String(p.school).trim(); changed.push('高校'); }
+    if(!String(data.assistant||'').trim() && String(p.assistant||'').trim()){ data.assistant=String(p.assistant).trim(); changed.push('担任助手'); }
+    if(changed.length) filled.push(`${name}: ${changed.join('・')}`);
+  }
+  return {filled, logs};
+}
+function formatProfileRestoreResult(excelRes, rosterRes){
+  const lines=[];
+  if(excelRes?.filled?.length) lines.push(`個人Excel補完: ${excelRes.filled.join(' / ')}`);
+  if(rosterRes?.filled?.length) lines.push(`対応表補完: ${rosterRes.filled.join(' / ')}`);
+  if(rosterRes?.ambiguous?.length) lines.push(`対応表あいまい候補: ${rosterRes.ambiguous.join(' / ')}`);
+  const silentExcel=(excelRes?.logs||[]).filter(x=>!/プロフィール値なし|未読込/.test(x)).slice(0,8);
+  if(silentExcel.length) lines.push(`個人Excel読取: ${silentExcel.join(' / ')}`);
+  return lines.join('\n');
+}
+
+async function applyProfilePriorityAfterJsonRestore(names){
+  const excelRes=await applyPersonalExcelProfilesToStudents(names);
+  const rosterRes=applyRosterProfilesToStudents(names);
+  const msg=formatProfileRestoreResult(excelRes, rosterRes);
+  if(msg) auditPush(msg);
+  return {excelRes, rosterRes, msg};
+}
+
+async function restoreInterviewDataFromShared(names){
+  if(!names.length) return {restored:false, missing:[], mode:'none'};
+  LAST_PROFILE_RESTORE_LOGS=[];
+  if(sharedDirHandle){
+    await refreshDynamicStudentNameCandidatesFromFolder(sharedDirHandle);
+    await refreshRosterProfilesFromShared(true);
+  }
+  await applySharedSettingsIfAny();
+  const groupMem=await readJsonFromShared(sharedGroupFileName(names));
+  if(groupMem){
+    students=groupMem.names||names;
+    $('#studentNames').value=students.join(', ');
+    if(groupMem.weekStart) meetingPrepRestoredWeekStart = groupMem.weekStart;
+    Object.assign(studentData, applyRestoredStudentMapForInput(groupMem.studentData||{}));
+    await applyProfilePriorityAfterJsonRestore(students);
+    renderExamMasterPanel(); renderEventMasterPanel(); renderCommentMasterPanel();
+    const allRes=await applyAllStudentListOverridesToInput(students); if(allRes?.msg) auditPush(allRes.msg);
+    const subjRes=await applySubjectListOverridesToInput(students); if(subjRes) auditPush(`科目リスト反映: ${subjRes.count||0}件`);
+    renderStudents();
+    return {restored:true, missing:[], mode:'group', savedAt:groupMem.savedAt, audit:LAST_PROFILE_RESTORE_LOGS.slice()};
+  }
+  const collected={}; const missing=[];
+  for(const name of names){
+    const one=await readJsonFromShared(sharedStudentFileName(name));
+    if(one) collected[name]=one;
+    else missing.push(name);
+  }
+  if(Object.keys(collected).length){
+    students=names;
+    $('#studentNames').value=students.join(', ');
+    Object.assign(studentData, applyRestoredStudentMapForInput(collected));
+    await applyProfilePriorityAfterJsonRestore(students);
+    const allRes=await applyAllStudentListOverridesToInput(students); if(allRes?.msg) auditPush(allRes.msg);
+    const subjRes=await applySubjectListOverridesToInput(students); if(subjRes) auditPush(`科目リスト反映: ${subjRes.count||0}件`);
+    renderStudents();
+    return {restored:true, missing, mode:'individuals', audit:LAST_PROFILE_RESTORE_LOGS.slice()};
+  }
+  // JSONが無い場合でも、生徒欄を作った後の空欄へ 個人Excel → 対応表 の順で補完できるようにする。
+  students=names;
+  names.forEach(n=>ensureStudent(n));
+  await applyProfilePriorityAfterJsonRestore(names);
+  renderStudents();
+  return {restored:false, missing:names, mode:'profile-only', audit:LAST_PROFILE_RESTORE_LOGS.slice()};
+}
+
+async function loadGroup(){
+  const names=splitNames();
+  if(!names.length)return alert('先に生徒名を入力してください。');
+  let dir=null;
+  if(sharedSupported()){
+    dir=await pickSharedFolder();
+    if(!dir) return;
+    await refreshDynamicStudentNameCandidatesFromFolder(dir);
+    await refreshRosterProfilesFromShared(true);
+  }
+  const details=[];
+  let place='ブラウザ内保存';
+  let mem=loadGroupFromBrowser(names);
+  if(dir){
+    const restored=await restoreInterviewDataFromShared(names);
+    if(restored.audit && restored.audit.length) details.push(restored.audit.join('\n'));
+    if(restored.restored){
+      place = restored.mode==='group' ? '保存復元フォルダー/json/group JSON' : '保存復元フォルダー/json/student JSON';
+      mem={names:students, studentData, savedAt:restored.savedAt || new Date().toISOString()};
+    }else if(restored.mode==='profile-only'){
+      place='保存復元フォルダー（JSONなし・プロフィールのみ補完）';
+      mem={names:students, studentData, savedAt:new Date().toISOString()};
+    }
+    try{
+      const hist=await readPrepResultHistoryFromShared();
+      if(hist.debug && hist.debug.length) details.push(hist.debug.join(' / '));
+    }catch(e){ details.push(`結果履歴JSON確認エラー: ${e?.message || e}`); }
+  }
+  if(!mem){
+    await applySharedSettingsIfAny();
+    await applyProfilePriorityAfterJsonRestore(names);
+    renderStudents();
+    const detailText=LAST_PROFILE_RESTORE_LOGS.length?'\n'+LAST_PROFILE_RESTORE_LOGS.join('\n'):'';
+    showSaveInfo(`前回保存が見つかりませんでした。入力欄だけ作成しました。${detailText}`);
+    alert('前回保存が見つかりませんでした。入力欄だけ作成しました。');
+    return;
+  }
+  students=mem.names||names;
+  $('#studentNames').value=students.join(', ');
+  if(mem.studentData && place==='ブラウザ内保存'){
+    Object.assign(studentData, applyRestoredStudentMapForInput(mem.studentData||{}));
+    await applyProfilePriorityAfterJsonRestore(students);
+  }
+  renderStudents();
+  setDirty(false,'復元済み');
+  const savedAt=mem.savedAt?new Date(mem.savedAt).toLocaleString('ja-JP'):'保存日時不明';
+  const allDetails=[...details, ...LAST_PROFILE_RESTORE_LOGS].filter(Boolean);
+  const detailText = allDetails.length ? '\n' + Array.from(new Set(allDetails)).join('\n') : '';
+  showSaveInfo(`内容を復元しました：${students.join('、')}（${savedAt} / ${place}）${detailText}`);
+  alert(`内容を復元しました。\n復元元：${place}`);
+}
+
+function exportAll(){
+  alert('安全のため、複数生徒名を含むZIP出力は使いません。⑤保存で各生徒フォルダーへ直接保存してください。');
+}
+
+try{
+  const oldBindGlobalEvents = bindGlobalEvents;
+  bindGlobalEvents = function(){
+    oldBindGlobalEvents();
+    const btn=$('#loadGroupMemory');
+    if(btn) btn.onclick=loadGroup;
+    const exp=$('#exportAll');
+    if(exp) exp.onclick=exportAll;
+  };
+  // init() はこの精査パッチより前に実行済みのため、既存ボタンへも即時に再バインドする。
+  const btn=$('#loadGroupMemory');
+  if(btn) btn.onclick=loadGroup;
+  const exp=$('#exportAll');
+  if(exp) exp.onclick=exportAll;
+}catch(e){}
 </script>
 
 </body>
