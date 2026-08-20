@@ -817,12 +817,24 @@ async function parseAllListRestoreFile(file){
       if(canon.includes('生徒番号') && canon.includes('生徒名')){ headerRow = r; break; }
     }
     if(headerRow < 0) continue;
-    const header = (aoa[headerRow] || []).map(normalizeAllListHeaderText);
+    const rawHeaderTop = (aoa[headerRow] || []).map(normalizeAllListHeaderText);
+    const rawHeaderSub = (aoa[headerRow+1] || []).map(normalizeAllListHeaderText);
+    const looksTwoRow = rawHeaderSub.length && rawHeaderSub.some((v,i)=>v && v !== rawHeaderTop[i]);
+    const header = rawHeaderTop.map((top,i) => {
+      const sub = rawHeaderSub[i] || '';
+      const canonTop = allListCanonicalHeader(top);
+      if(looksTwoRow && sub && sub !== top && !['学年','生徒番号','生徒名','読み仮名','高校','担当','入力用備考','全員分リスト備考'].includes(canonTop)){
+        return `${top}
+${sub}`;
+      }
+      return top;
+    });
     const headerCanon = header.map(allListCanonicalHeader);
     const idxGrade = headerCanon.findIndex(h => h === '学年');
     const rows = new Map();
     let gradeKey = allListGradeKey(sname);
-    for(let r=headerRow+1; r<aoa.length; r++){
+    const dataStartRow = looksTwoRow ? headerRow + 2 : headerRow + 1;
+    for(let r=dataStartRow; r<aoa.length; r++){
       const row = aoa[r] || [];
       if(!row.some(v => allListCellText(v))) continue;
       const key = allListRowKeyFromCells(row, header);
@@ -5460,24 +5472,24 @@ function buildMonthlyPosterResultAoa(records, rule, label){
 }
 function styleMonthlyPosterSheet(ws, aoa){
   // 掲示用の横幅：Excel列幅はwch指定なので、286px相当を約41wchとして使う。
-  // 内容列はその約2.6倍で、50ptでも横に広く使えるようにする。
+  // 内容列はその約2.6倍で、40ptでも横に広く使えるようにする。
   const posterTwoCharWch = 286 / 7;
   const widths = [Math.round(posterTwoCharWch * 0.45), Math.round(posterTwoCharWch * 0.90), Math.round(posterTwoCharWch * 2.60), Math.round(posterTwoCharWch * 0.70)];
-  const range = applyNiceSheetSettings(ws, aoa, widths, {rows:{min:74,max:300,header:92,pxPerLine:64}});
+  const range = applyNiceSheetSettings(ws, aoa, widths, {rows:{min:60,max:240,header:78,pxPerLine:52}});
   const colCount = Math.max(3, (aoa && aoa[1] ? aoa[1].length : 3));
   ws['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:colCount-1}}];
   ws['!freeze'] = {xSplit:0, ySplit:2};
   ws['!pageSetup'] = {orientation:'portrait', fitToWidth:1, fitToHeight:0};
   ws['!margins'] = {left:0.28, right:0.28, top:0.35, bottom:0.35, header:0.15, footer:0.15};
   const border = {top:{style:'thin',color:{rgb:'000000'}},bottom:{style:'thin',color:{rgb:'000000'}},left:{style:'thin',color:{rgb:'000000'}},right:{style:'thin',color:{rgb:'000000'}}};
-  // 毎日掲示はMS Pゴシック・50ptで大きく印刷する。文字と罫線は黒、背景だけ薄い赤系にする。
+  // 毎日掲示はMS Pゴシック・40ptで大きく印刷する。文字と罫線は黒、背景だけ薄い赤系にする。
   const titleFill = {fgColor:{rgb:'FEE2E2'}};
   const headerFill = {fgColor:{rgb:'FCE7E7'}};
   const nameFill = {fgColor:{rgb:'FFF5F5'}};
   const posterFontName = 'ＭＳ Ｐゴシック';
-  const fontTitle = {name:posterFontName, sz:50, bold:true, color:{rgb:'000000'}};
-  const fontHeader = {name:posterFontName, sz:50, bold:true, color:{rgb:'000000'}};
-  const fontBase = {name:posterFontName, sz:50, bold:true, color:{rgb:'000000'}};
+  const fontTitle = {name:posterFontName, sz:40, bold:true, color:{rgb:'000000'}};
+  const fontHeader = {name:posterFontName, sz:40, bold:true, color:{rgb:'000000'}};
+  const fontBase = {name:posterFontName, sz:40, bold:true, color:{rgb:'000000'}};
   setRangeStyle(ws, range, (R,C,cell)=>{
     const style = {font:fontBase, alignment:{vertical:'center', horizontal:'center', wrapText:true}, border};
     if(R === 0){ style.font = fontTitle; style.fill = titleFill; style.alignment = {vertical:'center', horizontal:'center', wrapText:false, shrinkToFit:true}; }
@@ -5627,20 +5639,20 @@ function styleHighSpeedRankingSheet(ws, aoa){
   // 高速基礎ランキングはC列（氏名）を広めにし、タイトルの折り返しを防ぐ。
   const posterTwoCharWch = 286 / 7;
   const widths = [Math.round(posterTwoCharWch * 0.35), Math.round(posterTwoCharWch * 0.45), Math.round(posterTwoCharWch * 1.55), Math.round(posterTwoCharWch * 0.55)];
-  const range = applyNiceSheetSettings(ws, cleanAoa, widths, {rows:{min:74,max:220,header:92,pxPerLine:64}});
+  const range = applyNiceSheetSettings(ws, cleanAoa, widths, {rows:{min:60,max:190,header:78,pxPerLine:52}});
   ws['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:3}}];
   ws['!freeze'] = {xSplit:0, ySplit:2};
   ws['!pageSetup'] = {orientation:'portrait', fitToWidth:1, fitToHeight:1};
   ws['!margins'] = {left:0.35, right:0.35, top:0.4, bottom:0.35, header:0.15, footer:0.15};
   const border = {top:{style:'thin',color:{rgb:'000000'}},bottom:{style:'thin',color:{rgb:'000000'}},left:{style:'thin',color:{rgb:'000000'}},right:{style:'thin',color:{rgb:'000000'}}};
-  // ランキング掲示もMS Pゴシック・50ptで大きく印刷する。文字と罫線は黒、背景だけ薄い赤系にする。
+  // ランキング掲示もMS Pゴシック・40ptで大きく印刷する。文字と罫線は黒、背景だけ薄い赤系にする。
   const titleFill = {fgColor:{rgb:'FEE2E2'}};
   const headerFill = {fgColor:{rgb:'FCE7E7'}};
   const rankFill = {fgColor:{rgb:'FFF5F5'}};
   const posterFontName = 'ＭＳ Ｐゴシック';
-  const fontTitle = {name:posterFontName, sz:50, bold:true, color:{rgb:'000000'}};
-  const fontHeader = {name:posterFontName, sz:50, bold:true, color:{rgb:'000000'}};
-  const fontBase = {name:posterFontName, sz:50, bold:true, color:{rgb:'000000'}};
+  const fontTitle = {name:posterFontName, sz:40, bold:true, color:{rgb:'000000'}};
+  const fontHeader = {name:posterFontName, sz:40, bold:true, color:{rgb:'000000'}};
+  const fontBase = {name:posterFontName, sz:40, bold:true, color:{rgb:'000000'}};
   setRangeStyle(ws, range, (R,C,cell)=>{
     const style = {font:fontBase, alignment:{vertical:'center', horizontal:'center', wrapText:true}, border};
     if(R === 0){ style.font = fontTitle; style.fill = titleFill; style.alignment = {vertical:'center', horizontal:'center', wrapText:true}; }
@@ -6799,7 +6811,8 @@ function allListDropdownFormulaForHeader(headerText){
 }
 
 function allListApplyDropdowns(ws, aoa){
-  const header = aoa[1] || [];
+  const header = allListInputEffectiveHeader(aoa);
+  const firstDataRowExcel = allListInputDataStartRowIndex(aoa) + 1;
   // 手入力やコピー貼り付けが増えても入力規則が途中で切れないよう、実データ行より長めにかける。
   // 10000行までかけておけば、後から生徒や行を増やしても候補が残りやすい。
   const lastRow = Math.max(aoa.length + 80, 10000);
@@ -6807,7 +6820,7 @@ function allListApplyDropdowns(ws, aoa){
   const addValidation=(c, formula, headerText)=>{
     if(!formula) return;
     const col=XLSX.utils.encode_col(c);
-    const sqref=`${col}3:${col}${lastRow}`;
+    const sqref=`${col}${firstDataRowExcel}:${col}${lastRow}`;
     const title = String(headerText || '').replace(/\n/g,' ');
     validations.push({
       sqref,
@@ -7434,11 +7447,74 @@ function isAllListOneLineIdentityHeader(headerText, colIndex){
   return /^(生徒番号|氏名|生徒名|カナ|読み仮名)$/.test(t);
 }
 
+
+function allListInputTwoRowHeaderParts(headerText){
+  const h = normalizeAllListHeaderText(headerText);
+  const compact = h.replace(/[\s\n\r　]+/g,'');
+  const basic = new Set(['学年','生徒番号','氏名','生徒名','カナ','読み仮名','高校','担当','備考','入力用備考','全員分リスト備考','確認メモ']);
+  if(basic.has(compact)) return {top:h, sub:h, merge:true};
+  const lines = h.split(/\n+/).map(x=>x.trim()).filter(Boolean);
+  if(lines.length >= 2){
+    const sub = lines[lines.length-1];
+    const top = lines.slice(0,-1).join('\n') || h;
+    return {top, sub, merge:false};
+  }
+  return {top:h, sub:h, merge:true};
+}
+function buildAllStudentInputTwoRowAoa(fullAoa){
+  // 助手が入力する更新シートも、印刷用と同じく「大項目 / 入力項目」の2段見出しにする。
+  // 内部処理・印刷用生成は従来の1段ヘッダーを正本にしたまま、Excelに書く直前だけ表示用へ変換する。
+  if(!fullAoa || fullAoa.length < 2) return fullAoa;
+  const title = Array.isArray(fullAoa[0]) ? fullAoa[0].slice() : [String(fullAoa[0] || '')];
+  const header = fullAoa[1] || [];
+  const top=[], sub=[];
+  const merges=[];
+  for(let c=0;c<header.length;c++){
+    const p = allListInputTwoRowHeaderParts(header[c]);
+    top.push(p.top);
+    sub.push(p.sub);
+    if(p.merge) merges.push({s:{r:1,c}, e:{r:2,c}});
+  }
+  // 同じ模試名・イベント名・同じ日付が横並びになっているところは1段目を横結合する。
+  let start=0;
+  while(start<top.length){
+    let end=start;
+    while(end+1<top.length && top[end+1]===top[start] && !allListInputTwoRowHeaderParts(header[start]).merge){ end++; }
+    if(end>start) merges.push({s:{r:1,c:start}, e:{r:1,c:end}});
+    start=end+1;
+  }
+  const out=[title, top, sub, ...fullAoa.slice(2).map(r => Array.isArray(r) ? r.slice() : [])];
+  out._allListOriginalAoa = fullAoa;
+  out._allListInputTwoRowHeader = true;
+  out._allListInputMerges = merges;
+  if(Array.isArray(fullAoa._allListConflictCells)){
+    out._allListConflictCells = fullAoa._allListConflictCells.map(k => {
+      const [r,c] = String(k).split(':').map(Number);
+      return Number.isFinite(r) && Number.isFinite(c) ? `${r+1}:${c}` : k;
+    });
+  }
+  if(Array.isArray(fullAoa._allListManualOverrideCells)){
+    out._allListManualOverrideCells = fullAoa._allListManualOverrideCells.map(k => {
+      const [r,c] = String(k).split(':').map(Number);
+      return Number.isFinite(r) && Number.isFinite(c) ? `${r+1}:${c}` : k;
+    });
+  }
+  return out;
+}
+function allListInputEffectiveHeader(aoa){
+  if(aoa && aoa._allListOriginalAoa && aoa._allListOriginalAoa[1]) return aoa._allListOriginalAoa[1];
+  return aoa?.[1] || [];
+}
+function allListInputDataStartRowIndex(aoa){
+  return aoa && aoa._allListInputTwoRowHeader ? 3 : 2; // 0-indexのデータ開始行
+}
 function styleAllStudentGradeSheet(ws, aoa){
   const colCount = Math.max(...aoa.map(r => r.length));
+  const effectiveHeader = allListInputEffectiveHeader(aoa);
+  const inputDataStart = allListInputDataStartRowIndex(aoa);
   const widths = [];
   for(let c=0;c<colCount;c++){
-    const h=String(aoa[1]?.[c]||'');
+    const h=String(effectiveHeader?.[c]||aoa[1]?.[c]||'');
     if(c===0) widths.push(5);          // 学年
     else if(c===1) widths.push(12);    // 生徒番号（掲示と同じフォントで大きく1行表示）
     else if(c===2) widths.push(18);    // 氏名（掲示と同じフォントで大きく1行表示）
@@ -7465,17 +7541,19 @@ function styleAllStudentGradeSheet(ws, aoa){
   }
   const range = applyNiceSheetSettings(ws, aoa, widths, {rows:{min:18,max:78,header:38,pxPerLine:13}});
   ws['!rows'][0] = {hpt:28};
-  // 2行目の見出しは高すぎると入力領域が狭くなるため、従来の約半分にする。
-  ws['!rows'][1] = {hpt:19};
-  // 助手用の更新入力シートは、下にスクロールしても1行目タイトル・2行目見出しを固定する。
+  // 入力用も2段見出し。1段目は模試名/イベント名、2段目は回答・Comiru等。
+  ws['!rows'][1] = {hpt:17};
+  if(aoa._allListInputTwoRowHeader) ws['!rows'][2] = {hpt:18};
+  // 助手用の更新入力シートは、下にスクロールしてもタイトル・2段見出しを固定する。
   // さらに左3列も固定して、生徒名を見失わないようにする。
-  setWorksheetFreezePane(ws, 3, 2, 'D3', 'bottomRight');
+  setWorksheetFreezePane(ws, 3, aoa._allListInputTwoRowHeader ? 3 : 2, aoa._allListInputTwoRowHeader ? 'D4' : 'D3', 'bottomRight');
   allListSetInitialOpenZoom(ws, aoa, {targetWch:112, minZoom:45, maxZoom:100});
   ws['!pageSetup'] = {orientation:'landscape', paperSize:12, fitToWidth:1, fitToHeight:1};
   ws['!margins'] = {left:0.12, right:0.12, top:0.20, bottom:0.20, header:0.05, footer:0.05};
   if(colCount > 1){
     ws['!merges'] = ws['!merges'] || [];
     ws['!merges'].push({s:{r:0,c:0}, e:{r:0,c:colCount-1}});
+    if(Array.isArray(aoa._allListInputMerges)) ws['!merges'].push(...aoa._allListInputMerges);
   }
   allListApplyDropdowns(ws, aoa);
   const border = {top:{style:'thin',color:{rgb:'98A2B3'}},bottom:{style:'thin',color:{rgb:'98A2B3'}},left:{style:'thin',color:{rgb:'98A2B3'}},right:{style:'thin',color:{rgb:'98A2B3'}}};
@@ -7497,13 +7575,13 @@ function styleAllStudentGradeSheet(ws, aoa){
   const conflictCells = new Set(Array.isArray(aoa._allListConflictCells) ? aoa._allListConflictCells : []);
   setRangeStyle(ws, range, (R,C,cell)=>{
     const cellText = cell && cell.v != null ? String(cell.v) : '';
-    const isBangMissing = R>1 && cell && typeof cell.v === 'string' && cell.v.startsWith('!');
+    const isBangMissing = R>=inputDataStart && cell && typeof cell.v === 'string' && cell.v.startsWith('!');
     if(isBangMissing) cell.v = cell.v.slice(1);
     const text = cell && cell.v != null ? String(cell.v) : cellText;
-    const headerText = String(aoa[1]?.[C] || '');
+    const headerText = String(effectiveHeader?.[C] || aoa[1]?.[C] || '');
     const isExtra = /(?:小規模\s*)?\d+\n/.test(headerText);
-    const isAllListDirectRedValue = R>1 && /^(×|不受験|未|未入力)$/.test(String(text || '').trim());
-    const isMissing = R>1 && (
+    const isAllListDirectRedValue = R>=inputDataStart && /^(×|不受験|未|未入力)$/.test(String(text || '').trim());
+    const isMissing = R>=inputDataStart && (
       isBangMissing ||
       isAllListDirectRedValue ||
       (/\n科目リスト$/.test(headerText) && text === '未入力') ||
@@ -7515,15 +7593,16 @@ function styleAllStudentGradeSheet(ws, aoa){
     const identityFont = oneLineIdentity && R > 1
       ? {name:inputListFontName, sz:allListIdentityDisplayFontSize(text, C, false), bold:true, color:{rgb:'000000'}}
       : null;
-    const style = {font:identityFont || (R===0?fontTitle:(R===1?fontHeader:fontBase)), alignment:{vertical:'center', horizontal:'center', wrapText:!oneLineIdentity, shrinkToFit:true}, border};
+    const isHeaderRow = R > 0 && R < inputDataStart;
+    const style = {font:identityFont || (R===0?fontTitle:(isHeaderRow?fontHeader:fontBase)), alignment:{vertical:'center', horizontal:'center', wrapText:!oneLineIdentity, shrinkToFit:true}, border};
     if(oneLineIdentity){
       style.alignment.horizontal = 'center';
       style.alignment.vertical = 'center';
     }
     if(R===0) style.fill = titleFill;
-    else if(R===1) style.fill = headerFill;
+    else if(isHeaderRow) style.fill = headerFill;
     else if(C<=3) style.fill = nameFill;
-    else if(R>1 && C>=8){
+    else if(R>=inputDataStart && C>=8){
       if(headerText.includes('\n予定')) style.fill = planFill;
       else if(headerText.includes('\n結果')) style.fill = resultFill;
       else if(isExtra) style.fill = extraFill;
@@ -8360,8 +8439,9 @@ async function downloadAllStudentList(){
 
     const wb = XLSX.utils.book_new();
     for(const item of gradeAoas){
-      const ws = aoaToSheet(item.aoa);
-      styleAllStudentGradeSheet(ws, item.aoa);
+      const inputAoa = buildAllStudentInputTwoRowAoa(item.aoa);
+      const ws = aoaToSheet(inputAoa);
+      styleAllStudentGradeSheet(ws, inputAoa);
       XLSX.utils.book_append_sheet(wb, ws, safeSheetName(`${item.grade}更新入力(助手用)`));
 
       const printAoa = buildAllStudentPrintAoaFromFullAoa(item.grade, item.aoa);
