@@ -377,7 +377,7 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
 }
 
 </style>
-<!-- 精査済み: 入力用2段見出し・各項目1列・入力用行高最低32pt・毎日掲示40pt版 -->
+<!-- 精査済み: 入力用2段見出し・各項目1列・入力用行高32pt最終ロック・毎日掲示40pt版 -->
 </head>
 <body>
 <header>
@@ -7578,6 +7578,25 @@ function allListInputEffectiveHeader(aoa){
 function allListInputDataStartRowIndex(aoa){
   return aoa && aoa._allListInputTwoRowHeader ? 3 : 2; // 0-indexのデータ開始行
 }
+
+function forceAllStudentInputRowsMinimum32(ws, aoa){
+  // 最終ロック用。古い自動行高処理が後ろから勝っても、入力用シートだけは必ずここで32pt以上に戻す。
+  if(!ws) return;
+  const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:A1');
+  const rowCount = Math.max(range.e.r + 1, Array.isArray(aoa) ? aoa.length : 0);
+  const rows = ws['!rows'] || [];
+  for(let r=0; r<rowCount; r++){
+    const cur = rows[r] || {};
+    const curH = Number(cur.hpt || 0);
+    rows[r] = Object.assign({}, cur, {hpt: Math.max(32, curH || 32)});
+  }
+  // 2段見出しもデータ行と同じ32ptで固定。入力中に見やすく、下スクロール時も高さが崩れないようにする。
+  rows[0] = Object.assign({}, rows[0] || {}, {hpt:32});
+  rows[1] = Object.assign({}, rows[1] || {}, {hpt:32});
+  if(aoa && aoa._allListInputTwoRowHeader) rows[2] = Object.assign({}, rows[2] || {}, {hpt:32});
+  ws['!rows'] = rows;
+}
+
 function styleAllStudentGradeSheet(ws, aoa){
   const colCount = Math.max(...aoa.map(r => r.length));
   const effectiveHeader = allListInputEffectiveHeader(aoa);
@@ -7609,11 +7628,10 @@ function styleAllStudentGradeSheet(ws, aoa){
     else if(/\n結果$/.test(h)) widths.push(12);
     else widths.push(16);
   }
-  const range = applyNiceSheetSettings(ws, aoa, widths, {rows:{min:32,max:96,header:38,pxPerLine:13}});
-  ws['!rows'][0] = {hpt:28};
-  // 入力用も2段見出し。1段目は模試名/イベント名、2段目は回答・Comiru等。
-  ws['!rows'][1] = {hpt:32};
-  if(aoa._allListInputTwoRowHeader) ws['!rows'][2] = {hpt:32};
+  const range = applyNiceSheetSettings(ws, aoa, widths, {rows:{min:32,max:96,header:32,pxPerLine:13}});
+  // 入力用の行高は最終的に32pt以上でロックする。
+  // ここで先に入れて、後段の結合・入力規則・固定表示処理のあとにも再度入れる。
+  forceAllStudentInputRowsMinimum32(ws, aoa);
   // 助手用の更新入力シートは、下にスクロールしてもタイトル・2段見出しを固定する。
   // さらに左3列も固定して、生徒名を見失わないようにする。
   setWorksheetFreezePane(ws, 3, aoa._allListInputTwoRowHeader ? 3 : 2, aoa._allListInputTwoRowHeader ? 'D4' : 'D3', 'bottomRight');
@@ -7626,6 +7644,8 @@ function styleAllStudentGradeSheet(ws, aoa){
     if(Array.isArray(aoa._allListInputMerges)) ws['!merges'].push(...aoa._allListInputMerges);
   }
   allListApplyDropdowns(ws, aoa);
+  // 最後にも再適用。これで古い自動行高処理や入力規則処理が混ざっても入力用の高さが戻らない。
+  forceAllStudentInputRowsMinimum32(ws, aoa);
   const border = {top:{style:'thin',color:{rgb:'98A2B3'}},bottom:{style:'thin',color:{rgb:'98A2B3'}},left:{style:'thin',color:{rgb:'98A2B3'}},right:{style:'thin',color:{rgb:'98A2B3'}}};
   const titleFill = {fgColor:{rgb:'DBEAFE'}};
   const headerFill = {fgColor:{rgb:'E0F2FE'}};
