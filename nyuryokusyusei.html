@@ -2798,10 +2798,10 @@ function applyExamMasterFromRestoredMemory(mem, sourceLabel='復元JSON'){
   // 模試マスタは、個人JSON / group JSON からは復元しない。
   // 予定復元用JSONに古い examMaster が混ざっていると、現在の模試マスタを上書きして
   // 対象学年なのに入力欄へ出ない原因になるため、保存復元フォルダー/json の
-  // settings_exam_master.json または exam_master.json 由来だけを採用する。
+  // exam_master.json 由来を正本とし、settings_exam_master.json は正本が無い場合の移行用だけ採用する。
   const type=String(mem.type||'');
   const src=String(sourceLabel||'');
-  const isStandaloneMaster = type==='master-settings' || type==='exam-master' || /settings_exam_master\.json|exam_master\.json|保存用フォルダ既存マスタ/.test(src);
+  const isStandaloneMaster = type==='master-settings' || type==='exam-master' || /master-files|settings_exam_master\.json|exam_master\.json|保存用フォルダ既存マスタ/.test(src);
   if(!isStandaloneMaster) return false;
 
   const trusted=masterTargetsTrusted(mem);
@@ -2838,32 +2838,34 @@ function standaloneSavedAt(mem){
   return '';
 }
 async function writeMasterSettingsFilesToShared(mem){
-  // 重要：ここは再帰呼び出し禁止。
-  // 旧版では await writeMasterSettingsFilesToShared(mem) と自分自身を呼んでしまい、
-  // RangeErrorで保存復元フォルダー/json へマスタJSONが書き出されていなかった。
-  // 統合用は保存復元フォルダー/json 内の settings_exam_master.json / exam_master.json / event_master.json を読むため、
-  // ここで必ず3系統を同時保存する。
+  // v20260820_1916 方針：正本を分離する。
+  // settings_exam_master.json は古い版からの移行用に「読むだけ」。今後は書かない。
+  // 正本：exam_master.json / event_master.json / subject_templates.json / comment_master.json
   const payload = mem || buildMasterSettingsPayload(new Date().toISOString());
-  await writeJsonToShared('settings_exam_master.json', payload);
   await writeJsonToShared('exam_master.json', {
-    version:3,
+    version:4,
     type:'exam-master',
     targetRestoreVersion:MASTER_TARGET_RESTORE_VERSION,
     examMaster:payload.examMaster || [],
     examTargetHistory:payload.examTargetHistory || [],
-    subjectTemplates:payload.subjectTemplates || [],
     savedAt:payload.savedAt
   });
   await writeJsonToShared('event_master.json', {
-    version:3,
+    version:4,
     type:'event-master',
     targetRestoreVersion:MASTER_TARGET_RESTORE_VERSION,
     eventMaster:payload.eventMaster || [],
     eventTargetHistory:payload.eventTargetHistory || [],
     savedAt:payload.savedAt
   });
+  await writeJsonToShared('subject_templates.json', {
+    version:4,
+    type:'subject-templates',
+    subjectTemplates:payload.subjectTemplates || [],
+    savedAt:payload.savedAt
+  });
   await writeJsonToShared('comment_master.json', {
-    version:3,
+    version:4,
     type:'comment-master',
     targetRestoreVersion:MASTER_TARGET_RESTORE_VERSION,
     commentMaster:payload.commentMaster || [],
@@ -2872,42 +2874,47 @@ async function writeMasterSettingsFilesToShared(mem){
   });
 }
 async function readMasterSettingsFilesFromShared(){
-  const settings = await readJsonFromShared('settings_exam_master.json');
-  const eventOnly = await readJsonFromShared('event_master.json');
+  // 正本優先で読む。settings_exam_master.json は正本が無い項目だけを埋める移行用。
   const examOnly = await readJsonFromShared('exam_master.json');
+  const eventOnly = await readJsonFromShared('event_master.json');
+  const subjectOnly = await readJsonFromShared('subject_templates.json');
   const commentOnly = await readJsonFromShared('comment_master.json');
-  if(!settings && !eventOnly && !examOnly && !commentOnly) return null;
-  const merged = Object.assign({version:3,type:'master-settings'}, settings || {});
-  const settingsSavedAt = String((settings && settings.savedAt) || '');
+  const settings = await readJsonFromShared('settings_exam_master.json');
+  if(!settings && !eventOnly && !examOnly && !subjectOnly && !commentOnly) return null;
 
-  const eventRows = extractStandaloneRows(eventOnly, 'eventMaster');
-  if(eventRows.length && (!Array.isArray(merged.eventMaster) || !merged.eventMaster.length || standaloneSavedAt(eventOnly) >= settingsSavedAt)){
-    merged.eventMaster = eventRows;
-  }
-  if(eventOnly && Array.isArray(eventOnly.eventTargetHistory) && (!Array.isArray(merged.eventTargetHistory) || standaloneSavedAt(eventOnly) >= settingsSavedAt)){
-    merged.eventTargetHistory = eventOnly.eventTargetHistory;
-  }
+  const merged = {
+    version:4,
+    type:'master-settings',
+    targetRestoreVersion:MASTER_TARGET_RESTORE_VERSION,
+    examMaster:[], eventMaster:[], subjectTemplates:[], commentMaster:[],
+    examTargetHistory:[], eventTargetHistory:[], commentTargetHistory:[],
+    migratedFromSettings:false,
+    savedAt:''
+  };
 
   const examRows = extractStandaloneRows(examOnly, 'examMaster');
-  if(examRows.length && (!Array.isArray(merged.examMaster) || !merged.examMaster.length || standaloneSavedAt(examOnly) >= settingsSavedAt)){
-    merged.examMaster = examRows;
-  }
-  if(examOnly && Array.isArray(examOnly.examTargetHistory) && (!Array.isArray(merged.examTargetHistory) || standaloneSavedAt(examOnly) >= settingsSavedAt)){
-    merged.examTargetHistory = examOnly.examTargetHistory;
-  }
-  if(examOnly && Array.isArray(examOnly.subjectTemplates) && (!Array.isArray(merged.subjectTemplates) || standaloneSavedAt(examOnly) >= settingsSavedAt)){
-    merged.subjectTemplates = examOnly.subjectTemplates;
-  }
+  if(examRows.length) merged.examMaster = examRows;
+  else if(settings && Array.isArray(settings.examMaster)) { merged.examMaster = settings.examMaster; merged.migratedFromSettings = true; }
+  if(examOnly && Array.isArray(examOnly.examTargetHistory)) merged.examTargetHistory = examOnly.examTargetHistory;
+  else if(settings && Array.isArray(settings.examTargetHistory)) { merged.examTargetHistory = settings.examTargetHistory; merged.migratedFromSettings = true; }
+
+  const eventRows = extractStandaloneRows(eventOnly, 'eventMaster');
+  if(eventRows.length) merged.eventMaster = eventRows;
+  else if(settings && Array.isArray(settings.eventMaster)) { merged.eventMaster = settings.eventMaster; merged.migratedFromSettings = true; }
+  if(eventOnly && Array.isArray(eventOnly.eventTargetHistory)) merged.eventTargetHistory = eventOnly.eventTargetHistory;
+  else if(settings && Array.isArray(settings.eventTargetHistory)) { merged.eventTargetHistory = settings.eventTargetHistory; merged.migratedFromSettings = true; }
+
+  const subjectRows = extractStandaloneRows(subjectOnly, 'subjectTemplates');
+  if(subjectRows.length) merged.subjectTemplates = subjectRows;
+  else if(settings && Array.isArray(settings.subjectTemplates)) { merged.subjectTemplates = settings.subjectTemplates; merged.migratedFromSettings = true; }
 
   const commentRows = extractStandaloneRows(commentOnly, 'commentMaster');
-  if(commentRows.length && (!Array.isArray(merged.commentMaster) || !merged.commentMaster.length || standaloneSavedAt(commentOnly) >= settingsSavedAt)){
-    merged.commentMaster = commentRows;
-  }
-  if(commentOnly && Array.isArray(commentOnly.commentTargetHistory) && (!Array.isArray(merged.commentTargetHistory) || standaloneSavedAt(commentOnly) >= settingsSavedAt)){
-    merged.commentTargetHistory = commentOnly.commentTargetHistory;
-  }
+  if(commentRows.length) merged.commentMaster = commentRows;
+  else if(settings && Array.isArray(settings.commentMaster)) { merged.commentMaster = settings.commentMaster; merged.migratedFromSettings = true; }
+  if(commentOnly && Array.isArray(commentOnly.commentTargetHistory)) merged.commentTargetHistory = commentOnly.commentTargetHistory;
+  else if(settings && Array.isArray(settings.commentTargetHistory)) { merged.commentTargetHistory = settings.commentTargetHistory; merged.migratedFromSettings = true; }
 
-  merged.savedAt = merged.savedAt || standaloneSavedAt(eventOnly) || standaloneSavedAt(examOnly) || standaloneSavedAt(commentOnly) || new Date().toISOString();
+  merged.savedAt = standaloneSavedAt(examOnly) || standaloneSavedAt(eventOnly) || standaloneSavedAt(subjectOnly) || standaloneSavedAt(commentOnly) || standaloneSavedAt(settings) || new Date().toISOString();
   return merged;
 }
 function persistMasterPanelsToLocalForSave(){
@@ -3484,7 +3491,7 @@ async function saveEventMasterFromPanel(){
     await saveMasterSettingsWithNormalSaveFolder(false);
     const savedAt=new Date().toLocaleString('ja-JP');
     const targeted=rows.filter(ev=>itemHasAnyTarget(ev)).length;
-    showSaveInfo(`イベントマスタを保存復元フォルダー/jsonへ保存しました。\nイベントマスタ ${rows.length}件 / 対象指定あり ${targeted}件 / 保存時刻 ${savedAt}\n保存ファイル: settings_exam_master.json・event_master.json`);
+    showSaveInfo(`イベントマスタを保存復元フォルダー/jsonへ保存しました。\nイベントマスタ ${rows.length}件 / 対象指定あり ${targeted}件 / 保存時刻 ${savedAt}\n保存ファイル: event_master.json・subject_templates.json・exam_master.json・comment_master.json（settings_exam_master.jsonは移行用で書き込みません）`);
     alert(`イベントマスタを保存し、保存復元フォルダー/json に反映しました。\nイベントマスタ ${rows.length}件\n対象指定あり ${targeted}件`);
   }catch(e){
     console.error(e);
@@ -4823,7 +4830,7 @@ async function saveSharedFolder(){
 async function applySharedSettingsIfAny(){
   const settings=await readMasterSettingsFilesFromShared();
   if(settings){
-    applyExamMasterFromRestoredMemory(settings, 'settings_exam_master.json');
+    applyExamMasterFromRestoredMemory(settings, 'master-files');
     if(Array.isArray(settings.eventMaster)) saveEventMasterData(settings.eventMaster);
     if(Array.isArray(settings.commentMaster)) saveCommentMasterData(settings.commentMaster);
     if(Array.isArray(settings.eventTargetHistory)) saveEventTargetHistory(settings.eventTargetHistory);
@@ -5754,7 +5761,7 @@ async function restoreInterviewDataFromShared(names){
     Object.assign(studentData, applyRestoredStudentMapForInput(groupMem.studentData||{}));
     applyRosterProfilesToStudents(students);
     // 個人JSON / group JSON内のマスタ情報は復元しない。
-    // 保存復元フォルダー/json の event_master.json / settings_exam_master.json だけを正とする。
+    // 保存復元フォルダー/json の event_master.json / exam_master.json / subject_templates.json を正とする。settings_exam_master.jsonは移行用だけ。
     applyExamMasterFromRestoredMemory(groupMem, 'グループJSON');
     renderExamMasterPanel(); renderEventMasterPanel(); renderCommentMasterPanel();
     await applyAllStudentListOverridesToInput(students);
@@ -5875,8 +5882,8 @@ async function writeCurrentLocalMasterSettingsToShared(showAlert=false){
   const mem=buildMasterSettingsMemoryFromLocal(new Date().toISOString());
   await writeMasterSettingsFilesToShared(mem);
   if(showAlert){
-    showSaveInfo(`模試・イベント・コメントマスタを保存用フォルダに保存しました（${new Date(mem.savedAt).toLocaleString('ja-JP')}）`);
-    alert('模試マスタ・イベントマスタ・コメントマスタを保存用フォルダ直下の「json」フォルダに保存しました。\nsettings_exam_master.json / exam_master.json / event_master.json / comment_master.json を更新しました。');
+    showSaveInfo(`模試・イベント・科目型・コメントマスタを保存用フォルダに保存しました（${new Date(mem.savedAt).toLocaleString('ja-JP')}）\n正本: exam_master.json / event_master.json / subject_templates.json / comment_master.json\nsettings_exam_master.json は移行用のため書き込みません。`);
+    alert('模試マスタ・イベントマスタ・科目型マスタ・コメントマスタを保存用フォルダ直下の「json」フォルダに保存しました。\nexam_master.json / event_master.json / subject_templates.json / comment_master.json を更新しました。\nsettings_exam_master.json は移行用のため新規書き込みしません。');
   }
   return true;
 }
@@ -5908,7 +5915,7 @@ async function loadMasterSettingsFromShared(showAlert=true){
       return false;
     }
     const trusted=masterTargetsTrusted(settings);
-    applyExamMasterFromRestoredMemory(settings, 'settings_exam_master.json');
+    applyExamMasterFromRestoredMemory(settings, 'master-files');
     if(Array.isArray(settings.eventMaster)) saveEventMasterData(settings.eventMaster);
     if(Array.isArray(settings.commentMaster)) saveCommentMasterData(settings.commentMaster);
     if(Array.isArray(settings.eventTargetHistory)) saveEventTargetHistory(settings.eventTargetHistory);
