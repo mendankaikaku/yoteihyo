@@ -4199,10 +4199,10 @@ async function loadGroup(){
   students=[...names];
   $('#studentNames').value=students.join(', ');
   Object.assign(studentData, applyRestoredStudentMapForInput(mem.studentData||{}));
+  // 重要：個人JSON / group JSON内のマスタ情報は、復元時に採用しない。
+  // マスタは保存復元フォルダー/json の standalone マスタJSONだけを正とする。
+  // 古い group JSON に空の eventMaster が残っていると、復元時に最新イベントマスタを消してしまうため。
   applyExamMasterFromRestoredMemory(mem, '復元JSON');
-  if(Array.isArray(mem.eventMaster)) saveEventMasterData(mem.eventMaster); if(Array.isArray(mem.commentMaster)) saveCommentMasterData(mem.commentMaster);
-  if(Array.isArray(mem.eventTargetHistory)) saveEventTargetHistory(mem.eventTargetHistory); if(Array.isArray(mem.commentTargetHistory)) saveCommentTargetHistory(mem.commentTargetHistory);
-  if(Array.isArray(mem.subjectTemplates)) saveSubjectTemplates(mem.subjectTemplates);
   renderExamMasterPanel();
   renderEventMasterPanel();
   if(dir){
@@ -4752,8 +4752,9 @@ async function loadSharedGroup(){
     if(mem.weekStart) meetingPrepRestoredWeekStart = mem.weekStart;
     Object.assign(studentData, applyRestoredStudentMapForInput(mem.studentData||{}));
     if(mem.lessonCount||mem.otherCount){students.forEach(n=>{const d=ensureStudent(n); if(mem.lessonCount)d.lessonCount=mem.lessonCount; if(mem.otherCount)d.otherCount=mem.otherCount;});}
-    applyExamMasterFromRestoredMemory(mem, '復元JSON'); if(Array.isArray(mem.eventMaster)) saveEventMasterData(mem.eventMaster); if(Array.isArray(mem.commentMaster)) saveCommentMasterData(mem.commentMaster); if(Array.isArray(mem.eventTargetHistory)) saveEventTargetHistory(mem.eventTargetHistory); if(Array.isArray(mem.commentTargetHistory)) saveCommentTargetHistory(mem.commentTargetHistory);
-    if(Array.isArray(mem.subjectTemplates)) saveSubjectTemplates(mem.subjectTemplates);
+    // 個人JSON / group JSON内のマスタ情報は復元しない。
+    // 最新マスタは applySharedSettingsIfAny() で standalone JSON から先に反映済み。
+    applyExamMasterFromRestoredMemory(mem, '復元JSON');
     renderExamMasterPanel(); renderEventMasterPanel(); renderCommentMasterPanel();
     renderStudents();
     const savedAt=mem.savedAt?new Date(mem.savedAt).toLocaleString('ja-JP'):'保存日時不明';
@@ -5562,12 +5563,9 @@ async function restoreInterviewDataFromShared(names){
     $('#studentNames').value=students.join(', ');
     if(groupMem.weekStart) meetingPrepRestoredWeekStart = groupMem.weekStart;
     Object.assign(studentData, applyRestoredStudentMapForInput(groupMem.studentData||{}));
+    // 個人JSON / group JSON内のマスタ情報は復元しない。
+    // 保存復元フォルダー/json の event_master.json / settings_exam_master.json だけを正とする。
     applyExamMasterFromRestoredMemory(groupMem, 'グループJSON');
-    if(Array.isArray(groupMem.eventTargetHistory)) saveEventTargetHistory(groupMem.eventTargetHistory);
-    if(Array.isArray(groupMem.commentTargetHistory)) saveCommentTargetHistory(groupMem.commentTargetHistory);
-    if(Array.isArray(groupMem.eventMaster)) saveEventMasterData(groupMem.eventMaster);
-    if(Array.isArray(groupMem.commentMaster)) saveCommentMasterData(groupMem.commentMaster);
-    if(Array.isArray(groupMem.subjectTemplates)) saveSubjectTemplates(groupMem.subjectTemplates);
     renderExamMasterPanel(); renderEventMasterPanel(); renderCommentMasterPanel();
     await applyAllStudentListOverridesToInput(students);
     await applySubjectListOverridesToInput(students);
