@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>面談予定入力アプリ（2026-08-20 19:53 出力）</title>
+<title>面談予定入力アプリ（2026-08-20 20:33 出力）</title>
 <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
 <script src="./libs/xlsx.bundle.js"></script>
 <script></script>
@@ -6783,7 +6783,7 @@ function buildMeetingPrepPrintHtml(resultRecords, weeklyHtml){
     body+=`<section class="page prevResultPage sheetFront"><div class="sheetMark">1枚目 表</div><div class="fitPageShell"><div class="fitPageInner"><h1>面談準備資料：${esc(name)}</h1><div class="subline">対象日までの一週間：${esc(prevPeriod)} / 作成：${now.toLocaleString('ja-JP')}</div><h2>1. 予定・結果カレンダー</h2>${meetingPrepScheduleTableHtml(name,resultRecords)}</div></div></section>`;
     body+=`<section class="page sheetBack"><div class="sheetMark">1枚目 裏</div><h1>面談準備資料：${esc(name)}</h1><div class="subline">今週：${esc(currentPeriod)}</div><h2>2. 今週の記入用予定表・模試・イベント</h2>${meetingPrepCurrentPlanHtml(name)}</section>`;
     body+=`<section class="page weeklyPage sheetFront"><div class="sheetMark">2枚目 表</div><h1>面談準備資料：${esc(name)}</h1><h2>3. 面談フロー</h2>${weeklyHtml}</section>`;
-    body+=`<section class="page goukakuPrintPage sheetBack${isLastStudent ? ' isLastPrintPage' : ''}"><div class="sheetMark">2枚目 裏</div><h1>面談準備資料：${esc(name)}</h1><h2>4. 合格設計図</h2>${meetingPrepGoukakuDesignHtml(name)}</section>`;
+    body+=`<section class="page goukakuPrintPage sheetBack${isLastStudent ? ' isLastPrintPage' : ''}"><div class="sheetMark">4枚目</div><h1>面談準備資料：${esc(name)}</h1><h2>4. 通期講座受講計画</h2>${meetingPrepGoukakuDesignHtml(name)}</section>`;
   });
   return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>面談準備資料</title><style>
     @page{size:A4 portrait;margin:6mm;}
@@ -6801,7 +6801,7 @@ function buildMeetingPrepPrintHtml(resultRecords, weeklyHtml){
     .weeklyPage{padding:5mm;}
     .goukakuPrintPage{padding:4mm;overflow:hidden;display:flex;flex-direction:column;height:282mm!important;max-height:282mm!important}.goukakuPrintPage h1{font-size:10px;margin:0 0 .3mm;flex:0 0 auto}.goukakuPrintPage h2{font-size:8px;margin:0 0 .5mm;flex:0 0 auto;border-left:2px solid #2563eb;padding-left:3px}.goukakuPrintPage .muted{font-size:7px;margin-top:.5mm;flex:0 0 auto}.goukakuPrintPdf{height:auto;width:100%;flex:1 1 auto;min-height:0;border:1px solid #9ca3af;background:#f8fafc;overflow:hidden;position:relative;display:flex;align-items:center;justify-content:center}.goukakuPrintPdf iframe{width:100%;height:100%;border:0;background:#fff}.goukakuPrintPdf canvas.goukakuAllPagesCanvas{max-width:100%;max-height:100%;width:auto;height:auto;display:block;background:#fff}.goukakuPdfRenderStatus{position:absolute;left:4mm;right:4mm;bottom:4mm;padding:2mm;background:rgba(255,255,255,.92);border:1px solid #d1d5db;border-radius:4px;font-size:9px;color:#475569;text-align:center}.goukakuPrintPdf.rendered .goukakuFallbackPdf,.goukakuPrintPdf.rendered .goukakuPdfRenderStatus{display:none}.goukakuPrintPdf.fallback .goukakuPdfRenderStatus{background:#fff7ed;color:#9a3412;border-color:#fed7aa}.goukakuStyledSheetTable{border-collapse:collapse;width:max-content;min-width:100%;font-size:10px;line-height:1.2;table-layout:auto}.goukakuStyledSheetTable th,.goukakuStyledSheetTable td{border:1px solid #d0d5dd;padding:2px 4px;min-width:26px;max-width:180px;white-space:pre-wrap;word-break:break-word;vertical-align:middle}.goukakuStyledSheetTable .goukakuColHeader th,.goukakuStyledSheetTable .goukakuRowHeader{background:#f2f4f7;color:#475569;font-weight:800;text-align:center}.goukakuPrintExcelWrap{flex:1 1 auto;min-height:0;overflow:hidden;border:1px solid #9ca3af;background:#fff;position:relative;width:100%;height:auto}.goukakuPrintExcelFitInner{transform-origin:top left;width:max-content}.goukakuPrintExcelWrap .goukakuStyledSheetTable{width:max-content;min-width:0;font-size:7.6px;line-height:1.0;table-layout:auto}.goukakuPrintExcelWrap .goukakuStyledSheetTable th,.goukakuPrintExcelWrap .goukakuStyledSheetTable td{padding:.16mm .28mm;max-width:none;min-width:10px;white-space:pre-wrap;word-break:break-word}.goukakuPrintExcelWrap[data-fitted="1"]::after{content:"Excel実データ範囲をA4実寸で全面フィット";position:absolute;right:1.5mm;bottom:1.5mm;font-size:7px;color:#64748b;background:rgba(255,255,255,.78);padding:.4mm 1mm;border:1px solid #e5e7eb;border-radius:999px}.goukakuPrintTable{font-size:6.8px;table-layout:fixed;width:100%;line-height:1.12}.goukakuPrintTable th,.goukakuPrintTable td{padding:1px 2px;min-width:0;max-width:none;white-space:normal;word-break:break-word;}
     @media print{.printGuide{display:none!important}.page{break-after:auto!important;page-break-after:auto!important;}.page + .page{break-before:page!important;page-break-before:always!important;}}
-  </style><script src="./libs/pdf.min.js"><\/script></head><body><div class="printGuide">印刷設定：A4／縦／両面印刷オン／長辺とじ。各生徒はA4両面2枚：1枚目 表=前週確認、裏=今週記入、2枚目 表=面談フロー、裏=合格設計図。</div>${body}<script>
+  </style><script src="./libs/pdf.min.js"><\/script></head><body><div class="printGuide">印刷設定：A4／縦／両面印刷オン／長辺とじ。各生徒はA4 4ページ：1枚目=前週確認、2枚目=今週記入、3枚目=面談フロー、4枚目=通期講座受講計画。</div>${body}<script>
     function base64ToUint8Array(base64){
       var binary=atob(base64 || '');
       var len=binary.length;
@@ -9015,6 +9015,1210 @@ try{
   const btn=$('#loadGroupMemory');
   if(btn){btn.type='button';btn.disabled=false;btn.onclick=loadGroup;}
 }catch(e){}
+</script>
+<style>
+/* =========================================================
+   2026-08-20 20:28 通期講座受講計画：Book1列構造再現版
+   - 合格設計図を丸ごと重く表示せず、通期講座受講計画だけを抽出
+   - 17〜19行目相当の結合・列位置を維持
+   - 講座CD/講座名がある講座行だけ表示
+   - 色判定はしない。数字入力セルだけ編集対象。
+========================================================= */
+.goukakuPlanBox{border:1px solid #dbe4ef;border-radius:14px;background:#fff;margin-top:8px;overflow:hidden}
+.goukakuPlanHead{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#f8fafc;border-bottom:1px solid #dbe4ef;padding:9px 10px;font-weight:900}
+.goukakuPlanTitle{font-size:14px;color:#172033}.goukakuPlanMeta{font-size:11px;color:#64748b;font-weight:800;margin-top:2px}
+.goukakuPlanActions{display:flex;gap:7px;flex-wrap:wrap}.goukakuPlanActions button{min-height:30px;padding:6px 9px;font-size:12px;border-radius:9px}
+.goukakuPlanNotice{font-size:12px;color:#475569;background:#fff7ed;border-bottom:1px solid #fed7aa;padding:8px 10px;line-height:1.55}
+.goukakuPlanWrap{overflow:auto;max-height:380px;background:#fff;padding:8px}
+.goukakuPlanTable{border-collapse:collapse;width:max-content;min-width:100%;font-size:11px;background:#fff;table-layout:fixed}
+.goukakuPlanTable th,.goukakuPlanTable td{border:1px solid #9ca3af;padding:4px 5px;min-width:32px;max-width:220px;white-space:pre-wrap;word-break:break-word;vertical-align:middle;text-align:center;line-height:1.25}
+.goukakuPlanTable .planTitleCell{font-weight:900;font-size:14px;text-align:left;background:#dbeafe!important;color:#172033;padding:7px 9px}
+.goukakuPlanTable .planHeaderCell{font-weight:900;background:#eef2ff!important;color:#111827}
+.goukakuPlanTable .planPeriodCell{font-weight:900;background:#ecfdf5!important;color:#14532d}
+.goukakuPlanTable .planCourseCell{background:#fff;color:#172033}
+.goukakuPlanTable .planLeftCell{text-align:left;font-weight:800;min-width:78px}.goukakuPlanTable .planCourseName{text-align:left;min-width:260px;max-width:360px;font-weight:800}
+.goukakuPlanTable .planNumberCell{font-weight:900;font-size:15px;min-width:34px;cursor:text;outline:none;background:#fff}
+.goukakuPlanTable .planNumberCell:focus{background:#fffbea!important;box-shadow:inset 0 0 0 2px #f59e0b}.goukakuPlanTable .goukakuDirtyCell{background:#eff6ff!important;box-shadow:inset 0 0 0 2px #2563eb}
+.goukakuPlanEmpty{padding:10px;color:#64748b;font-size:12px;line-height:1.6}
+@media print{
+  .goukakuPlanBox{border:0;margin:0;overflow:visible}.goukakuPlanHead,.goukakuPlanNotice{break-inside:avoid}.goukakuPlanWrap{max-height:none;overflow:visible;padding:0}.goukakuPlanTable{font-size:10.5px}.goukakuPlanTable th,.goukakuPlanTable td{padding:3px 4px}.goukakuPlanTable .planTitleCell{font-size:15px}.goukakuPlanTable .planNumberCell{font-size:14px}.goukakuPlanActions{display:none!important}
+}
+</style>
+<script>
+// ============================================================
+// 2026-08-20 20:28 通期講座受講計画：Book1列構造再現版
+// 目的：Book1の17〜19行目相当を結合セルごと再現し、20行目以降は
+//       講座CD/講座名がある行だけ、元の列位置のまま表示・数字編集する。
+// ============================================================
+(function(){
+  function planCleanText(v){
+    let s=String(v ?? '').replace(/\u00a0/g,' ').trim();
+    if(!s) return '';
+    const fixed=[
+      ['教科キョウカ','教科'],['講座cdコウザ','講座cd'],['講座CDコウザ','講座CD'],['講座名コウザメイ','講座名'],['コマ数ス','コマ数'],
+      ['夏期講習期間カキコウキカン','夏期講習期間'],['仕上げ特訓(ＡＩ演習)期間シアトエンシュウキカン','仕上げ特訓(ＡＩ演習)期間'],
+      ['仕上げ特訓(ＡＩ演習)期間シアゲトックンエンシュウキカン','仕上げ特訓(ＡＩ演習)期間']
+    ];
+    fixed.forEach(([a,b])=>{s=s.replace(a,b);});
+    s=s.replace(/(通期講座受講計画\s*［講座判定テスト／確認テスト］いずれもＳＳ判定までやりきること！).*/,'$1');
+    s=s.replace(/(基礎力完成\s*→\s*受験科目の通期講座の受講修了).*/,'$1');
+    return s;
+  }
+  function planCellText(model,r,c){
+    return planCleanText(model?.rows?.[r]?.[c]?.text || '');
+  }
+  function planNorm(s){return String(s||'').replace(/[\s　]+/g,'').toLowerCase();}
+  function planFindCoursePlan(model){
+    const rows=model?.rows||[];
+    for(let r=0;r<rows.length;r++){
+      const joined=(rows[r]||[]).map(x=>planCleanText(x?.text||'')).join('|');
+      if(joined.includes('通期講座受講計画')) return r;
+    }
+    return -1;
+  }
+  function planMergeAt(model,r,c){
+    return (model?.merges||[]).find(m=>m.s.r<=r && m.e.r>=r && m.s.c<=c && m.e.c>=c) || null;
+  }
+  function planFindNonEmptyCol(row){
+    for(let c=0;c<(row||[]).length;c++) if(planCleanText(row[c]?.text||'')) return c;
+    return 0;
+  }
+  function planFindHeaderCols(model, headerRow, startCol, endCol){
+    let codeCol=-1,nameCol=-1,komaCol=-1;
+    for(let c=startCol;c<=endCol;c++){
+      const t=planNorm(planCellText(model,headerRow,c));
+      if(codeCol<0 && /講座(cd|ｃｄ|コード)/.test(t)) codeCol=c;
+      if(nameCol<0 && /講座名/.test(t)) nameCol=c;
+      if(komaCol<0 && /コマ数/.test(t)) komaCol=c;
+    }
+    return {codeCol,nameCol,komaCol, firstMonthCol:(komaCol>=0?komaCol+1:startCol)};
+  }
+  function planIsCourseRow(model,r,cols){
+    const code=cols.codeCol>=0 ? planCellText(model,r,cols.codeCol) : '';
+    let name='';
+    if(cols.nameCol>=0){
+      name=planCellText(model,r,cols.nameCol);
+      const m=planMergeAt(model,r,cols.nameCol);
+      if(!name && m){
+        for(let c=m.s.c;c<=m.e.c;c++){ name = name || planCellText(model,r,c); }
+      }
+    }
+    const n=planNorm(name), cd=planNorm(code);
+    if(!cd && !n) return false;
+    if(/講座名|講座cd|コマ数|教科/.test(cd+n)) return false;
+    return true;
+  }
+  function planBuild(model){
+    const titleRow=planFindCoursePlan(model);
+    if(titleRow<0) return null;
+    const titleCol=planFindNonEmptyCol(model.rows[titleRow]||[]);
+    const titleMerge=planMergeAt(model,titleRow,titleCol);
+    const startCol=titleMerge ? titleMerge.s.c : Math.max(0,titleCol);
+    const endCol=titleMerge ? titleMerge.e.c : Math.min((model.rows[titleRow]||[]).length-1,startCol+80);
+    const headerRows=[titleRow,titleRow+1,titleRow+2].filter(r=>r<(model.rows||[]).length);
+    const cols=planFindHeaderCols(model,titleRow+1,startCol,endCol);
+    const courseRows=[];
+    for(let r=titleRow+3;r<(model.rows||[]).length;r++){
+      if(planIsCourseRow(model,r,cols)) courseRows.push(r);
+    }
+    const displayRows=[...headerRows,...courseRows];
+    const rowMap=new Map(displayRows.map((r,i)=>[r,i]));
+    const merges=[];
+    (model.merges||[]).forEach(m=>{
+      if(!rowMap.has(m.s.r) || !rowMap.has(m.e.r)) return;
+      const sC=Math.max(m.s.c,startCol), eC=Math.min(m.e.c,endCol);
+      if(sC>endCol || eC<startCol || sC>eC) return;
+      merges.push({s:{r:rowMap.get(m.s.r),c:sC-startCol},e:{r:rowMap.get(m.e.r),c:eC-startCol}});
+    });
+    return {titleRow,startCol,endCol,displayRows,headerRows,courseRows,cols,merges,colCount:endCol-startCol+1};
+  }
+  function planCellClass(info, displayRi, originalRi, originalC, text){
+    if(displayRi===0) return 'planTitleCell';
+    if(displayRi===1) return 'planHeaderCell';
+    if(displayRi===2) return 'planPeriodCell';
+    const t=planNorm(text);
+    if(originalC===info.cols.nameCol) return 'planCourseCell planCourseName';
+    if(originalC<=info.cols.komaCol || /講座|教科|☑/.test(t)) return 'planCourseCell planLeftCell';
+    return 'planCourseCell planNumberCell';
+  }
+  function planEditable(info, displayRi, originalRi, originalC){
+    if(displayRi<3) return false;
+    // 月別4分割セルだけ編集対象。講座CD/講座名/コマ数までは触らない。
+    return originalC>=info.cols.firstMonthCol;
+  }
+  function goukakuCoursePlanHtml(item, name, options={}){
+    const model=item?.model;
+    const info=planBuild(model);
+    if(!info){
+      return '<div class="goukakuPlanEmpty">「通期講座受講計画」を見つけられませんでした。Book1形式でない場合は従来のマス目表示を使います。</div>';
+    }
+    const mergeStart=new Map(), covered=new Set();
+    info.merges.forEach(m=>{
+      const rs=m.e.r-m.s.r+1, cs=m.e.c-m.s.c+1;
+      if(rs<=1 && cs<=1) return;
+      mergeStart.set(`${m.s.r},${m.s.c}`,{rowspan:rs,colspan:cs});
+      for(let r=m.s.r;r<=m.e.r;r++) for(let c=m.s.c;c<=m.e.c;c++) if(r!==m.s.r||c!==m.s.c) covered.add(`${r},${c}`);
+    });
+    const dirtyCells=item?.editedCells||{};
+    let html='<table class="goukakuPlanTable"><tbody>';
+    info.displayRows.forEach((origR,di)=>{
+      html+='<tr>';
+      for(let c=0;c<info.colCount;c++){
+        if(covered.has(`${di},${c}`)) continue;
+        const origC=info.startCol+c;
+        const merge=mergeStart.get(`${di},${c}`)||{};
+        const addr=goukakuCellAddressFromModel(model,origR,origC);
+        const rawText=planCellText(model,origR,origC);
+        const dirty=Object.prototype.hasOwnProperty.call(dirtyCells,addr);
+        const shown=dirty?dirtyCells[addr]:rawText;
+        const cls=planCellClass(info,di,origR,origC,shown) + (dirty?' goukakuDirtyCell':'');
+        const canEdit=options.editable && planEditable(info,di,origR,origC);
+        const edit=canEdit?` contenteditable="true" spellcheck="false" data-goukaku-student="${escapeHtml(name)}" data-goukaku-sheet="${escapeHtml(item.sheetName||'')}" data-goukaku-cell="${escapeHtml(addr)}" data-goukaku-r="${origR}" data-goukaku-c="${origC}" title="${escapeHtml(addr)}"`:'';
+        const span=(merge.rowspan?` rowspan="${merge.rowspan}"`:'')+(merge.colspan?` colspan="${merge.colspan}"`:'');
+        const tag=(di<3?'th':'td');
+        html+=`<${tag} class="${cls}"${span}${edit}>${escapeHtml(shown||'').replace(/\n/g,'<br>')}</${tag}>`;
+      }
+      html+='</tr>';
+    });
+    html+='</tbody></table>';
+    html+=`<div class="hint" style="padding:7px 2px 0">抽出：見出し3行＋講座行${info.courseRows.length}行 / 列は元Excelの ${colName(info.startCol+1)}〜${colName(info.endCol+1)} を維持。色は無視、数字欄だけ編集対象。</div>`;
+    return html;
+  }
+  window.goukakuCoursePlanHtml=goukakuCoursePlanHtml;
+  function goukakuPlanBoxHtml(name){
+    const item=goukakuDesignSheets[name];
+    if(!item) return '<div class="goukakuPlanBox"><div class="goukakuPlanHead"><span>通期講座受講計画：未読み込み</span></div><div class="goukakuPlanEmpty">④復元で保存復元フォルダーを選ぶと、生徒フォルダー内の合格設計図Excelを探して表示します。</div></div>';
+    if(item.error) return `<div class="goukakuPlanBox"><div class="goukakuPlanHead"><span>合格設計図：読み込み失敗</span></div><div class="goukakuPlanEmpty" style="color:#dc2626">${escapeHtml(item.error)}</div></div>`;
+    if(item.kind==='pdf') return `<div class="goukakuPlanBox"><div class="goukakuPlanHead"><div><div class="goukakuPlanTitle">合格設計図PDF</div><div class="goukakuPlanMeta">${escapeHtml(item.fileName||'')}</div></div><div class="goukakuPlanActions"><button type="button" class="secondary small" data-open-goukaku="${escapeHtml(name)}">開く</button></div></div><div class="goukakuPlanEmpty">PDFは通期講座受講計画の抽出対象外です。Excel形式の合格設計図を置くと表抽出できます。</div></div>`;
+    const cnt=goukakuEditedCount(item);
+    return `<div class="goukakuPlanBox"><div class="goukakuPlanHead"><div><div class="goukakuPlanTitle">通期講座受講計画${cnt?`<span class="goukakuDirtyBadge">編集 ${cnt}セル</span>`:''}</div><div class="goukakuPlanMeta">${escapeHtml(item.fileName||'')} / ${escapeHtml(item.sheetName||'')}</div></div><div class="goukakuPlanActions"><button type="button" class="secondary small" data-open-goukaku="${escapeHtml(name)}">拡大</button><button type="button" class="secondary small" data-print-goukaku-plan="${escapeHtml(name)}">印刷</button><button type="button" class="secondary small" data-save-goukaku-excel="${escapeHtml(name)}">編集済みExcelを保存</button></div></div><div class="goukakuPlanNotice">Book1の17〜19行目相当を列位置・結合セルごと再現し、20行目以降は講座CDまたは講座名がある行だけ表示します。色は読まず、月別の数字欄だけ編集できます。</div><div class="goukakuPlanWrap">${goukakuCoursePlanHtml(item,name,{editable:true})}</div></div>`;
+  }
+  window.goukakuPanelHtml=function(name){ return goukakuPlanBoxHtml(name); };
+  window.openGoukakuModal=function(name){
+    const item=goukakuDesignSheets[name];
+    if(!item || item.error) return alert(`${name}の合格設計図はまだ読み込めていません。`);
+    $('#goukakuModalTitle').textContent=`${name} 通期講座受講計画（${item.fileName||''}${item.sheetName?' / '+item.sheetName:''}）`;
+    currentGoukakuModalName=name;
+    if(item.kind==='pdf'){
+      $('#goukakuModalBody').innerHTML=`<div class="goukakuPdfWrap"><iframe class="goukakuPdfFrame" src="${escapeHtml(item.pdfUrl||'')}"></iframe></div>`;
+    }else{
+      $('#goukakuModalBody').innerHTML=`<div class="goukakuPlanNotice">拡大表示です。数字欄を編集できます。保存は「編集済みExcelを保存」または⑤保存時の自動保存で反映します。</div><div class="goukakuPlanActions" style="padding:8px 0"><button type="button" class="secondary small" data-print-goukaku-plan="${escapeHtml(name)}">この表を印刷</button><button type="button" class="secondary small" data-save-goukaku-excel="${escapeHtml(name)}">編集済みExcelを保存</button></div><div class="goukakuPlanWrap" style="max-height:none">${goukakuCoursePlanHtml(item,name,{editable:true})}</div>`;
+      setTimeout(bindGoukakuButtons,0);
+    }
+    $('#goukakuModal').classList.add('open');
+    $('#goukakuModal').setAttribute('aria-hidden','false');
+  };
+  function printGoukakuPlan(name){
+    const item=goukakuDesignSheets[name];
+    if(!item || item.kind!=='excel') return alert('印刷できる通期講座受講計画がありません。');
+    const table=goukakuCoursePlanHtml(item,name,{editable:false});
+    const w=window.open('','_blank','noopener,width=1200,height=800');
+    if(!w) return alert('印刷画面を開けませんでした。ポップアップブロックを確認してください。');
+    w.document.write(`<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>${escapeHtml(name)} 通期講座受講計画</title><style>body{font-family:"Yu Gothic","Noto Sans JP",sans-serif;margin:12px;color:#111827}h1{font-size:18px;margin:0 0 8px}.meta{font-size:11px;color:#475569;margin-bottom:8px}.goukakuPlanTable{border-collapse:collapse;width:100%;font-size:10.5px;table-layout:fixed}.goukakuPlanTable th,.goukakuPlanTable td{border:1px solid #6b7280;padding:3px 4px;white-space:pre-wrap;word-break:break-word;text-align:center;vertical-align:middle;line-height:1.2}.planTitleCell{font-size:15px!important;font-weight:900;text-align:left!important;background:#dbeafe}.planHeaderCell{font-weight:900;background:#eef2ff}.planPeriodCell{font-weight:900;background:#ecfdf5;color:#14532d}.planCourseName{text-align:left!important;font-weight:900}.planLeftCell{text-align:left!important;font-weight:800}.planNumberCell{font-size:14px!important;font-weight:900}.hint{font-size:10px;color:#64748b;margin-top:6px}@page{size:A4 landscape;margin:8mm}@media print{body{margin:0}}</style></head><body><h1>${escapeHtml(name)} 通期講座受講計画</h1><div class="meta">${escapeHtml(item.fileName||'')} / ${escapeHtml(item.sheetName||'')}</div>${table}</body></html>`);
+    w.document.close();
+    setTimeout(()=>{w.focus();w.print();},300);
+  }
+  const oldBind=window.bindGoukakuButtons;
+  window.bindGoukakuButtons=function(){
+    if(typeof oldBind==='function') oldBind();
+    document.querySelectorAll('[data-print-goukaku-plan]').forEach(btn=>{
+      if(btn.dataset.printBound==='1') return;
+      btn.dataset.printBound='1';
+      btn.onclick=()=>printGoukakuPlan(btn.dataset.printGoukakuPlan);
+    });
+  };
+  const oldRecord=window.recordGoukakuCellEdit;
+  window.recordGoukakuCellEdit=function(el){
+    if(el && el.classList && el.classList.contains('planNumberCell')){
+      const v=String(el.innerText||'').trim();
+      if(v && !/^[0-9０-９]+(?:\.[0-9０-９]+)?$/.test(v)){
+        el.textContent=v.replace(/[^0-9０-９.]/g,'');
+      }
+    }
+    if(typeof oldRecord==='function') return oldRecord(el);
+  };
+})();
+</script>
+
+</body></html>`;
+}
+let __meetingPrepPrintBusy=false;
+function printHtmlInHiddenIframe(html){
+  // 印刷キャンセルを2回押す問題の対策：
+  // 1) 既存iframeを必ず消す 2) onload印刷を1回だけにする 3) afterprint/focus復帰でiframeを破棄する
+  if(__meetingPrepPrintBusy) return;
+  __meetingPrepPrintBusy=true;
+  const oldFrame=document.getElementById('meetingPrepPrintFrame');
+  if(oldFrame) oldFrame.remove();
+  const frame=document.createElement('iframe');
+  frame.id='meetingPrepPrintFrame';
+  frame.style.position='fixed';
+  frame.style.left='-10000px';
+  frame.style.top='0';
+  // 印刷前にA4相当の幅・高さでレイアウトさせる。
+  // 1px iframeだと合格設計図の自動フィット倍率が極小になってしまうため。
+  frame.style.width='210mm';
+  frame.style.height='297mm';
+  frame.style.border='0';
+  frame.style.opacity='0';
+  frame.style.pointerEvents='none';
+  frame.setAttribute('aria-hidden','true');
+  let printed=false;
+  let cleaned=false;
+  const cleanup=()=>{
+    if(cleaned) return;
+    cleaned=true;
+    setTimeout(()=>{
+      try{ frame.remove(); }catch(e){}
+      __meetingPrepPrintBusy=false;
+    },120);
+  };
+  frame.onload=()=>{
+    if(printed) return;
+    printed=true;
+    frame.onload=null;
+    setTimeout(async()=>{
+      try{
+        const w=frame.contentWindow;
+        if(!w){ cleanup(); return; }
+        if(typeof w.prepareMeetingPrepPrint === 'function'){
+          await w.prepareMeetingPrepPrint();
+        }
+        w.onafterprint=cleanup;
+        // Chrome/Edgeではキャンセル後にafterprintが不安定なことがあるため、
+        // 親画面にフォーカスが戻った時も後始末する。
+        const parentFocusCleanup=()=>{
+          window.removeEventListener('focus',parentFocusCleanup,true);
+          cleanup();
+        };
+        window.addEventListener('focus',parentFocusCleanup,true);
+        w.focus();
+        w.print();
+        // 念のため一定時間後にロックだけ解除。iframeが残っても次回印刷を邪魔しない。
+        setTimeout(()=>{ __meetingPrepPrintBusy=false; },2500);
+      }catch(e){
+        cleanup();
+        alert('印刷プレビューを開けませんでした。ブラウザの印刷権限やポップアップ設定を確認してください。');
+      }
+    },450);
+  };
+  document.body.appendChild(frame);
+  frame.srcdoc=html;
+}
+function memoryWeekContainsDate(mem, targetDate){
+  const base=parseYmdLocal(mem?.weekStart || '');
+  if(!base) return true;
+  const diff=daysBetween(base,targetDate);
+  return diff>=0 && diff<7;
+}
+function rowFromMemoryForAbsent(mem, fallbackName, targetDate){
+  if(!mem || !mem.weeklyMeetingAbsent) return null;
+  if(!memoryWeekContainsDate(mem,targetDate)) return null;
+  const name=String(mem.studentName || fallbackName || '').trim();
+  if(!name) return null;
+  const d=normalizeStudentData(mem);
+  d.weekStart=mem.weekStart||d.weekStart||'';
+  return {name, grade:d.grade||'', studentNo:d.studentNo||'', weekStart:d.weekStart||'', savedAt:mem.savedAt||'', data:d};
+}
+function addAbsentRowUnique(map,row){
+  if(!row) return;
+  const key=(row.studentNo?`no:${prepNormalizeStudentNo(row.studentNo)}`:`name:${String(row.name||'').replace(/[\s\u3000]+/g,'')}`);
+  if(!map.has(key)) map.set(key,row);
+}
+function collectWeeklyAbsentRowsFromBrowser(targetDate){
+  const map=new Map();
+  try{
+    for(let i=0;i<localStorage.length;i++){
+      const key=localStorage.key(i);
+      if(!key || !key.startsWith('yoteiStudentMemory:')) continue;
+      try{const mem=JSON.parse(localStorage.getItem(key)||'null'); const fallback=key.replace(/^yoteiStudentMemory:/,''); addAbsentRowUnique(map,rowFromMemoryForAbsent(mem,fallback,targetDate));}catch(e){}
+    }
+    for(let i=0;i<localStorage.length;i++){
+      const key=localStorage.key(i);
+      if(!key || !key.startsWith('yoteiGroupMemory:')) continue;
+      try{const mem=JSON.parse(localStorage.getItem(key)||'null'); const names=mem?.names||[]; const sd=mem?.studentData||{}; names.forEach(name=>{const one=Object.assign({studentName:name,weekStart:mem.weekStart,savedAt:mem.savedAt},sd[name]||{}); addAbsentRowUnique(map,rowFromMemoryForAbsent(one,name,targetDate));});}catch(e){}
+    }
+  }catch(e){}
+  return Array.from(map.values());
+}
+async function collectWeeklyAbsentRowsFromShared(targetDate){
+  const map=new Map();
+  const files=await listJsonFilesFromShared();
+  for(const handle of files){
+    try{
+      const file=await handle.getFile();
+      const mem=JSON.parse(await file.text());
+      if(/^student_.*\.json$/i.test(handle.name)){
+        const fallback=handle.name.replace(/^student_/i,'').replace(/\.json$/i,'').replace(/_/g,' ');
+        addAbsentRowUnique(map,rowFromMemoryForAbsent(mem,fallback,targetDate));
+      }else if(/^group_.*\.json$/i.test(handle.name)){
+        const names=mem?.names||[]; const sd=mem?.studentData||{};
+        names.forEach(name=>{const one=Object.assign({studentName:name,weekStart:mem.weekStart,savedAt:mem.savedAt},sd[name]||{}); addAbsentRowUnique(map,rowFromMemoryForAbsent(one,name,targetDate));});
+      }
+    }catch(e){}
+  }
+  return Array.from(map.values());
+}
+async function collectWeeklyAbsentRowsForPrint(){
+  syncFromDom();
+  const target=getMeetingPrepTargetDate();
+  const map=new Map();
+  students.forEach(name=>{const one=Object.assign({studentName:name,weekStart:safeInputWeekStartValueForSave(),savedAt:'画面表示中'},ensureStudent(name)); addAbsentRowUnique(map,rowFromMemoryForAbsent(one,name,target));});
+  collectWeeklyAbsentRowsFromBrowser(target).forEach(r=>addAbsentRowUnique(map,r));
+  try{ if(sharedSupported()){ await ensureSharedFolder(); const sharedRows=await collectWeeklyAbsentRowsFromShared(target); sharedRows.forEach(r=>addAbsentRowUnique(map,r)); } }catch(e){ console.warn('保存用フォルダの週面欠席者集計に失敗', e); }
+  return Array.from(map.values()).sort((a,b)=>String(a.grade||'').localeCompare(String(b.grade||''),'ja')||String(a.name||'').localeCompare(String(b.name||''),'ja'));
+}
+function listenItemsHtmlFromData(data){
+  const items=[];
+  (data?.exams||[]).forEach(ex=>{
+    if(!(ex.name||ex.status||ex.comiruAnswered||ex.schoolRegistered||ex.subjectChanged)) return;
+    const pending=examPendingListenDetailHtml(ex);
+    if(pending) items.push(`模試：${esc(ex.name||'名称未入力')}（${pending}）`);
+  });
+  (data?.events||[]).forEach(ev=>{
+    if(!(ev.name||ev.status||ev.comiruAnswered||ev.note||ev.datetime)) return;
+    const pending=eventPendingListenDetailHtml(ev);
+    if(pending) items.push(`イベント：${esc(ev.name||'名称未入力')}（${pending}）`);
+  });
+  return items.length ? items.join('<br>') : '<span class="muted">未入力の模試・イベント確認なし</span>';
+}
+function absentPlansResultsHtml(row, resultRecords){
+  const data=normalizeStudentData(row.data||{});
+  if(row.weekStart && !data.weekStart) data.weekStart=row.weekStart;
+  const dates=getMeetingPrepPreviousDates();
+  let html='<div class="absentDetailTitle">対象日までの一週間の予定・結果</div>';
+  html+='<table class="detailTable"><thead><tr><th style="width:70px">日付</th><th>予定</th><th>結果</th></tr></thead><tbody>';
+  dates.forEach((d,di)=>{
+    const si=scheduleIndexForPrepDate(data,d,di);
+    const daySchedule = si >= 0 ? (data.schedule?.[si] || []) : [];
+    const plans=daySchedule.map((v,i)=>String(v||'').trim()?`<li>${esc(LIMITS[i])} ${esc(v).replace(/\n/g,'<br>')}</li>`:'').filter(Boolean).join('');
+    const results=resultForStudentDate(resultRecords||[],row.name,ymd(d)).map(r=>`<li>${esc(r.timeLabel? r.timeLabel+' ' : '')}${esc(r.summary)}</li>`).join('');
+    html+=`<tr><th>${jpDate(d)}<br>${DOW[d.getDay()]}曜</th><td>${plans?'<ul>'+plans+'</ul>':'<span class="muted">予定なし</span>'}</td><td>${results?'<ul>'+results+'</ul>':'<span class="muted">結果なし</span>'}</td></tr>`;
+  });
+  html+='</tbody></table>';
+  html+=`<div class="listenBox"><b>今週聞き取る内容（模試・イベント）</b><br>${listenItemsHtmlFromData(data)}</div>`;
+  return html;
+}
+function buildWeeklyAbsentCallListPrintHtml(absentRows, resultRecords){
+  const now=new Date();
+  const targetDate=getMeetingPrepTargetDate();
+  const todayLabel=`${targetDate.getFullYear()}年${targetDate.getMonth()+1}月${targetDate.getDate()}日（${DOW[targetDate.getDay()]}）`;
+  const weekStart=$('#weekStart')?.value || '';
+  const rows=absentRows.map((row,i)=>`<tr class="mainRow"><td class="center">${i+1}</td><td>${esc(row.grade||'')}</td><td>${esc(row.studentNo||'')}</td><td class="nameCell">${esc(row.name)}</td><td class="checkCell">□</td><td class="checkCell">□</td><td class="memoCell"></td></tr><tr class="detailRow"><td colspan="7">${absentPlansResultsHtml(row,resultRecords)}</td></tr>`).join('');
+  return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>週面欠席者 電話確認リスト</title><style>
+*{box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif;color:#111827;margin:0;background:#fff}
+.page{width:210mm;min-height:auto;padding:8mm 8mm 7mm;background:#fff}
+h1{font-size:18px;margin:0 0 2px;line-height:1.15}.subline{font-size:10px;color:#667085;margin-bottom:6px}.summary{border:1px solid #9ca3af;border-radius:6px;padding:5px 7px;margin-bottom:6px;font-size:11px;background:#f8fafc}
+table{border-collapse:collapse;width:100%;font-size:10.5px}th,td{border:1px solid #6b7280;padding:4px 4px;vertical-align:middle}th{background:#f3f4f6;text-align:center;font-weight:800}.center{text-align:center}.nameCell{font-size:12px;font-weight:800}.checkCell{text-align:center;font-size:16px;width:14mm}.memoCell{height:7mm;width:38mm}.mainRow td{height:8mm}.detailRow td{background:#fff;padding:4px 5px;vertical-align:top}.absentDetailTitle{font-weight:800;margin:0 0 3px;color:#1e40af;font-size:10.5px}.detailTable{font-size:8.6px;margin:0 0 4px;line-height:1.22}.detailTable th,.detailTable td{padding:2px 3px;border:1px solid #cbd5e1;vertical-align:top}.detailTable th{background:#eef2ff;width:15mm}.detailTable ul{margin:0;padding-left:11px}.detailTable li{margin:0 0 1px}.listenBox{border:1px solid #c7d2fe;background:#eef2ff;border-radius:5px;padding:3px 5px;font-size:9.5px;line-height:1.3}.muted{color:#667085}.note{margin-top:5px;font-size:9.5px;color:#667085;line-height:1.35}.footerLine{margin-top:4px;display:grid;grid-template-columns:1fr 1fr;gap:8mm;font-size:10.5px;break-inside:avoid;page-break-inside:avoid}.footerLine div{border-bottom:1px solid #9ca3af;height:7mm;padding-top:1mm}
+@page{size:A4 portrait;margin:0}
+@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.page{page-break-after:auto;break-after:auto}}
+
+
+/* ============================================================
+   追加修正: 上部操作ボタンを画面内に収める
+   - 1段目: 助手名 / 生徒一覧 / 生徒名 / 開始日
+   - 2段目: 生徒欄作成 / 前回復元 / 保存 / 予備ZIP
+   - 生徒名欄を広く、助手名欄は小さく固定
+   ============================================================ */
+.topActions{
+  display:grid!important;
+  grid-template-columns: 210px 112px minmax(360px, 1fr) 150px!important;
+  grid-template-areas:
+    "assistant list students start"
+    "apply restore save export"!important;
+  gap:8px!important;
+  align-items:end!important;
+  overflow:visible!important;
+}
+.topActions .assistantNameField{grid-area:assistant!important;min-width:0!important;}
+.topActions .assistantListBtn{grid-area:list!important;min-width:0!important;width:100%!important;}
+.topActions .studentNameField{grid-area:students!important;min-width:0!important;}
+.topActions .startDateField{grid-area:start!important;min-width:0!important;}
+.topActions #applyStudents{grid-area:apply!important;}
+.topActions #loadGroupMemory{grid-area:restore!important;}
+.topActions #saveGroupMemory{grid-area:save!important;}
+.topActions #exportXlsx{grid-area:export!important;}
+.topActions button{
+  min-width:0!important;
+  width:100%!important;
+  white-space:normal!important;
+  line-height:1.2!important;
+  padding:9px 10px!important;
+  min-height:40px!important;
+  height:auto!important;
+}
+.topActions input{width:100%!important;min-width:0!important;}
+.topActions .field label{white-space:nowrap!important;}
+@media(max-width:980px){
+  .topActions{
+    grid-template-columns: 170px 108px minmax(260px,1fr)!important;
+    grid-template-areas:
+      "assistant list start"
+      "students students students"
+      "apply restore save"
+      "export export export"!important;
+  }
+}
+@media(max-width:640px){
+  .topActions{
+    grid-template-columns:1fr 1fr!important;
+    grid-template-areas:
+      "assistant list"
+      "students students"
+      "start start"
+      "apply restore"
+      "save export"!important;
+  }
+}
+
+
+/* ============================================================
+   最終修正: 上部操作欄をHTML構造そのままで確実に2段固定する
+   既存CSSの後ろに置いて、v32/v34の横1列指定を上書きする。
+   ============================================================ */
+html, body{
+  overflow:hidden!important;
+}
+main.wrap{
+  grid-template-rows:auto auto minmax(0,1fr)!important;
+}
+.workflowCard{
+  overflow:visible!important;
+}
+.workflowCard .topActions{
+  display:grid!important;
+  grid-template-columns:220px 130px minmax(420px,1fr) 165px!important;
+  grid-template-areas:
+    "assistant list students start"
+    "apply restore save save"!important;
+  gap:7px!important;
+  align-items:end!important;
+  width:100%!important;
+  max-width:100%!important;
+  overflow:visible!important;
+}
+.workflowCard .topActions .assistantNameField{grid-area:assistant!important;min-width:0!important;width:100%!important;}
+.workflowCard .topActions .assistantListBtn{grid-area:list!important;min-width:0!important;width:100%!important;}
+.workflowCard .topActions .studentNameField{grid-area:students!important;min-width:0!important;width:100%!important;}
+.workflowCard .topActions .startDateField{grid-area:start!important;min-width:0!important;width:100%!important;}
+.workflowCard .topActions #exportXlsx{grid-area:initzip!important;}
+.workflowCard .topActions #applyStudents{grid-area:apply!important;}
+.workflowCard .topActions #loadGroupMemory{grid-area:restore!important;}
+.workflowCard .topActions #saveGroupMemory{grid-area:save!important;}
+.workflowCard .topActions .field label{
+  font-size:10px!important;
+  line-height:1.1!important;
+  margin:0 0 2px!important;
+  white-space:nowrap!important;
+}
+.workflowCard .topActions .field input,
+.workflowCard .topActions button{
+  min-height:30px!important;
+  height:30px!important;
+  padding:4px 8px!important;
+  font-size:12px!important;
+  border-radius:9px!important;
+  box-sizing:border-box!important;
+}
+.workflowCard .topActions input{
+  width:100%!important;
+  max-width:100%!important;
+  min-width:0!important;
+}
+.workflowCard .topActions button{
+  width:100%!important;
+  min-width:0!important;
+  max-width:none!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  box-shadow:none!important;
+}
+.workflowCard .topActions #saveGroupMemory{
+  font-size:13px!important;
+  box-shadow:0 4px 10px rgba(22,163,74,.18)!important;
+}
+.workflowCard .topActions #exportXlsx{
+  background:#7c3aed!important;
+  color:#fff!important;
+}
+.workflowCard .appSteps,
+.workflowCard .compactHint{
+  display:none!important;
+}
+.workflowCard #saveInfo{
+  display:none!important;
+}
+.prepCompactCard{
+  margin-top:6px!important;
+  margin-bottom:8px!important;
+}
+.prepCompactCard .prepDetails summary{
+  min-height:26px!important;
+  font-size:13px!important;
+}
+@media(max-width:1180px){
+  .workflowCard .topActions{
+    grid-template-columns:190px 120px minmax(300px,1fr) 150px!important;
+  }
+}
+@media(max-width:900px){
+  html, body{overflow:auto!important;}
+  main.wrap{height:auto!important;display:block!important;overflow:visible!important;}
+  .workflowCard .topActions{
+    grid-template-columns:1fr 120px 150px!important;
+    grid-template-areas:
+      "assistant list start"
+      "students students students"
+      "apply restore restore"
+      "save save save"!important;
+  }
+  .workflowCard .topActions .field input,
+  .workflowCard .topActions button{height:34px!important;min-height:34px!important;}
+}
+@media(max-width:620px){
+  .workflowCard .topActions{
+    grid-template-columns:1fr 1fr!important;
+    grid-template-areas:
+      "assistant list"
+      "students students"
+      "start start"
+      "apply apply"
+      "restore save"!important;
+  }
+}
+</style></head><body><section class="page"><h1>週面欠席者 電話確認リスト</h1><div class="subline">対象日：${esc(todayLabel)} / 週開始：${esc(weekStart)} / 作成：${esc(now.toLocaleString('ja-JP'))}</div><div class="summary">週面欠席にチェックが入っている生徒：<b>${absentRows.length}名</b>　※電話後に「電話済み」欄へチェックしてください。</div><table><thead><tr><th>No.</th><th>学年</th><th>生徒番号</th><th>生徒名</th><th>未電話</th><th>電話済み</th><th>電話メモ</th></tr></thead><tbody>${rows}</tbody></table><div class="note">使い方：欠席確認前は「未電話」、電話完了後は「電話済み」にチェック。つながらなかった場合や保護者対応などは電話メモへ記入してください。</div><div class="footerLine"><div>担当者：</div><div>確認完了時刻：</div></div></section>
+
+
+</body></html>`;
+}
+async function printWeeklyAbsentList(){
+  const absentRows=await collectWeeklyAbsentRowsForPrint();
+  if(!absentRows.length) return alert('対象日を含む週で、週面欠席にチェックが入っている保存済み生徒はいません。');
+  const resultRecords=await readPrepResultRecords();
+  const html=buildWeeklyAbsentCallListPrintHtml(absentRows,resultRecords);
+  printHtmlInHiddenIframe(html);
+}
+
+async function printMeetingPrep(){
+  syncFromDom();
+  if(!students.length) return alert('先に生徒名を入力して「② 生徒欄を作る」を押してください。');
+  if(!window.XLSX) return alert('Excel読み取りライブラリの読み込みに失敗しました。\nこの機能は毎日更新.xlsx・合格設計図Excelを読むために xlsx ライブラリが必要です。\nインターネット接続がある状態で開くか、職場PCのセキュリティで CDN がブロックされていないか確認してください。');
+  const empty=students.filter(n=>!studentHasMeaningfulInputData(n));
+  if(empty.length && !confirm(`入力内容が空の生徒がいます：${empty.join('、')}\nこのまま印刷しますか？`)) return;
+  const resultRecords=await readPrepResultRecords();
+  // 週面シートは読み取らない。3ページ目は常に面談フローを印刷する。
+  const weeklyHtml=loadWeeklySheetHtml();
+  const html=buildMeetingPrepPrintHtml(resultRecords, weeklyHtml);
+  printHtmlInHiddenIframe(html);
+}
+
+/* =========================================================
+   11. イベント
+========================================================= */
+function bindGlobalEvents(){
+  const closeBtn=$('#closeGoukakuModal'); if(closeBtn) closeBtn.onclick=closeGoukakuModal;
+  const modal=$('#goukakuModal'); if(modal) modal.addEventListener('click', e=>{ if(e.target===modal) closeGoukakuModal(); });
+  document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeGoukakuModal(); });
+  $('#applyStudents').onclick=applyStudentsWithDynamicCandidates; const eas=$('#expandAssistantStudents'); if(eas)eas.onclick=expandAssistantStudentsToStudentField;
+  $('#weekStart').onchange=()=>{syncFromDom(); const a=$('#weeklyAbsentTargetDate'); if(a && !a.value) a.value=$('#weekStart').value; renderStudents()};
+  $('#saveGroupMemory').onclick=saveGroup;
+  $('#loadGroupMemory').onclick=loadGroup;
+  const exb=$('#exportXlsx'); if(exb){ exb.style.display='none'; exb.onclick=null; } const sae=$('#saveAllExcelToStudentFolders'); if(sae)sae.onclick=saveAllToExistingStudentFolders; const pmp=$('#printMeetingPrep'); if(pmp)pmp.onclick=printMeetingPrep; const pwa=$('#printWeeklyAbsentList'); if(pwa)pwa.onclick=printWeeklyAbsentList;
+  $('#addExamMaster').onclick=addExamMasterRow;
+  $('#saveExamMaster').onclick=saveExamMasterFromPanel;
+  const aem=$('#addEventMaster'); if(aem)aem.onclick=addEventMasterRow;
+  const sem=$('#saveEventMaster'); if(sem)sem.onclick=saveEventMasterFromPanel;
+  const acm=$('#addCommentMaster'); if(acm)acm.onclick=addCommentMasterRow;
+  const scm=$('#saveCommentMaster'); if(scm)scm.onclick=saveCommentMasterFromPanel;
+  const lts=$('#loadSubjectTemplate'); if(lts)lts.onclick=loadSubjectTemplateToEditor;
+  const nts=$('#newSubjectTemplate'); if(nts)nts.onclick=newSubjectTemplateInEditor;
+  const sts=$('#saveSubjectTemplate'); if(sts)sts.onclick=saveSubjectTemplateFromEditor; const dts=$('#deleteSubjectTemplate'); if(dts)dts.onclick=deleteSubjectTemplateFromEditor;
+  const clear=$('#clearAll'); if(clear)clear.onclick=()=>{if(confirm('入力内容をすべて消しますか？')){localStorage.removeItem(groupKey()); students.forEach(n=>localStorage.removeItem(indivKey(n))); location.reload()}};
+}
+
+/* =========================================================
+   v25 実務UI版：保存状態・一覧カウント・下部クイック操作
+========================================================= */
+const UX_STATE={dirty:true,lastSavedAt:null,mode:'dirty'};
+const UX_ORIGINAL_SHOW_SAVE_INFO=showSaveInfo;
+function uxShowSaveToast(text){
+  const t=String(text||'').trim();
+  if(!t) return;
+  // 右上トーストではなく、ブラウザ標準の中央ダイアログで表示する。
+  // EnterキーでOKできるので、入力中に邪魔になったログをすぐ閉じられる。
+  try{
+    alert(t);
+  }catch(e){
+    const el=document.getElementById('saveInfo');
+    if(el) el.textContent=t;
+  }
+}
+
+showSaveInfo=function(text){
+  UX_ORIGINAL_SHOW_SAVE_INFO(text);
+  const t=String(text||'');
+  uxShowSaveToast(t);
+  if(/保存済み|保存が完了|保存しました|同期しました/.test(t)) uxSetSaved('saved');
+  else if(/復元しました|読み込みました|反映しました|選択しました|自動追加しました/.test(t)) uxSetSaved('loaded');
+  uxUpdateSummary();
+};
+function uxEnsureDock(){
+  if(document.getElementById('uxActionDock')) return;
+  const dock=document.createElement('div');
+  dock.id='uxActionDock';
+  dock.className='uxActionDock';
+  dock.innerHTML='<span class="uxDockStatus" id="uxDockStatus">未保存</span><button type="button" class="uxDockSave">保存</button><button type="button" class="uxDockPrint">面談印刷</button><button type="button" class="uxDockAbsent">欠席リスト</button>';
+  document.body.appendChild(dock);
+  dock.querySelector('.uxDockSave').onclick=()=>document.getElementById('saveGroupMemory')?.click();
+  dock.querySelector('.uxDockPrint').onclick=()=>document.getElementById('printMeetingPrep')?.click();
+  dock.querySelector('.uxDockAbsent').onclick=()=>document.getElementById('printWeeklyAbsentList')?.click();
+}
+function uxSetDirty(){
+  if(!UX_STATE.dirty){UX_STATE.dirty=true;UX_STATE.mode='dirty';}
+  uxUpdateSummary();
+}
+function uxSetSaved(mode='saved'){
+  UX_STATE.dirty=false;
+  UX_STATE.mode=mode;
+  UX_STATE.lastSavedAt=new Date();
+  uxUpdateSummary();
+}
+function uxCountMeaningfulStudents(){
+  try{return students.filter(n=>studentHasMeaningfulData(ensureStudent(n))).length;}catch(e){return students.length||0;}
+}
+function uxUpdateSummary(){
+  try{ syncFromDom(); }catch(e){}
+  const count=students.length||0;
+  let absent=0, failure=0;
+  students.forEach(name=>{
+    const d=ensureStudent(name);
+    if(d.weeklyMeetingAbsent) absent++;
+    if(String(d.failureReason||'').trim()) failure++;
+  });
+  const statusText=UX_STATE.dirty?'未保存':(UX_STATE.mode==='loaded'?'復元済み':'保存済み');
+  const header=document.getElementById('uxHeaderSaveBadge');
+  const stat=document.getElementById('uxSaveStatus');
+  const dock=document.getElementById('uxDockStatus');
+  [header,stat,dock].forEach(el=>{if(el)el.textContent=statusText;});
+  if(header){header.classList.toggle('saved',!UX_STATE.dirty&&UX_STATE.mode==='saved');header.classList.toggle('loaded',!UX_STATE.dirty&&UX_STATE.mode==='loaded');}
+  const dash=document.getElementById('uxDashboard');
+  if(dash){dash.classList.toggle('saved',!UX_STATE.dirty&&UX_STATE.mode==='saved');dash.classList.toggle('loaded',!UX_STATE.dirty&&UX_STATE.mode==='loaded');}
+  const last=document.getElementById('uxLastSaveTime');
+  if(last) last.textContent=UX_STATE.lastSavedAt ? `最終更新：${UX_STATE.lastSavedAt.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}` : 'まだ保存していません';
+  const set=(id,val)=>{const el=document.getElementById(id); if(el)el.textContent=val;};
+  set('uxStudentCount',`${count}名`); set('uxAbsentCount',`${absent}名`); set('uxFailureCount',`${failure}名`); set('uxPrintTargetCount',`${uxCountMeaningfulStudents()}名`);
+  document.querySelectorAll('[data-student-card]').forEach(card=>{
+    const name=card.getAttribute('data-student-card')||'';
+    const d=ensureStudent(name);
+    card.classList.toggle('hasAbsent',!!d.weeklyMeetingAbsent);
+    card.classList.toggle('hasFailure',!!String(d.failureReason||'').trim());
+  });
+}
+function uxBindDirtyTracking(){
+  document.addEventListener('input',e=>{
+    if(e.target && e.target.closest('main')) uxSetDirty();
+  },true);
+  document.addEventListener('change',e=>{
+    const t=e.target;
+    if(t && t.matches && (t.matches('input[data-exam-status]') || t.matches('input[data-event-status]')) && t.checked){
+      const box=t.closest(t.matches('input[data-exam-status]') ? '.examItem' : '.eventItem');
+      if(box) box.querySelectorAll(t.matches('input[data-exam-status]') ? 'input[data-exam-status]' : 'input[data-event-status]').forEach(x=>{ if(x!==t) x.checked=false; });
+    }
+    if(e.target && e.target.closest('main')) uxSetDirty();
+  },true);
+  window.addEventListener('beforeunload',e=>{
+    if(!UX_STATE.dirty) return;
+    e.preventDefault();
+    e.returnValue='入力内容が保存されていない可能性があります。席を外す前に保存してください。';
+  });
+}
+const UX_ORIGINAL_RENDER_STUDENTS=renderStudents;
+renderStudents=function(){
+  UX_ORIGINAL_RENDER_STUDENTS();
+  uxUpdateSummary();
+};
+const UX_ORIGINAL_APPLY_STUDENTS=applyStudents;
+applyStudents=function(){
+  UX_ORIGINAL_APPLY_STUDENTS();
+  uxUpdateSummary();
+};
+function initRealAppUX(){
+  uxEnsureDock();
+  uxBindDirtyTracking();
+  uxUpdateSummary();
+}
+
+
+
+/* =========================================================
+   v32 ドラッグ横スクロール・印刷1回化版
+========================================================= */
+const UX26_STATE={activeStudent:''};
+function ux26BuildWorkspace(){
+  const main=document.querySelector('main.wrap');
+  const grid=document.getElementById('studentGrid');
+  const anchor=document.getElementById('uxWorkflowCard')||grid;
+  if(!main||!grid||document.getElementById('uxWorkspace')) return;
+  const workspace=document.createElement('section');
+  workspace.id='uxWorkspace';
+  workspace.className='uxWorkspace';
+  workspace.innerHTML=`
+    <section class="uxPane uxStudentMain">
+      <div class="uxPaneHead">
+        <div class="uxStudentHeadLeft"><span id="uxActiveStudentTitle">生徒入力</span><small class="uxStudentModeHint" id="uxStudentModeHint">3人まで同時編集</small></div>
+        <div id="uxStudentList" class="uxStudentList uxStudentTabs"></div>
+      </div>
+      <div class="uxPaneBody" id="uxStudentMainBody"></div>
+    </section>
+    <aside class="uxPane uxRightPanel">
+      <div class="uxPaneHead"><span>確認・印刷</span></div>
+      <div class="uxPaneBody" id="uxRightPaneBody"><div id="uxStatusList" class="uxStatusList"></div></div>
+    </aside>`;
+  anchor.insertAdjacentElement('afterend',workspace);
+  document.getElementById('uxStudentMainBody').appendChild(grid);
+  const right=document.getElementById('uxRightPaneBody');
+  const prep=document.querySelector('.prepCompactCard');
+  if(prep) right.appendChild(prep);
+  const settings=document.createElement('section');
+  settings.id='uxSettingsBelow';
+  settings.className='uxSettingsBelow';
+  settings.innerHTML='<details><summary>模試マスタ・イベントマスタ・コメントマスタ・詳細設定を開く</summary><div id="uxMovedSettings" class="uxSettingsBelowBody"></div></details>';
+  workspace.insertAdjacentElement('afterend',settings);
+  const moved=settings.querySelector('#uxMovedSettings');
+  Array.from(main.children).forEach(el=>{
+    if(el===workspace||el===settings||el===document.getElementById('uxWorkflowCard')||el===document.getElementById('uxDashboard')) return;
+    if(el.id==='studentGrid') return;
+    if(el.classList && el.classList.contains('prepCompactCard')) return;
+    const txt=el.textContent||'';
+    if(/模試マスタ|イベントマスタ|今週の方針|詳細設定|統合用HTML/.test(txt)) moved.appendChild(el);
+  });
+}
+function ux26GetActiveStudent(){
+  if(UX26_STATE.activeStudent && students.includes(UX26_STATE.activeStudent)) return UX26_STATE.activeStudent;
+  UX26_STATE.activeStudent=students[0]||'';
+  return UX26_STATE.activeStudent;
+}
+function ux26SetActiveStudent(name){
+  UX26_STATE.activeStudent=name||'';
+  ux26RefreshStudentList();
+  ux26ShowActiveCard();
+  uxUpdateSummary();
+}
+function ux26RefreshStudentList(){
+  const list=document.getElementById('uxStudentList');
+  if(!list) return;
+  const active=ux26GetActiveStudent();
+  const escLocal=(s)=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  if(!students.length){
+    list.innerHTML='<div class="uxEmptySelect">生徒名を入力してください</div>';
+  }else{
+    list.innerHTML=students.map(name=>{
+      const d=ensureStudent(name);
+      const badges=[];
+      if(d.weeklyMeetingAbsent) badges.push('<span class="uxMiniBadge absent">欠席</span>');
+      if(String(d.failureReason||'').trim()) badges.push('<span class="uxMiniBadge failure">未達</span>');
+      const isActive=(students.length<=3) || name===active;
+      return `<button type="button" class="uxStudentBtn ${isActive?'active':''}" data-ux-select-student="${escLocal(name)}"><span class="name">${escLocal(name)}</span><span class="uxStudentBadges">${badges.join('')}</span></button>`;
+    }).join('');
+    list.querySelectorAll('[data-ux-select-student]').forEach(btn=>{
+      btn.onclick=()=>ux26SetActiveStudent(btn.getAttribute('data-ux-select-student')||'');
+    });
+  }
+}
+function ux26ShowActiveCard(){
+  const active=ux26GetActiveStudent();
+  const title=document.getElementById('uxActiveStudentTitle');
+  const hint=document.getElementById('uxStudentModeHint');
+  const grid=document.getElementById('studentGrid');
+  const multi=students.length>0 && students.length<=3;
+  if(title) title.textContent=multi ? `生徒入力（${students.length}人同時）` : (active ? `${active} の入力` : '生徒入力');
+  if(hint) hint.textContent=multi ? '3人まで同時編集できます' : '4人以上はタブで切替';
+  if(grid){
+    grid.classList.toggle('uxMultiMode',multi);
+    grid.classList.toggle('uxSingleMode',!multi);
+  }
+  document.querySelectorAll('[data-student-card]').forEach(card=>{
+    const name=card.getAttribute('data-student-card')||'';
+    card.classList.toggle('uxActiveStudentCard',multi || name===active);
+  });
+  if(grid && !students.length) grid.innerHTML='<div class="uxEmptySelect">生徒名を入力すると、ここに入力画面が表示されます。</div>';
+}
+function ux26UpdateRightStatus(){
+  const box=document.getElementById('uxStatusList');
+  if(!box) return;
+  let absent=[],failure=[],exam=0,event=0;
+  students.forEach(name=>{
+    const d=ensureStudent(name);
+    if(d.weeklyMeetingAbsent) absent.push(name);
+    if(String(d.failureReason||'').trim()) failure.push(name);
+    if((d.exams||[]).length) exam++;
+    if((d.events||[]).length) event++;
+  });
+  const active=ux26GetActiveStudent();
+  const selectedText=students.length<=3 && students.length ? students.join('、') : (active||'未選択');
+  box.innerHTML=`
+    <div class="uxStatusItem ${UX_STATE.dirty?'warn':'info'}"><b>${UX_STATE.dirty?'未保存です':'保存状態OK'}</b>${UX_STATE.dirty?'復元後・保存後に変更があります。席を外す前に保存してください。':'現在の内容は保存済みまたは復元直後です。'}</div>
+    <div class="uxStatusItem"><b>編集中</b>${selectedText}</div>
+    <div class="uxStatusItem ${absent.length?'warn':''}"><b>週面欠席</b>${absent.length?absent.join('、'):'なし'}</div>
+    <div class="uxStatusItem ${failure.length?'info':''}"><b>未達理由あり</b>${failure.length?failure.join('、'):'なし'}</div>
+    <div class="uxStatusItem"><b>確認事項</b>模試確認 ${exam}名 / イベント確認 ${event}名</div>`;
+}
+const UX26_ORIGINAL_UPDATE_SUMMARY=uxUpdateSummary;
+uxUpdateSummary=function(){
+  UX26_ORIGINAL_UPDATE_SUMMARY();
+  const header=document.getElementById('uxHeaderSaveBadge');
+  const dash=document.getElementById('uxDashboard');
+  if(header){
+    header.classList.toggle('dirty',!!UX_STATE.dirty);
+    header.classList.toggle('saved',!UX_STATE.dirty&&UX_STATE.mode==='saved');
+    header.classList.toggle('loaded',!UX_STATE.dirty&&UX_STATE.mode==='loaded');
+  }
+  if(dash){
+    dash.classList.toggle('dirty',!!UX_STATE.dirty);
+    dash.classList.toggle('saved',!UX_STATE.dirty&&UX_STATE.mode==='saved');
+    dash.classList.toggle('loaded',!UX_STATE.dirty&&UX_STATE.mode==='loaded');
+  }
+  ux26RefreshStudentList();
+  ux26ShowActiveCard();
+  ux26UpdateRightStatus();
+};
+const UX26_ORIGINAL_RENDER_STUDENTS=renderStudents;
+renderStudents=function(){
+  UX26_ORIGINAL_RENDER_STUDENTS();
+  if(!students.includes(UX26_STATE.activeStudent)) UX26_STATE.activeStudent=students[0]||'';
+  ux26BuildWorkspace();
+  ux26RefreshStudentList();
+  ux26ShowActiveCard();
+  ux26UpdateRightStatus();
+};
+const UX26_ORIGINAL_UX_SET_DIRTY=uxSetDirty;
+uxSetDirty=function(){
+  UX_STATE.dirty=true;
+  UX_STATE.mode='dirty';
+  uxUpdateSummary();
+};
+const UX26_ORIGINAL_UX_SET_SAVED=uxSetSaved;
+uxSetSaved=function(mode='saved'){
+  UX_STATE.dirty=false;
+  UX_STATE.mode=mode;
+  UX_STATE.lastSavedAt=new Date();
+  uxUpdateSummary();
+};
+function initNoScrollUX(){
+  ux26BuildWorkspace();
+  ux26RefreshStudentList();
+  ux26ShowActiveCard();
+  ux26UpdateRightStatus();
+}
+
+
+
+/* =========================================================
+   v32 ドラッグ横スクロール・印刷1回化版 JS
+========================================================= */
+function ux30EnsureHeaderLog(){
+  const inner=document.querySelector('.appHeaderInner');
+  if(!inner) return null;
+  let log=document.getElementById('uxHeaderLog');
+  if(!log){
+    log=document.createElement('div');
+    log.id='uxHeaderLog';
+    const badge=document.getElementById('uxHeaderSaveBadge');
+    if(badge) inner.insertBefore(log,badge); else inner.appendChild(log);
+  }
+  return log;
+}
+function ux30InlinePrintMenu(){
+  const workflow=document.getElementById('uxWorkflowCard');
+  const prep=document.querySelector('.prepCompactCard');
+  const saveInfo=document.getElementById('saveInfo');
+  if(workflow && prep && prep.parentElement!==workflow){
+    if(saveInfo) saveInfo.insertAdjacentElement('afterend',prep);
+    else workflow.appendChild(prep);
+  }
+}
+function ux30RestoreOriginalFlow(){
+  const main=document.querySelector('main.wrap');
+  const workflow=document.getElementById('uxWorkflowCard');
+  const grid=document.getElementById('studentGrid');
+  if(!main||!workflow||!grid) return;
+  // v29 のワークスペース内へ移動されていた場合は、元の縦フローへ戻す。
+  if(grid.parentElement!==main){
+    workflow.insertAdjacentElement('afterend',grid);
+  }
+  const moved=document.getElementById('uxMovedSettings');
+  if(moved){
+    Array.from(moved.children).forEach(el=>main.appendChild(el));
+  }
+  const workspace=document.getElementById('uxWorkspace');
+  if(workspace) workspace.remove();
+  const settings=document.getElementById('uxSettingsBelow');
+  if(settings) settings.remove();
+  ux30InlinePrintMenu();
+}
+function ux30UpdateHeaderLog(){
+  const log=ux30EnsureHeaderLog();
+  if(!log) return;
+  let absent=[],failure=[],exam=0,event=0;
+  students.forEach(name=>{
+    const d=ensureStudent(name);
+    if(d.weeklyMeetingAbsent) absent.push(name);
+    if(String(d.failureReason||'').trim()) failure.push(name);
+    if((d.exams||[]).length) exam++;
+    if((d.events||[]).length) event++;
+  });
+  const editing=students.length?students.join('、'):'未選択';
+  log.innerHTML=`
+    <span class="uxHeaderChip ${UX_STATE.dirty?'danger':'info'}">${UX_STATE.dirty?'未保存':'保存OK'}</span>
+    <span class="uxHeaderChip"><span>編集中</span><strong>${escapeHtml(editing)}</strong></span>
+    <span class="uxHeaderChip ${absent.length?'warn':''}">欠席 <strong>${absent.length?absent.length+'名':'なし'}</strong></span>
+    <span class="uxHeaderChip ${failure.length?'info':''}">未達 <strong>${failure.length?failure.length+'名':'なし'}</strong></span>
+    <span class="uxHeaderChip">確認 <strong>模試${exam} / イベント${event}</strong></span>`;
+}
+function ux30MarkCards(){
+  document.querySelectorAll('[data-student-card]').forEach(card=>{
+    const name=card.getAttribute('data-student-card')||'';
+    const d=ensureStudent(name);
+    card.classList.toggle('hasAbsent',!!d.weeklyMeetingAbsent);
+    card.classList.toggle('hasFailure',!!String(d.failureReason||'').trim());
+    card.classList.add('uxActiveStudentCard');
+  });
+  const grid=document.getElementById('studentGrid');
+  if(grid){
+    grid.classList.remove('uxMultiMode','uxSingleMode');
+  }
+}
+const UX30_PREV_UPDATE_SUMMARY=uxUpdateSummary;
+uxUpdateSummary=function(){
+  UX30_PREV_UPDATE_SUMMARY();
+  ux30RestoreOriginalFlow();
+  ux30MarkCards();
+  ux30UpdateHeaderLog();
+};
+const UX30_RENDER_STUDENTS=(typeof UX26_ORIGINAL_RENDER_STUDENTS!=='undefined')?UX26_ORIGINAL_RENDER_STUDENTS:renderStudents;
+renderStudents=function(){
+  UX30_RENDER_STUDENTS();
+  ux30RestoreOriginalFlow();
+  ux30MarkCards();
+  ux30UpdateHeaderLog();
+};
+function initV30ClassicHorizontalUX(){
+  ux30EnsureHeaderLog();
+  ux30RestoreOriginalFlow();
+  ux30MarkCards();
+  ux30UpdateHeaderLog();
+}
+
+
+
+/* =========================================================
+   v32 ドラッグ横スクロール・印刷1回化
+========================================================= */
+(function injectV32Style(){
+  if(document.getElementById('v32DragScrollStyle')) return;
+  const style=document.createElement('style');
+  style.id='v32DragScrollStyle';
+  style.textContent=`
+    #studentGrid.studentGrid{cursor:grab;scrollbar-gutter:stable;}
+    #studentGrid.studentGrid.is-dragging{cursor:grabbing;user-select:none;}
+    #studentGrid.studentGrid textarea,
+    #studentGrid.studentGrid input,
+    #studentGrid.studentGrid select,
+    #studentGrid.studentGrid button,
+    #studentGrid.studentGrid label,
+    #studentGrid.studentGrid a{cursor:auto;}
+    #studentGrid.studentGrid .dragScrollHint{display:none;}
+    @media (pointer:fine){
+      #studentGrid.studentGrid::before{
+        content:'空白部分をつかんで横に動かせます';
+        display:block;
+        position:sticky;
+        left:4px;
+        width:max-content;
+        margin:0 0 6px 2px;
+        padding:3px 8px;
+        border-radius:999px;
+        background:#eff6ff;
+        border:1px solid #bfdbfe;
+        color:#1e40af;
+        font-size:11px;
+        font-weight:800;
+        z-index:2;
+      }
+    }
+  `;
+  document.head.appendChild(style);
+})();
+function initV32DragHorizontalScroll(){
+  const grid=document.getElementById('studentGrid');
+  if(!grid || grid.dataset.dragScrollReady==='1') return;
+  grid.dataset.dragScrollReady='1';
+  const interactive='textarea,input,select,button,a,label,summary,details,[contenteditable="true"],.goukakuBox,.goukakuModal,.modalInner';
+  let down=false;
+  let dragging=false;
+  let startX=0;
+  let startY=0;
+  let startLeft=0;
+  let pointerId=null;
+  grid.addEventListener('pointerdown',e=>{
+    if(e.button!==0) return;
+    if(e.target.closest(interactive)) return;
+    down=true;
+    dragging=false;
+    pointerId=e.pointerId;
+    startX=e.clientX;
+    startY=e.clientY;
+    startLeft=grid.scrollLeft;
+  });
+  grid.addEventListener('pointermove',e=>{
+    if(!down) return;
+    const dx=e.clientX-startX;
+    const dy=e.clientY-startY;
+    if(!dragging){
+      if(Math.abs(dx)<6 || Math.abs(dx)<Math.abs(dy)) return;
+      dragging=true;
+      grid.classList.add('is-dragging');
+      try{ grid.setPointerCapture(pointerId); }catch(err){}
+    }
+    grid.scrollLeft=startLeft-dx;
+    e.preventDefault();
+  },{passive:false});
+  const stop=()=>{
+    down=false;
+    if(dragging){
+      grid.classList.remove('is-dragging');
+      try{ grid.releasePointerCapture(pointerId); }catch(err){}
+    }
+    dragging=false;
+    pointerId=null;
+  };
+  grid.addEventListener('pointerup',stop);
+  grid.addEventListener('pointercancel',stop);
+  grid.addEventListener('mouseleave',()=>{ if(down) stop(); });
+  // Shift + ホイール、または横ホイールにも対応。縦スクロールを横移動に変換しすぎないようShift時だけ強める。
+  grid.addEventListener('wheel',e=>{
+    if(e.shiftKey && Math.abs(e.deltaY)>Math.abs(e.deltaX)){
+      grid.scrollLeft += e.deltaY;
+      e.preventDefault();
+    }
+  },{passive:false});
+}
+const V32_PREV_RENDER_STUDENTS=renderStudents;
+renderStudents=function(){
+  V32_PREV_RENDER_STUDENTS();
+  initV32DragHorizontalScroll();
+};
+function initV32(){
+  initV32DragHorizontalScroll();
+}
+
+
+
+/* =========================================================
+   v33 左の空白除去・学年/生徒番号重なり修正
+========================================================= */
+(function injectV33LayoutFix(){
+  if(document.getElementById('v33LayoutFixStyle')) return;
+  const style=document.createElement('style');
+  style.id='v33LayoutFixStyle';
+  style.textContent=`
+    /* v32の説明ラベルをgridの1列として数えさせない。これが左の大きな空白の原因。 */
+    #studentGrid.studentGrid{position:relative!important;padding-top:28px!important;}
+    @media (pointer:fine){
+      #studentGrid.studentGrid::before{
+        display:block!important;
+        position:absolute!important;
+        top:4px!important;
+        left:8px!important;
+        margin:0!important;
+        width:max-content!important;
+        pointer-events:none!important;
+      }
+    }
+
+    /* 学年・生徒番号の入力欄が互いに食い込まないようにする。 */
+    .studentMeta{
+      display:grid!important;
+      grid-template-columns:minmax(120px,150px) minmax(180px,240px)!important;
+      gap:10px!important;
+      align-items:end!important;
+      max-width:410px!important;
+    }
+    .studentMeta .field{min-width:0!important;width:100%!important;}
+    .studentMeta .field input,
+    .studentMeta .field select{width:100%!important;min-width:0!important;box-sizing:border-box!important;}
+
+    /* 横並びカードは左詰め。カード幅を安定させて、最初の1人目が左から始まるようにする。 */
+    #studentGrid.studentGrid{
+      justify-content:start!important;
+      align-content:start!important;
+      grid-auto-columns:minmax(720px,760px)!important;
+    }
+    #studentGrid.studentGrid .studentCard{
+      width:100%!important;
+      min-width:720px!important;
+      max-width:760px!important;
+    }
+
+    @media(max-width:900px){
+      .studentMeta{grid-template-columns:1fr 1fr!important;max-width:none!important;}
+      #studentGrid.studentGrid{grid-auto-columns:minmax(620px,90vw)!important;}
+      #studentGrid.studentGrid .studentCard{min-width:620px!important;max-width:none!important;}
+    }
+  `;
+  document.head.appendChild(style);
+})();
+
+function v33ResetStudentScrollLeft(){
+  const grid=document.getElementById('studentGrid');
+  if(grid && !grid.dataset.v33UserScrolled){
+    grid.scrollLeft=0;
+  }
+}
+(function initV33ScrollMemory(){
+  const grid=document.getElementById('studentGrid');
+  if(!grid || grid.dataset.v33ScrollMemory==='1') return;
+  grid.dataset.v33ScrollMemory='1';
+  grid.addEventListener('scroll',()=>{grid.dataset.v33UserScrolled='1';},{passive:true});
+})();
+
+const V33_PREV_RENDER_STUDENTS=renderStudents;
+renderStudents=function(){
+  const grid=document.getElementById('studentGrid');
+  if(grid) delete grid.dataset.v33UserScrolled;
+  V33_PREV_RENDER_STUDENTS();
+  initV32DragHorizontalScroll();
+  v33ResetStudentScrollLeft();
+};
+
+init();
+initV32();
+initRealAppUX();
+initV30ClassicHorizontalUX();
+</script>
+
+<script>
+// ============================================================
+// 2026-08-20 20:33 通期講座受講計画：面談準備印刷4枚目固定
+// - 面談準備印刷の4枚目は、合格設計図丸ごとではなく通期講座受講計画の抽出表にする。
+// - Book1の17〜19行目相当の列位置・結合セルを維持する。
+// ============================================================
+(function(){
+  const previousMeetingPrepGoukakuDesignHtml = (typeof meetingPrepGoukakuDesignHtml === 'function') ? meetingPrepGoukakuDesignHtml : null;
+  function fourthPageCoursePlanHtml(name){
+    const item = (typeof goukakuDesignSheets !== 'undefined' && goukakuDesignSheets) ? goukakuDesignSheets[name] : null;
+    if(item && !item.error && item.kind === 'excel' && typeof window.goukakuCoursePlanHtml === 'function'){
+      const meta = `${escapeHtml(item.fileName || '合格設計図.xlsx')}${item.sheetName ? ' / ' + escapeHtml(item.sheetName) : ''}`;
+      return `<div class="goukakuPlanBox printFourthCoursePlan"><div class="goukakuPlanHead"><div><div class="goukakuPlanTitle">通期講座受講計画</div><div class="goukakuPlanMeta">${meta}</div></div></div><div class="goukakuPlanNotice">Book1の17〜19行目相当を列位置・結合セルごと再現し、20行目以降は講座CDまたは講座名がある行だけ表示します。色は読まず、数字だけ反映します。</div><div class="goukakuPlanWrap" style="max-height:none;overflow:visible;padding:0">${window.goukakuCoursePlanHtml(item, name, {editable:false})}</div></div>`;
+    }
+    if(previousMeetingPrepGoukakuDesignHtml) return previousMeetingPrepGoukakuDesignHtml(name);
+    return '<div class="box muted">通期講座受講計画はまだ読み込まれていません。</div>';
+  }
+  window.meetingPrepGoukakuDesignHtml = fourthPageCoursePlanHtml;
+  try{ meetingPrepGoukakuDesignHtml = fourthPageCoursePlanHtml; }catch(e){}
+})();
 </script>
 </body>
 </html>
