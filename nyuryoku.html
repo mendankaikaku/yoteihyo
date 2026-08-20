@@ -1775,11 +1775,8 @@ function remapRestoredScheduleToCurrentInputWeek(restored){
     if(inputScheduleRowsHaveAnyValue(trial)) return trial;
   }
 
-  // 最後の保険：weekStart では復元しない。日付情報が無い旧JSONだけ、
-  // 保存日が現在の開始日に近ければ予定消失を避けるため行位置そのままで復元する。
-  if(!restoredBase && inputScheduleRowsHaveAnyValue(schedule) && savedAtCloseToCurrentWeek(restored?.savedAt)){
-    return Array.from({length:7},(_,i)=>Array.from({length:6},(_,r)=>schedule?.[i]?.[r]||''));
-  }
+  // 行位置そのまま復元はしない。
+  // 日付根拠が無い／日付が重ならない予定は、誤配置防止のため空欄にする。
   return out;
 }
 function makeCurrentInputDataFromRestored(data){
