@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>面談予定入力アプリ（2026-08-20 19:09 出力・模試イベント画面表示分だけ保存版）</title>
+<title>面談予定入力アプリ（2026-08-20 19:35 出力）</title>
 <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
 <script src="./libs/xlsx.bundle.js"></script>
 <script></script>
@@ -1079,97 +1079,23 @@ const SUBJECT_POOL=[...new Set([...COMMON_TEST_SUBJECTS,...CROWN_TEST_SUBJECTS,'
 const EXAM_MASTER_KEY='yoteiExamMaster';
 const EXAM_MASTER_DEFAULT_VERSION_KEY='yoteiExamMasterDefaultVersion';
 const DEFAULT_TOSHIN_EXAM_VERSION='exam_master_empty_20260818_v1';
-const DEFAULT_TOSHIN_EXAM_MASTER=[
-  ['\u5168\u56fd\u7d71\u4e00\u9ad8\u6821\u751f\u30c6\u30b9\u30c8','2026-06-21',['\u9ad81','\u9ad82','\u9ad83']],
-  ['\u4eac\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-06-21',['\u9ad83']],
-  ['\u5317\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-06-21',['\u9ad83']],
-  ['\u9ad82\u4eac\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-06-21',['\u9ad81','\u9ad82']],
-  ['\u9ad82\u5317\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-06-21',['\u9ad81','\u9ad82']],
-  ['\u4e5d\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-06-28',['\u9ad83']],
-  ['\u4e00\u6a4b\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-06-28',['\u9ad83']],
-  ['\u6771\u4eac\u79d1\u5b66\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-06-28',['\u9ad83']],
-  ['\u9ad82\u4e5d\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-06-28',['\u9ad81','\u9ad82']],
-  ['\u9ad82\u6771\u4eac\u79d1\u5b66\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-06-28',['\u9ad81','\u9ad82']],
-  ['\u533b\u5b66\u90e882\u5927\u5b66\u5224\u5b9a\u30c6\u30b9\u30c8','2026-07-05',['\u9ad83']],
-  ['\u6771\u5317\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-07-05',['\u9ad83']],
-  ['\u540d\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-07-05',['\u9ad83']],
-  ['\u9ad82\u4e00\u6a4b\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-07-05',['\u9ad81','\u9ad82']],
-  ['\u9ad82\u6771\u5317\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-07-05',['\u9ad81','\u9ad82']],
-  ['\u9ad82\u540d\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-07-05',['\u9ad81','\u9ad82']],
-  ['\u962a\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-07-12',['\u9ad83']],
-  ['\u5343\u8449\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-07-12',['\u9ad83']],
-  ['\u795e\u6238\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-07-12',['\u9ad83']],
-  ['\u5e83\u5cf6\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-07-19',['\u9ad83']],
-  ['\u9ad82\u962a\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-07-19',['\u9ad81','\u9ad82']],
-  ['\u5927\u5b66\u5408\u683c\u57fa\u790e\u529b\u5224\u5b9a\u30c6\u30b9\u30c8','2026-07-20',['\u9ad81','\u9ad82','\u9ad83']],
-  ['\u65e9\u5927\u30fb\u6176\u5927\u30ec\u30d9\u30eb\u6a21\u8a66','2026-07-20',['\u9ad83']],
-  ['\u5168\u56fd\u56fd\u516c\u7acb\u5927 \u8a18\u8ff0\u6a21\u8a66','2026-07-20',['\u9ad83']],
-  ['\u4e0a\u7406\u30fb\u660e\u9752\u7acb\u6cd5\u4e2d\u30ec\u30d9\u30eb\u6a21\u8a66','2026-07-20',['\u9ad83']],
-  ['\u95a2\u95a2\u540c\u7acb\u30ec\u30d9\u30eb\u6a21\u8a66','2026-07-26',['\u9ad83']],
-  ['\u9ad8\u6821\u30ec\u30d9\u30eb\u8a18\u8ff0\u6a21\u8a66(\u9ad82)(\u9ad81)','2026-07-26',['\u9ad81','\u9ad82']],
-  ['\u4e5d\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-08-02',['\u9ad83']],
-  ['\u4eac\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-08-02',['\u9ad83']],
-  ['\u4e00\u6a4b\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-08-02',['\u9ad83']],
-  ['\u9ad82\u4e5d\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-08-02',['\u9ad81','\u9ad82']],
-  ['\u9ad82\u4eac\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-08-02',['\u9ad81','\u9ad82']],
-  ['\u9ad82\u6771\u4eac\u79d1\u5b66\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-08-02',['\u9ad81','\u9ad82']],
-  ['\u6771\u4eac\u79d1\u5b66\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-08-23',['\u9ad83']],
-  ['\u9ad82\u4e00\u6a4b\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-08-23',['\u9ad81','\u9ad82']],
-  ['\u5171\u901a\u30c6\u30b9\u30c8\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-08-30',['\u9ad82','\u9ad83']],
-  ['\u6771\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-09-06',['\u9ad83']],
-  ['\u540d\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-09-06',['\u9ad83']],
-  ['\u9ad82\u6771\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-09-06',['\u9ad81','\u9ad82']],
-  ['\u9ad82\u540d\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-09-06',['\u9ad81','\u9ad82']],
-  ['\u962a\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-09-13',['\u9ad83']],
-  ['\u9ad82\u962a\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-09-13',['\u9ad81','\u9ad82']],
-  ['\u5927\u5b66\u5408\u683c\u57fa\u790e\u529b\u5224\u5b9a\u30c6\u30b9\u30c8','2026-09-20',['\u9ad81','\u9ad82','\u9ad83']],
-  ['\u65e9\u5927\u30fb\u6176\u5927\u30ec\u30d9\u30eb\u6a21\u8a66','2026-09-20',['\u9ad83']],
-  ['\u5168\u56fd\u56fd\u516c\u7acb\u5927 \u8a18\u8ff0\u6a21\u8a66','2026-09-20',['\u9ad83']],
-  ['\u4e0a\u7406\u30fb\u660e\u9752\u7acb\u6cd5\u4e2d\u30ec\u30d9\u30eb\u6a21\u8a66','2026-09-20',['\u9ad83']],
-  ['\u95a2\u95a2\u540c\u7acb\u30ec\u30d9\u30eb\u6a21\u8a66','2026-10-04',['\u9ad83']],
-  ['\u4eac\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-10-04',['\u9ad83']],
-  ['\u6771\u5317\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-10-04',['\u9ad83']],
-  ['\u9ad82\u5927\u5b66\u5408\u683c\u57fa\u790e\u529b\u5224\u5b9a\u30c6\u30b9\u30c8','2026-10-04',['\u9ad81','\u9ad82']],
-  ['\u9ad82\u4eac\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-10-04',['\u9ad81','\u9ad82']],
-  ['\u9ad82\u6771\u5317\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-10-04',['\u9ad81','\u9ad82']],
-  ['\u4e5d\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-10-11',['\u9ad83']],
-  ['\u9ad82\u4e5d\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-10-11',['\u9ad81','\u9ad82']],
-  ['\u6771\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-10-18',['\u9ad83']],
-  ['\u5317\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-10-18',['\u9ad83']],
-  ['\u540d\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-10-18',['\u9ad83']],
-  ['\u9ad82\u6771\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-10-18',['\u9ad81','\u9ad82']],
-  ['\u9ad82\u5317\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-10-18',['\u9ad81','\u9ad82']],
-  ['\u9ad82\u540d\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-10-18',['\u9ad81','\u9ad82']],
-  ['\u962a\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-10-25',['\u9ad83']],
-  ['\u533b\u5b66\u90e882\u5927\u5b66\u5224\u5b9a\u30c6\u30b9\u30c8','2026-11-01',['\u9ad83']],
-  ['\u9ad82\u962a\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-11-01',['\u9ad81','\u9ad82']],
-  ['\u5168\u56fd\u7d71\u4e00\u9ad8\u6821\u751f\u30c6\u30b9\u30c8','2026-11-08',['\u9ad81','\u9ad82','\u9ad83']],
-  ['\u5e83\u5cf6\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-11-08',['\u9ad83']],
-  ['\u4e00\u6a4b\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-11-08',['\u9ad83']],
-  ['\u9ad82\u6771\u4eac\u79d1\u5b66\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-11-08',['\u9ad81','\u9ad82']],
-  ['\u6771\u4eac\u79d1\u5b66\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-11-15',['\u9ad83']],
-  ['\u5927\u5b66\u5408\u683c\u57fa\u790e\u529b\u5224\u5b9a\u30c6\u30b9\u30c8','2026-11-15',['\u9ad81','\u9ad82','\u9ad83']],
-  ['\u5343\u8449\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-11-15',['\u9ad83']],
-  ['\u9ad82\u4e00\u6a4b\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-11-15',['\u9ad81','\u9ad82']],
-  ['\u795e\u6238\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2026-11-22',['\u9ad83']],
-  ['\u65e9\u5927\u30fb\u6176\u5927\u30ec\u30d9\u30eb\u6a21\u8a66','2026-11-22',['\u9ad83']],
-  ['\u5168\u56fd\u56fd\u516c\u7acb\u5927 \u8a18\u8ff0\u6a21\u8a66','2026-11-22',['\u9ad83']],
-  ['\u4e0a\u7406\u30fb\u660e\u9752\u7acb\u6cd5\u4e2d\u30ec\u30d9\u30eb\u6a21\u8a66','2026-11-22',['\u9ad83']],
-  ['\u95a2\u95a2\u540c\u7acb\u30ec\u30d9\u30eb\u6a21\u8a66','2026-12-20',['\u9ad83']],
-  ['\u9ad8\u6821\u30ec\u30d9\u30eb\u8a18\u8ff0\u6a21\u8a66(\u9ad82)(\u9ad81)','2026-12-20',['\u9ad81','\u9ad82']],
-  ['\u5171\u901a\u30c6\u30b9\u30c8\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2027-01-23',['\u9ad82','\u9ad83']],
-  ['\u6771\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2027-01-23',['\u9ad83']],
-  ['\u9ad82\u6771\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2027-01-23',['\u9ad81','\u9ad82']],
-  ['\u4eac\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2027-01-24',['\u9ad83']],
-  ['\u5168\u56fd\u56fd\u516c\u7acb\u5927 \u8a18\u8ff0\u6a21\u8a66','2027-02-07',['\u9ad83']],
-  ['\u9ad82\u4eac\u5927\u672c\u756a\u30ec\u30d9\u30eb\u6a21\u8a66','2027-02-07',['\u9ad81','\u9ad82']]
-];
+const DEFAULT_TOSHIN_EXAM_MASTER=[]; // 旧東進模試一覧は完全削除。復活防止は LEGACY_TOSHIN_INITIAL_EXAM_KEYS で行う。
 const EXAM_TARGET_HISTORY_KEY='yoteiExamTargetHistory';
 const EVENT_TARGET_HISTORY_KEY='yoteiEventTargetHistory';
 const EVENT_MASTER_KEY='yoteiEventMaster';
 const COMMENT_MASTER_KEY='yoteiCommentMaster';
 const COMMENT_TARGET_HISTORY_KEY='yoteiCommentTargetHistory';
 const GRADE_OPTIONS=['','高1','高2','高3'];
+function normalizeInputGradeValue(value){
+  const raw=String(value||'').trim()
+    .replace(/[０-９]/g,ch=>String.fromCharCode(ch.charCodeAt(0)-0xFEE0))
+    .replace(/[\s　]+/g,'');
+  if(!raw) return '';
+  if(/高(?:校)?1(?:年|生)?|^1年$|^高一$/.test(raw)) return '高1';
+  if(/高(?:校)?2(?:年|生)?|^2年$|^高二$/.test(raw)) return '高2';
+  if(/高(?:校)?3(?:年|生)?|^3年$|^高三$/.test(raw)) return '高3';
+  return GRADE_OPTIONS.includes(raw) ? raw : '';
+}
 const POS_URL='https://pos.toshin.com/SSO2022/SSO2/FCoach/SSOLogin/SSOLogin';
 let students=[];
 let studentData={};
@@ -1348,7 +1274,7 @@ function addRosterProfile(p){
   const name=String(p.name||'').trim();
   const no=String(p.studentNo||'').trim();
   if(!name && !no) return;
-  const item={name, studentNo:no, grade:String(p.grade||'').trim(), school:String(p.school||'').trim(), assistant:String(p.assistant||'').trim(), source:p.source||''};
+  const item={name, studentNo:no, grade:normalizeInputGradeValue(p.grade), school:String(p.school||'').trim(), assistant:String(p.assistant||'').trim(), source:p.source||''};
   const nk=profileKey(name); const pk=no?`no:${no}`:'';
   const displayName=inputTargetDisplayName(name);
   const dk=profileKey(displayName);
@@ -1382,7 +1308,7 @@ function parseRosterAoa(aoa, source=''){
     const item={
       studentNo:idx.studentNo>=0?String(row[idx.studentNo]??'').trim():'',
       name:idx.name>=0?String(row[idx.name]??'').trim():'',
-      grade:idx.grade>=0?String(row[idx.grade]??'').trim():'',
+      grade:idx.grade>=0?normalizeInputGradeValue(row[idx.grade]):'',
       school:idx.school>=0?String(row[idx.school]??'').trim():'',
       assistant:idx.assistant>=0?String(row[idx.assistant]??'').trim():'',
       source
@@ -1533,7 +1459,7 @@ function getKnownStudentProfile(name){
   return Object.assign({}, p||{}, {
     name,
     studentNo:String(data?.studentNo||'').trim() || p?.studentNo || '',
-    grade:String(data?.grade||'').trim() || p?.grade || '',
+    grade:normalizeInputGradeValue(data?.grade) || normalizeInputGradeValue(p?.grade) || '',
     school:String(data?.school||'').trim() || p?.school || '',
     assistant:String(data?.assistant||'').trim() || p?.assistant || mapAssistant || ''
   });
@@ -1544,7 +1470,7 @@ function mergeRosterProfileIntoStudentData(name, data){
   if(!p) return {data:d, changed:[], matched:false, ambiguous:false};
   const changed=[];
   if(!String(d.studentNo||'').trim() && String(p.studentNo||'').trim()){ d.studentNo=String(p.studentNo).trim(); changed.push('生徒番号'); }
-  if(!String(d.grade||'').trim() && String(p.grade||'').trim()){ d.grade=String(p.grade).trim(); changed.push('学年'); }
+  if(!String(d.grade||'').trim() && normalizeInputGradeValue(p.grade)){ d.grade=normalizeInputGradeValue(p.grade); changed.push('学年'); }
   if(!String(d.school||'').trim() && String(p.school||'').trim()){ d.school=String(p.school).trim(); changed.push('高校'); }
   if(!String(d.assistant||'').trim() && String(p.assistant||'').trim()){ d.assistant=String(p.assistant).trim(); changed.push('担任助手'); }
   return {data:d, changed, matched:true, profile:p};
@@ -1965,6 +1891,9 @@ function renderStudents(options={}){
   const viewState=options.viewState || (options.preserveView?captureStudentViewState():null);
   const grid=$('#studentGrid');
   if(!students.length){grid.innerHTML='<section class="card"><span class="empty">生徒名を入力して「② 生徒欄を作る」を押してください。</span></section>';return;}
+  // 対応表キャッシュが読めている場合は、HTML生成前に空欄プロフィールを studentData へ入れる。
+  // これで復元直後から対象学年の模試・イベントも正しく表示される。
+  try{ applyRosterProfilesToStudents(students); }catch(e){}
   grid.innerHTML=students.map(name=>studentCardHtml(name)).join('');
   students.forEach(name=>fillStudentValues(name));
   updateScheduleHeaders();
@@ -2714,7 +2643,28 @@ function addScheduleRow(kind,name){
 ========================================================= */
 function syncFromDom(){if(!students.length)return; students.forEach(name=>{const card=document.querySelector(`[data-student-card="${cssEscape(name)}"]`); if(!card)return; const data=ensureStudent(name); data.grade=card.querySelector('[data-kind="grade"]')?.value||''; data.studentNo=card.querySelector('[data-kind="studentNo"]')?.value||''; data.school=card.querySelector('[data-kind="school"]')?.value||''; data.assistant=card.querySelector('[data-kind="assistant"]')?.value||''; data.schedule=Array.from({length:7},(_,d)=>LIMITS.map((_,r)=>card.querySelector(`textarea[data-kind="schedule"][data-day="${d}"][data-row="${r}"]`)?.value||'')); data.materials=Array.from(card.querySelectorAll('tbody[data-material-body] tr')).map((tr,i)=>({subject:tr.querySelector(`[data-kind="subj"]`)?.value||'',book:tr.querySelector(`[data-kind="book"]`)?.value||'',content:tr.querySelector(`[data-kind="content"]`)?.value||''})); if(!data.materials.length)data.materials=[{subject:'',book:'',content:''}]; data.remarks=card.querySelector('textarea[data-kind="remarks"]')?.value||''; data.failureReason=card.querySelector('textarea[data-kind="failureReason"]')?.value||''; data.weeklyMeetingAbsent=!!card.querySelector('input[data-kind="weeklyMeetingAbsent"]')?.checked; data.exams=filterVisibleExamRowsForStudent(name,getExamInputsForCard(card)); data.events=filterVisibleEventRowsForStudent(name,getEventInputsForCard(card)); data.comments=getCommentInputsForCard(card);});}
 function cssEscape(s){return String(s).replace(/\\/g,'\\\\').replace(/"/g,'\\"')}
-function fillStudentValues(name){const card=document.querySelector(`[data-student-card="${cssEscape(name)}"]`);if(!card)return; const data=ensureStudent(name); const prof=getKnownStudentProfile(name); const gradeEl=card.querySelector('[data-kind="grade"]'); if(gradeEl)gradeEl.value=data.grade||prof.grade||''; const noEl=card.querySelector('[data-kind="studentNo"]'); if(noEl)noEl.value=data.studentNo||prof.studentNo||''; const schoolEl=card.querySelector('[data-kind="school"]'); if(schoolEl)schoolEl.value=data.school||prof.school||''; const assistantEl=card.querySelector('[data-kind="assistant"]'); if(assistantEl)assistantEl.value=data.assistant||prof.assistant||''; data.schedule.forEach((day,d)=>day.forEach((v,r)=>{const el=card.querySelector(`textarea[data-kind="schedule"][data-day="${d}"][data-row="${r}"]`);if(el)el.value=v||''})); (data.materials||[]).forEach((m,i)=>{const tr=card.querySelectorAll('tbody[data-material-body] tr')[i]; if(!tr)return; tr.querySelector('[data-kind="subj"]').value=m.subject||''; tr.querySelector('[data-kind="book"]').value=m.book||''; tr.querySelector('[data-kind="content"]').value=m.content||'';}); const rem=card.querySelector('textarea[data-kind="remarks"]'); if(rem)rem.value=data.remarks||''; const fr=card.querySelector('textarea[data-kind="failureReason"]'); if(fr)fr.value=data.failureReason||''; const absent=card.querySelector('input[data-kind="weeklyMeetingAbsent"]'); if(absent)absent.checked=!!data.weeklyMeetingAbsent; applyExamValuesToCard(card,data.exams||[]); applyEventValuesToCard(card,data.events||[]); applyCommentValuesToCard(card,data.comments||[]);}
+function fillStudentValues(name){
+  const card=document.querySelector(`[data-student-card="${cssEscape(name)}"]`);
+  if(!card)return;
+  const data=ensureStudent(name);
+  const prof=getKnownStudentProfile(name);
+  // DOMに表示するだけでなく、空欄プロフィールは studentData にも即時反映する。
+  // これをしないと、復元直後は模試/イベント対象判定が空欄のままになり、学年を触った瞬間だけ再描画で表示される事故が起きる。
+  if(!String(data.grade||'').trim() && normalizeInputGradeValue(prof.grade)) data.grade=normalizeInputGradeValue(prof.grade);
+  if(!String(data.studentNo||'').trim() && String(prof.studentNo||'').trim()) data.studentNo=String(prof.studentNo).trim();
+  if(!String(data.school||'').trim() && String(prof.school||'').trim()) data.school=String(prof.school).trim();
+  if(!String(data.assistant||'').trim() && String(prof.assistant||'').trim()) data.assistant=String(prof.assistant).trim();
+  const gradeEl=card.querySelector('[data-kind="grade"]'); if(gradeEl)gradeEl.value=normalizeInputGradeValue(data.grade)||'';
+  const noEl=card.querySelector('[data-kind="studentNo"]'); if(noEl)noEl.value=data.studentNo||'';
+  const schoolEl=card.querySelector('[data-kind="school"]'); if(schoolEl)schoolEl.value=data.school||'';
+  const assistantEl=card.querySelector('[data-kind="assistant"]'); if(assistantEl)assistantEl.value=data.assistant||'';
+  data.schedule.forEach((day,d)=>day.forEach((v,r)=>{const el=card.querySelector(`textarea[data-kind="schedule"][data-day="${d}"][data-row="${r}"]`);if(el)el.value=v||''}));
+  (data.materials||[]).forEach((m,i)=>{const tr=card.querySelectorAll('tbody[data-material-body] tr')[i]; if(!tr)return; tr.querySelector('[data-kind="subj"]').value=m.subject||''; tr.querySelector('[data-kind="book"]').value=m.book||''; tr.querySelector('[data-kind="content"]').value=m.content||'';});
+  const rem=card.querySelector('textarea[data-kind="remarks"]'); if(rem)rem.value=data.remarks||'';
+  const fr=card.querySelector('textarea[data-kind="failureReason"]'); if(fr)fr.value=data.failureReason||'';
+  const absent=card.querySelector('input[data-kind="weeklyMeetingAbsent"]'); if(absent)absent.checked=!!data.weeklyMeetingAbsent;
+  applyExamValuesToCard(card,data.exams||[]); applyEventValuesToCard(card,data.events||[]); applyCommentValuesToCard(card,data.comments||[]);
+}
 function bindInputs(){
   $$('input,textarea,select').forEach(el=>{
     el.oninput=()=>{
@@ -2761,10 +2711,21 @@ function deleteStudentFromGroup(name){
 ========================================================= */
 // v38以降は模試マスタの固定初期値を0件にする。必要な模試は手動追加または保存フォルダから復元する。
 function defaultToshinExamRows(){return []}
+const LEGACY_TOSHIN_INITIAL_EXAM_KEYS = new Set(["全国統一高校生テスト|2026-06-21", "京大本番レベル模試|2026-06-21", "北大本番レベル模試|2026-06-21", "高2京大本番レベル模試|2026-06-21", "高2北大本番レベル模試|2026-06-21", "九大本番レベル模試|2026-06-28", "一橋大本番レベル模試|2026-06-28", "東京科学大本番レベル模試|2026-06-28", "高2九大本番レベル模試|2026-06-28", "高2東京科学大本番レベル模試|2026-06-28", "医学部82大学判定テスト|2026-07-05", "東北大本番レベル模試|2026-07-05", "名大本番レベル模試|2026-07-05", "高2一橋大本番レベル模試|2026-07-05", "高2東北大本番レベル模試|2026-07-05", "高2名大本番レベル模試|2026-07-05", "阪大本番レベル模試|2026-07-12", "千葉大本番レベル模試|2026-07-12", "神戸大本番レベル模試|2026-07-12", "広島大本番レベル模試|2026-07-19", "高2阪大本番レベル模試|2026-07-19", "大学合格基礎力判定テスト|2026-07-20", "早大・慶大レベル模試|2026-07-20", "全国国公立大 記述模試|2026-07-20", "上理・明青立法中レベル模試|2026-07-20", "関関同立レベル模試|2026-07-26", "高校レベル記述模試(高2)(高1)|2026-07-26", "九大本番レベル模試|2026-08-02", "京大本番レベル模試|2026-08-02", "一橋大本番レベル模試|2026-08-02", "高2九大本番レベル模試|2026-08-02", "高2京大本番レベル模試|2026-08-02", "高2東京科学大本番レベル模試|2026-08-02", "東京科学大本番レベル模試|2026-08-23", "高2一橋大本番レベル模試|2026-08-23", "共通テスト本番レベル模試|2026-08-30", "東大本番レベル模試|2026-09-06", "名大本番レベル模試|2026-09-06", "高2東大本番レベル模試|2026-09-06", "高2名大本番レベル模試|2026-09-06", "阪大本番レベル模試|2026-09-13", "高2阪大本番レベル模試|2026-09-13", "大学合格基礎力判定テスト|2026-09-20", "早大・慶大レベル模試|2026-09-20", "全国国公立大 記述模試|2026-09-20", "上理・明青立法中レベル模試|2026-09-20", "関関同立レベル模試|2026-10-04", "京大本番レベル模試|2026-10-04", "東北大本番レベル模試|2026-10-04", "高2大学合格基礎力判定テスト|2026-10-04", "高2京大本番レベル模試|2026-10-04", "高2東北大本番レベル模試|2026-10-04", "九大本番レベル模試|2026-10-11", "高2九大本番レベル模試|2026-10-11", "東大本番レベル模試|2026-10-18", "北大本番レベル模試|2026-10-18", "名大本番レベル模試|2026-10-18", "高2東大本番レベル模試|2026-10-18", "高2北大本番レベル模試|2026-10-18", "高2名大本番レベル模試|2026-10-18", "阪大本番レベル模試|2026-10-25", "医学部82大学判定テスト|2026-11-01", "高2阪大本番レベル模試|2026-11-01", "全国統一高校生テスト|2026-11-08", "広島大本番レベル模試|2026-11-08", "一橋大本番レベル模試|2026-11-08", "高2東京科学大本番レベル模試|2026-11-08", "東京科学大本番レベル模試|2026-11-15", "大学合格基礎力判定テスト|2026-11-15", "千葉大本番レベル模試|2026-11-15", "高2一橋大本番レベル模試|2026-11-15", "神戸大本番レベル模試|2026-11-22", "早大・慶大レベル模試|2026-11-22", "全国国公立大 記述模試|2026-11-22", "上理・明青立法中レベル模試|2026-11-22", "関関同立レベル模試|2026-12-20", "高校レベル記述模試(高2)(高1)|2026-12-20", "共通テスト本番レベル模試|2027-01-23", "東大本番レベル模試|2027-01-23", "高2東大本番レベル模試|2027-01-23", "京大本番レベル模試|2027-01-24", "全国国公立大 記述模試|2027-02-07", "高2京大本番レベル模試|2027-02-07"]);
+function examMasterKeyForLegacyPurge(row){return `${String(row?.name||'').trim()}|${String(row?.date||'').trim()}`;}
+function purgeLegacyToshinInitialExamRows(rows){
+  // だいぶ前に入れた東進模試一覧を、localStorage/古いJSON/画面マスタから保存時に必ず落とす。
+  // 現在の正本は exam_master.json と画面上の模試マスタだけ。旧初期一覧は正本にしない。
+  return (Array.isArray(rows)?rows:[]).filter(row=>{
+    if(!row || !row.name) return false;
+    return !LEGACY_TOSHIN_INITIAL_EXAM_KEYS.has(examMasterKeyForLegacyPurge(row));
+  });
+}
+
 function mergeDefaultExamMaster(saved){
   const map=new Map();
   defaultToshinExamRows().forEach(row=>map.set(`${row.name}|${row.date}`,row));
-  (Array.isArray(saved)?saved:[]).forEach(row=>{if(row&&row.name&&!looksMojibakeExamRow(row))map.set(`${row.name}|${row.date||''}`,Object.assign({type:'common',subjectTemplate:'',grades:[],students:[]},row))});
+  purgeLegacyToshinInitialExamRows(Array.isArray(saved)?saved:[]).forEach(row=>{if(row&&row.name&&!looksMojibakeExamRow(row))map.set(`${row.name}|${row.date||''}`,Object.assign({type:'common',subjectTemplate:'',grades:[],students:[]},row))});
   return Array.from(map.values());
 }
 function looksMojibakeExamRow(row){
@@ -2919,14 +2880,15 @@ async function readMasterSettingsFilesFromShared(){
 }
 function persistMasterPanelsToLocalForSave(){
   // 画面で編集中のマスタを、保存直前に必ずlocalStorageへ反映する。
-  // これがないと「イベントマスタを編集したのに、別の保存ボタンで旧マスタを保存する」事故が起きる。
+  // v20260820_1928: マスタ上書きは「現在の画面」を唯一の正本にする。
+  // 以前のJSON/localStorageに残っているが画面に無い模試・イベント・対象履歴は保存時に消す。
   try{
-    const examRows = mergeVisibleExamMasterRowsForSave(collectExamMasterFromPanel());
+    const examRows = collectExamMasterFromPanel();
     saveExamMasterData(examRows);
     updateExamTargetHistoryFromMasters(examRows);
   }catch(e){}
   try{
-    const eventRows = applyPreviousEventTargetsWithConfirm(collectEventMasterFromPanel());
+    const eventRows = collectEventMasterFromPanel();
     saveEventMasterData(eventRows);
     updateEventTargetHistoryFromMasters(eventRows);
   }catch(e){}
@@ -2947,8 +2909,8 @@ function mergeMasterRowsKeepCurrent(current, restored, kind){
   (restored||[]).forEach(r=>{const k=masterRowKey(r,kind); if(!seen.has(k)){seen.add(k); out.push(r);}});
   return out;
 }
-function getExamMaster(){try{const saved=JSON.parse(localStorage.getItem(EXAM_MASTER_KEY)||'[]');let rows=Array.isArray(saved)?saved:[];if(localStorage.getItem(EXAM_MASTER_KEY+':targetVersion')!==String(MASTER_TARGET_RESTORE_VERSION)){rows=stripLegacyExamTargetStudents(rows);localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(rows));localStorage.setItem(EXAM_MASTER_KEY+':targetVersion',String(MASTER_TARGET_RESTORE_VERSION));}if(localStorage.getItem(EXAM_MASTER_DEFAULT_VERSION_KEY)!==DEFAULT_TOSHIN_EXAM_VERSION){rows=[];localStorage.setItem(EXAM_MASTER_KEY,'[]');localStorage.setItem(EXAM_MASTER_DEFAULT_VERSION_KEY,DEFAULT_TOSHIN_EXAM_VERSION);return rows}return rows}catch(e){return []}}
-function saveExamMasterData(rows){const merged=mergeDefaultExamMaster(Array.isArray(rows)?rows:[]);localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(merged));localStorage.setItem(EXAM_MASTER_DEFAULT_VERSION_KEY,DEFAULT_TOSHIN_EXAM_VERSION);localStorage.setItem(EXAM_MASTER_KEY+':targetVersion',String(MASTER_TARGET_RESTORE_VERSION))}
+function getExamMaster(){try{const saved=JSON.parse(localStorage.getItem(EXAM_MASTER_KEY)||'[]');let rows=purgeLegacyToshinInitialExamRows(Array.isArray(saved)?saved:[]);if(localStorage.getItem(EXAM_MASTER_KEY+':targetVersion')!==String(MASTER_TARGET_RESTORE_VERSION)){rows=stripLegacyExamTargetStudents(rows);localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(rows));localStorage.setItem(EXAM_MASTER_KEY+':targetVersion',String(MASTER_TARGET_RESTORE_VERSION));}if(localStorage.getItem(EXAM_MASTER_DEFAULT_VERSION_KEY)!==DEFAULT_TOSHIN_EXAM_VERSION){rows=[];localStorage.setItem(EXAM_MASTER_KEY,'[]');localStorage.setItem(EXAM_MASTER_DEFAULT_VERSION_KEY,DEFAULT_TOSHIN_EXAM_VERSION);return rows}return rows}catch(e){return []}}
+function saveExamMasterData(rows){const merged=purgeLegacyToshinInitialExamRows(mergeDefaultExamMaster(purgeLegacyToshinInitialExamRows(Array.isArray(rows)?rows:[])));localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(merged));localStorage.setItem(EXAM_MASTER_DEFAULT_VERSION_KEY,DEFAULT_TOSHIN_EXAM_VERSION);localStorage.setItem(EXAM_MASTER_KEY+':targetVersion',String(MASTER_TARGET_RESTORE_VERSION))}
 function visibleExamMasters(){const start=new Date($('#weekStart').value+'T00:00:00');return getExamMaster().filter(ex=>{if(!ex.date)return false;const d=new Date(ex.date+'T00:00:00');const diff=daysBetween(start,d);return diff>=0&&diff<=21})}
 function getSubjectTemplates(){
   try{
@@ -2983,8 +2945,8 @@ function saveSubjectTemplates(list){localStorage.setItem(SUBJECT_TEMPLATE_KEY,JS
 function findSubjectTemplate(name){return getSubjectTemplates().find(t=>t.name===name)||null}
 function defaultTemplateNameForType(type){return type==='crown'?'冠模試型':'共テ型'}
 function examSubjectsForType(type,templateName){const t=findSubjectTemplate(templateName||defaultTemplateNameForType(type));return t?t.subjects:(type==='crown'?CROWN_TEST_SUBJECTS:COMMON_TEST_SUBJECTS)}
-function getExamMaster(){try{const saved=JSON.parse(localStorage.getItem(EXAM_MASTER_KEY)||'[]');let rows=Array.isArray(saved)?saved:[];if(localStorage.getItem(EXAM_MASTER_KEY+':targetVersion')!==String(MASTER_TARGET_RESTORE_VERSION)){rows=stripLegacyExamTargetStudents(rows);localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(rows));localStorage.setItem(EXAM_MASTER_KEY+':targetVersion',String(MASTER_TARGET_RESTORE_VERSION));}if(localStorage.getItem(EXAM_MASTER_DEFAULT_VERSION_KEY)!==DEFAULT_TOSHIN_EXAM_VERSION){rows=[];localStorage.setItem(EXAM_MASTER_KEY,'[]');localStorage.setItem(EXAM_MASTER_DEFAULT_VERSION_KEY,DEFAULT_TOSHIN_EXAM_VERSION);return rows}return rows}catch(e){return []}}
-function saveExamMasterData(rows){const merged=mergeDefaultExamMaster(Array.isArray(rows)?rows:[]);localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(merged));localStorage.setItem(EXAM_MASTER_DEFAULT_VERSION_KEY,DEFAULT_TOSHIN_EXAM_VERSION);localStorage.setItem(EXAM_MASTER_KEY+':targetVersion',String(MASTER_TARGET_RESTORE_VERSION))}
+function getExamMaster(){try{const saved=JSON.parse(localStorage.getItem(EXAM_MASTER_KEY)||'[]');let rows=purgeLegacyToshinInitialExamRows(Array.isArray(saved)?saved:[]);if(localStorage.getItem(EXAM_MASTER_KEY+':targetVersion')!==String(MASTER_TARGET_RESTORE_VERSION)){rows=stripLegacyExamTargetStudents(rows);localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(rows));localStorage.setItem(EXAM_MASTER_KEY+':targetVersion',String(MASTER_TARGET_RESTORE_VERSION));}if(localStorage.getItem(EXAM_MASTER_DEFAULT_VERSION_KEY)!==DEFAULT_TOSHIN_EXAM_VERSION){rows=[];localStorage.setItem(EXAM_MASTER_KEY,'[]');localStorage.setItem(EXAM_MASTER_DEFAULT_VERSION_KEY,DEFAULT_TOSHIN_EXAM_VERSION);return rows}return rows}catch(e){return []}}
+function saveExamMasterData(rows){const merged=purgeLegacyToshinInitialExamRows(mergeDefaultExamMaster(purgeLegacyToshinInitialExamRows(Array.isArray(rows)?rows:[])));localStorage.setItem(EXAM_MASTER_KEY,JSON.stringify(merged));localStorage.setItem(EXAM_MASTER_DEFAULT_VERSION_KEY,DEFAULT_TOSHIN_EXAM_VERSION);localStorage.setItem(EXAM_MASTER_KEY+':targetVersion',String(MASTER_TARGET_RESTORE_VERSION))}
 function visibleExamMasters(){const start=new Date($('#weekStart').value+'T00:00:00');return getExamMaster().filter(ex=>{if(!ex.date)return false;const d=new Date(ex.date+'T00:00:00');const diff=daysBetween(start,d);return diff>=0&&diff<=21})}
 function examId(ex){return `${ex.name||''}|${ex.date||''}|${ex.type||'common'}|${ex.subjectTemplate||defaultTemplateNameForType(ex.type)}`}
 function splitTargetNames(s){return String(s||'').split(/[、，,\n]+/).map(x=>x.trim()).filter(Boolean)}
@@ -3224,10 +3186,12 @@ function saveExamTargetHistory(list){
   localStorage.setItem(EXAM_TARGET_HISTORY_KEY,JSON.stringify(cleaned.slice(0,200)));
 }
 function updateExamTargetHistoryFromMasters(rows){
+  // マスタ上書き時は、現在画面に残っている模試だけを正とする。
+  // 以前のJSONやtargetHistoryにだけ残っている模試対象は、ここで完全に落とす。
   const current=(rows||[])
     .filter(ex=>ex&&ex.name&&itemHasAnyTarget(ex))
     .map(ex=>({name:ex.name,grades:ex.grades||[],schools:ex.schools||[],assistants:ex.assistants||[],students:ex.students||[],savedAt:new Date().toISOString()}));
-  saveExamTargetHistory([...current,...getExamTargetHistory()]);
+  saveExamTargetHistory(current);
 }
 function findSimilarExamTarget(name, rowsForSearch=[]){
   const key=normalizeExamNameForTarget(name);
@@ -3318,14 +3282,11 @@ function cleanExamMasterRowForSave(row){
   return copy;
 }
 function mergeVisibleExamMasterRowsForSave(editedRows){
-  const all=getExamMaster().map(x=>Object.assign({},x));
-  (editedRows||[]).forEach(row=>{
-    const idx=Number(row.__masterIndex);
-    const clean=cleanExamMasterRowForSave(row);
-    if(Number.isInteger(idx) && idx>=0 && idx<all.length) all[idx]=clean;
-    else all.push(clean);
-  });
-  return all.filter(x=>x.name||x.date||(x.grades||[]).length||(x.schools||[]).length||(x.assistants||[]).length||(x.students||[]).length||x.subjectTemplate);
+  // 名前は互換のため残すが、もう「旧マスタと結合」はしない。
+  // 画面にある行だけを正本として保存し、画面に無い古い模試は削除する。
+  return (editedRows||[])
+    .map(cleanExamMasterRowForSave)
+    .filter(x=>x.name||x.date||(x.grades||[]).length||(x.schools||[]).length||(x.assistants||[]).length||(x.students||[]).length||x.subjectTemplate);
 }
 
 function collectExamMasterFromPanel(){return $$('.examMasterRow').map(row=>{
@@ -3355,10 +3316,12 @@ function addExamMasterRow(){
   renderStudents();
 }
 async function saveExamMasterFromPanel(){
-  const mergedRows=mergeVisibleExamMasterRowsForSave(collectExamMasterFromPanel());
-  const rows=applyPreviousExamTargetsWithConfirm(mergedRows);
+  const beforeCount=getExamMaster().length;
+  const rows=collectExamMasterFromPanel();
   saveExamMasterData(rows);
   updateExamTargetHistoryFromMasters(rows);
+  const afterCount=getExamMaster().length;
+  const deletedCount=Math.max(0, beforeCount-afterCount);
   renderExamMasterPanel();
   renderStudents();
 
@@ -3367,7 +3330,7 @@ async function saveExamMasterFromPanel(){
   // 選ばれた保存復元フォルダー直下の既存/新規 json フォルダーへ保存する。
   try{
     await saveMasterSettingsWithNormalSaveFolder(false);
-    alert(`模試マスタを保存し、保存復元フォルダー/json に反映しました。\n模試マスタ ${getExamMaster().length}件`);
+    alert(`模試マスタを保存し、保存復元フォルダー/json に反映しました。\n模試マスタ ${getExamMaster().length}件\n画面に無い古い模試は削除反映：${deletedCount}件`);
   }catch(e){
     console.error(e);
     alert('模試マスタはブラウザ内に保存しましたが、保存復元フォルダー/json への反映に失敗しました。\n保存復元フォルダー本体を選んでください。');
@@ -3404,10 +3367,11 @@ function saveEventTargetHistory(list){
   localStorage.setItem(EVENT_TARGET_HISTORY_KEY,JSON.stringify(cleaned.slice(0,200)));
 }
 function updateEventTargetHistoryFromMasters(rows){
+  // イベントも現在画面のマスタだけを正とする。古い履歴から復活させない。
   const current=(rows||[])
     .filter(ev=>ev&&ev.name&&itemHasAnyTarget(ev))
     .map(ev=>({name:ev.name,grades:ev.grades||[],schools:ev.schools||[],assistants:ev.assistants||[],students:ev.students||[],savedAt:new Date().toISOString()}));
-  saveEventTargetHistory([...current,...getEventTargetHistory()]);
+  saveEventTargetHistory(current);
 }
 function findSimilarEventTarget(name, rowsForSearch=[]){
   const key=normalizeExamNameForTarget(name);
@@ -3481,9 +3445,12 @@ async function saveEventMasterFromPanel(){
   // イベントマスタは、ボタンを押した瞬間の画面値を唯一の正として保存する。
   // 以前はこの後に全マスタ保存処理がもう一度パネルを再収集していたため、
   // イベントを追加/編集した直後に保存しても弱く、古い値が混ざる可能性があった。
-  const rows=applyPreviousEventTargetsWithConfirm(collectEventMasterFromPanel());
+  const beforeCount=getEventMaster().length;
+  const rows=collectEventMasterFromPanel();
   saveEventMasterData(rows);
   updateEventTargetHistoryFromMasters(rows);
+  const afterCount=getEventMaster().length;
+  const deletedCount=Math.max(0, beforeCount-afterCount);
   renderEventMasterPanel();
   renderStudents();
 
@@ -3729,6 +3696,10 @@ function loadOneFromBrowser(name){
 }
 function buildGroupMemory(savedAt=new Date().toISOString(), previousGroupMem=null){
   syncFromDom();
+  // ⑤保存でも、マスタ画面に無い古い模試・イベントをJSONへ持ち越さない。
+  // 先にマスタ画面をlocalStorageへ確定してから、group JSONとmaster JSONを作る。
+  try{ persistMasterPanelsToLocalForSave(); }catch(e){}
+  try{ saveExamMasterData(purgeLegacyToshinInitialExamRows(getExamMaster())); }catch(e){}
   pruneHiddenExamEventRowsForAllStudents();
   let prev=previousGroupMem;
   if(!prev){try{prev=JSON.parse(localStorage.getItem(groupKey())||'null');}catch(e){prev=null;}}
@@ -6997,6 +6968,22 @@ function buildMeetingPrepPrintHtml(resultRecords, weeklyHtml){
   <\/script>
 
 
+
+<script>
+// 2026-08-20 19:35 旧東進模試一覧のブラウザ内残骸を起動時にも削除する。
+try{
+  if(typeof getExamMaster==='function' && typeof saveExamMasterData==='function' && typeof purgeLegacyToshinInitialExamRows==='function'){
+    const before=getExamMaster();
+    const after=purgeLegacyToshinInitialExamRows(before);
+    if(after.length!==before.length){
+      saveExamMasterData(after);
+      if(typeof renderExamMasterPanel==='function') renderExamMasterPanel();
+      if(typeof renderStudents==='function') renderStudents();
+      if(typeof showSaveInfo==='function') showSaveInfo('旧東進模試一覧をブラウザ内マスタから削除しました：'+(before.length-after.length)+'件');
+    }
+  }
+}catch(e){}
+</script>
 </body></html>`;
 }
 let __meetingPrepPrintBusy=false;
@@ -8531,7 +8518,7 @@ function getKnownStudentProfile(name){
   return Object.assign({}, p||{}, {
     name,
     studentNo:String(data?.studentNo||'').trim() || p?.studentNo || '',
-    grade:String(data?.grade||'').trim() || p?.grade || '',
+    grade:normalizeInputGradeValue(data?.grade) || normalizeInputGradeValue(p?.grade) || '',
     school:String(data?.school||'').trim() || p?.school || '',
     assistant:String(data?.assistant||'').trim() || p?.assistant || mapAssistant || ''
   });
@@ -8546,7 +8533,7 @@ function mergeRosterProfileIntoStudentData(name, data){
   if(!p) return {data:d, changed:[], matched:false, ambiguous:false, candidates:[]};
   const changed=[];
   if(!String(d.studentNo||'').trim() && String(p.studentNo||'').trim()){ d.studentNo=String(p.studentNo).trim(); changed.push('生徒番号'); }
-  if(!String(d.grade||'').trim() && String(p.grade||'').trim()){ d.grade=String(p.grade).trim(); changed.push('学年'); }
+  if(!String(d.grade||'').trim() && normalizeInputGradeValue(p.grade)){ d.grade=normalizeInputGradeValue(p.grade); changed.push('学年'); }
   if(!String(d.school||'').trim() && String(p.school||'').trim()){ d.school=String(p.school).trim(); changed.push('高校'); }
   if(!String(d.assistant||'').trim() && String(p.assistant||'').trim()){ d.assistant=String(p.assistant).trim(); changed.push('担任助手'); }
   return {data:d, changed, matched:true, ambiguous:false, profile:p};
@@ -8594,7 +8581,7 @@ function profileFromKeyValueRows(aoa){
       const k=norm(row[c]); const v=norm(row[c+1]);
       if(!v) continue;
       if(/生徒番号|生徒No|^番号$|^ID$/.test(k) && !p.studentNo) p.studentNo=v;
-      if(/学年/.test(k) && !p.grade) p.grade=v;
+      if(/学年/.test(k) && !p.grade) p.grade=normalizeInputGradeValue(v);
       if(/高校|高校名|学校|学校名|在籍校|所属校|在学校/.test(k) && !p.school) p.school=v;
       if(/担任助手|担当|助手|担任|担当者/.test(k) && !p.assistant) p.assistant=v;
     }
@@ -8626,7 +8613,7 @@ function extractProfileFromWorkbookForInputStudent(wb, studentName){
         if(nameMatches){
           merge({
             studentNo:idx.studentNo>=0?rowNo:'',
-            grade:idx.grade>=0?norm(row[idx.grade]):'',
+            grade:idx.grade>=0?normalizeInputGradeValue(row[idx.grade]):'',
             school:idx.school>=0?norm(row[idx.school]):'',
             assistant:idx.assistant>=0?norm(row[idx.assistant]):''
           });
@@ -8683,7 +8670,7 @@ async function applyPersonalExcelProfilesToStudents(names){
     if(!p) continue;
     const changed=[];
     if(!String(data.studentNo||'').trim() && String(p.studentNo||'').trim()){ data.studentNo=String(p.studentNo).trim(); changed.push('生徒番号'); }
-    if(!String(data.grade||'').trim() && String(p.grade||'').trim()){ data.grade=String(p.grade).trim(); changed.push('学年'); }
+    if(!String(data.grade||'').trim() && normalizeInputGradeValue(p.grade)){ data.grade=normalizeInputGradeValue(p.grade); changed.push('学年'); }
     if(!String(data.school||'').trim() && String(p.school||'').trim()){ data.school=String(p.school).trim(); changed.push('高校'); }
     if(!String(data.assistant||'').trim() && String(p.assistant||'').trim()){ data.assistant=String(p.assistant).trim(); changed.push('担任助手'); }
     if(changed.length) filled.push(`${name}: ${changed.join('・')}`);
