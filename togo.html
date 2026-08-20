@@ -2128,41 +2128,48 @@ function masterStrictModeActive(){
   // ここを true にしておくと、マスタが空なら模試/イベントは全員分リストへ一切出さない。
   return state.strictMasterOnlyExamEvent !== false;
 }
+function masterRecordCandidateMetaForTargetCheck(r){
+  const rawName = norm(r?.student || r?.studentName || r?.name || '');
+  const rawNo = norm(r?.studentNo || r?.no || '');
+  const byNo = rawNo ? lookupRosterByStudentNo(rawNo) : null;
+  const resolved = rawName ? rosterMetaForStudent(rawName) : null;
+  const meta = Object.assign({}, resolved || {}, byNo || {});
+  meta['生徒名'] = norm(meta['生徒名'] || rawName);
+  meta['氏名'] = norm(meta['氏名'] || meta['生徒名'] || rawName);
+  meta['生徒番号'] = norm(meta['生徒番号'] || rawNo);
+  meta['学年'] = norm(meta['学年'] || r?.grade || '');
+  meta['読み仮名'] = norm(meta['読み仮名'] || r?.kana || '');
+  return meta;
+}
+function masterRowMatchesRecordNameDate(kind, master, record){
+  const recName = masterNormalizeNameForMatch(kind === 'exam' ? (record?.examName || record?.name || '') : (record?.eventName || record?.name || ''));
+  const recDate = masterDateKeyForMatch(kind === 'exam' ? (record?.examDate || record?.datetime || record?.date || '') : (record?.datetime || record?.date || ''));
+  if(!recName) return false;
+  const mn = masterNormalizeNameForMatch(master?.name || '');
+  if(!mn || mn !== recName) return false;
+  if(master?.date && recDate && master.date !== recDate) return false;
+  if(master?.date && !recDate) return false;
+  return true;
+}
 function examRecordAllowedByMaster(r){
   const masters = state.examMasterRows || [];
   if(!masters.length) return masterStrictModeActive() ? false : true;
-  const recName = masterNormalizeNameForMatch(r?.examName || r?.name || '');
-  const recDate = masterDateKeyForMatch(r?.examDate || r?.datetime || r?.date || '');
-  if(!recName) return false;
-  return masters.some(m => {
-    const mn = masterNormalizeNameForMatch(m.name);
-    if(!mn || mn !== recName) return false;
-    if(m.date && recDate && m.date !== recDate) return false;
-    if(m.date && !recDate) return false;
-    return true;
-  });
+  const meta = masterRecordCandidateMetaForTargetCheck(r);
+  return masters.some(m => masterRowMatchesRecordNameDate('exam', m, r) && examMasterRowTargetsRosterMeta(m, meta));
 }
 function eventRecordAllowedByMaster(r){
   const masters = state.eventMasterRows || [];
   if(!masters.length) return masterStrictModeActive() ? false : true;
-  const recName = masterNormalizeNameForMatch(r?.eventName || r?.name || '');
-  const recDate = masterDateKeyForMatch(r?.datetime || r?.date || '');
-  if(!recName) return false;
-  return masters.some(m => {
-    const mn = masterNormalizeNameForMatch(m.name);
-    if(!mn || mn !== recName) return false;
-    if(m.date && recDate && m.date !== recDate) return false;
-    if(m.date && !recDate) return false;
-    return true;
-  });
+  const meta = masterRecordCandidateMetaForTargetCheck(r);
+  return masters.some(m => masterRowMatchesRecordNameDate('event', m, r) && eventMasterRowTargetsRosterMeta(m, meta));
 }
 function smallRestoreObjectAllowedByMaster(obj){
   if(!obj || !obj.kind) return true;
   if(obj.kind === '模試'){
-    return examRecordAllowedByMaster({examName:obj.name, examDate:obj.date});
+    return examRecordAllowedByMaster({examName:obj.name, examDate:obj.date, student:obj.student, studentNo:obj.studentNo, grade:obj.grade});
   }
   if(obj.kind === 'イベント'){
-    return eventRecordAllowedByMaster({eventName:obj.name, datetime:obj.date});
+    return eventRecordAllowedByMaster({eventName:obj.name, datetime:obj.date, student:obj.student, studentNo:obj.studentNo, grade:obj.grade});
   }
   return true;
 }
@@ -2259,11 +2266,16 @@ function eventMasterRowTargetsRosterMeta(master, meta){
   const students = masterTargetListFromRaw(raw, 'students', 'studentNames');
   const schools = masterTargetListFromRaw(raw, 'schools', 'schoolNames');
   const assistants = masterTargetListFromRaw(raw, 'assistants', 'assistantNames');
+  const hasTarget = grades.length || students.length || schools.length || assistants.length;
   const grade = masterNormalizeGradeForMatch(meta['学年'] || '');
   const name = norm(meta['生徒名'] || meta['氏名'] || '');
+  if(!hasTarget) return false;
   if(grades.length && (!grade || !grades.includes(grade))) return false;
-  if(!students.length && (schools.length || assistants.length)) return false;
-  return masterStudentNameMatches(name, students);
+  if(students.length) return masterStudentNameMatches(name, students);
+  // 入力用と同じ扱い：高校/助手だけ指定は「対象生徒名へ一括追加するためだけ」なので、単独では出さない。
+  if(schools.length || assistants.length) return false;
+  // 対象学年だけ指定されたイベントは、その学年全員を対象にする。
+  return grades.length > 0;
 }
 function masterRecordStudentKeyForSeed(r){
   const meta = rosterMetaForStudent(r.student || '');
@@ -5416,21 +5428,21 @@ function buildMonthlyPosterResultAoa(records, rule, label){
 }
 function styleMonthlyPosterSheet(ws, aoa){
   const widths = [12, 28, 92, 18];
-  const range = applyNiceSheetSettings(ws, aoa, widths, {rows:{min:50,max:240,header:64,pxPerLine:34}});
+  const range = applyNiceSheetSettings(ws, aoa, widths, {rows:{min:96,max:360,header:112,pxPerLine:86}});
   const colCount = Math.max(3, (aoa && aoa[1] ? aoa[1].length : 3));
   ws['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:colCount-1}}];
   ws['!freeze'] = {xSplit:0, ySplit:2};
   ws['!pageSetup'] = {orientation:'portrait', fitToWidth:1, fitToHeight:0};
   ws['!margins'] = {left:0.28, right:0.28, top:0.35, bottom:0.35, header:0.15, footer:0.15};
   const border = {top:{style:'thin',color:{rgb:'000000'}},bottom:{style:'thin',color:{rgb:'000000'}},left:{style:'thin',color:{rgb:'000000'}},right:{style:'thin',color:{rgb:'000000'}}};
-  // 掲示物は遠くから見やすい BIZ UDPゴシック。文字と罫線は黒、背景だけ薄い赤系にする。
+  // 毎日掲示はMS Pゴシック・72ptで大きく印刷する。文字と罫線は黒、背景だけ薄い赤系にする。
   const titleFill = {fgColor:{rgb:'FEE2E2'}};
   const headerFill = {fgColor:{rgb:'FCE7E7'}};
   const nameFill = {fgColor:{rgb:'FFF5F5'}};
-  const posterFontName = 'BIZ UDPゴシック';
-  const fontTitle = {name:posterFontName, sz:32, bold:true, color:{rgb:'000000'}};
-  const fontHeader = {name:posterFontName, sz:22, bold:true, color:{rgb:'000000'}};
-  const fontBase = {name:posterFontName, sz:20, bold:true, color:{rgb:'000000'}};
+  const posterFontName = 'ＭＳ Ｐゴシック';
+  const fontTitle = {name:posterFontName, sz:72, bold:true, color:{rgb:'000000'}};
+  const fontHeader = {name:posterFontName, sz:72, bold:true, color:{rgb:'000000'}};
+  const fontBase = {name:posterFontName, sz:72, bold:true, color:{rgb:'000000'}};
   setRangeStyle(ws, range, (R,C,cell)=>{
     const style = {font:fontBase, alignment:{vertical:'center', horizontal:'center', wrapText:true}, border};
     if(R === 0){ style.font = fontTitle; style.fill = titleFill; style.alignment = {vertical:'center', horizontal:'center', wrapText:false, shrinkToFit:true}; }
@@ -5579,20 +5591,20 @@ function styleHighSpeedRankingSheet(ws, aoa){
   XLSX.utils.sheet_add_aoa(ws, cleanAoa, {origin:'A1'});
   // 高速基礎ランキングはC列（氏名）を広めにし、タイトルの折り返しを防ぐ。
   const widths = [9,12,48,16];
-  const range = applyNiceSheetSettings(ws, cleanAoa, widths, {rows:{min:50,max:120,header:68,pxPerLine:34}});
+  const range = applyNiceSheetSettings(ws, cleanAoa, widths, {rows:{min:96,max:260,header:112,pxPerLine:86}});
   ws['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:3}}];
   ws['!freeze'] = {xSplit:0, ySplit:2};
   ws['!pageSetup'] = {orientation:'portrait', fitToWidth:1, fitToHeight:1};
   ws['!margins'] = {left:0.35, right:0.35, top:0.4, bottom:0.35, header:0.15, footer:0.15};
   const border = {top:{style:'thin',color:{rgb:'000000'}},bottom:{style:'thin',color:{rgb:'000000'}},left:{style:'thin',color:{rgb:'000000'}},right:{style:'thin',color:{rgb:'000000'}}};
-  // ランキング掲示も BIZ UDPゴシック。文字と罫線は黒、背景だけ薄い赤系にする。
+  // ランキング掲示もMS Pゴシック・72ptで大きく印刷する。文字と罫線は黒、背景だけ薄い赤系にする。
   const titleFill = {fgColor:{rgb:'FEE2E2'}};
   const headerFill = {fgColor:{rgb:'FCE7E7'}};
   const rankFill = {fgColor:{rgb:'FFF5F5'}};
-  const posterFontName = 'BIZ UDPゴシック';
-  const fontTitle = {name:posterFontName, sz:34, bold:true, color:{rgb:'000000'}};
-  const fontHeader = {name:posterFontName, sz:22, bold:true, color:{rgb:'000000'}};
-  const fontBase = {name:posterFontName, sz:24, bold:true, color:{rgb:'000000'}};
+  const posterFontName = 'ＭＳ Ｐゴシック';
+  const fontTitle = {name:posterFontName, sz:72, bold:true, color:{rgb:'000000'}};
+  const fontHeader = {name:posterFontName, sz:72, bold:true, color:{rgb:'000000'}};
+  const fontBase = {name:posterFontName, sz:72, bold:true, color:{rgb:'000000'}};
   setRangeStyle(ws, range, (R,C,cell)=>{
     const style = {font:fontBase, alignment:{vertical:'center', horizontal:'center', wrapText:true}, border};
     if(R === 0){ style.font = fontTitle; style.fill = titleFill; style.alignment = {vertical:'center', horizontal:'center', wrapText:true}; }
