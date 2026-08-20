@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>予定統合アプリ（2026-08-20 19:20 出力 / 個人groupJSON全員分リスト除外版）</title>
+  <title>予定統合アプリ（2026-08-20 20:00 出力 / 志望校登録元断ち版）</title>
   <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
   <script src="./libs/xlsx.bundle.js"></script>
   <script>
@@ -378,7 +378,7 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
 
 </style>
 <!-- 精査済み: 印刷用行高34.8pt・中央揃え・模試イベント太罫線版 -->
-<!-- 精査済み: 模試 志望校登録チェック追加版 -->
+<!-- 精査済み: 志望校登録は大規模模試2段見出し内だけ。小規模・復元・旧列からの独立列生成を元から禁止。 -->
 </head>
 <body>
 <header>
@@ -6392,7 +6392,7 @@ function allListSmallRowObjectToLine(obj){
   const date = obj.date ? allListSmallDateLabel(obj.date) + ' ' : '';
   const name = allListSmallReadableName(obj.name, 18);
   if(obj.kind === '模試'){
-    return `${date}${name}　${allListSmallStatusToken(obj)}　${allListSmallSubjectToken(obj)}　志:${obj.aspirationRegistered ? '〇' : '未'}　${allListFormatSmallComiru(obj.comiru || (obj.comiruAnswered ? '済' : '未'))}`;
+    return `${date}${name}　${allListSmallStatusToken(obj)}　${allListSmallSubjectToken(obj)}　${allListFormatSmallComiru(obj.comiru || (obj.comiruAnswered ? '済' : '未'))}`;
   }
   const note = allListCellText(obj.note || '');
   return `${date}${name}　${allListSmallStatusToken(obj)}　${allListFormatSmallComiru(obj.comiru || (obj.comiruAnswered ? '済' : '未'))}　備:${note}`;
@@ -6415,7 +6415,6 @@ function allListSmallRowObjectToArray(obj){
     allListCheckMark(!!obj.distributed),
     allListCheckMark(!!obj.collected),
     obj.kind === '模試' ? allListCheckMark(!!obj.supportReflected) : allListCheckMark(!!obj.listReflected),
-    obj.kind === '模試' ? allListCheckMark(!!obj.aspirationRegistered) : '',
     obj.note || '',
     obj.machineKey || ''
   ];
@@ -6490,7 +6489,6 @@ async function parseSmallAllListRestoreFile(file){
       distributed: allListSmallHeaderIndex(header, ['配布']),
       collected: allListSmallHeaderIndex(header, ['回収']),
       reflected: allListSmallHeaderIndex(header, ['支援反映済み','リスト反映済み','反映']),
-      aspiration: allListSmallHeaderIndex(header, ['志望校登録','志望校登録済み','志望校']),
       note: allListSmallHeaderIndex(header, ['備考']),
       machineKey: allListSmallHeaderIndex(header, ['機械キー'])
     };
@@ -6511,12 +6509,10 @@ async function parseSmallAllListRestoreFile(file){
         distributedText: idx.distributed >= 0 ? norm(row[idx.distributed]) : '',
         collectedText: idx.collected >= 0 ? norm(row[idx.collected]) : '',
         supportReflectedText: idx.reflected >= 0 ? norm(row[idx.reflected]) : '',
-        aspirationRegisteredText: idx.aspiration >= 0 ? norm(row[idx.aspiration]) : '',
         listReflectedText: idx.reflected >= 0 ? norm(row[idx.reflected]) : '',
         distributed: idx.distributed >= 0 ? allListCheckValueToBool(row[idx.distributed]) : undefined,
         collected: idx.collected >= 0 ? allListCheckValueToBool(row[idx.collected]) : undefined,
         supportReflected: idx.reflected >= 0 ? allListCheckValueToBool(row[idx.reflected]) : undefined,
-        aspirationRegistered: idx.aspiration >= 0 ? allListCheckValueToBool(row[idx.aspiration]) : undefined,
         listReflected: idx.reflected >= 0 ? allListCheckValueToBool(row[idx.reflected]) : undefined,
         note: idx.note >= 0 ? norm(row[idx.note]) : '',
         machineKey: idx.machineKey >= 0 ? norm(row[idx.machineKey]) : ''
@@ -6597,7 +6593,7 @@ function buildSmallExamEventNoteMaps(examRecords=[], eventRecords=[]){
 
   const noteMap = new Map();
   const pendingMap = new Map();
-  const restoreRows = [["区分","日付/日時","名称","対象人数","学年","生徒番号","生徒名","受験方法/参加","科目変更","Comiru回答","配布","回収","反映","志望校登録","備考","機械キー"]];
+  const restoreRows = [["区分","日付/日時","名称","対象人数","学年","生徒番号","生徒名","受験方法/参加","科目変更","Comiru回答","配布","回収","反映","備考","機械キー"]];
   const rows = [...rowObjects.values()].sort((a,b)=>
     String(a.date || '').localeCompare(String(b.date || '')) ||
     String(a.kind || '').localeCompare(String(b.kind || ''),'ja') ||
@@ -6660,7 +6656,7 @@ function allListSmallColumnLabel(date, name, field){
   const d = date ? String(date).slice(5,10).replace('-','/') + '\n' : '';
   return `${d}${name || '名称未'}\n${field}`;
 }
-function buildSmallExamEventColumnGroups(examRecords=[], eventRecords=[]){
+function buildLargeExamEventColumnGroups(examRecords=[], eventRecords=[]){
   const examCounts = allListGroupTargetCountByBase(examRecords, examKeyOf, allListExamStillVisible);
   const eventCounts = allListGroupTargetCountByBase(eventRecords, eventKeyOf, null);
   const examGroups=[], eventGroups=[];
@@ -6704,9 +6700,9 @@ function buildSmallExamEventColumnGroups(examRecords=[], eventRecords=[]){
   }
   examGroups.sort((a,b)=>String(a.label).localeCompare(String(b.label),'ja'));
   eventGroups.sort((a,b)=>String(a.label).localeCompare(String(b.label),'ja'));
-  return {smallExamGroups:examGroups, smallEventGroups:eventGroups};
+  return {examGroups, eventGroups};
 }
-function buildSmallExamEventColumnMaps(examRecords=[], eventRecords=[]){
+function buildLargeExamEventColumnMaps(examRecords=[], eventRecords=[]){
   const examCounts = allListGroupTargetCountByBase(examRecords, examKeyOf, allListExamStillVisible);
   const eventCounts = allListGroupTargetCountByBase(eventRecords, eventKeyOf, null);
   const examByStudent = new Map();
@@ -6781,34 +6777,18 @@ function buildSmallExamEventColumnMaps(examRecords=[], eventRecords=[]){
       }
     }
   }
-  return {smallExamByStudent:examByStudent, smallEventByStudent:eventByStudent, smallPendingMap:pendingMap};
+  return {examByStudent, eventByStudent, pendingMap};
 }
 
-// 全員分リスト用の模試/イベント列グループ。過去版で関数名が分かれていたため、ここで明示的に接続する。
+// 全員分リスト用の大規模模試/イベント列グループ。
+// 志望校登録を出してよいのは、この大規模2段見出し内だけ。
 function buildExamEventGroups(examRecords=[], eventRecords=[]){
-  const groups = buildSmallExamEventColumnGroups(examRecords, eventRecords);
-  return {examGroups:groups.smallExamGroups || [], eventGroups:groups.smallEventGroups || []};
+  return buildLargeExamEventColumnGroups(examRecords, eventRecords);
 }
 function buildExamEventMaps(examRecords=[], eventRecords=[]){
-  const maps = buildSmallExamEventColumnMaps(examRecords, eventRecords);
-  return {examByStudent:maps.smallExamByStudent || new Map(), eventByStudent:maps.smallEventByStudent || new Map()};
+  const maps = buildLargeExamEventColumnMaps(examRecords, eventRecords);
+  return {examByStudent:maps.examByStudent || new Map(), eventByStudent:maps.eventByStudent || new Map()};
 }
-function allListDropdownFormulaForHeader(headerText){
-  const h = String(headerText || '').replace(/\r\n/g,'\n').replace(/\r/g,'\n').trim();
-  const compact = h.replace(/[ 　]/g,'');
-  // 全員分リストの更新欄は、模試・イベントで入力がばらつかないようにプルダウンを付ける。
-  // 改行入り見出し・旧版見出し・小規模スロットの表記ゆれを広めに拾う。
-  if(!compact) return null;
-  if(/(?:^|\n|\d)回答$/.test(compact) || /回答$/.test(compact)) return '"当日,後日,不受験,参加,不参加,未,〇,×"';
-  if(/(?:^|\n|\d)受験$/.test(compact) || /受験$/.test(compact)) return '"当日,後日,不受験,未"';
-  if(/(?:^|\n|\d)参加$/.test(compact) || /参加$/.test(compact)) return '"〇,×,未,参加,不参加"';
-  if(/(配布|回収|反映|支援反映済み|リスト反映済み|志望校登録)$/.test(compact)) return '"〇,未"';
-  if(/Comiru$/i.test(compact) || /コミル$/.test(compact)) return '"〇,×"';
-  if(/科目変更$/.test(compact)) return '"〇,×"';
-  if(/科目リスト$/.test(compact)) return '"入力済,未入力,不受験"';
-  return null;
-}
-
 function allListDropdownFormulaForHeader(headerText){
   const h = String(headerText || '').replace(/\r\n/g,'\n').replace(/\r/g,'\n').trim();
   const compact = h.replace(/[ 　]/g,'');
@@ -7294,13 +7274,13 @@ function ensureAllListSmallSubjectListColumns(mergedAoa, generatedAoa){
   const genHeader = (generatedAoa?.[1] || []).map(normalizeAllListHeaderText);
   const allNos = new Set();
   for(const h of header){
-    ['日付','名称','回答','Comiru','配布','回収','支援反映済み','リスト反映済み','志望校登録','備考','科目変更','科目リスト'].forEach(field => {
+    ['日付','名称','回答','Comiru','配布','回収','支援反映済み','リスト反映済み','備考','科目変更','科目リスト'].forEach(field => {
       const n = allListSmallSlotNoFromHeader(h, field);
       if(n) allNos.add(n);
     });
   }
   for(const h of genHeader){
-    ['日付','名称','回答','Comiru','配布','回収','支援反映済み','リスト反映済み','志望校登録','備考','科目変更','科目リスト'].forEach(field => {
+    ['日付','名称','回答','Comiru','配布','回収','支援反映済み','リスト反映済み','備考','科目変更','科目リスト'].forEach(field => {
       const n = allListSmallSlotNoFromHeader(h, field);
       if(n) allNos.add(n);
     });
@@ -7362,7 +7342,7 @@ function buildSmallSlotObjectsByStudent(examRecords=[], eventRecords=[]){
     if(allListMasterSizeCategoryForRecord('exam', r) !== 'small') continue;
     const meta=rosterMetaForStudent(r.student);
     const stuKey=studentKeyForList(meta['生徒名'] || r.student, meta['生徒番号'] || r.studentNo || '');
-    put({kind:'模試',date:r.examDate || '',name:r.examName || '',count,grade:meta['学年'] || r.grade || '',studentNo:meta['生徒番号'] || r.studentNo || '',student:meta['生徒名'] || r.student || '',status:allListExamStatusFull(r.status),subject:r.subjectChanged ? 'あり' : '',subjectChanged:!!r.subjectChanged,distributed:!!r.distributed,collected:!!r.collected,supportReflected:!!r.supportReflected,aspirationRegistered:!!r.aspirationRegistered,subjectList:allListSubjectListStatusForRecord(r, subjectStatusIndex, stuKey),comiru:r.comiruAnswered ? '済' : '未聞き取り',comiruAnswered:!!r.comiruAnswered,note:r.note || '',machineKey:baseKey,studentKey:stuKey}, 'auto');
+    put({kind:'模試',date:r.examDate || '',name:r.examName || '',count,grade:meta['学年'] || r.grade || '',studentNo:meta['生徒番号'] || r.studentNo || '',student:meta['生徒名'] || r.student || '',status:allListExamStatusFull(r.status),subject:r.subjectChanged ? 'あり' : '',subjectChanged:!!r.subjectChanged,distributed:!!r.distributed,collected:!!r.collected,supportReflected:!!r.supportReflected,subjectList:allListSubjectListStatusForRecord(r, subjectStatusIndex, stuKey),comiru:r.comiruAnswered ? '済' : '未聞き取り',comiruAnswered:!!r.comiruAnswered,note:r.note || '',machineKey:baseKey,studentKey:stuKey}, 'auto');
   }
   for(const r of eventRecords || []){
     const baseKey=eventKeyOf(r);
@@ -7505,7 +7485,20 @@ function dedupeAllListInputItemColumns(aoa){
     if(baseAlwaysKeep.has(compact)) return `base:${idx}:${compact}`;
     return clean.replace(/[\s　]+/g,' ').trim();
   }
+  const droppedStandaloneAspirationCols = new Set();
+  function isStandaloneAspirationHeader(h){
+    const clean = normalizeAllListHeaderText(h);
+    const compact = clean.replace(/[\s\n\r　]+/g,'');
+    // 志望校登録は「模試名\n志望校登録」という2段見出し内だけ許可する。
+    // 旧版・手修正復元で単独の「志望校登録」列が混ざった場合はここで落とす。
+    return compact === '志望校登録';
+  }
   for(let c=0;c<header.length;c++){
+    if(isStandaloneAspirationHeader(header[c])){
+      droppedStandaloneAspirationCols.add(c);
+      oldToNew.set(c, -1);
+      continue;
+    }
     const k = keyOfHeader(header[c], c);
     if(!k){
       keep.push(c);
@@ -7521,7 +7514,7 @@ function dedupeAllListInputItemColumns(aoa){
       oldToNew.set(c, nc);
     }
   }
-  if(keep.length === header.length) return aoa;
+  if(keep.length === header.length && !droppedStandaloneAspirationCols.size) return aoa;
 
   const out = [];
   for(let r=0;r<aoa.length;r++){
@@ -7529,7 +7522,7 @@ function dedupeAllListInputItemColumns(aoa){
     const dstRow = keep.map(c => srcRow[c]);
     for(let c=0;c<header.length;c++){
       const nc = oldToNew.get(c);
-      if(nc == null) continue;
+      if(nc == null || nc < 0) continue;
       const v = srcRow[c];
       if(v === undefined || v === null || String(v) === '') continue;
       const cur = dstRow[nc];
@@ -7544,7 +7537,7 @@ function dedupeAllListInputItemColumns(aoa){
     for(const k of cells){
       const [r,c] = String(k).split(':').map(Number);
       const nc = oldToNew.get(c);
-      if(Number.isFinite(r) && Number.isFinite(nc)) mapped.push(`${r}:${nc}`);
+      if(Number.isFinite(r) && Number.isFinite(nc) && nc >= 0) mapped.push(`${r}:${nc}`);
     }
     return Array.from(new Set(mapped));
   }
@@ -7946,6 +7939,9 @@ function buildAllStudentPrintAoaFromFullAoa(grade, fullAoa){
     if(!h) continue;
     if(hc === '電話番号' || /電話|TEL|ＴＥＬ/i.test(h)) continue;
     if(identity.has(hc)) continue;
+    // 旧版の独立「志望校登録」列は印刷用にも出さない。
+    // 大規模模試の2段見出し内「模試名\n志望校登録」だけを正とする。
+    if(String(h || '').replace(/[\s\n\r　]+/g,'') === '志望校登録') continue;
     if(isAllListDateDynamicHeader(h)) continue;
     if(/^(?:小規模\s*)?[0-9０-９]+\s*\n(日付|名称|回答|受験|参加|Comiru|配布|回収|反映|支援反映済み|リスト反映済み|志望校登録|備考|科目変更|科目リスト)$/.test(h)) continue;
     if(largeGroupCols.has(c)) continue;
