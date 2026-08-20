@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>面談予定入力アプリ（2026-08-20 19:47 出力）</title>
+<title>面談予定入力アプリ（2026-08-20 19:53 出力）</title>
 <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
 <script src="./libs/xlsx.bundle.js"></script>
 <script></script>
@@ -8900,6 +8900,121 @@ try{
   else bindRepeatedly();
   window.addEventListener('load', bindRepeatedly);
 })();
+</script>
+<script>
+/* v20260820_1953 ④復元：フォルダー選択後すぐ生徒パネルへ表示 */
+async function loadGroup(){
+  const names=splitNames();
+  if(!names.length) return alert('先に生徒名を入力してください。');
+  let mem=null, place='未取得';
+  const details=[];
+  inputRestoreConflictLog=[];
+  LAST_PROFILE_RESTORE_LOGS=[];
+  showSaveInfo('④復元：保存復元フォルダーを選択してください。');
+  const dir=await pickSaveRootFolder(true);
+  if(dir){
+    try{
+      showSaveInfo('④復元：フォルダーを読み取り中です。JSON・個人Excel・対応表を確認しています。');
+      await refreshDynamicStudentNameCandidatesFromFolder(dir);
+      await refreshRosterProfilesFromShared(true);
+      await applySharedSettingsIfAny();
+      const groupHit=await readGroupJsonFromSharedByNames(names);
+      if(groupHit.mem){
+        mem=groupHit.mem;
+        mem._sourceUpdatedAtMillis=groupHit.sourceModified || inputTimeMillis(mem.savedAt);
+        Object.values(mem.studentData||{}).forEach(d=>{ if(d && typeof d==='object' && !d._sourceUpdatedAtMillis) d._sourceUpdatedAtMillis=mem._sourceUpdatedAtMillis; });
+        place='保存復元フォルダー/json/group JSON';
+        details.push(`グループJSON: ${groupHit.source} / 更新日時=${inputFormatTimeLabel(mem._sourceUpdatedAtMillis)}`);
+      }
+      if(!mem){
+        const collected={}, missing=[];
+        for(const name of names){
+          const oneHit=await readStudentJsonFromSharedByName(name);
+          if(oneHit.mem){
+            oneHit.mem._sourceUpdatedAtMillis=oneHit.sourceModified || inputTimeMillis(oneHit.mem.savedAt);
+            collected[name]=oneHit.mem;
+            if(oneHit.mem.weekStart && !meetingPrepRestoredWeekStart) meetingPrepRestoredWeekStart=oneHit.mem.weekStart;
+            details.push(`${name}: ${oneHit.source} / 更新日時=${inputFormatTimeLabel(oneHit.mem._sourceUpdatedAtMillis)}`);
+          }else missing.push(name);
+        }
+        if(Object.keys(collected).length){
+          mem={version:1,type:'group-from-shared-individuals',names,weekStart:safeInputWeekStartValueForSave(),studentData:collected,savedAt:new Date().toISOString()};
+          place='保存復元フォルダー/json/student JSON';
+          if(missing.length) details.push(`個人JSON未検出: ${missing.join('、')}`);
+        }
+      }
+    }catch(e){ details.push(`保存復元フォルダー読込エラー: ${e?.message || e}`); }
+  }
+  if(!mem){
+    const s=localStorage.getItem(`yoteiGroupMemory:${names.join('|')}`);
+    mem=s?JSON.parse(s):null;
+    if(mem) place='ブラウザ内グループ保存';
+  }
+  if(!mem){
+    const collected={}, missing=[];
+    for(const name of names){ const one=loadOneFromBrowser(name); if(one) collected[name]=one; else missing.push(name); }
+    if(Object.keys(collected).length){
+      mem={version:1,type:'group-from-browser-individuals',names,weekStart:safeInputWeekStartValueForSave(),studentData:collected,savedAt:new Date().toISOString()};
+      place='ブラウザ内の個人保存データ';
+      if(missing.length) details.push(`ブラウザ内個人保存なし: ${missing.join('、')}`);
+    }
+  }
+  if(!mem){
+    mem={version:2,type:'new-from-student-folders',names:[...names],weekStart:safeInputWeekStartValueForSave(),studentData:{},savedAt:new Date().toISOString()};
+    place=dir?'保存復元フォルダー（JSONなし・新規入力）':'新規入力';
+    details.push('JSONなし：生徒入力欄を作成し、個人Excel・対応表・合格設計図だけ自動確認します。');
+  }
+  if(mem.weekStart) meetingPrepRestoredWeekStart=mem.weekStart;
+  students=[...names];
+  $('#studentNames').value=students.join(', ');
+  Object.assign(studentData, applyRestoredStudentMapForInput(mem.studentData||{}));
+  try{
+    if(typeof applyProfilePriorityAfterJsonRestore==='function') await applyProfilePriorityAfterJsonRestore(students);
+    else{
+      const rosterProfileResult=applyRosterProfilesToStudents(students);
+      if(rosterProfileResult?.filled?.length) details.push(`対応表から空欄プロフィールを補完: ${rosterProfileResult.filled.join(' / ')}`);
+    }
+  }catch(e){ details.push(`プロフィール補完エラー: ${e?.message || e}`); }
+  if(dir && !ROSTER_PROFILE_CACHE.profiles.length) details.push('対応表プロフィール補完: 対応表ファイルを読めませんでした（対応表フォルダー/直下配置/見出しを確認）');
+  applyExamMasterFromRestoredMemory(mem, '復元JSON');
+  renderExamMasterPanel(); renderEventMasterPanel(); renderCommentMasterPanel();
+  if(dir){
+    try{ const allListResult=await applyAllStudentListOverridesToInput(students); if(allListResult?.msg) details.push(allListResult.msg); }catch(e){ details.push(`全員分リスト反映エラー: ${e?.message || e}`); }
+    try{ const subjectListResult=await applySubjectListOverridesToInput(students); if(subjectListResult) details.push(`科目リスト反映: ${subjectListResult.count || 0}件`); }catch(e){ details.push(`科目リスト反映エラー: ${e?.message || e}`); }
+    try{ const diagLines=await buildInputRestoreDiagnostics(dir, students); if(diagLines.length) details.push(diagLines.join('\n')); }catch(e){ details.push(`復元診断エラー: ${e?.message || e}`); }
+    const conflictLines=inputRestoreConflictSummaryLines(); if(conflictLines?.length) details.push(conflictLines.join('\n'));
+  }
+  renderStudents();
+  setDirty(false,'復元済み');
+  const savedAt=mem.savedAt?new Date(mem.savedAt).toLocaleString('ja-JP'):'保存日時不明';
+  const firstDetails=[...details, ...LAST_PROFILE_RESTORE_LOGS].filter(Boolean);
+  showSaveInfo(`内容を復元して入力欄に表示しました：${students.join('、')}（${savedAt} / ${place}）\n合格設計図を続けて確認中です。${firstDetails.length?'\n'+Array.from(new Set(firstDetails)).join('\n'):''}`);
+  await new Promise(resolve=>setTimeout(resolve,0));
+  if(dir){
+    try{
+      const studentParent=await findStudentFolderParentFromSaveRoot(dir, students);
+      if(studentParent?.label) details.push(`担任助手フォルダ: ${studentParent.label}`);
+      details.push('週面シート: 読み取り廃止（3ページ目は常に面談フロー）');
+      const goukakuResult=await loadGoukakuDesignsFromRoot(dir, students);
+      const goukakuMsg=formatGoukakuLoadSummary(goukakuResult);
+      if(goukakuMsg) details.push(goukakuMsg);
+    }catch(e){ details.push(`合格設計図読込エラー: ${e?.message || e}`); }
+    try{ const hist=await readPrepResultHistoryFromShared(); if(hist.debug?.length) details.push(hist.debug.join(' / ')); }catch(e){ details.push(`結果履歴JSON確認エラー: ${e?.message || e}`); }
+  }
+  const finalDetails=[...details, ...LAST_PROFILE_RESTORE_LOGS].filter(Boolean);
+  const detailText=finalDetails.length?'\n'+Array.from(new Set(finalDetails)).join('\n'):'';
+  showSaveInfo(`内容を復元しました：${students.join('、')}（${savedAt} / ${place}）${detailText}`);
+}
+try{
+  const oldBindGlobalEventsForRestore1953=bindGlobalEvents;
+  bindGlobalEvents=function(){
+    oldBindGlobalEventsForRestore1953();
+    const btn=$('#loadGroupMemory');
+    if(btn){btn.type='button';btn.disabled=false;btn.onclick=loadGroup;}
+  };
+  const btn=$('#loadGroupMemory');
+  if(btn){btn.type='button';btn.disabled=false;btn.onclick=loadGroup;}
+}catch(e){}
 </script>
 </body>
 </html>
