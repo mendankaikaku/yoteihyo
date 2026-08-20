@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>面談予定入力アプリ（2026-08-20 20:41 出力）</title>
+<title>面談予定入力アプリ（2026-08-20 20:53 出力）</title>
 <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
 <script src="./libs/xlsx.bundle.js"></script>
 <script></script>
@@ -2405,6 +2405,12 @@ async function findStudentFoldersRecursive(root, studentName, maxDepth=5){
   const target=String(studentName||'').trim();
   const normalizedTarget=normalizeFolderNameForMatch(target);
   const matches=[];
+  const rootLabel=root?.name||'選択フォルダ';
+  const rootNorm=normalizeFolderNameForMatch(rootLabel);
+  // ④で生徒フォルダそのものを選んだ場合も拾う。既存の下位探索条件は変えない。
+  if(normalizedTarget && rootNorm && (rootNorm===normalizedTarget || rootNorm.includes(normalizedTarget) || normalizedTarget.includes(rootNorm))){
+    matches.push({dir:root, label:rootLabel, selectedSelf:true});
+  }
   async function walk(dir, pathParts, depth){
     if(!dir || depth<0 || !dir.entries) return;
     for await (const [entryName, handle] of dir.entries()){
@@ -2417,7 +2423,7 @@ async function findStudentFoldersRecursive(root, studentName, maxDepth=5){
       await walk(handle, nextPath, depth-1);
     }
   }
-  await walk(root, [root.name||'選択フォルダ'], maxDepth);
+  await walk(root, [rootLabel], maxDepth);
   return matches;
 }
 async function findGoukakuPdfInStudentFolder(studentDir){
@@ -2465,6 +2471,25 @@ async function findGoukakuExcelInStudentFolder(studentDir){
   });
   return candidates[0] || null;
 }
+async function listGoukakuCandidateFilesForLog(studentDir){
+  const out=[];
+  if(!studentDir || !studentDir.entries) return out;
+  try{
+    for await (const [entryName, handle] of studentDir.entries()){
+      if(handle.kind !== 'file') continue;
+      if(/^~\$/.test(entryName)) continue;
+      if(/\.(xlsx|xlsm|xls|pdf)$/i.test(entryName)){
+        out.push(entryName);
+      }
+    }
+  }catch(e){}
+  return out.sort((a,b)=>a.localeCompare(b,'ja'));
+}
+function goukakuDebugHtml(item){
+  const logs=Array.isArray(item?.debugLog)?item.debugLog.filter(Boolean):[];
+  if(!logs.length) return '';
+  return `<details class="goukakuDebugBox" open><summary>合格設計図 探索ログ</summary><pre>${escapeHtml(logs.join('\n'))}</pre></details>`;
+}
 function pickGoukakuDesignSheetName(wb){
   const names=(wb&&wb.SheetNames)?wb.SheetNames:[];
   if(!names.length) return '';
@@ -2487,38 +2512,76 @@ async function loadGoukakuDesignsFromRoot(root, names=students){
   if(!root || !names || !names.length) return {loaded:[],missing:[],failed:[],duplicate:[]};
   const loaded=[], missing=[], failed=[], duplicate=[];
   for(const name of names){
+    const debug=[];
     try{
+      debug.push(`対象生徒: ${name}`);
+      debug.push(`選択フォルダ: ${root?.name || '不明'}`);
+      debug.push('生徒フォルダ探索: 開始（選択フォルダ自身＋下位フォルダ 最大5階層）');
       const dirs=await findStudentFoldersRecursive(root, name, 5);
-      if(!dirs.length){missing.push(`${name}: 生徒フォルダなし`);goukakuDesignSheets[name]={error:'生徒名フォルダが見つかりません。'};renderGoukakuPanel(name);continue;}
-      if(dirs.length>1){duplicate.push(`${name}: ${dirs.map(d=>d.label).join(' / ')}`);goukakuDesignSheets[name]={error:'同じ生徒名フォルダが複数見つかったため読み込みませんでした。'};renderGoukakuPanel(name);continue;}
+      debug.push(`生徒フォルダ探索: ${dirs.length}件${dirs.length ? ' → ' + dirs.map(d=>d.label).join(' / ') : ''}`);
+      if(!dirs.length){
+        const msg=`${name}: 生徒フォルダなし`;
+        missing.push(msg);
+        goukakuDesignSheets[name]={error:'生徒名フォルダが見つかりません。', debugLog:debug};
+        renderGoukakuPanel(name);
+        continue;
+      }
+      if(dirs.length>1){
+        const msg=`${name}: ${dirs.map(d=>d.label).join(' / ')}`;
+        duplicate.push(msg);
+        debug.push('判定: 同じ生徒名っぽいフォルダが複数あるため安全停止');
+        goukakuDesignSheets[name]={error:'同じ生徒名フォルダが複数見つかったため読み込みませんでした。', debugLog:debug};
+        renderGoukakuPanel(name);
+        continue;
+      }
       const studentDir=dirs[0].dir;
+      const candidateNames=await listGoukakuCandidateFilesForLog(studentDir);
+      debug.push(`生徒フォルダ直下のExcel/PDF候補: ${candidateNames.length ? candidateNames.join('、') : 'なし'}`);
       const pdfHit=await findGoukakuPdfInStudentFolder(studentDir);
       const excelHit=await findGoukakuExcelInStudentFolder(studentDir);
+      debug.push(`合格設計図PDF判定: ${pdfHit ? '発見 → ' + pdfHit.name : '未検出（ファイル名に「合格設計図」を含むPDFなし）'}`);
+      debug.push(`合格設計図Excel判定: ${excelHit ? '発見 → ' + excelHit.name : '未検出（ファイル名に「合格設計図」を含むExcelなし）'}`);
       const printPdf=pdfHit ? await readGoukakuPdfPrintSource(pdfHit) : null;
+      if(printPdf) debug.push('印刷用PDF: 読込OK');
       revokeGoukakuPdfUrls(goukakuDesignSheets[name]);
 
       // 画面編集用は Excel 優先（アプリ編集済みExcel → 通常Excel → PDF）。印刷用は PDF があれば常にPDFを優先する。
       if(excelHit){
+        debug.push('Excel読込: 開始');
         const file=await excelHit.handle.getFile();
         const parsed=await readGoukakuExcelFile(file);
-        goukakuDesignSheets[name]={kind:'excel',fileName:excelHit.name,sheetName:parsed.sheetName,aoa:parsed.aoa,model:parsed.model,workbook:parsed.workbook,fileHandle:excelHit.handle,dirHandle:studentDir,path:dirs[0].label,dirty:false,editedCells:{},printPdf};
+        debug.push(`Excel読込: OK / シート=${parsed.sheetName || '不明'}`);
+        const item={kind:'excel',fileName:excelHit.name,sheetName:parsed.sheetName,aoa:parsed.aoa,model:parsed.model,workbook:parsed.workbook,fileHandle:excelHit.handle,dirHandle:studentDir,path:dirs[0].label,dirty:false,editedCells:{},printPdf,debugLog:debug};
+        let planMsg='通期講座抽出: 診断関数未読込';
+        try{
+          if(typeof window.goukakuCoursePlanDiagnostic === 'function'){
+            const d=window.goukakuCoursePlanDiagnostic(item);
+            planMsg=d?.ok ? `通期講座抽出: OK / 見出し=${d.headerRows}行 / 講座=${d.courseRows}行 / 列=${d.range}` : `通期講座抽出: NG / ${d?.reason || '不明'}`;
+          }
+        }catch(e){ planMsg=`通期講座抽出: 診断エラー / ${e?.message || e}`; }
+        debug.push(planMsg);
+        item.debugLog=[...debug];
+        goukakuDesignSheets[name]=item;
         const label=excelHit.isEdited ? '編集済みExcel' : 'Excel簡易表示';
-        loaded.push(`${name}: ${dirs[0].label} / ${excelHit.name}（${label}${printPdf ? '・印刷はPDF優先' : ''}）`);
+        loaded.push(`${name}: ${dirs[0].label} / ${excelHit.name}（${label}${printPdf ? '・印刷はPDF優先' : ''}） / ${planMsg}`);
         renderGoukakuPanel(name);
         continue;
       }
       if(printPdf){
-        goukakuDesignSheets[name]={kind:'pdf',fileName:printPdf.fileName,pdfUrl:printPdf.pdfUrl,pdfBase64:printPdf.pdfBase64,path:dirs[0].label,fileHandle:printPdf.fileHandle,dirHandle:studentDir,dirty:false};
-        loaded.push(`${name}: ${dirs[0].label} / ${printPdf.fileName}（PDF）`);
+        debug.push('画面表示: PDF表示（Excelが無いため通期講座表は抽出できません）');
+        goukakuDesignSheets[name]={kind:'pdf',fileName:printPdf.fileName,pdfUrl:printPdf.pdfUrl,pdfBase64:printPdf.pdfBase64,path:dirs[0].label,fileHandle:printPdf.fileHandle,dirHandle:studentDir,dirty:false,debugLog:debug};
+        loaded.push(`${name}: ${dirs[0].label} / ${printPdf.fileName}（PDF / Excelなしのため通期講座抽出なし）`);
         renderGoukakuPanel(name);
         continue;
       }
-      missing.push(`${name}: 合格設計図PDF/Excelなし`);
-      goukakuDesignSheets[name]={error:'生徒フォルダ直下に「合格設計図」を含むPDFまたはExcelがありません。'};
+      debug.push('判定: 生徒フォルダは見つかったが、対象ファイルなし');
+      missing.push(`${name}: 合格設計図PDF/Excelなし（生徒フォルダ=${dirs[0].label} / 直下候補=${candidateNames.join('、')||'なし'}）`);
+      goukakuDesignSheets[name]={error:'生徒フォルダ直下に「合格設計図」を含むPDFまたはExcelがありません。', debugLog:debug};
       renderGoukakuPanel(name);
     }catch(e){
+      debug.push(`例外: ${e?.message||e}`);
       failed.push(`${name}: ${e?.message||e}`);
-      goukakuDesignSheets[name]={error:e?.message||String(e)};
+      goukakuDesignSheets[name]={error:e?.message||String(e), debugLog:debug};
       renderGoukakuPanel(name);
     }
   }
@@ -9063,6 +9126,10 @@ try{
 .goukakuPlanTable .planNumberCell{font-weight:900;font-size:15px;min-width:34px;cursor:text;outline:none;background:#fff}
 .goukakuPlanTable .planNumberCell:focus{background:#fffbea!important;box-shadow:inset 0 0 0 2px #f59e0b}.goukakuPlanTable .goukakuDirtyCell{background:#eff6ff!important;box-shadow:inset 0 0 0 2px #2563eb}
 .goukakuPlanEmpty{padding:10px;color:#64748b;font-size:12px;line-height:1.6}
+
+.goukakuDebugBox{margin:8px 10px 10px;border:1px solid #cbd5e1;border-radius:10px;background:#f8fafc;font-size:11px;color:#334155;overflow:hidden}
+.goukakuDebugBox summary{cursor:pointer;font-weight:900;padding:7px 9px;background:#eef2ff;color:#1e40af}
+.goukakuDebugBox pre{margin:0;padding:8px 9px;white-space:pre-wrap;word-break:break-word;line-height:1.45;max-height:220px;overflow:auto;background:#fff}
 @media print{
   .goukakuPlanBox{border:0;margin:0;overflow:visible}.goukakuPlanHead,.goukakuPlanNotice{break-inside:avoid}.goukakuPlanWrap{max-height:none;overflow:visible;padding:0}.goukakuPlanTable{font-size:10.5px}.goukakuPlanTable th,.goukakuPlanTable td{padding:3px 4px}.goukakuPlanTable .planTitleCell{font-size:15px}.goukakuPlanTable .planNumberCell{font-size:14px}.goukakuPlanActions{display:none!important}
 }
@@ -9208,13 +9275,19 @@ try{
     return html;
   }
   window.goukakuCoursePlanHtml=goukakuCoursePlanHtml;
+  window.goukakuCoursePlanDiagnostic=function(item){
+    const info=planBuild(item?.model);
+    if(!info) return {ok:false, reason:'「通期講座受講計画」またはBook1形式の見出しを検出できません'};
+    return {ok:true, headerRows:info.headerRows.length, courseRows:info.courseRows.length, range:`${colName(info.startCol+1)}〜${colName(info.endCol+1)}`};
+  };
   function goukakuPlanBoxHtml(name){
     const item=goukakuDesignSheets[name];
     if(!item) return '<div class="goukakuPlanBox"><div class="goukakuPlanHead"><span>通期講座受講計画：未読み込み</span></div><div class="goukakuPlanEmpty">④復元で保存復元フォルダーを選ぶと、生徒フォルダー内の合格設計図Excelを探して表示します。</div></div>';
-    if(item.error) return `<div class="goukakuPlanBox"><div class="goukakuPlanHead"><span>合格設計図：読み込み失敗</span></div><div class="goukakuPlanEmpty" style="color:#dc2626">${escapeHtml(item.error)}</div></div>`;
-    if(item.kind==='pdf') return `<div class="goukakuPlanBox"><div class="goukakuPlanHead"><div><div class="goukakuPlanTitle">合格設計図PDF</div><div class="goukakuPlanMeta">${escapeHtml(item.fileName||'')}</div></div><div class="goukakuPlanActions"><button type="button" class="secondary small" data-open-goukaku="${escapeHtml(name)}">開く</button></div></div><div class="goukakuPlanEmpty">PDFは通期講座受講計画の抽出対象外です。Excel形式の合格設計図を置くと表抽出できます。</div></div>`;
+    const dbg=(typeof goukakuDebugHtml==='function') ? goukakuDebugHtml(item) : '';
+    if(item.error) return `<div class="goukakuPlanBox"><div class="goukakuPlanHead"><span>合格設計図：読み込み失敗</span></div><div class="goukakuPlanEmpty" style="color:#dc2626">${escapeHtml(item.error)}</div>${dbg}</div>`;
+    if(item.kind==='pdf') return `<div class="goukakuPlanBox"><div class="goukakuPlanHead"><div><div class="goukakuPlanTitle">合格設計図PDF</div><div class="goukakuPlanMeta">${escapeHtml(item.fileName||'')}</div></div><div class="goukakuPlanActions"><button type="button" class="secondary small" data-open-goukaku="${escapeHtml(name)}">開く</button></div></div><div class="goukakuPlanEmpty">PDFは通期講座受講計画の抽出対象外です。Excel形式の合格設計図を置くと表抽出できます。</div>${dbg}</div>`;
     const cnt=goukakuEditedCount(item);
-    return `<div class="goukakuPlanBox"><div class="goukakuPlanHead"><div><div class="goukakuPlanTitle">通期講座受講計画${cnt?`<span class="goukakuDirtyBadge">編集 ${cnt}セル</span>`:''}</div><div class="goukakuPlanMeta">${escapeHtml(item.fileName||'')} / ${escapeHtml(item.sheetName||'')}</div></div><div class="goukakuPlanActions"><button type="button" class="secondary small" data-open-goukaku="${escapeHtml(name)}">拡大</button><button type="button" class="secondary small" data-print-goukaku-plan="${escapeHtml(name)}">印刷</button><button type="button" class="secondary small" data-save-goukaku-excel="${escapeHtml(name)}">編集済みExcelを保存</button></div></div><div class="goukakuPlanNotice">Book1の17〜19行目相当を列位置・結合セルごと再現し、20行目以降は講座CDまたは講座名がある行だけ表示します。色は読まず、月別の数字欄だけ編集できます。</div><div class="goukakuPlanWrap">${goukakuCoursePlanHtml(item,name,{editable:true})}</div></div>`;
+    return `<div class="goukakuPlanBox"><div class="goukakuPlanHead"><div><div class="goukakuPlanTitle">通期講座受講計画${cnt?`<span class="goukakuDirtyBadge">編集 ${cnt}セル</span>`:''}</div><div class="goukakuPlanMeta">${escapeHtml(item.fileName||'')} / ${escapeHtml(item.sheetName||'')}</div></div><div class="goukakuPlanActions"><button type="button" class="secondary small" data-open-goukaku="${escapeHtml(name)}">拡大</button><button type="button" class="secondary small" data-print-goukaku-plan="${escapeHtml(name)}">印刷</button><button type="button" class="secondary small" data-save-goukaku-excel="${escapeHtml(name)}">編集済みExcelを保存</button></div></div><div class="goukakuPlanNotice">Book1の17〜19行目相当を列位置・結合セルごと再現し、20行目以降は講座CDまたは講座名がある行だけ表示します。色は読まず、月別の数字欄だけ編集できます。</div>${dbg}<div class="goukakuPlanWrap">${goukakuCoursePlanHtml(item,name,{editable:true})}</div></div>`;
   }
   window.goukakuPanelHtml=function(name){ return goukakuPlanBoxHtml(name); };
   window.openGoukakuModal=function(name){
