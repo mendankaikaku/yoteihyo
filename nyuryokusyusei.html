@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>面談予定入力アプリ（2026-08-20 22:27 出力）</title>
+<title>面談予定入力アプリ（2026-08-20 22:42 出力）</title>
 <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
 <script src="./libs/xlsx.bundle.js"></script>
 <script></script>
@@ -56,6 +56,9 @@ table{width:100%;border-collapse:collapse;background:#fff}th,td{border:1px solid
 .goukakuEditCell:hover{box-shadow:inset 0 0 0 2px #bfdbfe}
 .goukakuEditCell:focus{background:#fffbea!important;box-shadow:inset 0 0 0 2px #f59e0b}
 .goukakuEditCell.goukakuDirtyCell{box-shadow:inset 0 0 0 2px #2563eb;background:#eff6ff!important}
+.goukakuPlanTable [contenteditable="true"]{cursor:text;outline:none}
+.goukakuPlanTable [contenteditable="true"]:hover{box-shadow:inset 0 0 0 2px #bfdbfe}
+.goukakuPlanTable [contenteditable="true"]:focus{background:#fffbea!important;box-shadow:inset 0 0 0 2px #f59e0b}
 .goukakuDirtyBadge{display:inline-block;background:#dbeafe;color:#1e40af;border:1px solid #bfdbfe;border-radius:999px;padding:2px 8px;font-size:11px;font-weight:900;margin-left:6px}
 .goukakuPlanBox{border:1px solid #dbe4ef;border-radius:14px;background:#fff;margin-top:8px;overflow:hidden}
 .goukakuPlanHead{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#f8fafc;border-bottom:1px solid #dbe4ef;padding:9px 10px;font-weight:900}
@@ -2181,6 +2184,10 @@ function normalizeGoukakuCellValueForWrite(value){
   if(/^[+-]?(?:\d+|\d+\.\d+|\.\d+)$/.test(text)) return {v:Number(text), t:'n'};
   return {v:text, t:'s'};
 }
+function goukakuModelCellHasFormula(model,r,c){
+  const raw=model?.rows?.[r]?.[c]?.raw;
+  return !!raw&&Object.prototype.hasOwnProperty.call(raw,'f');
+}
 function goukakuExcelModelToHtml(model, maxRows=150, maxCols=20, editable=false, options={}){
   const sourceRows=(model?.rows || []);
   const rows=sourceRows.slice(0,maxRows);
@@ -2338,7 +2345,7 @@ function planIsCourseRow(model,r,cols){
   if(!joined || /講座名|講座cd|コマ数|教科/.test(joined)) return false;
   return true;
 }
-function planBuild(model){
+function planBuild(model,extraCourseRows=[]){
   const titleRow=planFindCoursePlan(model);
   if(titleRow<0) return null;
   const titleCol=planFindNonEmptyCol(model.rows[titleRow]||[]);
@@ -2362,6 +2369,11 @@ function planBuild(model){
   const courseRows=[];
   const courseScanEnd=eventRow??(highCell?highCell.r:endRow+1);
   for(let r=titleRow+3;r<courseScanEnd;r++) if(planIsCourseRow(model,r,cols)) courseRows.push(r);
+  (extraCourseRows||[]).forEach(r=>{
+    const row=Number(r);
+    if(Number.isInteger(row)&&row>=titleRow+3&&row<courseScanEnd&&!courseRows.includes(row))courseRows.push(row);
+  });
+  courseRows.sort((a,b)=>a-b);
   const displayRows=[...headerRows,...courseRows];
   let originalCourseAreaHeight=0;
   for(let r=titleRow+3;r<courseScanEnd;r++)originalCourseAreaHeight+=parseFloat(model?.rowHeights?.[r])||20;
@@ -2375,7 +2387,7 @@ function planBuild(model){
     if(sC>endCol || eC<startCol || sC>eC) return;
     merges.push({s:{r:rowMap.get(keptRows[0]),c:sC-startCol},e:{r:rowMap.get(keptRows[keptRows.length-1]),c:eC-startCol},source:{r:m.s.r,c:m.s.c}});
   });
-  return {titleRow,startCol,endCol,displayRows,headerRows,courseRows,cols,merges,eventRow,eventEndRow:endRow,courseRowHeightPx,colCount:endCol-startCol+1};
+  return {titleRow,startCol,endCol,displayRows,headerRows,courseRows,cols,merges,eventRow,eventEndRow:endRow,courseScanEnd,courseRowHeightPx,colCount:endCol-startCol+1};
 }
 function planFindTextCell(model,needle){
   const target=planNorm(needle);
@@ -2404,8 +2416,8 @@ function planLastContentRow(model,startRow,startCol,endCol){
   });
   return Math.min(last,Math.max(0,rows.length-1));
 }
-function planBuildBookSections(model){
-  const course=planBuild(model);
+function planBuildBookSections(model,extraCourseRows=[]){
+  const course=planBuild(model,extraCourseRows);
   if(!course) return null;
   const high=planFindTextCell(model,'高速マスター基礎力養成講座学習計画');
   const school=planFindTextCell(model,'学校での科目選択、学習時期');
@@ -2434,12 +2446,11 @@ function planCellClass(info,displayRi,originalC){
   return 'planCourseCell planNumberCell';
 }
 function planEditable(info,displayRi,originalC){
-  const originalR=info.displayRows[displayRi];
-  return displayRi>=3 && info.courseRows.includes(originalR) && originalC>=info.cols.firstMonthCol;
+  return !!info && displayRi>=0 && originalC>=info.startCol && originalC<=info.endCol;
 }
 function goukakuCoursePlanHtml(item,name,options={}){
   const model=item?.model;
-  const info=planBuild(model);
+  const info=planBuild(model,item?.extraCourseRows||[]);
   if(!info) return '<div class="goukakuPlanEmpty">「通期講座受講計画」を見つけられませんでした。合格設計図Excelの対象表を確認してください。</div>';
   const mergeStart=new Map(),covered=new Set();
   info.merges.forEach(m=>{
@@ -2470,8 +2481,9 @@ function goukakuCoursePlanHtml(item,name,options={}){
       const dirty=Object.prototype.hasOwnProperty.call(dirtyCells,addr);
       const shown=dirty?dirtyCells[addr]:rawText;
       const cls=planCellClass(info,di,origC)+(dirty?' goukakuDirtyCell':'');
-      const canEdit=options.editable&&planEditable(info,di,origC);
-      const edit=canEdit?` contenteditable="true" spellcheck="false" data-goukaku-student="${escapeHtml(name)}" data-goukaku-sheet="${escapeHtml(item.sheetName||'')}" data-goukaku-cell="${escapeHtml(addr)}" data-goukaku-r="${origR}" data-goukaku-c="${origC}" title="${escapeHtml(addr)}"`:'';
+      const formulaLocked=goukakuModelCellHasFormula(model,sourceR,sourceC);
+      const canEdit=options.editable&&planEditable(info,di,origC)&&!formulaLocked;
+      const edit=canEdit?` contenteditable="true" spellcheck="false" data-goukaku-student="${escapeHtml(name)}" data-goukaku-sheet="${escapeHtml(item.sheetName||'')}" data-goukaku-cell="${escapeHtml(addr)}" data-goukaku-r="${sourceR}" data-goukaku-c="${sourceC}" title="${escapeHtml(addr)}"`:'';
       const span=(merge.rowspan?` rowspan="${merge.rowspan}"`:'')+(merge.colspan?` colspan="${merge.colspan}"`:'');
       const tag=di<3?'th':'td';
       html+=`<${tag} class="${cls}"${span}${edit}>${escapeHtml(shown||'').replace(/\n/g,'<br>')}</${tag}>`;
@@ -2496,7 +2508,7 @@ function goukakuRangeTableHtml(item,name,range,options={}){
     const ec=Math.min(m.e.c,range.endCol)-range.startCol;
     const rs=er-sr+1,cs=ec-sc+1;
     if(rs<=1&&cs<=1)return;
-    mergeStart.set(`${sr},${sc}`,{rowspan:rs,colspan:cs});
+    mergeStart.set(`${sr},${sc}`,{rowspan:rs,colspan:cs,source:{r:m.s.r,c:m.s.c}});
     for(let r=sr;r<=er;r++)for(let c=sc;c<=ec;c++)if(r!==sr||c!==sc)covered.add(`${r},${c}`);
   });
   const dirtyCells=item?.editedCells||{};
@@ -2515,9 +2527,10 @@ function goukakuRangeTableHtml(item,name,range,options={}){
       if(covered.has(`${di},${c}`))continue;
       const origC=range.startCol+c;
       const merge=mergeStart.get(`${di},${c}`)||{};
-      const addr=goukakuCellAddressFromModel(model,origR,origC);
+      const sourceR=merge.source?.r??origR,sourceC=merge.source?.c??origC;
+      const addr=goukakuCellAddressFromModel(model,sourceR,sourceC);
       const dirty=Object.prototype.hasOwnProperty.call(dirtyCells,addr);
-      const rawText=planCellText(model,origR,origC);
+      const rawText=planCellText(model,sourceR,sourceC);
       const shown=dirty?dirtyCells[addr]:rawText;
       let cls='planFormCell';
       if(di===0) cls=shown?'planTitleCell':'planHeaderCell';
@@ -2526,7 +2539,9 @@ function goukakuRangeTableHtml(item,name,range,options={}){
       if(dirty)cls+=' goukakuDirtyCell';
       const span=(merge.rowspan?` rowspan="${merge.rowspan}"`:'')+(merge.colspan?` colspan="${merge.colspan}"`:'');
       const tag=di<=1?'th':'td';
-      html+=`<${tag} class="${cls}"${span} title="${escapeHtml(addr)}">${escapeHtml(shown||'').replace(/\n/g,'<br>')}</${tag}>`;
+      const formulaLocked=goukakuModelCellHasFormula(model,sourceR,sourceC);
+      const edit=(options.editable&&!formulaLocked)?` contenteditable="true" spellcheck="false" data-goukaku-student="${escapeHtml(name)}" data-goukaku-sheet="${escapeHtml(item.sheetName||'')}" data-goukaku-cell="${escapeHtml(addr)}" data-goukaku-r="${sourceR}" data-goukaku-c="${sourceC}"`:'';
+      html+=`<${tag} class="${cls}${formulaLocked?'':' goukakuEditCell'}"${span}${edit} title="${escapeHtml(addr)}">${escapeHtml(shown||'').replace(/\n/g,'<br>')}</${tag}>`;
     }
     html+='</tr>';
   }
@@ -2544,19 +2559,19 @@ function goukakuBookBlankRowsHtml(model,startRow,endRow){
   return html+'</div>';
 }
 function goukakuBookLayoutHtml(item,name,options={}){
-  const book=planBuildBookSections(item?.model);
+  const book=planBuildBookSections(item?.model,item?.extraCourseRows||[]);
   if(!book)return '<div class="goukakuPlanEmpty">合格設計図の学習計画表を見つけられませんでした。</div>';
   let html='<div class="goukakuBookLayout">';
   html+='<div class="goukakuBookSection">'+goukakuCoursePlanHtml(item,name,{editable:!!options.editable,showSummary:false})+'</div>';
   if(book.highRange){
     html+=goukakuBookBlankRowsHtml(item.model,book.course.eventEndRow+1,book.highRange.startRow-1);
-    html+='<div class="goukakuBookSection">'+goukakuRangeTableHtml(item,name,book.highRange)+'</div>';
+    html+='<div class="goukakuBookSection">'+goukakuRangeTableHtml(item,name,book.highRange,{editable:!!options.editable})+'</div>';
   }
   else html+='<div class="goukakuBookMissing">高速マスター基礎力養成講座学習計画は見つかりませんでした。</div>';
   if(book.bottomRange){
     const previousEnd=book.highRange?book.highRange.endRow:book.course.eventEndRow;
     html+=goukakuBookBlankRowsHtml(item.model,previousEnd+1,book.bottomRange.startRow-1);
-    html+='<div class="goukakuBookSection">'+goukakuRangeTableHtml(item,name,book.bottomRange)+'</div>';
+    html+='<div class="goukakuBookSection">'+goukakuRangeTableHtml(item,name,book.bottomRange,{editable:!!options.editable})+'</div>';
   }
   else html+='<div class="goukakuBookMissing">学校での科目選択・学習時期／週間予定は見つかりませんでした。</div>';
   html+='</div>';
@@ -2575,14 +2590,36 @@ function goukakuPanelHtml(name){
   if(item.error) return `<div class="goukakuPlanBox"><div class="goukakuPlanHead"><span>合格設計図：読み込み失敗</span></div><div class="goukakuPlanEmpty" style="color:#dc2626">${escapeHtml(item.error)}</div></div>`;
   if(item.kind==='pdf') return `<div class="goukakuPlanBox"><div class="goukakuPlanHead"><div><div class="goukakuPlanTitle">合格設計図PDF</div><div class="goukakuPlanMeta">${escapeHtml(item.fileName||'')}</div></div><div class="goukakuPlanActions"><button type="button" class="secondary small" data-open-goukaku="${escapeHtml(name)}">開く</button></div></div><div class="goukakuPlanEmpty">PDFは学習計画表の抽出対象外です。Excel形式の合格設計図を置くと4表を表示できます。</div></div>`;
   const cnt=goukakuEditedCount(item);
-  return `<div class="goukakuPlanBox"><div class="goukakuPlanHead"><div><div class="goukakuPlanTitle">合格設計図 学習計画${cnt?`<span class="goukakuDirtyBadge">編集 ${cnt}セル</span>`:''}</div><div class="goukakuPlanMeta">${escapeHtml(item.fileName||'')} / ${escapeHtml(item.sheetName||'')}</div></div><div class="goukakuPlanActions"><button type="button" class="secondary small" data-open-goukaku="${escapeHtml(name)}">拡大</button><button type="button" class="secondary small" data-print-goukaku-plan="${escapeHtml(name)}">印刷</button><button type="button" class="secondary small" data-save-goukaku-excel="${escapeHtml(name)}">編集済みExcelを保存</button></div></div><div class="goukakuPlanNotice">通期講座受講計画は見出しと、行事予定より上にある講座CDまたは講座名入りの行だけを表示し、講座行の縦幅を自動拡大します。その下へ残り3表をBook1と同じ配置で並べ、B〜CA列の座標と結合セルを維持します。</div><div class="goukakuPlanWrap">${goukakuBookLayoutHtml(item,name,{editable:true})}</div></div>`;
+  return `<div class="goukakuPlanBox"><div class="goukakuPlanHead"><div><div class="goukakuPlanTitle">合格設計図 学習計画${cnt?`<span class="goukakuDirtyBadge">編集 ${cnt}セル</span>`:''}</div><div class="goukakuPlanMeta">${escapeHtml(item.fileName||'')} / ${escapeHtml(item.sheetName||'')}</div></div><div class="goukakuPlanActions"><button type="button" class="secondary small" data-open-goukaku="${escapeHtml(name)}">拡大</button><button type="button" class="secondary small" data-add-goukaku-course="${escapeHtml(name)}">講座行を追加</button><button type="button" class="secondary small" data-print-goukaku-plan="${escapeHtml(name)}">印刷</button><button type="button" class="secondary small" data-save-goukaku-excel="${escapeHtml(name)}">編集済みExcelを保存</button></div></div><div class="goukakuPlanNotice">4表の表示中セルは、数式セルを除いてすべて直接編集できます。数式セルは保護して編集不可にしています。通期講座は既存講座行だけを表示し、「講座行を追加」で数式のない空き行を1行ずつ表示します。</div><div class="goukakuPlanWrap">${goukakuBookLayoutHtml(item,name,{editable:true})}</div></div>`;
 }
 function renderGoukakuPanel(name){
   const host=document.querySelector(`[data-goukaku-panel="${cssEscape(name)}"]`);
   if(host){host.innerHTML=goukakuPanelHtml(name);bindGoukakuButtons();}
 }
+function addGoukakuCourseRow(name){
+  const item=goukakuDesignSheets[name];
+  if(!item||item.kind!=='excel')return alert(`${name}の合格設計図Excelが読み込まれていません。`);
+  const info=planBuild(item.model,item.extraCourseRows||[]);
+  if(!info)return alert('通期講座受講計画を見つけられませんでした。');
+  const shown=new Set(info.courseRows);
+  const all=[];
+  for(let r=info.titleRow+3;r<info.courseScanEnd;r++){
+    if(shown.has(r))continue;
+    const codeLocked=info.cols.codeCol>=0&&goukakuModelCellHasFormula(item.model,r,info.cols.codeCol);
+    const nameLocked=info.cols.nameCol>=0&&goukakuModelCellHasFormula(item.model,r,info.cols.nameCol);
+    if(!codeLocked&&!nameLocked)all.push(r);
+  }
+  if(!all.length)return alert('行事予定より上に、講座CD・講座名が数式ではない空き行がありません。元Excel側で入力可能な空き行を増やしてから復元してください。');
+  const last=info.courseRows.length?Math.max(...info.courseRows):info.titleRow+2;
+  const row=all.find(r=>r>last)??all[0];
+  item.extraCourseRows=Array.from(new Set([...(item.extraCourseRows||[]),row])).sort((a,b)=>a-b);
+  renderGoukakuPanel(name);
+  if(currentGoukakuModalName===name&&$('#goukakuModal')?.classList.contains('open'))openGoukakuModal(name);
+  if(typeof addQuietLog==='function')addQuietLog(`${name}: 通期講座の空き行 ${row+1}行目を編集欄へ追加しました。`);
+}
 function bindGoukakuButtons(){
   $$('[data-open-goukaku]').forEach(btn=>btn.onclick=()=>openGoukakuModal(btn.dataset.openGoukaku));
+  $$('[data-add-goukaku-course]').forEach(btn=>btn.onclick=()=>addGoukakuCourseRow(btn.dataset.addGoukakuCourse));
   $$('[data-print-goukaku-plan]').forEach(btn=>btn.onclick=()=>printGoukakuPlan(btn.dataset.printGoukakuPlan));
   $$('[data-save-goukaku-excel]').forEach(btn=>btn.onclick=async()=>{
     const result=await saveEditedGoukakuExcelForStudent(btn.dataset.saveGoukakuExcel);
@@ -2610,7 +2647,7 @@ function openGoukakuModal(name){
   if(item.kind === 'pdf'){
     $('#goukakuModalBody').innerHTML=`<div class="hint" style="padding:8px 0">PDFは学習計画表の抽出対象外です。Excel形式の合格設計図を生徒フォルダに置いてください。</div><div class="goukakuPdfWrap"><iframe class="goukakuPdfFrame" src="${escapeHtml(item.pdfUrl||'')}"></iframe></div>`;
   }else{
-    $('#goukakuModalBody').innerHTML='<div class="goukakuPlanNotice">通期講座受講計画は見出しと講座CDまたは講座名入りの行だけを表示し、講座行の縦幅を自動拡大します。その下の3表もB〜CA列の座標と結合セルを揃えて表示します。入力済み講座の月別数字欄だけ編集できます。</div><div class="goukakuPlanActions" style="padding:8px 0"><button type="button" class="secondary small" data-print-goukaku-plan="'+escapeHtml(name)+'">4表を印刷</button><button type="button" class="secondary small" data-save-goukaku-excel="'+escapeHtml(name)+'">編集済みExcelを保存</button><button type="button" class="secondary small" data-clear-goukaku-edits="'+escapeHtml(name)+'">編集をクリア</button></div><div class="goukakuPlanWrap" style="max-height:none">'+goukakuBookLayoutHtml(item,name,{editable:true})+'</div>';
+    $('#goukakuModalBody').innerHTML='<div class="goukakuPlanNotice">4表の表示中セルは数式セルを除いてすべて直接編集できます。数式セルは保護して編集不可です。新しい通期講座は「講座行を追加」で、講座CD・講座名が数式ではない空き行を表示して入力してください。</div><div class="goukakuPlanActions" style="padding:8px 0"><button type="button" class="secondary small" data-add-goukaku-course="'+escapeHtml(name)+'">講座行を追加</button><button type="button" class="secondary small" data-print-goukaku-plan="'+escapeHtml(name)+'">4表を印刷</button><button type="button" class="secondary small" data-save-goukaku-excel="'+escapeHtml(name)+'">編集済みExcelを保存</button><button type="button" class="secondary small" data-clear-goukaku-edits="'+escapeHtml(name)+'">編集をクリア</button></div><div class="goukakuPlanWrap" style="max-height:none">'+goukakuBookLayoutHtml(item,name,{editable:true})+'</div>';
     setTimeout(bindGoukakuButtons,0);
   }
   $('#goukakuModal').classList.add('open');
@@ -2636,18 +2673,18 @@ function recordGoukakuCellEdit(el){
   const sheetName=el.dataset.goukakuSheet;
   const item=goukakuDesignSheets[name];
   if(!item || item.kind!=='excel' || !addr) return;
-  if(el.classList?.contains('planNumberCell')){
-    const raw=String(el.innerText||'').trim();
-    if(raw && !/^[0-9０-９]+(?:\.[0-9０-９]+)?$/.test(raw)) el.textContent=raw.replace(/[^0-9０-９.]/g,'');
-  }
+  const ri=Number(el.dataset.goukakuR), c=Number(el.dataset.goukakuC);
+  if(goukakuModelCellHasFormula(item.model,ri,c))return;
   const value=String(el.innerText || '').replace(/\r/g,'').trim();
   if(!item.editedCells) item.editedCells={};
   item.editedCells[addr]=value;
   item.dirty=true;
   el.classList.add('goukakuDirtyCell');
   // 表示モデルも更新しておく。印刷・再表示に反映するため。
-  const ri=Number(el.dataset.goukakuR), c=Number(el.dataset.goukakuC);
-  if(item.model?.rows?.[ri]?.[c]) item.model.rows[ri][c].text=value;
+  if(item.model?.rows?.[ri]){
+    if(!item.model.rows[ri][c])item.model.rows[ri][c]={text:'',style:'',raw:null};
+    item.model.rows[ri][c].text=value;
+  }
   applyGoukakuEditToWorkbook(item, addr, value, sheetName);
 }
 function applyGoukakuEditToWorkbook(item, addr, value, sheetName){
@@ -2655,8 +2692,11 @@ function applyGoukakuEditToWorkbook(item, addr, value, sheetName){
   const ws=item.workbook.Sheets[sheetName || item.sheetName];
   if(!ws) return;
   const prev=ws[addr] || {};
+  if(Object.prototype.hasOwnProperty.call(prev,'f'))return;
   const written=normalizeGoukakuCellValueForWrite(value);
-  ws[addr]=Object.assign({}, prev, written);
+  const next=Object.assign({},prev,written);
+  delete next.w;
+  ws[addr]=next;
 }
 function clearGoukakuEdits(name){
   const item=goukakuDesignSheets[name];
@@ -2670,7 +2710,7 @@ function clearGoukakuEdits(name){
       if(item.fileHandle){
         const file=await item.fileHandle.getFile();
         const parsed=await readGoukakuExcelFile(file);
-        Object.assign(item,{sheetName:parsed.sheetName,aoa:parsed.aoa,model:parsed.model,workbook:parsed.workbook,dirty:false,editedCells:{}});
+        Object.assign(item,{sheetName:parsed.sheetName,aoa:parsed.aoa,model:parsed.model,workbook:parsed.workbook,dirty:false,editedCells:{},extraCourseRows:[]});
       }
     }catch(e){}
     renderGoukakuPanel(name);
@@ -2680,55 +2720,121 @@ function clearGoukakuEdits(name){
 function editedGoukakuFileName(item){
   const current=safeFileName(String(item?.fileName || '合格設計図.xlsx'));
   // すでにアプリ編集済みファイルを読み込んでいる場合は、その同じファイル名に上書き保存する。
-  if(/アプリ編集済\.(xlsx|xlsm|xls)$/i.test(current)) return current;
+  if(/アプリ編集済(?:_\d{8}_\d{6})?\.(xlsx|xlsm|xls)$/i.test(current)) return current;
   const base=current.replace(/\.(xlsx|xlsm|xls)$/i,'');
   return safeFileName(`${base}_アプリ編集済.xlsx`);
 }
 function isGoukakuEditedWorkbookFileName(fileName){
-  return /アプリ編集済\.(xlsx|xlsm|xls)$/i.test(String(fileName||''));
+  return /アプリ編集済(?:_\d{8}_\d{6})?\.(xlsx|xlsm|xls)$/i.test(String(fileName||''));
+}
+function goukakuTimestampFileName(fileName){
+  const base=String(fileName||'合格設計図_アプリ編集済.xlsx').replace(/\.xlsx$/i,'').replace(/_\d{8}_\d{6}$/,'');
+  const d=new Date(),pad=n=>String(n).padStart(2,'0');
+  return safeFileName(`${base}_${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.xlsx`);
+}
+function goukakuSaveLog(text){
+  try{if(typeof addQuietLog==='function')addQuietLog(text,{silentBrief:true});}catch(e){}
+}
+async function ensureGoukakuWritePermission(dirHandle){
+  if(!dirHandle)return false;
+  if(typeof dirHandle.queryPermission!=='function')return true;
+  let permission=await dirHandle.queryPermission({mode:'readwrite'});
+  if(permission!=='granted'&&typeof dirHandle.requestPermission==='function')permission=await dirHandle.requestPermission({mode:'readwrite'});
+  return permission==='granted';
+}
+async function writeGoukakuBlobToDirectory(dirHandle,fileName,blob){
+  const handle=await dirHandle.getFileHandle(fileName,{create:true});
+  const writable=await handle.createWritable();
+  try{
+    await writable.write(blob);
+    await writable.close();
+  }catch(e){
+    try{if(typeof writable.abort==='function')await writable.abort();}catch(_e){}
+    throw e;
+  }
+  return handle;
+}
+function downloadGoukakuExcelBlob(blob,fileName){
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download=fileName;
+  a.style.display='none';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),30000);
 }
 async function saveEditedGoukakuExcelForStudent(name){
   const item=goukakuDesignSheets[name];
   if(!item || item.kind!=='excel') return {ok:false,msg:`${name}: 合格設計図Excelが読み込まれていません。`};
   const count=goukakuEditedCount(item);
+  const sourceFileSize=item.originalFileSize||0;
   if(!count) return {ok:true,msg:`${name}: 編集されたセルはありません。`};
-  if(!item.dirHandle) return {ok:false,msg:`${name}: 生徒フォルダの保存権限がないため、編集済みExcelを保存できません。③前回を復元または④保存で保存用フォルダを選び直してください。`};
+  if(!item.dirHandle) return {ok:false,msg:`${name}: 生徒フォルダの保存権限がありません。④復元で保存復元フォルダーを選び直してください。`};
+  let stage='編集内容の反映';
   try{
+    goukakuSaveLog(`${name}: 合格設計図Excel保存開始（編集 ${count}セル）`);
     // 記録済みセルだけworkbookへ反映。結合セルは表示時に左上セル番地へ寄せている。
     Object.entries(item.editedCells || {}).forEach(([addr,value])=>applyGoukakuEditToWorkbook(item, addr, value, item.sheetName));
+    stage='フォルダーの書込権限確認';
+    if(!(await ensureGoukakuWritePermission(item.dirHandle)))throw new Error('生徒フォルダへの書込権限が許可されませんでした。');
     // xlsxはZIPコンテナ。圧縮を明示しないと、同じ内容でも保存後の容量が大きくなりやすい。
+    stage='Excelデータの生成';
+    goukakuSaveLog(`${name}: ExcelデータをZIP圧縮で生成中`);
     const out=XLSX.write(item.workbook,{bookType:'xlsx',type:'array',cellStyles:true,compression:true});
+    const blob=new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     const fileName=editedGoukakuFileName(item);
     const wasEditedFile=isGoukakuEditedWorkbookFileName(item.fileName);
-    const handle=await item.dirHandle.getFileHandle(fileName,{create:true});
-    const writable=await handle.createWritable();
-    await writable.write(new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
-    await writable.close();
+    stage='生徒フォルダへの保存';
+    let handle=null,savedName=fileName,primaryError=null;
+    try{
+      handle=await writeGoukakuBlobToDirectory(item.dirHandle,fileName,blob);
+    }catch(e){
+      primaryError=e;
+      savedName=goukakuTimestampFileName(fileName);
+      goukakuSaveLog(`${name}: ${fileName}への保存失敗（${e?.message||e}）。別名 ${savedName} で再試行します。`);
+      try{
+        handle=await writeGoukakuBlobToDirectory(item.dirHandle,savedName,blob);
+      }catch(retryError){
+        const downloadName=goukakuTimestampFileName(fileName);
+        downloadGoukakuExcelBlob(blob,downloadName);
+        const msg=`${name}: 生徒フォルダへの保存は失敗しましたが、編集済みExcelのブラウザダウンロードを開始しました。\nダウンロード名：${downloadName}\n通常保存：${primaryError?.message||primaryError}\n別名保存：${retryError?.message||retryError}\n※Excelで対象ファイルを開いている場合は閉じてから、もう一度保存してください。`;
+        goukakuSaveLog(msg);
+        return {ok:false,msg};
+      }
+    }
 
     // 保存後は以後この「アプリ編集済みExcel」を正として扱う。
-    item.fileName=fileName;
+    item.fileName=savedName;
     item.fileHandle=handle;
-    item.savedEditedFileName=fileName;
+    item.savedEditedFileName=savedName;
     item.editedCells={};
     item.dirty=false;
+    let rereadWarning='';
     try{
       const savedFile=await handle.getFile();
       item.lastSavedFileSize=savedFile.size;
+      item.originalFileSize=savedFile.size;
       const parsed=await readGoukakuExcelFile(savedFile);
       item.sheetName=parsed.sheetName;
       item.aoa=parsed.aoa;
       item.model=parsed.model;
       item.workbook=parsed.workbook;
-    }catch(e){}
+    }catch(e){rereadWarning=`\n保存後の再読込確認のみ失敗：${e?.message||e}`;}
     renderGoukakuPanel(name);
     if(currentGoukakuModalName===name && $('#goukakuModal')?.classList.contains('open')) openGoukakuModal(name);
 
-    const action=wasEditedFile ? '上書き保存しました' : '新規作成しました';
-    const beforeSize=item.originalFileSize ? `${(item.originalFileSize/1024/1024).toFixed(2)} MB → ` : '';
+    const action=(wasEditedFile&&savedName===fileName) ? '上書き保存しました' : '新規作成しました';
+    const beforeSize=sourceFileSize ? `${(sourceFileSize/1024/1024).toFixed(2)} MB → ` : '';
     const sizeNote=item.lastSavedFileSize ? `\nファイルサイズ：${beforeSize}${(item.lastSavedFileSize/1024/1024).toFixed(2)} MB（ZIP圧縮あり）` : '';
-    return {ok:true,msg:`${name}: 合格設計図の編集セル ${count}件を${action}。\n保存先：${item.path || ''} / ${fileName}${sizeNote}`};
+    const msg=`${name}: 合格設計図の編集セル ${count}件を${action}。\n保存先：${item.path || ''} / ${savedName}${sizeNote}${rereadWarning}`;
+    goukakuSaveLog(msg);
+    return {ok:true,msg};
   }catch(e){
-    return {ok:false,msg:`${name}: 合格設計図編集済みExcelの保存に失敗しました。\n${e?.message || e}`};
+    const msg=`${name}: 合格設計図編集済みExcelの保存に失敗しました。\n停止段階：${stage}\n原因：${e?.message || e}\n※Excelで対象ファイルを開いている場合は閉じてから再試行してください。`;
+    goukakuSaveLog(msg);
+    return {ok:false,msg};
   }
 }
 
