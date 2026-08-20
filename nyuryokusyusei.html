@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>面談予定入力アプリ（2026-08-20 19:53 出力）</title>
+<title>面談予定入力アプリ（2026-08-20 21:21 出力）</title>
 <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
 <script src="./libs/xlsx.bundle.js"></script>
 <script></script>
@@ -8553,16 +8553,31 @@ function personalExcelLooksLikeProfileHeader(row){
   const joined=(row||[]).map(v=>norm(v)).join('|');
   return /生徒番号|生徒No|氏名|生徒名|学年|高校|学校|担任助手|担当/.test(joined);
 }
+function isProfileHeaderLikeValue(v){
+  const t=norm(v);
+  return /^(生徒番号|生徒No|番号|ID|名前|生徒名|氏名|フルネーム|学年|高校|高校名|学校|学校名|在籍校|所属校|在学校|担任助手|担当|助手|担任|担当者)$/.test(t);
+}
+function cleanProfileValue(kind, v){
+  const t=norm(v);
+  if(!t || isProfileHeaderLikeValue(t)) return '';
+  if(kind==='grade') return normalizeInputGradeValue(t);
+  if(kind==='school' && /^(担任助手|担当|助手|担任|担当者)$/.test(t)) return '';
+  if(kind==='assistant' && /^(高校|高校名|学校|学校名|在籍校|所属校|在学校)$/.test(t)) return '';
+  return t;
+}
 function profileFromKeyValueRows(aoa){
   const p={studentNo:'',grade:'',school:'',assistant:''};
   (aoa||[]).forEach(row=>{
+    // 「高校｜担任助手」のように見出し語が複数並ぶ行だけを除外する。
+    // 「高校｜〇〇高校」のような正しい key-value 行は残す。
+    if((row||[]).filter(v=>isProfileHeaderLikeValue(v)).length>=2) return;
     for(let c=0;c<(row||[]).length-1;c++){
-      const k=norm(row[c]); const v=norm(row[c+1]);
-      if(!v) continue;
-      if(/生徒番号|生徒No|^番号$|^ID$/.test(k) && !p.studentNo) p.studentNo=v;
-      if(/学年/.test(k) && !p.grade) p.grade=normalizeInputGradeValue(v);
-      if(/高校|高校名|学校|学校名|在籍校|所属校|在学校/.test(k) && !p.school) p.school=v;
-      if(/担任助手|担当|助手|担任|担当者/.test(k) && !p.assistant) p.assistant=v;
+      const k=norm(row[c]); const raw=norm(row[c+1]);
+      if(!raw || isProfileHeaderLikeValue(raw)) continue;
+      if(/生徒番号|生徒No|^番号$|^ID$/.test(k) && !p.studentNo) p.studentNo=cleanProfileValue('studentNo',raw);
+      if(/学年/.test(k) && !p.grade) p.grade=cleanProfileValue('grade',raw);
+      if(/高校|高校名|学校|学校名|在籍校|所属校|在学校/.test(k) && !p.school) p.school=cleanProfileValue('school',raw);
+      if(/担任助手|担当|助手|担任|担当者/.test(k) && !p.assistant) p.assistant=cleanProfileValue('assistant',raw);
     }
   });
   return p;
@@ -8591,10 +8606,10 @@ function extractProfileFromWorkbookForInputStudent(wb, studentName){
         // 生徒名列が無いシートや本人Excelでは、先頭のデータ行を本人情報として読む。
         if(nameMatches){
           merge({
-            studentNo:idx.studentNo>=0?rowNo:'',
-            grade:idx.grade>=0?normalizeInputGradeValue(row[idx.grade]):'',
-            school:idx.school>=0?norm(row[idx.school]):'',
-            assistant:idx.assistant>=0?norm(row[idx.assistant]):''
+            studentNo:idx.studentNo>=0?cleanProfileValue('studentNo',rowNo):'',
+            grade:idx.grade>=0?cleanProfileValue('grade',row[idx.grade]):'',
+            school:idx.school>=0?cleanProfileValue('school',row[idx.school]):'',
+            assistant:idx.assistant>=0?cleanProfileValue('assistant',row[idx.assistant]):''
           });
           break;
         }
@@ -8667,6 +8682,14 @@ function formatProfileRestoreResult(excelRes, rosterRes){
 }
 
 async function applyProfilePriorityAfterJsonRestore(names){
+  // 既に保存済みJSONへ混入した見出し語も除去してから、個人Excel→対応表で空欄補完する。
+  (names||students||[]).forEach(name=>{
+    const d=ensureStudent(name);
+    d.studentNo=cleanProfileValue('studentNo',d.studentNo);
+    d.grade=cleanProfileValue('grade',d.grade);
+    d.school=cleanProfileValue('school',d.school);
+    d.assistant=cleanProfileValue('assistant',d.assistant);
+  });
   const excelRes=await applyPersonalExcelProfilesToStudents(names);
   const rosterRes=applyRosterProfilesToStudents(names);
   const msg=formatProfileRestoreResult(excelRes, rosterRes);
@@ -8763,7 +8786,7 @@ async function loadGroup(){
     await applyProfilePriorityAfterJsonRestore(students);
   }
   renderStudents();
-  setDirty(false,'復元済み');
+  uxSetSaved('loaded');
   const savedAt=mem.savedAt?new Date(mem.savedAt).toLocaleString('ja-JP'):'保存日時不明';
   const allDetails=[...details, ...LAST_PROFILE_RESTORE_LOGS].filter(Boolean);
   const detailText = allDetails.length ? '\n' + Array.from(new Set(allDetails)).join('\n') : '';
@@ -8985,7 +9008,7 @@ async function loadGroup(){
     const conflictLines=inputRestoreConflictSummaryLines(); if(conflictLines?.length) details.push(conflictLines.join('\n'));
   }
   renderStudents();
-  setDirty(false,'復元済み');
+  uxSetSaved('loaded');
   const savedAt=mem.savedAt?new Date(mem.savedAt).toLocaleString('ja-JP'):'保存日時不明';
   const firstDetails=[...details, ...LAST_PROFILE_RESTORE_LOGS].filter(Boolean);
   showSaveInfo(`内容を復元して入力欄に表示しました：${students.join('、')}（${savedAt} / ${place}）\n合格設計図を続けて確認中です。${firstDetails.length?'\n'+Array.from(new Set(firstDetails)).join('\n'):''}`);
