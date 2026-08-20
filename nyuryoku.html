@@ -3391,21 +3391,24 @@ function collectEventMasterFromPanel(){
 }
 function addEventMasterRow(){const arr=collectEventMasterFromPanel();arr.push({name:'',datetime:'',grades:[],students:[]});saveEventMasterData(arr);renderEventMasterPanel()}
 async function saveEventMasterFromPanel(){
+  // イベントマスタは、ボタンを押した瞬間の画面値を唯一の正として保存する。
+  // 以前はこの後に全マスタ保存処理がもう一度パネルを再収集していたため、
+  // イベントを追加/編集した直後に保存しても弱く、古い値が混ざる可能性があった。
   const rows=applyPreviousEventTargetsWithConfirm(collectEventMasterFromPanel());
   saveEventMasterData(rows);
   updateEventTargetHistoryFromMasters(rows);
   renderEventMasterPanel();
   renderStudents();
 
-  // イベントマスタ保存ボタンだけで完結させる。
-  // まだ保存復元フォルダーを選んでいない場合はここでフォルダー選択を出し、
-  // 選ばれた保存復元フォルダー直下の既存/新規 json フォルダーへ保存する。
   try{
     await saveMasterSettingsWithNormalSaveFolder(false);
-    alert(`イベントマスタを保存し、保存復元フォルダー/json に反映しました。\nイベントマスタ ${getEventMaster().length}件`);
+    const savedAt=new Date().toLocaleString('ja-JP');
+    const targeted=rows.filter(ev=>itemHasAnyTarget(ev)).length;
+    showSaveInfo(`イベントマスタを保存復元フォルダー/jsonへ保存しました。\nイベントマスタ ${rows.length}件 / 対象指定あり ${targeted}件 / 保存時刻 ${savedAt}\n保存ファイル: settings_exam_master.json・event_master.json`);
+    alert(`イベントマスタを保存し、保存復元フォルダー/json に反映しました。\nイベントマスタ ${rows.length}件\n対象指定あり ${targeted}件`);
   }catch(e){
     console.error(e);
-    alert('イベントマスタはブラウザ内に保存しましたが、保存復元フォルダー/json への反映に失敗しました。\n保存復元フォルダー本体を選んでください。');
+    alert('イベントマスタはブラウザ内に保存しましたが、保存復元フォルダー/json への反映に失敗しました。\n保存復元フォルダー本体を選んでください。\n※json・打ち込み結果・担任助手フォルダーではなく、その1つ上を選びます。');
   }
 }
 
@@ -5658,16 +5661,40 @@ function buildMasterSettingsMemory(){
   return buildMasterSettingsPayload(new Date().toISOString());
 }
 
+function folderNameLooksLikeSaveRootChild(name){
+  const key=String(name||'').replace(/[\s\u3000]+/g,'').toLowerCase();
+  return [
+    'json','打ち込み結果','面談結果打ち込み','面談結果打ち込みフォルダ',
+    '担任助手フォルダ','担任助手フォルダー','毎日更新','全員分リスト',
+    '科目リスト','対応表','全体予定表','comiru','コミル','アンケート','毎日掲示'
+  ].some(x=>String(x).replace(/[\s\u3000]+/g,'').toLowerCase()===key);
+}
+async function pickSaveRootFolderForMasterSave(){
+  const dir=await pickSaveRootFolder(true);
+  if(!dir) return null;
+  if(folderNameLooksLikeSaveRootChild(dir.name)){
+    sharedDirHandle=null;
+    alert('保存復元フォルダー本体を選択してください。\njson・打ち込み結果・担任助手フォルダー・生徒フォルダーではなく、その1つ上の「保存復元フォルダー」を選びます。');
+    return null;
+  }
+  return dir;
+}
+function buildMasterSettingsMemoryFromLocal(savedAt=new Date().toISOString()){
+  return buildMasterSettingsPayload(savedAt);
+}
+async function writeCurrentLocalMasterSettingsToShared(showAlert=false){
+  const mem=buildMasterSettingsMemoryFromLocal(new Date().toISOString());
+  await writeMasterSettingsFilesToShared(mem);
+  if(showAlert){
+    showSaveInfo(`模試・イベント・コメントマスタを保存用フォルダに保存しました（${new Date(mem.savedAt).toLocaleString('ja-JP')}）`);
+    alert('模試マスタ・イベントマスタ・コメントマスタを保存用フォルダ直下の「json」フォルダに保存しました。\nsettings_exam_master.json / exam_master.json / event_master.json / comment_master.json を更新しました。');
+  }
+  return true;
+}
 async function saveMasterSettingsToShared(showAlert=true){
   try{
     persistMasterPanelsToLocalForSave();
-    const mem=buildMasterSettingsMemory();
-    await writeMasterSettingsFilesToShared(mem);
-    if(showAlert){
-      showSaveInfo(`模試・イベント・コメントマスタを保存用フォルダに保存しました（${new Date(mem.savedAt).toLocaleString('ja-JP')}）`);
-      alert('模試マスタ・イベントマスタ・コメントマスタを保存用フォルダ直下の「json」フォルダに保存しました。\n※settings_exam_master.json に加えて event_master.json も作成します。');
-    }
-    return true;
+    return await writeCurrentLocalMasterSettingsToShared(showAlert);
   }catch(e){
     if(showAlert)alert('マスタの保存用フォルダ保存に失敗しました。保存用フォルダの権限を確認してください。');
     throw e;
@@ -5677,10 +5704,12 @@ async function saveMasterSettingsToShared(showAlert=true){
 async function saveMasterSettingsWithNormalSaveFolder(showAlert=false){
   // マスタ単独保存ボタンでも、⑤保存と同じく保存復元フォルダー本体を選び、
   // その直下の json フォルダーへマスタJSONを書き出す。
-  const dir = await pickSaveRootFolder(true);
+  // ただし単独保存では、直前に確定済みのlocalStorage値をそのまま書き出し、
+  // 保存中に別マスタの画面値を再収集してイベントを巻き戻す事故を避ける。
+  const dir = await pickSaveRootFolderForMasterSave();
   if(!dir) throw new Error('保存復元フォルダーが選択されませんでした。');
   sharedDirHandle = dir;
-  return await saveMasterSettingsToShared(showAlert);
+  return await writeCurrentLocalMasterSettingsToShared(showAlert);
 }
 async function loadMasterSettingsFromShared(showAlert=true){
   try{
