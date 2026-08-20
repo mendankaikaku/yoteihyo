@@ -377,7 +377,7 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
 }
 
 </style>
-<!-- 精査済み: 読み取り方式819朝復帰版 /  全員分リスト固定見出し・A〜C固定・氏名大文字表示・2行目見出し半高版 -->
+<!-- 精査済み: 読み取り方式819朝復帰版 / マスタ対象人数で小規模・大規模判定版 -->
 </head>
 <body>
 <header>
@@ -6114,6 +6114,64 @@ function allListIsSmallTargetCount(count){
   return Number(count || 0) > 0 && Number(count || 0) <= ALL_LIST_SMALL_TARGET_LIMIT;
 }
 
+function allListMasterRecordMatcher(kind, record){
+  const masters = kind === 'exam' ? (state.examMasterRows || []) : (state.eventMasterRows || []);
+  const recName = masterNormalizeNameForMatch(kind === 'exam' ? (record?.examName || record?.name || '') : (record?.eventName || record?.name || ''));
+  const recDate = masterDateKeyForMatch(kind === 'exam' ? (record?.examDate || record?.datetime || record?.date || '') : (record?.datetime || record?.date || ''));
+  if(!recName) return null;
+  return masters.find(m => {
+    const mn = masterNormalizeNameForMatch(m.name);
+    if(!mn || mn !== recName) return false;
+    if(m.date && recDate && m.date !== recDate) return false;
+    if(m.date && !recDate) return false;
+    return true;
+  }) || null;
+}
+function allListMasterRawListAny(raw, keys){
+  const out=[];
+  for(const k of keys || []){
+    const vals = masterTargetListFromRaw(raw, k, k);
+    vals.forEach(v => { if(v && !out.includes(v)) out.push(v); });
+  }
+  return out;
+}
+function allListMasterGradeTargets(raw){
+  return allListMasterRawListAny(raw, ['grades','targetGrades','対象学年'])
+    .map(masterNormalizeGradeForMatch)
+    .filter(Boolean);
+}
+function allListMasterStudentTargets(raw){
+  return allListMasterRawListAny(raw, ['students','studentNames','targetStudents','targetStudentNames','対象生徒','対象生徒名']);
+}
+function allListMasterBroadTargets(raw){
+  return allListMasterRawListAny(raw, ['schools','schoolNames','targetSchools','targetSchoolNames','対象高校','assistants','assistantNames','targetAssistants','targetAssistantNames','対象担任助手','対象助手']);
+}
+function allListMasterSizeCategoryFromMaster(master){
+  // マスタ不明・対象未設定は無視。対象学年ありは必ず大規模。
+  // 対象生徒名が明示されている場合だけ、15人以下を小規模、16人以上を大規模にする。
+  if(!master || !master.raw) return 'ignore';
+  const raw = master.raw || {};
+  const grades = allListMasterGradeTargets(raw);
+  const students = allListMasterStudentTargets(raw);
+  const broad = allListMasterBroadTargets(raw);
+  if(grades.length) return 'large';
+  if(students.length) return students.length <= ALL_LIST_SMALL_TARGET_LIMIT ? 'small' : 'large';
+  // 高校/助手だけの広い指定は、入力用では対象生徒名へ展開するための指定。
+  // もし残っていた場合は小規模にせず大規模扱いにする。
+  if(broad.length) return 'large';
+  return 'ignore';
+}
+function allListMasterSizeCategoryForRecord(kind, record){
+  const master = allListMasterRecordMatcher(kind, record);
+  return allListMasterSizeCategoryFromMaster(master);
+}
+function allListMasterSizeCategoryForSmallObject(obj){
+  if(!obj) return 'ignore';
+  if(obj.kind === '模試') return allListMasterSizeCategoryForRecord('exam', {examName:obj.name, examDate:obj.date});
+  if(obj.kind === 'イベント') return allListMasterSizeCategoryForRecord('event', {eventName:obj.name, datetime:obj.date});
+  return 'ignore';
+}
+
 function allListMarkToBool(v){
   const s=allListCellText(v).replace(/\s/g,'');
   if(/^(〇|○|◯|済|回答済|あり|有|true|yes|y|1)$/i.test(s)) return true;
@@ -6406,7 +6464,7 @@ function buildSmallExamEventNoteMaps(examRecords=[], eventRecords=[]){
     if(!allListExamStillVisible(r)) continue;
     const baseKey = examKeyOf(r);
     const count = examCounts.get(baseKey) || 0;
-    if(!allListIsSmallTargetCount(count)) continue;
+    if(allListMasterSizeCategoryForRecord('exam', r) !== 'small') continue;
     const meta = rosterMetaForStudent(r.student);
     const stuKey = studentKeyForList(meta['生徒名'] || r.student, meta['生徒番号'] || r.studentNo || '');
     putRowObject({
@@ -6429,7 +6487,7 @@ function buildSmallExamEventNoteMaps(examRecords=[], eventRecords=[]){
   for(const r of eventRecords || []){
     const baseKey = eventKeyOf(r);
     const count = eventCounts.get(baseKey) || 0;
-    if(!allListIsSmallTargetCount(count)) continue;
+    if(allListMasterSizeCategoryForRecord('event', r) !== 'small') continue;
     const meta = rosterMetaForStudent(r.student);
     const stuKey = studentKeyForList(meta['生徒名'] || r.student, meta['生徒番号'] || r.studentNo || '');
     putRowObject({
@@ -6531,8 +6589,9 @@ function buildSmallExamEventColumnGroups(examRecords=[], eventRecords=[]){
 
   for(const r of examRecords || []){
     if(!allListExamStillVisible(r)) continue;
+    if(allListMasterSizeCategoryForRecord('exam', r) !== 'large') continue;
     const baseKey=examKeyOf(r);
-    // マスタ対象が学年全員など15人超でも、全員分リストには確認列を出す。
+    // マスタ判定で大規模になった模試/イベントだけ、全員分リストには確認列を出す。
     if(seenExam.has(baseKey)) continue;
     seenExam.add(baseKey);
     const name=r.examName || '模試';
@@ -6549,8 +6608,9 @@ function buildSmallExamEventColumnGroups(examRecords=[], eventRecords=[]){
     examGroups.push({key:`${baseKey}|subject`, baseKey, field:'subject', label:allListSmallColumnLabel(date,name,'科目変更'), small:true, kind:'exam'});
   }
   for(const r of eventRecords || []){
+    if(allListMasterSizeCategoryForRecord('event', r) !== 'large') continue;
     const baseKey=eventKeyOf(r);
-    // マスタ対象が学年全員など15人超でも、全員分リストには確認列を出す。
+    // マスタ判定で大規模になった模試/イベントだけ、全員分リストには確認列を出す。
     if(seenEvent.has(baseKey)) continue;
     seenEvent.add(baseKey);
     const name=r.eventName || 'イベント';
@@ -6581,8 +6641,9 @@ function buildSmallExamEventColumnMaps(examRecords=[], eventRecords=[]){
 
   for(const r of examRecords || []){
     if(!allListExamStillVisible(r)) continue;
+    if(allListMasterSizeCategoryForRecord('exam', r) !== 'large') continue;
     const baseKey=examKeyOf(r);
-    // マスタ対象が学年全員など15人超でも、全員分リストには確認列を出す。
+    // マスタ判定で大規模になった模試/イベントだけ、全員分リストには確認列を出す。
     const meta=rosterMetaForStudent(r.student);
     const key=studentKeyForList(meta['生徒名'] || r.student, meta['生徒番号'] || r.studentNo || '');
     setMap(examByStudent,key,`${baseKey}|status`,allListExamStatusFull(r.status));
@@ -6596,8 +6657,9 @@ function buildSmallExamEventColumnMaps(examRecords=[], eventRecords=[]){
     if(!r.status || !r.comiruAnswered) pendingMap.set(key,true);
   }
   for(const r of eventRecords || []){
+    if(allListMasterSizeCategoryForRecord('event', r) !== 'large') continue;
     const baseKey=eventKeyOf(r);
-    // マスタ対象が学年全員など15人超でも、全員分リストには確認列を出す。
+    // マスタ判定で大規模になった模試/イベントだけ、全員分リストには確認列を出す。
     const meta=rosterMetaForStudent(r.student);
     const key=studentKeyForList(meta['生徒名'] || r.student, meta['生徒番号'] || r.studentNo || '');
     setMap(eventByStudent,key,`${baseKey}|status`,allListEventStatusMark(r.status));
@@ -6615,6 +6677,7 @@ function buildSmallExamEventColumnMaps(examRecords=[], eventRecords=[]){
     for(const obj of manual.rowObjects){
       if(!obj || !obj.studentKey || !obj.machineKey) continue;
       if(!smallRestoreObjectAllowedByMaster(obj)) continue;
+      if(allListMasterSizeCategoryForSmallObject(obj) !== 'large') continue;
       if(obj.kind === '模試'){
         setMap(examByStudent,obj.studentKey,`${obj.machineKey}|status`,allListExamStatusFull(obj.status));
         setMap(examByStudent,obj.studentKey,`${obj.machineKey}|comiru`,obj.comiruAnswered===true || norm(obj.comiru).includes('済') ? '〇' : '×');
@@ -7164,7 +7227,7 @@ function buildSmallSlotObjectsByStudent(examRecords=[], eventRecords=[]){
     if(!allListExamStillVisible(r)) continue;
     const baseKey=examKeyOf(r);
     const count=examCounts.get(baseKey) || 0;
-    if(!allListIsSmallTargetCount(count)) continue;
+    if(allListMasterSizeCategoryForRecord('exam', r) !== 'small') continue;
     const meta=rosterMetaForStudent(r.student);
     const stuKey=studentKeyForList(meta['生徒名'] || r.student, meta['生徒番号'] || r.studentNo || '');
     put({kind:'模試',date:r.examDate || '',name:r.examName || '',count,grade:meta['学年'] || r.grade || '',studentNo:meta['生徒番号'] || r.studentNo || '',student:meta['生徒名'] || r.student || '',status:allListExamStatusFull(r.status),subject:r.subjectChanged ? 'あり' : '',subjectChanged:!!r.subjectChanged,distributed:!!r.distributed,collected:!!r.collected,supportReflected:!!r.supportReflected,subjectList:allListSubjectListStatusForRecord(r, subjectStatusIndex, stuKey),comiru:r.comiruAnswered ? '済' : '未聞き取り',comiruAnswered:!!r.comiruAnswered,note:r.note || '',machineKey:baseKey,studentKey:stuKey}, 'auto');
@@ -7172,7 +7235,7 @@ function buildSmallSlotObjectsByStudent(examRecords=[], eventRecords=[]){
   for(const r of eventRecords || []){
     const baseKey=eventKeyOf(r);
     const count=eventCounts.get(baseKey) || 0;
-    if(!allListIsSmallTargetCount(count)) continue;
+    if(allListMasterSizeCategoryForRecord('event', r) !== 'small') continue;
     const meta=rosterMetaForStudent(r.student);
     const stuKey=studentKeyForList(meta['生徒名'] || r.student, meta['生徒番号'] || r.studentNo || '');
     put({kind:'イベント',date:r.datetime || '',name:r.eventName || '',count,grade:meta['学年'] || r.grade || '',studentNo:meta['生徒番号'] || r.studentNo || '',student:meta['生徒名'] || r.student || '',status:norm(r.status || '') || '未聞き取り',subject:'',subjectChanged:false,distributed:!!r.distributed,collected:!!r.collected,listReflected:!!r.listReflected,subjectList:'',comiru:r.comiruAnswered ? '済' : '未聞き取り',comiruAnswered:!!r.comiruAnswered,note:r.note || '',machineKey:baseKey,studentKey:stuKey}, 'auto');
@@ -7183,6 +7246,7 @@ function buildSmallSlotObjectsByStudent(examRecords=[], eventRecords=[]){
   if(manual && manual.rowObjects && manual.rowObjects.length){
     for(const obj of manual.rowObjects){
       if(!smallRestoreObjectAllowedByMaster(obj)) continue;
+      if(allListMasterSizeCategoryForSmallObject(obj) !== 'small') continue;
       put(obj, 'restore');
     }
   }
