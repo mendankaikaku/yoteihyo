@@ -2715,6 +2715,16 @@ function stripLegacyExamTargetStudents(rows){
 }
 function applyExamMasterFromRestoredMemory(mem, sourceLabel='復元JSON'){
   if(!mem || !Array.isArray(mem.examMaster)) return false;
+
+  // 模試マスタは、個人JSON / group JSON からは復元しない。
+  // 予定復元用JSONに古い examMaster が混ざっていると、現在の模試マスタを上書きして
+  // 対象学年なのに入力欄へ出ない原因になるため、保存復元フォルダー/json の
+  // settings_exam_master.json または exam_master.json 由来だけを採用する。
+  const type=String(mem.type||'');
+  const src=String(sourceLabel||'');
+  const isStandaloneMaster = type==='master-settings' || type==='exam-master' || /settings_exam_master\.json|exam_master\.json|保存用フォルダ既存マスタ/.test(src);
+  if(!isStandaloneMaster) return false;
+
   const trusted=masterTargetsTrusted(mem);
   saveExamMasterData(trusted ? mem.examMaster : stripLegacyExamTargetStudents(mem.examMaster));
   // 旧JSONの対象履歴は、似た模試へ対象生徒を再注入する原因になるので復元しない。
@@ -3263,7 +3273,7 @@ async function saveExamMasterFromPanel(){
   // まだ保存復元フォルダーを選んでいない場合はここでフォルダー選択を出し、
   // 選ばれた保存復元フォルダー直下の既存/新規 json フォルダーへ保存する。
   try{
-    await saveMasterSettingsToShared(false);
+    await saveMasterSettingsWithNormalSaveFolder(false);
     alert(`模試マスタを保存し、保存復元フォルダー/json に反映しました。\n模試マスタ ${getExamMaster().length}件`);
   }catch(e){
     console.error(e);
@@ -3385,7 +3395,7 @@ async function saveEventMasterFromPanel(){
   // まだ保存復元フォルダーを選んでいない場合はここでフォルダー選択を出し、
   // 選ばれた保存復元フォルダー直下の既存/新規 json フォルダーへ保存する。
   try{
-    await saveMasterSettingsToShared(false);
+    await saveMasterSettingsWithNormalSaveFolder(false);
     alert(`イベントマスタを保存し、保存復元フォルダー/json に反映しました。\nイベントマスタ ${getEventMaster().length}件`);
   }catch(e){
     console.error(e);
@@ -3495,7 +3505,7 @@ function newSubjectTemplateInEditor(){
   setTimeout(()=>nameInput&&nameInput.focus(),0);
   showSaveInfo('新しい科目型を作る準備をしました。科目型名を入れて、必要な科目を選び、「科目型を保存」を押してください。');
 }
-function saveSubjectTemplateFromEditor(){
+async function saveSubjectTemplateFromEditor(){
   const name=($('#subjectTemplateName')?.value||'').trim();
   if(!name)return alert('科目型名を入力してください。');
   const checked=$$('[data-template-subject]:checked').map(x=>x.value);
@@ -3509,12 +3519,16 @@ function saveSubjectTemplateFromEditor(){
   saveSubjectTemplates(list);
   renderExamMasterPanel(); renderEventMasterPanel(); renderCommentMasterPanel();
   renderStudents();
-  if(sharedDirHandle){
-    saveMasterSettingsToShared(false).then(()=>alert(`科目型「${name}」を保存し、保存用フォルダにも反映しました。`)).catch(()=>alert(`科目型「${name}」はブラウザ内に保存しましたが、保存用フォルダへの反映に失敗しました。`));
-  }else{
-    alert(`科目型「${name}」を保存しました。保存用フォルダへ反映する場合は「保存用フォルダを選んで全データを保存・反映」を押してください。`);
+  try{
+    await saveMasterSettingsWithNormalSaveFolder(false);
+    alert(`科目型「${name}」を保存し、保存復元フォルダー/json に反映しました。`);
+  }catch(e){
+    console.error(e);
+    alert(`科目型「${name}」はブラウザ内に保存しましたが、保存復元フォルダー/json への反映に失敗しました。
+保存復元フォルダー本体を選んでください。`);
   }
 }
+
 
 function deleteSubjectTemplateFromEditor(){
   const name=($('#subjectTemplateName')?.value||$('#subjectTemplateSelect')?.value||'').trim();
@@ -5652,6 +5666,15 @@ async function saveMasterSettingsToShared(showAlert=true){
     if(showAlert)alert('マスタの保存用フォルダ保存に失敗しました。保存用フォルダの権限を確認してください。');
     throw e;
   }
+}
+
+async function saveMasterSettingsWithNormalSaveFolder(showAlert=false){
+  // マスタ単独保存ボタンでも、⑤保存と同じく保存復元フォルダー本体を選び、
+  // その直下の json フォルダーへマスタJSONを書き出す。
+  const dir = await pickSaveRootFolder(true);
+  if(!dir) throw new Error('保存復元フォルダーが選択されませんでした。');
+  sharedDirHandle = dir;
+  return await saveMasterSettingsToShared(showAlert);
 }
 async function loadMasterSettingsFromShared(showAlert=true){
   try{
