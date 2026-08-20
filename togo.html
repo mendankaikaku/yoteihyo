@@ -774,6 +774,7 @@ function mergeRestoredAllListAoa(grade, generatedAoa){
   const genCanon = genHeader.map(allListCanonicalHeader);
   const out = generatedAoa.map(r => Array.isArray(r) ? r.slice() : []);
   const baseCanons = new Set(['学年','生徒番号','生徒名','読み仮名','高校','担当','入力用備考']);
+  const manualOverrideCells = Array.isArray(generatedAoa._allListManualOverrideCells) ? generatedAoa._allListManualOverrideCells.slice() : [];
   for(let r=2; r<out.length; r++){
     const row = out[r] || [];
     const key = allListRowKeyFromCells(row, genHeader);
@@ -787,10 +788,16 @@ function mergeRestoredAllListAoa(grade, generatedAoa){
       if(oi < 0) oi = restored.headerCanon.findIndex(h => h === cc && !baseCanons.has(h));
       if(oi < 0) continue;
       const oldVal = oldRow[oi];
-      if(oldVal !== undefined && allListCellText(oldVal) !== '') row[c] = oldVal;
+      if(oldVal !== undefined && allListCellText(oldVal) !== ''){
+        row[c] = oldVal;
+        // 手修正が入ったセルを記録しておく。印刷用で「未」「×」を空欄化するときも、
+        // 手修正セルだけはその値を優先して印刷へ反映する。
+        manualOverrideCells.push(`${r}:${c}`);
+      }
     }
     out[r] = row;
   }
+  if(manualOverrideCells.length) out._allListManualOverrideCells = Array.from(new Set(manualOverrideCells));
   return out;
 }
 async function parseAllListRestoreFile(file){
@@ -7205,6 +7212,7 @@ function ensureAllListSmallSubjectListColumns(mergedAoa, generatedAoa){
     }
   }
   if(mergedAoa._allListConflictCells) out._allListConflictCells = mergedAoa._allListConflictCells;
+  if(mergedAoa._allListManualOverrideCells) out._allListManualOverrideCells = mergedAoa._allListManualOverrideCells;
   return out;
 }
 
@@ -7483,6 +7491,28 @@ function allListPrintCell(row, idx){
   return idx >= 0 ? norm(row[idx]) : '';
 }
 
+function allListPrintIsUncheckedValue(value, field){
+  const f = String(field || '').replace(/[\s\n\r　]+/g, '');
+  const s = norm(value).replace(/[\s　]+/g, '');
+  if(!s) return false;
+  // 印刷用では、チェックが入っていない状態を空欄にする。
+  // 入力用シート側の「未」「×」はそのまま残す。
+  if(/^(回答|受験|参加|status)$/.test(f)) return /^(未|未回答|未確認)$/.test(s);
+  if(/^(Comiru|コミル|科目変更)$/.test(f)) return /^(×|✕|✖|未|未回答|false|0)$/.test(s);
+  if(/^(配布|回収|反映|支援反映|支援反映済み|リスト反映|リスト反映済み|distributed|collected|supportReflected|listReflected)$/.test(f)) return /^(未|×|✕|✖|false|0)$/.test(s);
+  return false;
+}
+function allListPrintDisplayValue(value, field, manualOverride=false){
+  const v = norm(value);
+  if(manualOverride) return v;
+  return allListPrintIsUncheckedValue(v, field) ? '' : v;
+}
+function allListSourceCellWasManual(fullAoa, rowIndex, colIndex){
+  if(!fullAoa || colIndex < 0) return false;
+  const cells = Array.isArray(fullAoa._allListManualOverrideCells) ? fullAoa._allListManualOverrideCells : [];
+  return cells.includes(`${rowIndex}:${colIndex}`);
+}
+
 
 function allListPrintHasBlankWritingField(text){
   const s = String(text ?? '');
@@ -7670,13 +7700,23 @@ function buildAllStudentPrintAoaFromFullAoa(grade, fullAoa){
       const find = field => header.findIndex(h => new RegExp(`^(?:小規模\\s*)?${n}\\s*\\n${field}$`).test(h));
       const d = allListPrintCell(row, find('日付'));
       const name = applyAllStudentPrintAbbrev(allListPrintCell(row, find('名称')));
-      const ans = allListPrintCell(row, find('回答')) || allListPrintCell(row, find('受験')) || allListPrintCell(row, find('参加'));
-      const comiru = allListPrintCell(row, find('Comiru'));
-      const distributed = allListPrintCell(row, find('配布'));
-      const collected = allListPrintCell(row, find('回収'));
-      const reflected = allListPrintCell(row, find('反映')) || allListPrintCell(row, find('支援反映済み')) || allListPrintCell(row, find('リスト反映済み'));
+      const idxAnswer = find('回答');
+      const idxJuken = find('受験');
+      const idxSanka = find('参加');
+      const idxComiru = find('Comiru');
+      const idxDistributed = find('配布');
+      const idxCollected = find('回収');
+      const idxReflected = find('反映') >= 0 ? find('反映') : (find('支援反映済み') >= 0 ? find('支援反映済み') : find('リスト反映済み'));
+      const idxSubject = find('科目変更');
+      const ansRaw = allListPrintCell(row, idxAnswer) || allListPrintCell(row, idxJuken) || allListPrintCell(row, idxSanka);
+      const ansField = idxSanka >= 0 ? '参加' : '回答';
+      const ans = allListPrintDisplayValue(ansRaw, ansField, allListSourceCellWasManual(fullAoa, r, idxAnswer >= 0 ? idxAnswer : (idxJuken >= 0 ? idxJuken : idxSanka)));
+      const comiru = allListPrintDisplayValue(allListPrintCell(row, idxComiru), 'Comiru', allListSourceCellWasManual(fullAoa, r, idxComiru));
+      const distributed = allListPrintDisplayValue(allListPrintCell(row, idxDistributed), '配布', allListSourceCellWasManual(fullAoa, r, idxDistributed));
+      const collected = allListPrintDisplayValue(allListPrintCell(row, idxCollected), '回収', allListSourceCellWasManual(fullAoa, r, idxCollected));
+      const reflected = allListPrintDisplayValue(allListPrintCell(row, idxReflected), '反映', allListSourceCellWasManual(fullAoa, r, idxReflected));
       const note = applyAllStudentPrintAbbrev(allListPrintCell(row, find('備考')));
-      const subject = allListPrintCell(row, find('科目変更'));
+      const subject = allListPrintDisplayValue(allListPrintCell(row, idxSubject), '科目変更', allListSourceCellWasManual(fullAoa, r, idxSubject));
       const subjectList = allListPrintCell(row, find('科目リスト'));
       if(d || name || ans || comiru || distributed || collected || reflected || note || subject || subjectList){
         const details = [
@@ -7706,7 +7746,8 @@ function buildAllStudentPrintAoaFromFullAoa(grade, fullAoa){
 
     for(const def of largeDefs){
       const raw = def.sourceCol >= 0 ? allListPrintCell(row, def.sourceCol) : '';
-      outRow.push(raw);
+      const manualOverride = allListSourceCellWasManual(fullAoa, r, def.sourceCol);
+      outRow.push(allListPrintDisplayValue(raw, def.field || def.label, manualOverride));
     }
 
     planCols.forEach(x => {
