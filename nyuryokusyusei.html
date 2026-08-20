@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>面談予定入力アプリ（2026-08-20 22:42 出力）</title>
+<title>面談予定入力アプリ（2026-08-20 23:59 出力）</title>
 <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
 <script src="./libs/xlsx.bundle.js"></script>
 <script></script>
@@ -2904,13 +2904,17 @@ async function findGoukakuExcelInStudentFolder(studentDir){
       candidates.push({name:entryName, handle, isEdited, modified});
     }
   }
-  // 一度「合格設計図_アプリ編集済.xlsx」ができたら、次回以降はそれを最優先で読み込む。
-  candidates.sort((a,b)=>{
-    if(a.isEdited !== b.isEdited) return a.isEdited ? -1 : 1;
-    if(a.modified !== b.modified) return b.modified - a.modified;
-    return a.name.localeCompare(b.name,'ja');
+  // 元Excel・アプリ編集済みExcelを区別せず、更新日時が最も新しいファイルを採用する。
+  candidates.sort((a,b)=>(b.modified-a.modified)||a.name.localeCompare(b.name,'ja'));
+  if(!candidates.length)return null;
+  return Object.assign({},candidates[0],{
+    candidateCount:candidates.length,
+    selectionReason:'更新日時が最新のため'
   });
-  return candidates[0] || null;
+}
+function formatGoukakuModifiedTime(ms){
+  if(!ms)return '更新日時不明';
+  try{return new Date(ms).toLocaleString('ja-JP');}catch(e){return '更新日時不明';}
 }
 function pickGoukakuDesignSheetName(wb){
   const names=(wb&&wb.SheetNames)?wb.SheetNames:[];
@@ -2952,7 +2956,7 @@ async function loadGoukakuDesignsFromRoot(root, names=students){
         const planInfo=planBuildBookSections(parsed.model);
         const tableCount=planInfo ? 1+(planInfo.highRange?1:0)+(planInfo.school?1:0)+(planInfo.weekly?1:0) : 0;
         const label=planInfo ? `${excelHit.isEdited?'編集済みExcel':'Excel読込OK'}・合格設計図${tableCount}/4表OK（通期：講座${planInfo.course.courseRows.length}行・行高${planInfo.course.courseRowHeightPx}px / ${colName(planInfo.startCol+1)}〜${colName(planInfo.endCol+1)}列）` : 'Excel読込OK・合格設計図表抽出NG';
-        loaded.push(`${name}: ${dirs[0].label} / ${excelHit.name}（${label}）`);
+        loaded.push(`${name}: 採用Excel「${excelHit.name}」 / 更新日時 ${formatGoukakuModifiedTime(excelHit.modified)} / 採用理由 ${excelHit.selectionReason} / 候補 ${excelHit.candidateCount}件 / ${dirs[0].label}（${label}）`);
         renderGoukakuPanel(name);
         continue;
       }
@@ -3027,7 +3031,7 @@ async function loadGoukakuDesignsFromStudentParent(studentParentDir, names=stude
         const planInfo=planBuildBookSections(parsed.model);
         const tableCount=planInfo ? 1+(planInfo.highRange?1:0)+(planInfo.school?1:0)+(planInfo.weekly?1:0) : 0;
         const label=planInfo ? `${excelHit.isEdited?'編集済みExcel':'Excel読込OK'}・合格設計図${tableCount}/4表OK（通期：講座${planInfo.course.courseRows.length}行・行高${planInfo.course.courseRowHeightPx}px / ${colName(planInfo.startCol+1)}〜${colName(planInfo.endCol+1)}列）` : 'Excel読込OK・合格設計図表抽出NG';
-        loaded.push(`${name}: ${found.label} / ${excelHit.name}（${label}）`);
+        loaded.push(`${name}: 採用Excel「${excelHit.name}」 / 更新日時 ${formatGoukakuModifiedTime(excelHit.modified)} / 採用理由 ${excelHit.selectionReason} / 候補 ${excelHit.candidateCount}件 / ${found.label}（${label}）`);
         renderGoukakuPanel(name);
         continue;
       }
@@ -4801,11 +4805,6 @@ const enc=new TextEncoder();function bytes(s){return enc.encode(s)}function crcT
 function zipBytes(files){let parts=[],central=[],offset=0;files.forEach(f=>{const name=bytes(f.name),data=(f.data instanceof Uint8Array)?f.data:bytes(f.data),crc=crc32Bytes(data);let h=new Uint8Array(30);put32(h,0,0x04034b50);put16(h,4,20);put16(h,6,0x0800);put16(h,8,0);put16(h,10,0);put16(h,12,0);put32(h,14,crc);put32(h,18,data.length);put32(h,22,data.length);put16(h,26,name.length);put16(h,28,0);parts.push(h,name,data);let c=new Uint8Array(46);put32(c,0,0x02014b50);put16(c,4,20);put16(c,6,20);put16(c,8,0x0800);put16(c,10,0);put16(c,12,0);put16(c,14,0);put32(c,16,crc);put32(c,20,data.length);put32(c,24,data.length);put16(c,28,name.length);put16(c,30,0);put16(c,32,0);put16(c,34,0);put16(c,36,0);put32(c,38,0);put32(c,42,offset);central.push(c,name);offset+=h.length+name.length+data.length});const centralBytes=concat(central);let e=new Uint8Array(22);put32(e,0,0x06054b50);put16(e,4,0);put16(e,6,0);put16(e,8,files.length);put16(e,10,files.length);put32(e,12,centralBytes.length);put32(e,16,offset);put16(e,20,0);return concat([...parts,centralBytes,e])}
 function makeXlsxBytesForStudent(name){const files=[{name:'[Content_Types].xml',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/worksheets/sheet3.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/worksheets/sheet4.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`},{name:'_rels/.rels',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`},{name:'xl/workbook.xml',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="予定入力" sheetId="1" r:id="rId1"/><sheet name="模試確認" sheetId="2" r:id="rId2"/><sheet name="イベント確認" sheetId="3" r:id="rId3"/><sheet name="コメント確認" sheetId="4" r:id="rId4"/></sheets></workbook>`},{name:'xl/_rels/workbook.xml.rels',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet3.xml"/><Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet4.xml"/><Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`},{name:'xl/styles.xml',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Yu Gothic"/></font><font><b/><sz val="11"/><name val="Yu Gothic"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFEFF6FF"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"/><right style="thin"/><top style="thin"/><bottom style="thin"/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"><alignment wrapText="1" vertical="top"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`},{name:'xl/worksheets/sheet1.xml',data:buildPlanSheetXml(name)},{name:'xl/worksheets/sheet2.xml',data:buildExamSheetXml(name)},{name:'xl/worksheets/sheet3.xml',data:buildEventSheetXml(name)},{name:'xl/worksheets/sheet4.xml',data:buildCommentSheetXml(name)}];return zipBytes(files)}
 function safeFileName(s){return String(s||'').replace(/[\\/:*?"<>|]/g,'_')}
-function exportAll(){
-  alert('安全のため、複数生徒名を含むZIP出力は削除しました。⑤保存で各生徒フォルダーへ直接保存してください。');
-}
-
-
 /* =========================================================
    8. Excelを既存の生徒名フォルダへ直接保存
 ========================================================= */
@@ -7571,7 +7570,7 @@ table{border-collapse:collapse;width:100%;font-size:10.5px}th,td{border:1px soli
 /* ============================================================
    追加修正: 上部操作ボタンを画面内に収める
    - 1段目: 助手名 / 生徒一覧 / 生徒名 / 開始日
-   - 2段目: 生徒欄作成 / 前回復元 / 保存 / 予備ZIP
+   - 2段目: 生徒欄作成 / 前回復元 / 保存
    - 生徒名欄を広く、助手名欄は小さく固定
    ============================================================ */
 .topActions{
@@ -8353,10 +8352,6 @@ initV30ClassicHorizontalUX();
 </script>
 
 
-<!-- 初期フォルダーZIP出力機能は、生徒名混入防止のため削除済み。 -->
-
-
-
 <!-- =========================================================
      追加修正: ログを画面上部/中央に出さず、普段は右下に隠す
      ========================================================= -->
@@ -8784,7 +8779,6 @@ async function expandMasterTargetStudents(row, kind){
    - 復元時プロフィール優先順位を明確化：JSON → 個人Excel → 対応表
    - 対応表の読取場所を 保存復元直下 / 対応表フォルダー の両方へ拡張
    - 同姓複数候補は自動補完せずログ化
-   - 古いZIP出力関数を安全停止
 ========================================================= */
 const INPUT_PROFILE_RESTORE_AUDIT_VERSION = '2026-08-20 18:55';
 let LAST_PROFILE_RESTORE_LOGS = [];
@@ -9224,24 +9218,16 @@ async function loadGroup(){
   alert(`内容を復元しました。\n復元元：${place}`);
 }
 
-function exportAll(){
-  alert('安全のため、複数生徒名を含むZIP出力は使いません。⑤保存で各生徒フォルダーへ直接保存してください。');
-}
-
 try{
   const oldBindGlobalEvents = bindGlobalEvents;
   bindGlobalEvents = function(){
     oldBindGlobalEvents();
     const btn=$('#loadGroupMemory');
     if(btn) btn.onclick=loadGroup;
-    const exp=$('#exportAll');
-    if(exp) exp.onclick=exportAll;
   };
   // init() はこの精査パッチより前に実行済みのため、既存ボタンへも即時に再バインドする。
   const btn=$('#loadGroupMemory');
   if(btn) btn.onclick=loadGroup;
-  const exp=$('#exportAll');
-  if(exp) exp.onclick=exportAll;
 }catch(e){}
 </script>
 
