@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>面談予定入力・準備資料アプリ （日付ずれ予定復元対応版）</title>
+<title>面談予定入力・準備資料アプリ v38（日付ずれ予定復元対応版）</title>
 <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
 <script src="./libs/xlsx.bundle.js"></script>
 <script></script>
@@ -3548,17 +3548,66 @@ function deleteSubjectTemplateFromEditor(){
 ========================================================= */
 function indivKey(name){return `yoteiStudentMemory:${name}`}
 function groupKey(){return `yoteiGroupMemory:${students.join('|')}`}
-function attachScheduleDateMetadata(data){
+function oldScheduleByDateFromMemory(mem){
+  const out={};
+  if(!mem || typeof mem !== 'object') return out;
+  if(mem.scheduleByDate && typeof mem.scheduleByDate === 'object'){
+    Object.entries(mem.scheduleByDate).forEach(([date,row])=>{
+      if(/^\d{4}-\d{2}-\d{2}$/.test(String(date||'')) && Array.isArray(row)){
+        out[date]=Array.from({length:6},(_,i)=>row?.[i]||'');
+      }
+    });
+  }
+  if(Array.isArray(mem.scheduleDates) && Array.isArray(mem.schedule)){
+    Object.assign(out, scheduleByDateFromSchedule(mem.schedule, mem.scheduleDates));
+  }else if(Array.isArray(mem.schedule) && mem.weekStart){
+    const base=localDateOnlyValue(mem.weekStart);
+    if(base){
+      const dates=Array.from({length:7},(_,i)=>{const d=new Date(base); d.setDate(base.getDate()+i); return ymd(d);});
+      Object.assign(out, scheduleByDateFromSchedule(mem.schedule, dates));
+    }
+  }
+  return out;
+}
+function mergeScheduleArchive(previousMem, currentSchedule, currentDates){
+  const merged=oldScheduleByDateFromMemory(previousMem);
+  const current=scheduleByDateFromSchedule(currentSchedule||[], currentDates||[]);
+  (currentDates||[]).forEach(date=>{
+    if(date) merged[date]=Array.from({length:6},(_,i)=>current?.[date]?.[i]||'');
+  });
+  return merged;
+}
+function attachScheduleDateMetadata(data, previousMem=null){
   const d=Object.assign({}, data||{});
   const weekStart=safeInputWeekStartValueForSave();
+  const dates=inputCurrentScheduleDatesForSave();
   d.weekStart=weekStart;
-  d.scheduleDates=inputCurrentScheduleDatesForSave();
-  d.scheduleByDate=scheduleByDateFromSchedule(d.schedule||[], d.scheduleDates);
+  d.scheduleDates=dates;
+  d.scheduleByDate=mergeScheduleArchive(previousMem, d.schedule||[], dates);
   return d;
 }
-function buildIndividualMemory(name,savedAt=new Date().toISOString()){
+function buildIndividualMemory(name,savedAt=new Date().toISOString(), previousMem=null){
   syncFromDom();
-  return Object.assign({studentName:name,weekStart:safeInputWeekStartValueForSave(),savedAt},attachScheduleDateMetadata(ensureStudent(name)));
+  const prev = previousMem || loadOneFromBrowser(name);
+  return Object.assign({studentName:name,weekStart:safeInputWeekStartValueForSave(),savedAt},attachScheduleDateMetadata(ensureStudent(name), prev));
+}
+function mergeIndividualMemoryWithPrevious(currentMem, previousMem){
+  if(!currentMem) return currentMem;
+  const dates=Array.isArray(currentMem.scheduleDates) ? currentMem.scheduleDates : inputCurrentScheduleDatesForSave();
+  currentMem.scheduleByDate=mergeScheduleArchive(previousMem, currentMem.schedule||[], dates);
+  currentMem.scheduleDates=dates;
+  return currentMem;
+}
+function mergeGroupMemoryWithPrevious(currentMem, previousGroupMem){
+  if(!currentMem || !previousGroupMem) return currentMem;
+  const prevStudentData=previousGroupMem.studentData || {};
+  currentMem.studentData = currentMem.studentData || {};
+  (currentMem.names||students).forEach(name=>{
+    const cur=currentMem.studentData[name];
+    const prev=prevStudentData[name] || null;
+    if(cur) mergeIndividualMemoryWithPrevious(cur, prev);
+  });
+  return currentMem;
 }
 function saveOneToBrowser(name,savedAt=new Date().toISOString()){
   if(!name)return false;
@@ -3570,20 +3619,24 @@ function loadOneFromBrowser(name){
   const s=localStorage.getItem(indivKey(name));
   return s?JSON.parse(s):null;
 }
-function buildGroupMemory(savedAt=new Date().toISOString()){
+function buildGroupMemory(savedAt=new Date().toISOString(), previousGroupMem=null){
   syncFromDom();
-  return {
+  let prev=previousGroupMem;
+  if(!prev){try{prev=JSON.parse(localStorage.getItem(groupKey())||'null');}catch(e){prev=null;}}
+  const prevStudentData=prev?.studentData || {};
+  const mem={
     version:2,
     type:'group',
     targetRestoreVersion:MASTER_TARGET_RESTORE_VERSION,
     names:students,
     weekStart:safeInputWeekStartValueForSave(),
     scheduleDates:inputCurrentScheduleDatesForSave(),
-    studentData:Object.fromEntries(students.map(n=>[n,attachScheduleDateMetadata(ensureStudent(n))])),
+    studentData:Object.fromEntries(students.map(n=>[n,attachScheduleDateMetadata(ensureStudent(n), prevStudentData[n]||null)])),
     examMaster:getExamMaster(),eventMaster:getEventMaster(),examTargetHistory:getExamTargetHistory(),eventTargetHistory:getEventTargetHistory(),commentMaster:getCommentMaster(),commentTargetHistory:getCommentTargetHistory(),
     subjectTemplates:getSubjectTemplates(),
     savedAt
   };
+  return mem;
 }
 function saveGroupToBrowser(mem){
   localStorage.setItem(groupKey(),JSON.stringify(mem));
@@ -3598,6 +3651,8 @@ async function saveOne(name,showAlert=true){
   let place='ブラウザ内';
   if(sharedDirHandle){
     try{
+      const existingShared = await readJsonFromShared(sharedStudentFileName(name));
+      mergeIndividualMemoryWithPrevious(mem, existingShared);
       await writeJsonToShared(sharedStudentFileName(name),mem);
       await writeMasterSettingsFilesToShared(buildMasterSettingsPayload(savedAt));
       place='保存用フォルダ＋ブラウザ内';
@@ -4626,28 +4681,21 @@ async function readStudentJsonFromSharedByName(name){
   }
   return {mem:null, source:''};
 }
-function buildSharedGroupMemory(){
+function buildSharedGroupMemory(previousGroupMem=null){
   syncFromDom();
-  return {
-    version:2,
-    type:'group',
-    targetRestoreVersion:MASTER_TARGET_RESTORE_VERSION,
-    names:students,
-    weekStart:safeInputWeekStartValueForSave(),
-    scheduleDates:inputCurrentScheduleDatesForSave(),
-        studentData:Object.fromEntries(students.map(n=>[n,attachScheduleDateMetadata(ensureStudent(n))])),
-    examMaster:getExamMaster(),eventMaster:getEventMaster(),examTargetHistory:getExamTargetHistory(),eventTargetHistory:getEventTargetHistory(),commentMaster:getCommentMaster(),commentTargetHistory:getCommentTargetHistory(),
-    subjectTemplates:getSubjectTemplates(),
-    savedAt:new Date().toISOString()
-  };
+  const savedAt=new Date().toISOString();
+  return buildGroupMemory(savedAt, previousGroupMem);
 }
 async function saveSharedFolder(){
   if(!students.length)return alert('先に生徒名を入力してください。');
   try{
-    const groupMem = buildSharedGroupMemory();
+    const existingGroup = await readJsonFromShared(sharedGroupFileName(students));
+    const groupMem = buildSharedGroupMemory(existingGroup);
     await writeJsonToShared(sharedGroupFileName(students), groupMem);
     for(const name of students){
-      const mem=Object.assign({studentName:name,weekStart:safeInputWeekStartValueForSave(),savedAt:groupMem.savedAt},attachScheduleDateMetadata(ensureStudent(name)));
+      const existingStudent = await readJsonFromShared(sharedStudentFileName(name));
+      const groupPrev = existingGroup?.studentData?.[name] || null;
+      const mem=Object.assign({studentName:name,weekStart:safeInputWeekStartValueForSave(),savedAt:groupMem.savedAt},attachScheduleDateMetadata(ensureStudent(name), existingStudent || groupPrev));
       await writeJsonToShared(sharedStudentFileName(name), mem);
     }
     await writeMasterSettingsFilesToShared(buildMasterSettingsPayload(groupMem.savedAt));
@@ -4740,11 +4788,14 @@ function currentHasMeaningfulData(names){
 async function saveAllCurrentDataToShared(showAlert=false){
   if(!students.length) return false;
   cleanupOldEventMasterRows(1);
-  const mem=buildSharedGroupMemory();
+  const existingGroup = await readJsonFromShared(sharedGroupFileName(students));
+  const mem=buildSharedGroupMemory(existingGroup);
   saveGroupToBrowser(mem);
   await writeJsonToShared(sharedGroupFileName(students), mem);
   for(const name of students){
-    await writeJsonToShared(sharedStudentFileName(name), buildIndividualMemory(name, mem.savedAt));
+    const existingStudent = await readJsonFromShared(sharedStudentFileName(name));
+    const groupPrev = existingGroup?.studentData?.[name] || null;
+    await writeJsonToShared(sharedStudentFileName(name), buildIndividualMemory(name, mem.savedAt, existingStudent || groupPrev));
   }
   await writeMasterSettingsFilesToShared(buildMasterSettingsPayload(mem.savedAt));
   if(showAlert){
