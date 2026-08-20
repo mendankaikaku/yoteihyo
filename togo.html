@@ -2202,9 +2202,30 @@ function filterExamEventRecordsByCurrentMasters(examRecords=[], eventRecords=[],
 // マスタ登録だけで全員分リストに出るように、マスタ対象者分の確認レコードを補完する。
 // 既存の個人Excelに同じ模試/イベントがある場合は、そちらの回答を優先して、足りない対象者だけ「未」で追加する。
 function masterTargetListFromRaw(raw, keyA, keyB){
-  const v = raw ? (raw[keyA] ?? raw[keyB] ?? '') : '';
-  if(Array.isArray(v)) return v.map(x=>norm(x)).filter(Boolean);
-  return String(v || '').split(/[、,\n\r\t;；／\/]+/).map(x=>norm(x)).filter(Boolean);
+  const keys = [];
+  [keyA, keyB].forEach(k => { if(k && !keys.includes(k)) keys.push(k); });
+  return masterTargetListFromRawKeys(raw, keys);
+}
+function masterTargetListFromRawKeys(raw, keys=[]){
+  if(!raw || typeof raw !== 'object') return [];
+  const values = [];
+  for(const k of keys || []){
+    if(!k) continue;
+    if(Object.prototype.hasOwnProperty.call(raw, k)) values.push(raw[k]);
+  }
+  const out = [];
+  function addOne(v){
+    if(v == null) return;
+    if(Array.isArray(v)){ v.forEach(addOne); return; }
+    if(typeof v === 'object'){
+      const cand = v.name ?? v.studentName ?? v.examName ?? v.eventName ?? v.label ?? v.value ?? '';
+      addOne(cand);
+      return;
+    }
+    String(v || '').split(/[、,\n\r\t;；／\/]+/).map(x=>norm(x)).filter(Boolean).forEach(x=>out.push(x));
+  }
+  values.forEach(addOne);
+  return [...new Set(out)];
 }
 
 function masterNormalizeGradeForMatch(v){
@@ -2215,7 +2236,17 @@ function masterNormalizeGradeForMatch(v){
   return s;
 }
 function masterGradeListFromRaw(raw, keyA, keyB){
-  return masterTargetListFromRaw(raw, keyA, keyB).map(masterNormalizeGradeForMatch).filter(Boolean);
+  const keys = [keyA, keyB, 'grades', 'targetGrades', 'targetGrade', 'gradeTargets', 'grade', '学年', '対象学年', '対象学年名'];
+  return masterTargetListFromRawKeys(raw, keys).map(masterNormalizeGradeForMatch).filter(Boolean);
+}
+function masterStudentListFromRaw(raw){
+  return masterTargetListFromRawKeys(raw, ['students','studentNames','targetStudents','targetStudentNames','targetNames','names','生徒','生徒名','対象生徒','対象生徒名']);
+}
+function masterSchoolListFromRaw(raw){
+  return masterTargetListFromRawKeys(raw, ['schools','schoolNames','targetSchools','targetSchoolNames','高校','高校名','対象高校','対象高校名']);
+}
+function masterAssistantListFromRaw(raw){
+  return masterTargetListFromRawKeys(raw, ['assistants','assistantNames','targetAssistants','targetAssistantNames','担任助手','担任助手名','対象担任助手','対象助手','助手','助手名']);
 }
 function masterStudentNameMatches(studentName, targetNames){
   if(!targetNames || !targetNames.length) return true;
@@ -2247,9 +2278,9 @@ function masterRosterCandidatesForSeed(){
 function examMasterRowTargetsRosterMeta(master, meta){
   const raw = master?.raw || {};
   const grades = masterGradeListFromRaw(raw, 'grades', 'targetGrades');
-  const students = masterTargetListFromRaw(raw, 'students', 'studentNames');
-  const schools = masterTargetListFromRaw(raw, 'schools', 'schoolNames');
-  const assistants = masterTargetListFromRaw(raw, 'assistants', 'assistantNames');
+  const students = masterStudentListFromRaw(raw);
+  const schools = masterSchoolListFromRaw(raw);
+  const assistants = masterAssistantListFromRaw(raw);
   const hasTarget = grades.length || students.length || schools.length || assistants.length;
   const grade = masterNormalizeGradeForMatch(meta['学年'] || '');
   const name = norm(meta['生徒名'] || meta['氏名'] || '');
@@ -2263,13 +2294,14 @@ function examMasterRowTargetsRosterMeta(master, meta){
 function eventMasterRowTargetsRosterMeta(master, meta){
   const raw = master?.raw || {};
   const grades = masterGradeListFromRaw(raw, 'grades', 'targetGrades');
-  const students = masterTargetListFromRaw(raw, 'students', 'studentNames');
-  const schools = masterTargetListFromRaw(raw, 'schools', 'schoolNames');
-  const assistants = masterTargetListFromRaw(raw, 'assistants', 'assistantNames');
+  const students = masterStudentListFromRaw(raw);
+  const schools = masterSchoolListFromRaw(raw);
+  const assistants = masterAssistantListFromRaw(raw);
   const hasTarget = grades.length || students.length || schools.length || assistants.length;
   const grade = masterNormalizeGradeForMatch(meta['学年'] || '');
   const name = norm(meta['生徒名'] || meta['氏名'] || '');
   if(!hasTarget) return false;
+  // イベントは現在のイベントマスタを正本にする。対象学年がある場合、1・2年へ絶対に漏らさない。
   if(grades.length && (!grade || !grades.includes(grade))) return false;
   if(students.length) return masterStudentNameMatches(name, students);
   // 入力用と同じ扱い：高校/助手だけ指定は「対象生徒名へ一括追加するためだけ」なので、単独では出さない。
