@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>面談予定入力・準備資料アプリ v38（日付ずれ予定復元対応版）</title>
+<title>面談予定入力アプリ_対応表プロフィール復元強化版_2026-08-20 18:42出力</title>
 <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
 <script src="./libs/xlsx.bundle.js"></script>
 <script></script>
@@ -1497,13 +1497,72 @@ async function refreshRosterProfilesFromShared(force=false){
   })();
   return ROSTER_PROFILE_CACHE.loading;
 }
+function findRosterProfileForInputName(name, data=null){
+  const rawKey=profileKey(name);
+  if(!rawKey) return null;
+  const no=String(data?.studentNo||'').trim();
+  if(no){
+    const byNo=ROSTER_PROFILE_CACHE.byNo.get(`no:${no}`);
+    if(byNo) return byNo;
+  }
+  const direct=ROSTER_PROFILE_CACHE.byName.get(rawKey);
+  if(direct) return direct;
+
+  // 対応表はフルネーム、生徒フォルダ/入力欄は「苗字」または「苗字＋一文字」のことがある。
+  // 例：入力欄「稲田」/ フォルダ「稲田」 ↔ 対応表「稲田〇〇」
+  // ただし同じ苗字が複数人いる場合は誤反映防止のため自動採用しない。
+  const candidates=[];
+  const seen=new Set();
+  (ROSTER_PROFILE_CACHE.profiles||[]).forEach(p=>{
+    const fullKey=profileKey(p.name || p.fullName || '');
+    const inputKey=profileKey(p.inputName || '');
+    if(!fullKey && !inputKey) return;
+    const matched = fullKey===rawKey || inputKey===rawKey || (rawKey.length>=2 && fullKey.startsWith(rawKey));
+    if(matched){
+      const unique=String(p.studentNo||'') || fullKey || inputKey;
+      if(!seen.has(unique)){seen.add(unique); candidates.push(p);}
+    }
+  });
+  if(candidates.length===1) return candidates[0];
+  return null;
+}
 function getKnownStudentProfile(name){
   const data=studentData && studentData[name] ? studentData[name] : null;
-  const no=String(data?.studentNo||'').trim();
-  const byNo=no?ROSTER_PROFILE_CACHE.byNo.get(`no:${no}`):null;
-  const byName=ROSTER_PROFILE_CACHE.byName.get(profileKey(name));
+  const p=findRosterProfileForInputName(name, data);
   const mapAssistant=Object.entries(ASSISTANT_STUDENT_MAP_FOR_INPUT||{}).find(([a,list])=>(list||[]).some(st=>profileKey(st)===profileKey(name)))?.[0]||'';
-  return Object.assign({}, byName||{}, byNo||{}, {name, studentNo:no||byNo?.studentNo||byName?.studentNo||'', grade:data?.grade||byNo?.grade||byName?.grade||'', school:data?.school||byNo?.school||byName?.school||'', assistant:data?.assistant||byNo?.assistant||byName?.assistant||mapAssistant});
+  return Object.assign({}, p||{}, {
+    name,
+    studentNo:String(data?.studentNo||'').trim() || p?.studentNo || '',
+    grade:String(data?.grade||'').trim() || p?.grade || '',
+    school:String(data?.school||'').trim() || p?.school || '',
+    assistant:String(data?.assistant||'').trim() || p?.assistant || mapAssistant || ''
+  });
+}
+function mergeRosterProfileIntoStudentData(name, data){
+  const d=normalizeStudentData(data||{});
+  const p=findRosterProfileForInputName(name, d);
+  if(!p) return {data:d, changed:[], matched:false, ambiguous:false};
+  const changed=[];
+  if(!String(d.studentNo||'').trim() && String(p.studentNo||'').trim()){ d.studentNo=String(p.studentNo).trim(); changed.push('生徒番号'); }
+  if(!String(d.grade||'').trim() && String(p.grade||'').trim()){ d.grade=String(p.grade).trim(); changed.push('学年'); }
+  if(!String(d.school||'').trim() && String(p.school||'').trim()){ d.school=String(p.school).trim(); changed.push('高校'); }
+  if(!String(d.assistant||'').trim() && String(p.assistant||'').trim()){ d.assistant=String(p.assistant).trim(); changed.push('担任助手'); }
+  return {data:d, changed, matched:true, profile:p};
+}
+function applyRosterProfilesToStudents(names){
+  const filled=[];
+  const noMatch=[];
+  (names||students||[]).forEach(name=>{
+    const current=ensureStudent(name);
+    const res=mergeRosterProfileIntoStudentData(name, current);
+    studentData[name]=res.data;
+    if(res.changed && res.changed.length){
+      filled.push(`${name}: ${res.changed.join('・')}`);
+    }else if(!res.matched){
+      noMatch.push(name);
+    }
+  });
+  return {filled, noMatch};
 }
 function studentsForSchools(schools){
   const inputSchools=(schools||[]).map(s=>String(s||'').trim()).filter(Boolean);
@@ -2635,7 +2694,7 @@ function addScheduleRow(kind,name){
 ========================================================= */
 function syncFromDom(){if(!students.length)return; students.forEach(name=>{const card=document.querySelector(`[data-student-card="${cssEscape(name)}"]`); if(!card)return; const data=ensureStudent(name); data.grade=card.querySelector('[data-kind="grade"]')?.value||''; data.studentNo=card.querySelector('[data-kind="studentNo"]')?.value||''; data.school=card.querySelector('[data-kind="school"]')?.value||''; data.assistant=card.querySelector('[data-kind="assistant"]')?.value||''; data.schedule=Array.from({length:7},(_,d)=>LIMITS.map((_,r)=>card.querySelector(`textarea[data-kind="schedule"][data-day="${d}"][data-row="${r}"]`)?.value||'')); data.materials=Array.from(card.querySelectorAll('tbody[data-material-body] tr')).map((tr,i)=>({subject:tr.querySelector(`[data-kind="subj"]`)?.value||'',book:tr.querySelector(`[data-kind="book"]`)?.value||'',content:tr.querySelector(`[data-kind="content"]`)?.value||''})); if(!data.materials.length)data.materials=[{subject:'',book:'',content:''}]; data.remarks=card.querySelector('textarea[data-kind="remarks"]')?.value||''; data.failureReason=card.querySelector('textarea[data-kind="failureReason"]')?.value||''; data.weeklyMeetingAbsent=!!card.querySelector('input[data-kind="weeklyMeetingAbsent"]')?.checked; data.exams=getExamInputsForCard(card); data.events=getEventInputsForCard(card); data.comments=getCommentInputsForCard(card);});}
 function cssEscape(s){return String(s).replace(/\\/g,'\\\\').replace(/"/g,'\\"')}
-function fillStudentValues(name){const card=document.querySelector(`[data-student-card="${cssEscape(name)}"]`);if(!card)return; const data=ensureStudent(name); const gradeEl=card.querySelector('[data-kind="grade"]'); if(gradeEl)gradeEl.value=data.grade||''; const noEl=card.querySelector('[data-kind="studentNo"]'); if(noEl)noEl.value=data.studentNo||''; const schoolEl=card.querySelector('[data-kind="school"]'); if(schoolEl)schoolEl.value=data.school||getKnownStudentProfile(name).school||''; const assistantEl=card.querySelector('[data-kind="assistant"]'); if(assistantEl)assistantEl.value=data.assistant||getKnownStudentProfile(name).assistant||''; data.schedule.forEach((day,d)=>day.forEach((v,r)=>{const el=card.querySelector(`textarea[data-kind="schedule"][data-day="${d}"][data-row="${r}"]`);if(el)el.value=v||''})); (data.materials||[]).forEach((m,i)=>{const tr=card.querySelectorAll('tbody[data-material-body] tr')[i]; if(!tr)return; tr.querySelector('[data-kind="subj"]').value=m.subject||''; tr.querySelector('[data-kind="book"]').value=m.book||''; tr.querySelector('[data-kind="content"]').value=m.content||'';}); const rem=card.querySelector('textarea[data-kind="remarks"]'); if(rem)rem.value=data.remarks||''; const fr=card.querySelector('textarea[data-kind="failureReason"]'); if(fr)fr.value=data.failureReason||''; const absent=card.querySelector('input[data-kind="weeklyMeetingAbsent"]'); if(absent)absent.checked=!!data.weeklyMeetingAbsent; applyExamValuesToCard(card,data.exams||[]); applyEventValuesToCard(card,data.events||[]); applyCommentValuesToCard(card,data.comments||[]);}
+function fillStudentValues(name){const card=document.querySelector(`[data-student-card="${cssEscape(name)}"]`);if(!card)return; const data=ensureStudent(name); const prof=getKnownStudentProfile(name); const gradeEl=card.querySelector('[data-kind="grade"]'); if(gradeEl)gradeEl.value=data.grade||prof.grade||''; const noEl=card.querySelector('[data-kind="studentNo"]'); if(noEl)noEl.value=data.studentNo||prof.studentNo||''; const schoolEl=card.querySelector('[data-kind="school"]'); if(schoolEl)schoolEl.value=data.school||prof.school||''; const assistantEl=card.querySelector('[data-kind="assistant"]'); if(assistantEl)assistantEl.value=data.assistant||prof.assistant||''; data.schedule.forEach((day,d)=>day.forEach((v,r)=>{const el=card.querySelector(`textarea[data-kind="schedule"][data-day="${d}"][data-row="${r}"]`);if(el)el.value=v||''})); (data.materials||[]).forEach((m,i)=>{const tr=card.querySelectorAll('tbody[data-material-body] tr')[i]; if(!tr)return; tr.querySelector('[data-kind="subj"]').value=m.subject||''; tr.querySelector('[data-kind="book"]').value=m.book||''; tr.querySelector('[data-kind="content"]').value=m.content||'';}); const rem=card.querySelector('textarea[data-kind="remarks"]'); if(rem)rem.value=data.remarks||''; const fr=card.querySelector('textarea[data-kind="failureReason"]'); if(fr)fr.value=data.failureReason||''; const absent=card.querySelector('input[data-kind="weeklyMeetingAbsent"]'); if(absent)absent.checked=!!data.weeklyMeetingAbsent; applyExamValuesToCard(card,data.exams||[]); applyEventValuesToCard(card,data.events||[]); applyCommentValuesToCard(card,data.comments||[]);}
 function bindInputs(){
   $$('input,textarea,select').forEach(el=>{
     el.oninput=()=>{
@@ -4105,6 +4164,10 @@ async function loadGroup(){
   const dir = await pickSaveRootFolder(true);
   if(dir){
     try{
+      // 復元ボタンでは、まず対応表と生徒フォルダ名候補を読む。
+      // 対応表はフルネーム、生徒フォルダは苗字/苗字＋一文字になりやすいため、ここで照合材料を揃える。
+      await refreshDynamicStudentNameCandidatesFromFolder(dir);
+      await refreshRosterProfilesFromShared(true);
       await applySharedSettingsIfAny();
       const groupHit=await readGroupJsonFromSharedByNames(names);
       if(groupHit.mem){
@@ -4200,6 +4263,13 @@ async function loadGroup(){
   students=[...names];
   $('#studentNames').value=students.join(', ');
   Object.assign(studentData, applyRestoredStudentMapForInput(mem.studentData||{}));
+  const rosterProfileResult = applyRosterProfilesToStudents(students);
+  if(rosterProfileResult.filled.length){
+    details.push(`対応表から空欄プロフィールを補完: ${rosterProfileResult.filled.slice(0,30).join(' / ')}${rosterProfileResult.filled.length>30?' / 他'+(rosterProfileResult.filled.length-30)+'件':''}`);
+  }
+  if(dir && !ROSTER_PROFILE_CACHE.profiles.length){
+    details.push('対応表プロフィール補完: 対応表ファイルを読めませんでした（対応表フォルダーまたは見出しを確認）');
+  }
   // 重要：個人JSON / group JSON内のマスタ情報は、復元時に採用しない。
   // マスタは保存復元フォルダー/json の standalone マスタJSONだけを正とする。
   // 古い group JSON に空の eventMaster が残っていると、復元時に最新イベントマスタを消してしまうため。
@@ -5646,6 +5716,10 @@ async function applyAllStudentListOverridesToInput(names){
 
 async function restoreInterviewDataFromShared(names){
   if(!names.length) return {restored:false, missing:[], mode:'none'};
+  if(sharedDirHandle){
+    await refreshDynamicStudentNameCandidatesFromFolder(sharedDirHandle);
+    await refreshRosterProfilesFromShared(true);
+  }
   await applySharedSettingsIfAny();
   const groupMem=await readJsonFromShared(sharedGroupFileName(names));
   if(groupMem){
@@ -5653,6 +5727,7 @@ async function restoreInterviewDataFromShared(names){
     $('#studentNames').value=students.join(', ');
     if(groupMem.weekStart) meetingPrepRestoredWeekStart = groupMem.weekStart;
     Object.assign(studentData, applyRestoredStudentMapForInput(groupMem.studentData||{}));
+    applyRosterProfilesToStudents(students);
     // 個人JSON / group JSON内のマスタ情報は復元しない。
     // 保存復元フォルダー/json の event_master.json / settings_exam_master.json だけを正とする。
     applyExamMasterFromRestoredMemory(groupMem, 'グループJSON');
@@ -5674,6 +5749,7 @@ async function restoreInterviewDataFromShared(names){
     students=names;
     $('#studentNames').value=students.join(', ');
     Object.assign(studentData, applyRestoredStudentMapForInput(collected));
+    applyRosterProfilesToStudents(students);
     await applyAllStudentListOverridesToInput(students);
     renderStudents();
     return {restored:true, missing, mode:'individuals'};
