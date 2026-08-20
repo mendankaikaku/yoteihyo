@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>面談予定入力アプリ（2026-08-20 20:53 出力）</title>
+<title>面談予定入力アプリ（2026-08-20 21:03 出力）</title>
 <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
 <script src="./libs/xlsx.bundle.js"></script>
 <script></script>
@@ -2405,12 +2405,6 @@ async function findStudentFoldersRecursive(root, studentName, maxDepth=5){
   const target=String(studentName||'').trim();
   const normalizedTarget=normalizeFolderNameForMatch(target);
   const matches=[];
-  const rootLabel=root?.name||'選択フォルダ';
-  const rootNorm=normalizeFolderNameForMatch(rootLabel);
-  // ④で生徒フォルダそのものを選んだ場合も拾う。既存の下位探索条件は変えない。
-  if(normalizedTarget && rootNorm && (rootNorm===normalizedTarget || rootNorm.includes(normalizedTarget) || normalizedTarget.includes(rootNorm))){
-    matches.push({dir:root, label:rootLabel, selectedSelf:true});
-  }
   async function walk(dir, pathParts, depth){
     if(!dir || depth<0 || !dir.entries) return;
     for await (const [entryName, handle] of dir.entries()){
@@ -2423,7 +2417,7 @@ async function findStudentFoldersRecursive(root, studentName, maxDepth=5){
       await walk(handle, nextPath, depth-1);
     }
   }
-  await walk(root, [rootLabel], maxDepth);
+  await walk(root, [root.name||'選択フォルダ'], maxDepth);
   return matches;
 }
 async function findGoukakuPdfInStudentFolder(studentDir){
@@ -2471,25 +2465,6 @@ async function findGoukakuExcelInStudentFolder(studentDir){
   });
   return candidates[0] || null;
 }
-async function listGoukakuCandidateFilesForLog(studentDir){
-  const out=[];
-  if(!studentDir || !studentDir.entries) return out;
-  try{
-    for await (const [entryName, handle] of studentDir.entries()){
-      if(handle.kind !== 'file') continue;
-      if(/^~\$/.test(entryName)) continue;
-      if(/\.(xlsx|xlsm|xls|pdf)$/i.test(entryName)){
-        out.push(entryName);
-      }
-    }
-  }catch(e){}
-  return out.sort((a,b)=>a.localeCompare(b,'ja'));
-}
-function goukakuDebugHtml(item){
-  const logs=Array.isArray(item?.debugLog)?item.debugLog.filter(Boolean):[];
-  if(!logs.length) return '';
-  return `<details class="goukakuDebugBox" open><summary>合格設計図 探索ログ</summary><pre>${escapeHtml(logs.join('\n'))}</pre></details>`;
-}
 function pickGoukakuDesignSheetName(wb){
   const names=(wb&&wb.SheetNames)?wb.SheetNames:[];
   if(!names.length) return '';
@@ -2512,76 +2487,38 @@ async function loadGoukakuDesignsFromRoot(root, names=students){
   if(!root || !names || !names.length) return {loaded:[],missing:[],failed:[],duplicate:[]};
   const loaded=[], missing=[], failed=[], duplicate=[];
   for(const name of names){
-    const debug=[];
     try{
-      debug.push(`対象生徒: ${name}`);
-      debug.push(`選択フォルダ: ${root?.name || '不明'}`);
-      debug.push('生徒フォルダ探索: 開始（選択フォルダ自身＋下位フォルダ 最大5階層）');
       const dirs=await findStudentFoldersRecursive(root, name, 5);
-      debug.push(`生徒フォルダ探索: ${dirs.length}件${dirs.length ? ' → ' + dirs.map(d=>d.label).join(' / ') : ''}`);
-      if(!dirs.length){
-        const msg=`${name}: 生徒フォルダなし`;
-        missing.push(msg);
-        goukakuDesignSheets[name]={error:'生徒名フォルダが見つかりません。', debugLog:debug};
-        renderGoukakuPanel(name);
-        continue;
-      }
-      if(dirs.length>1){
-        const msg=`${name}: ${dirs.map(d=>d.label).join(' / ')}`;
-        duplicate.push(msg);
-        debug.push('判定: 同じ生徒名っぽいフォルダが複数あるため安全停止');
-        goukakuDesignSheets[name]={error:'同じ生徒名フォルダが複数見つかったため読み込みませんでした。', debugLog:debug};
-        renderGoukakuPanel(name);
-        continue;
-      }
+      if(!dirs.length){missing.push(`${name}: 生徒フォルダなし`);goukakuDesignSheets[name]={error:'生徒名フォルダが見つかりません。'};renderGoukakuPanel(name);continue;}
+      if(dirs.length>1){duplicate.push(`${name}: ${dirs.map(d=>d.label).join(' / ')}`);goukakuDesignSheets[name]={error:'同じ生徒名フォルダが複数見つかったため読み込みませんでした。'};renderGoukakuPanel(name);continue;}
       const studentDir=dirs[0].dir;
-      const candidateNames=await listGoukakuCandidateFilesForLog(studentDir);
-      debug.push(`生徒フォルダ直下のExcel/PDF候補: ${candidateNames.length ? candidateNames.join('、') : 'なし'}`);
       const pdfHit=await findGoukakuPdfInStudentFolder(studentDir);
       const excelHit=await findGoukakuExcelInStudentFolder(studentDir);
-      debug.push(`合格設計図PDF判定: ${pdfHit ? '発見 → ' + pdfHit.name : '未検出（ファイル名に「合格設計図」を含むPDFなし）'}`);
-      debug.push(`合格設計図Excel判定: ${excelHit ? '発見 → ' + excelHit.name : '未検出（ファイル名に「合格設計図」を含むExcelなし）'}`);
       const printPdf=pdfHit ? await readGoukakuPdfPrintSource(pdfHit) : null;
-      if(printPdf) debug.push('印刷用PDF: 読込OK');
       revokeGoukakuPdfUrls(goukakuDesignSheets[name]);
 
       // 画面編集用は Excel 優先（アプリ編集済みExcel → 通常Excel → PDF）。印刷用は PDF があれば常にPDFを優先する。
       if(excelHit){
-        debug.push('Excel読込: 開始');
         const file=await excelHit.handle.getFile();
         const parsed=await readGoukakuExcelFile(file);
-        debug.push(`Excel読込: OK / シート=${parsed.sheetName || '不明'}`);
-        const item={kind:'excel',fileName:excelHit.name,sheetName:parsed.sheetName,aoa:parsed.aoa,model:parsed.model,workbook:parsed.workbook,fileHandle:excelHit.handle,dirHandle:studentDir,path:dirs[0].label,dirty:false,editedCells:{},printPdf,debugLog:debug};
-        let planMsg='通期講座抽出: 診断関数未読込';
-        try{
-          if(typeof window.goukakuCoursePlanDiagnostic === 'function'){
-            const d=window.goukakuCoursePlanDiagnostic(item);
-            planMsg=d?.ok ? `通期講座抽出: OK / 見出し=${d.headerRows}行 / 講座=${d.courseRows}行 / 列=${d.range}` : `通期講座抽出: NG / ${d?.reason || '不明'}`;
-          }
-        }catch(e){ planMsg=`通期講座抽出: 診断エラー / ${e?.message || e}`; }
-        debug.push(planMsg);
-        item.debugLog=[...debug];
-        goukakuDesignSheets[name]=item;
+        goukakuDesignSheets[name]={kind:'excel',fileName:excelHit.name,sheetName:parsed.sheetName,aoa:parsed.aoa,model:parsed.model,workbook:parsed.workbook,fileHandle:excelHit.handle,dirHandle:studentDir,path:dirs[0].label,dirty:false,editedCells:{},printPdf};
         const label=excelHit.isEdited ? '編集済みExcel' : 'Excel簡易表示';
-        loaded.push(`${name}: ${dirs[0].label} / ${excelHit.name}（${label}${printPdf ? '・印刷はPDF優先' : ''}） / ${planMsg}`);
+        loaded.push(`${name}: ${dirs[0].label} / ${excelHit.name}（${label}${printPdf ? '・印刷はPDF優先' : ''}）`);
         renderGoukakuPanel(name);
         continue;
       }
       if(printPdf){
-        debug.push('画面表示: PDF表示（Excelが無いため通期講座表は抽出できません）');
-        goukakuDesignSheets[name]={kind:'pdf',fileName:printPdf.fileName,pdfUrl:printPdf.pdfUrl,pdfBase64:printPdf.pdfBase64,path:dirs[0].label,fileHandle:printPdf.fileHandle,dirHandle:studentDir,dirty:false,debugLog:debug};
-        loaded.push(`${name}: ${dirs[0].label} / ${printPdf.fileName}（PDF / Excelなしのため通期講座抽出なし）`);
+        goukakuDesignSheets[name]={kind:'pdf',fileName:printPdf.fileName,pdfUrl:printPdf.pdfUrl,pdfBase64:printPdf.pdfBase64,path:dirs[0].label,fileHandle:printPdf.fileHandle,dirHandle:studentDir,dirty:false};
+        loaded.push(`${name}: ${dirs[0].label} / ${printPdf.fileName}（PDF）`);
         renderGoukakuPanel(name);
         continue;
       }
-      debug.push('判定: 生徒フォルダは見つかったが、対象ファイルなし');
-      missing.push(`${name}: 合格設計図PDF/Excelなし（生徒フォルダ=${dirs[0].label} / 直下候補=${candidateNames.join('、')||'なし'}）`);
-      goukakuDesignSheets[name]={error:'生徒フォルダ直下に「合格設計図」を含むPDFまたはExcelがありません。', debugLog:debug};
+      missing.push(`${name}: 合格設計図PDF/Excelなし`);
+      goukakuDesignSheets[name]={error:'生徒フォルダ直下に「合格設計図」を含むPDFまたはExcelがありません。'};
       renderGoukakuPanel(name);
     }catch(e){
-      debug.push(`例外: ${e?.message||e}`);
       failed.push(`${name}: ${e?.message||e}`);
-      goukakuDesignSheets[name]={error:e?.message||String(e), debugLog:debug};
+      goukakuDesignSheets[name]={error:e?.message||String(e)};
       renderGoukakuPanel(name);
     }
   }
@@ -9126,10 +9063,6 @@ try{
 .goukakuPlanTable .planNumberCell{font-weight:900;font-size:15px;min-width:34px;cursor:text;outline:none;background:#fff}
 .goukakuPlanTable .planNumberCell:focus{background:#fffbea!important;box-shadow:inset 0 0 0 2px #f59e0b}.goukakuPlanTable .goukakuDirtyCell{background:#eff6ff!important;box-shadow:inset 0 0 0 2px #2563eb}
 .goukakuPlanEmpty{padding:10px;color:#64748b;font-size:12px;line-height:1.6}
-
-.goukakuDebugBox{margin:8px 10px 10px;border:1px solid #cbd5e1;border-radius:10px;background:#f8fafc;font-size:11px;color:#334155;overflow:hidden}
-.goukakuDebugBox summary{cursor:pointer;font-weight:900;padding:7px 9px;background:#eef2ff;color:#1e40af}
-.goukakuDebugBox pre{margin:0;padding:8px 9px;white-space:pre-wrap;word-break:break-word;line-height:1.45;max-height:220px;overflow:auto;background:#fff}
 @media print{
   .goukakuPlanBox{border:0;margin:0;overflow:visible}.goukakuPlanHead,.goukakuPlanNotice{break-inside:avoid}.goukakuPlanWrap{max-height:none;overflow:visible;padding:0}.goukakuPlanTable{font-size:10.5px}.goukakuPlanTable th,.goukakuPlanTable td{padding:3px 4px}.goukakuPlanTable .planTitleCell{font-size:15px}.goukakuPlanTable .planNumberCell{font-size:14px}.goukakuPlanActions{display:none!important}
 }
@@ -9275,19 +9208,13 @@ try{
     return html;
   }
   window.goukakuCoursePlanHtml=goukakuCoursePlanHtml;
-  window.goukakuCoursePlanDiagnostic=function(item){
-    const info=planBuild(item?.model);
-    if(!info) return {ok:false, reason:'「通期講座受講計画」またはBook1形式の見出しを検出できません'};
-    return {ok:true, headerRows:info.headerRows.length, courseRows:info.courseRows.length, range:`${colName(info.startCol+1)}〜${colName(info.endCol+1)}`};
-  };
   function goukakuPlanBoxHtml(name){
     const item=goukakuDesignSheets[name];
     if(!item) return '<div class="goukakuPlanBox"><div class="goukakuPlanHead"><span>通期講座受講計画：未読み込み</span></div><div class="goukakuPlanEmpty">④復元で保存復元フォルダーを選ぶと、生徒フォルダー内の合格設計図Excelを探して表示します。</div></div>';
-    const dbg=(typeof goukakuDebugHtml==='function') ? goukakuDebugHtml(item) : '';
-    if(item.error) return `<div class="goukakuPlanBox"><div class="goukakuPlanHead"><span>合格設計図：読み込み失敗</span></div><div class="goukakuPlanEmpty" style="color:#dc2626">${escapeHtml(item.error)}</div>${dbg}</div>`;
-    if(item.kind==='pdf') return `<div class="goukakuPlanBox"><div class="goukakuPlanHead"><div><div class="goukakuPlanTitle">合格設計図PDF</div><div class="goukakuPlanMeta">${escapeHtml(item.fileName||'')}</div></div><div class="goukakuPlanActions"><button type="button" class="secondary small" data-open-goukaku="${escapeHtml(name)}">開く</button></div></div><div class="goukakuPlanEmpty">PDFは通期講座受講計画の抽出対象外です。Excel形式の合格設計図を置くと表抽出できます。</div>${dbg}</div>`;
+    if(item.error) return `<div class="goukakuPlanBox"><div class="goukakuPlanHead"><span>合格設計図：読み込み失敗</span></div><div class="goukakuPlanEmpty" style="color:#dc2626">${escapeHtml(item.error)}</div></div>`;
+    if(item.kind==='pdf') return `<div class="goukakuPlanBox"><div class="goukakuPlanHead"><div><div class="goukakuPlanTitle">合格設計図PDF</div><div class="goukakuPlanMeta">${escapeHtml(item.fileName||'')}</div></div><div class="goukakuPlanActions"><button type="button" class="secondary small" data-open-goukaku="${escapeHtml(name)}">開く</button></div></div><div class="goukakuPlanEmpty">PDFは通期講座受講計画の抽出対象外です。Excel形式の合格設計図を置くと表抽出できます。</div></div>`;
     const cnt=goukakuEditedCount(item);
-    return `<div class="goukakuPlanBox"><div class="goukakuPlanHead"><div><div class="goukakuPlanTitle">通期講座受講計画${cnt?`<span class="goukakuDirtyBadge">編集 ${cnt}セル</span>`:''}</div><div class="goukakuPlanMeta">${escapeHtml(item.fileName||'')} / ${escapeHtml(item.sheetName||'')}</div></div><div class="goukakuPlanActions"><button type="button" class="secondary small" data-open-goukaku="${escapeHtml(name)}">拡大</button><button type="button" class="secondary small" data-print-goukaku-plan="${escapeHtml(name)}">印刷</button><button type="button" class="secondary small" data-save-goukaku-excel="${escapeHtml(name)}">編集済みExcelを保存</button></div></div><div class="goukakuPlanNotice">Book1の17〜19行目相当を列位置・結合セルごと再現し、20行目以降は講座CDまたは講座名がある行だけ表示します。色は読まず、月別の数字欄だけ編集できます。</div>${dbg}<div class="goukakuPlanWrap">${goukakuCoursePlanHtml(item,name,{editable:true})}</div></div>`;
+    return `<div class="goukakuPlanBox"><div class="goukakuPlanHead"><div><div class="goukakuPlanTitle">通期講座受講計画${cnt?`<span class="goukakuDirtyBadge">編集 ${cnt}セル</span>`:''}</div><div class="goukakuPlanMeta">${escapeHtml(item.fileName||'')} / ${escapeHtml(item.sheetName||'')}</div></div><div class="goukakuPlanActions"><button type="button" class="secondary small" data-open-goukaku="${escapeHtml(name)}">拡大</button><button type="button" class="secondary small" data-print-goukaku-plan="${escapeHtml(name)}">印刷</button><button type="button" class="secondary small" data-save-goukaku-excel="${escapeHtml(name)}">編集済みExcelを保存</button></div></div><div class="goukakuPlanNotice">Book1の17〜19行目相当を列位置・結合セルごと再現し、20行目以降は講座CDまたは講座名がある行だけ表示します。色は読まず、月別の数字欄だけ編集できます。</div><div class="goukakuPlanWrap">${goukakuCoursePlanHtml(item,name,{editable:true})}</div></div>`;
   }
   window.goukakuPanelHtml=function(name){ return goukakuPlanBoxHtml(name); };
   window.openGoukakuModal=function(name){
@@ -10356,6 +10283,193 @@ initV30ClassicHorizontalUX();
   }
   window.meetingPrepGoukakuDesignHtml = fourthPageCoursePlanHtml;
   try{ meetingPrepGoukakuDesignHtml = fourthPageCoursePlanHtml; }catch(e){}
+})();
+</script>
+
+
+<!-- 2026-08-20 21:03 精査修正：コード落下防止 + ④復元リアルタイムログ -->
+<style id="restoreLiveLogStyle_20260820_2103">
+/* 画面下部にコードが落ちる事故対策：追加HTMLは必ず body 直下の正規style/scriptだけに限定 */
+html,body{height:auto!important;min-height:100%!important;overflow:auto!important;}
+main.wrap{height:auto!important;min-height:calc(100vh - 64px)!important;overflow:visible!important;display:block!important;}
+#studentGrid.studentGrid{overflow-x:auto!important;overflow-y:visible!important;}
+.studentCard{overflow:visible!important;}
+.restoreLiveLogPanel{position:fixed;right:14px;bottom:14px;z-index:2147482500;width:min(620px,calc(100vw - 28px));max-height:44vh;background:#fff;border:1px solid #bfdbfe;border-left:6px solid #2563eb;border-radius:14px;box-shadow:0 18px 44px rgba(15,23,42,.22);display:none;overflow:hidden;color:#172033;font-size:12px;}
+.restoreLiveLogPanel.show{display:block;}
+.restoreLiveLogHead{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#eff6ff;border-bottom:1px solid #dbeafe;padding:8px 10px;font-weight:900;color:#1e40af;}
+.restoreLiveLogHead small{font-size:11px;color:#475569;font-weight:800;}
+.restoreLiveLogBody{max-height:34vh;overflow:auto;padding:8px 10px;white-space:pre-wrap;font-family:Consolas,Menlo,monospace;line-height:1.45;background:#fff;}
+.restoreLiveLogActions{display:flex;gap:6px;align-items:center;}
+.restoreLiveLogActions button{min-height:26px!important;height:26px!important;padding:3px 8px!important;font-size:11px!important;border-radius:999px!important;box-shadow:none!important;background:#dbeafe!important;color:#1e40af!important;border:1px solid #bfdbfe!important;}
+.restoreLiveLogLine{margin:0 0 3px;}
+.restoreLiveLogLine.ok{color:#166534;}
+.restoreLiveLogLine.warn{color:#9a3412;}
+.restoreLiveLogLine.err{color:#991b1b;font-weight:900;}
+@media print{.restoreLiveLogPanel{display:none!important;} html,body{overflow:visible!important;} main.wrap{display:block!important;height:auto!important;}}
+</style>
+<script id="restoreLiveLogScript_20260820_2103">
+(function(){
+  var logLines=[];
+  var panel=null, body=null, sub=null;
+  function nowLabel(){
+    try{return new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit',second:'2-digit'});}catch(e){return ''+new Date();}
+  }
+  function escText(s){return String(s==null?'':s).replace(/[&<>]/g,function(ch){return ch==='&'?'&amp;':(ch==='<'?'&lt;':'&gt;');});}
+  function ensurePanel(){
+    if(panel && body) return;
+    panel=document.getElementById('restoreLiveLogPanel');
+    if(!panel){
+      panel=document.createElement('div');
+      panel.id='restoreLiveLogPanel';
+      panel.className='restoreLiveLogPanel';
+      panel.innerHTML='<div class="restoreLiveLogHead"><div>④復元リアルタイムログ <small id="restoreLiveLogSub">待機中</small></div><div class="restoreLiveLogActions"><button type="button" id="restoreLiveLogCopy">コピー</button><button type="button" id="restoreLiveLogClear">消去</button><button type="button" id="restoreLiveLogClose">閉じる</button></div></div><div class="restoreLiveLogBody" id="restoreLiveLogBody"></div>';
+      document.body.appendChild(panel);
+      var close=document.getElementById('restoreLiveLogClose');
+      var clear=document.getElementById('restoreLiveLogClear');
+      var copy=document.getElementById('restoreLiveLogCopy');
+      if(close) close.onclick=function(){panel.classList.remove('show');};
+      if(clear) clear.onclick=function(){logLines=[]; render();};
+      if(copy) copy.onclick=function(){try{navigator.clipboard.writeText(logLines.join('\n'));}catch(e){}};
+    }
+    body=document.getElementById('restoreLiveLogBody');
+    sub=document.getElementById('restoreLiveLogSub');
+  }
+  function render(){
+    ensurePanel();
+    if(body){
+      body.innerHTML=logLines.map(function(line){
+        var cls='restoreLiveLogLine';
+        if(/OK|成功|完了/.test(line)) cls+=' ok';
+        if(/未検出|なし|確認|注意/.test(line)) cls+=' warn';
+        if(/エラー|失敗|例外/.test(line)) cls+=' err';
+        return '<div class="'+cls+'">'+escText(line)+'</div>';
+      }).join('');
+      body.scrollTop=body.scrollHeight;
+    }
+  }
+  function add(msg){
+    ensurePanel();
+    panel.classList.add('show');
+    var text=String(msg||'').trim();
+    if(!text) return;
+    text.split(/\n+/).forEach(function(part){
+      var p=String(part||'').trim();
+      if(p) logLines.push('['+nowLabel()+'] '+p);
+    });
+    if(logLines.length>260) logLines=logLines.slice(logLines.length-260);
+    render();
+  }
+  window.restoreLiveLog={
+    start:function(msg){ensurePanel(); logLines=[]; panel.classList.add('show'); if(sub) sub.textContent='読み込み中...'; add(msg||'④復元を開始しました。');},
+    step:add,
+    done:function(msg){if(sub) sub.textContent='完了'; add(msg||'完了しました。');},
+    error:function(msg){if(sub) sub.textContent='エラー'; add('エラー: '+(msg||''));},
+    show:function(){ensurePanel(); panel.classList.add('show'); render();}
+  };
+
+  // showSaveInfo が非表示でもリアルタイムログへ流す。既存の保存/復元処理は壊さない。
+  try{
+    var originalShowSaveInfo = (typeof showSaveInfo==='function') ? showSaveInfo : null;
+    if(originalShowSaveInfo && !originalShowSaveInfo.__restoreLiveWrapped){
+      var wrappedShowSaveInfo=function(text){
+        try{ originalShowSaveInfo(text); }catch(e){}
+        try{
+          var t=String(text||'');
+          if(/④復元|復元|読み取り|読込|読み込み|JSON|個人Excel|対応表|合格設計図|通期講座|全員分リスト|科目リスト/.test(t)) add(t);
+        }catch(e){}
+      };
+      wrappedShowSaveInfo.__restoreLiveWrapped=true;
+      showSaveInfo=wrappedShowSaveInfo;
+      window.showSaveInfo=wrappedShowSaveInfo;
+    }
+  }catch(e){}
+
+  // 選択フォルダ自身が生徒フォルダのときも、合格設計図探索候補に入れる。
+  try{
+    if(typeof findStudentFoldersRecursive==='function' && !findStudentFoldersRecursive.__selfCandidateWrapped){
+      var oldFindStudentFoldersRecursive=findStudentFoldersRecursive;
+      var newFindStudentFoldersRecursive=async function(root, studentName, maxDepth){
+        var result=await oldFindStudentFoldersRecursive(root, studentName, maxDepth);
+        try{
+          var rootName=String(root&&root.name||'');
+          var target=String(studentName||'').trim();
+          var nroot=typeof normalizeFolderNameForMatch==='function'?normalizeFolderNameForMatch(rootName):rootName.replace(/[\s\u3000]+/g,'').toLowerCase();
+          var ntarget=typeof normalizeFolderNameForMatch==='function'?normalizeFolderNameForMatch(target):target.replace(/[\s\u3000]+/g,'').toLowerCase();
+          if(root && root.entries && ntarget && (nroot===ntarget || nroot.includes(ntarget) || ntarget.includes(nroot))){
+            var exists=(result||[]).some(function(x){return x && x.dir===root;});
+            if(!exists) result=[{dir:root,label:rootName+'（選択フォルダ自身）'}].concat(result||[]);
+          }
+        }catch(e){}
+        return result||[];
+      };
+      newFindStudentFoldersRecursive.__selfCandidateWrapped=true;
+      findStudentFoldersRecursive=newFindStudentFoldersRecursive;
+      window.findStudentFoldersRecursive=newFindStudentFoldersRecursive;
+    }
+  }catch(e){}
+
+  // 合格設計図探索の入口/出口をログ化。探せてないのか、読めたが抽出できないのかを切り分ける。
+  try{
+    if(typeof loadGoukakuDesignsFromRoot==='function' && !loadGoukakuDesignsFromRoot.__restoreLiveWrapped){
+      var oldLoadGoukakuDesignsFromRoot=loadGoukakuDesignsFromRoot;
+      var newLoadGoukakuDesignsFromRoot=async function(root, names){
+        add('合格設計図探索開始: 選択フォルダ='+String(root&&root.name||'不明')+' / 生徒='+(names||students||[]).join('、'));
+        var res=await oldLoadGoukakuDesignsFromRoot(root, names);
+        if(typeof formatGoukakuLoadSummary==='function') add(formatGoukakuLoadSummary(res)||'合格設計図: 結果なし');
+        return res;
+      };
+      newLoadGoukakuDesignsFromRoot.__restoreLiveWrapped=true;
+      loadGoukakuDesignsFromRoot=newLoadGoukakuDesignsFromRoot;
+      window.loadGoukakuDesignsFromRoot=newLoadGoukakuDesignsFromRoot;
+    }
+    if(typeof loadGoukakuDesignsFromStudentParent==='function' && !loadGoukakuDesignsFromStudentParent.__restoreLiveWrapped){
+      var oldLoadGoukakuDesignsFromStudentParent=loadGoukakuDesignsFromStudentParent;
+      var newLoadGoukakuDesignsFromStudentParent=async function(parent, names){
+        add('合格設計図探索開始: 生徒フォルダ親='+String(parent&&parent.name||'不明')+' / 生徒='+(names||students||[]).join('、'));
+        var res=await oldLoadGoukakuDesignsFromStudentParent(parent, names);
+        if(typeof formatGoukakuLoadSummary==='function') add(formatGoukakuLoadSummary(res)||'合格設計図: 結果なし');
+        return res;
+      };
+      newLoadGoukakuDesignsFromStudentParent.__restoreLiveWrapped=true;
+      loadGoukakuDesignsFromStudentParent=newLoadGoukakuDesignsFromStudentParent;
+      window.loadGoukakuDesignsFromStudentParent=newLoadGoukakuDesignsFromStudentParent;
+    }
+    if(typeof readGoukakuExcelFile==='function' && !readGoukakuExcelFile.__restoreLiveWrapped){
+      var oldReadGoukakuExcelFile=readGoukakuExcelFile;
+      var newReadGoukakuExcelFile=async function(file){
+        add('合格設計図Excel読込中: '+String(file&&file.name||''));
+        var parsed=await oldReadGoukakuExcelFile(file);
+        add('合格設計図Excel読込OK: シート='+String(parsed&&parsed.sheetName||'')+' / 行数='+String(parsed&&parsed.aoa?parsed.aoa.length:0));
+        return parsed;
+      };
+      newReadGoukakuExcelFile.__restoreLiveWrapped=true;
+      readGoukakuExcelFile=newReadGoukakuExcelFile;
+      window.readGoukakuExcelFile=newReadGoukakuExcelFile;
+    }
+  }catch(e){}
+
+  // ④復元ボタン全体をログで囲む。既存のloadGroup本体は触らない。
+  try{
+    if(typeof loadGroup==='function' && !loadGroup.__restoreLiveWrapped){
+      var oldLoadGroup=loadGroup;
+      var newLoadGroup=async function(){
+        if(window.restoreLiveLog) window.restoreLiveLog.start('④復元開始: フォルダ選択待ち');
+        try{
+          var res=await oldLoadGroup.apply(this, arguments);
+          if(window.restoreLiveLog) window.restoreLiveLog.done('④復元完了: 画面表示まで終了');
+          return res;
+        }catch(e){
+          if(window.restoreLiveLog) window.restoreLiveLog.error(e && e.message ? e.message : e);
+          throw e;
+        }
+      };
+      newLoadGroup.__restoreLiveWrapped=true;
+      loadGroup=newLoadGroup;
+      window.loadGroup=newLoadGroup;
+      var btn=document.getElementById('loadGroupMemory');
+      if(btn){btn.type='button';btn.disabled=false;btn.onclick=newLoadGroup;}
+    }
+  }catch(e){}
 })();
 </script>
 </body>
