@@ -1751,24 +1751,30 @@ function remapRestoredScheduleToCurrentInputWeek(restored){
     if(inputScheduleRowsHaveAnyValue(out)) return out;
   }
 
-  // 旧形式：weekStart を基準に日付をずらして復元する。
+  // 旧形式：scheduleDates / scheduleByDate が無いJSONでも、weekStart が読めるならそれを開始日として使う。
+  // weekStart が無い・読めない場合だけ、最後の候補として savedAt の日付を開始日扱いにする。
+  const candidateBases=[];
   const restoredBase=parseYmdLocal(restored?.weekStart || '');
-  if(restoredBase){
+  if(restoredBase) candidateBases.push(restoredBase);
+  const savedAtBase=localDateOnlyValue(restored?.savedAt || restored?._savedAt || '');
+  if(savedAtBase && !candidateBases.some(d=>ymd(d)===ymd(savedAtBase))) candidateBases.push(savedAtBase);
+
+  for(const base of candidateBases){
+    const trial=Array.from({length:7},()=>Array(6).fill(''));
     const oneDay=24*60*60*1000;
     for(let oldIndex=0; oldIndex<7; oldIndex++){
-      const savedDate=new Date(restoredBase);
-      savedDate.setDate(restoredBase.getDate()+oldIndex);
+      const savedDate=new Date(base);
+      savedDate.setDate(base.getDate()+oldIndex);
       const newIndex=Math.round((savedDate-currentBase)/oneDay);
       if(newIndex>=0 && newIndex<7){
-        out[newIndex]=Array.from({length:6},(_,r)=>schedule?.[oldIndex]?.[r]||'');
+        trial[newIndex]=Array.from({length:6},(_,r)=>schedule?.[oldIndex]?.[r]||'');
       }
     }
-    if(inputScheduleRowsHaveAnyValue(out)) return out;
+    if(inputScheduleRowsHaveAnyValue(trial)) return trial;
   }
 
-  // さらに保険：保存日が現在の開始日に近いのに weekStart がずれている旧JSONは、
-  // 予定が消える事故を避けるため、行位置そのままで復元する。
-  // 例：8/19に保存したJSONのweekStartだけ8/26になってしまった場合でも、8/20復元で表示する。
+  // 最後の保険：日付として重なる場所が判断できない旧JSONでも、
+  // 保存日が現在の開始日に近ければ予定消失を避けるため行位置そのままで復元する。
   if(inputScheduleRowsHaveAnyValue(schedule) && savedAtCloseToCurrentWeek(restored?.savedAt)){
     return Array.from({length:7},(_,i)=>Array.from({length:6},(_,r)=>schedule?.[i]?.[r]||''));
   }
