@@ -7378,7 +7378,7 @@ function buildAllStudentListAoaByGrade(examRecords=[], eventRecords=[]){
       header.push(`${mmdd(d)}(${WEEK_JA[d.getDay()]})\n予定`);
       header.push(`${mmdd(d)}(${WEEK_JA[d.getDay()]})\n結果`);
     }
-    const aoa = [[title], header];
+    let aoa = [[title], header];
     for(const st of students){
       const key = studentKeyForList(st.student, st.studentNo);
       const inputNote = inputNoteByStudent.get(key) || allListSmallBlockStrip(st.note || '');
@@ -7408,11 +7408,13 @@ function buildAllStudentListAoaByGrade(examRecords=[], eventRecords=[]){
       }
       aoa.push(row);
     }
+    aoa = dedupeAllListInputItemColumns(aoa);
     let mergedAoa = mergeRestoredAllListAoa(grade, aoa);
     mergedAoa = ensureAllListSmallSubjectListColumns(mergedAoa, aoa);
     // 最終防衛：基本情報列は今回生成した対応表/入力結果を正本に戻す。
     // これにより、旧全員分リストのF列に高校名が残っていても、担当列へ絶対に残さない。
     mergedAoa = enforceAllListBasicColumnsFromGenerated(mergedAoa, aoa);
+    mergedAoa = dedupeAllListInputItemColumns(mergedAoa);
     gradeAoas.push({grade, title, aoa:mergedAoa, windowDates, examCount:examGroups.length, eventCount:eventGroups.length, smallPendingMap, smallSlotCount:maxSmallSlots, restored: !!findAllListRestoreForGrade(grade)});
   }
   return gradeAoas;
@@ -7420,6 +7422,74 @@ function buildAllStudentListAoaByGrade(examRecords=[], eventRecords=[]){
 function safeSheetName(name, fallback='学年未設定'){
   let s = String(name || fallback).replace(/[\\\/\?\*\[\]:]/g, ' ').trim() || fallback;
   return s.slice(0, 31);
+}
+
+
+// 全員分リスト入力用：同じ見出しの列を1列に統合する。
+// 2段見出し表示にしても、「回答」「Comiru」など各項目は1列だけにするための最終防衛。
+function dedupeAllListInputItemColumns(aoa){
+  if(!aoa || aoa.length < 2) return aoa;
+  const header = (aoa[1] || []).map(normalizeAllListHeaderText);
+  if(!header.length) return aoa;
+  const keep = [];
+  const headerToNew = new Map();
+  const oldToNew = new Map();
+  const baseAlwaysKeep = new Set(['学年','生徒番号','氏名','生徒名','カナ','読み仮名','高校','担当','備考','入力用備考','全員分リスト備考','確認メモ']);
+  function keyOfHeader(h, idx){
+    const clean = normalizeAllListHeaderText(h);
+    const compact = clean.replace(/[\s\n\r　]+/g,'');
+    // 基本情報列は位置も意味を持つので、同名でも勝手に統合しない。
+    if(baseAlwaysKeep.has(compact)) return `base:${idx}:${compact}`;
+    return clean.replace(/[\s　]+/g,' ').trim();
+  }
+  for(let c=0;c<header.length;c++){
+    const k = keyOfHeader(header[c], c);
+    if(!k){
+      keep.push(c);
+      oldToNew.set(c, keep.length-1);
+      continue;
+    }
+    if(headerToNew.has(k)){
+      oldToNew.set(c, headerToNew.get(k));
+    }else{
+      const nc = keep.length;
+      keep.push(c);
+      headerToNew.set(k, nc);
+      oldToNew.set(c, nc);
+    }
+  }
+  if(keep.length === header.length) return aoa;
+
+  const out = [];
+  for(let r=0;r<aoa.length;r++){
+    const srcRow = Array.isArray(aoa[r]) ? aoa[r] : [];
+    const dstRow = keep.map(c => srcRow[c]);
+    for(let c=0;c<header.length;c++){
+      const nc = oldToNew.get(c);
+      if(nc == null) continue;
+      const v = srcRow[c];
+      if(v === undefined || v === null || String(v) === '') continue;
+      const cur = dstRow[nc];
+      // 重複列では、左側が空なら右側の手修正値を拾う。左側に値がある場合は左側を正にする。
+      if(cur === undefined || cur === null || String(cur) === '') dstRow[nc] = v;
+    }
+    out.push(dstRow);
+  }
+  function remapCellSet(cells){
+    if(!Array.isArray(cells)) return undefined;
+    const mapped = [];
+    for(const k of cells){
+      const [r,c] = String(k).split(':').map(Number);
+      const nc = oldToNew.get(c);
+      if(Number.isFinite(r) && Number.isFinite(nc)) mapped.push(`${r}:${nc}`);
+    }
+    return Array.from(new Set(mapped));
+  }
+  const conflicts = remapCellSet(aoa._allListConflictCells);
+  const manuals = remapCellSet(aoa._allListManualOverrideCells);
+  if(conflicts && conflicts.length) out._allListConflictCells = conflicts;
+  if(manuals && manuals.length) out._allListManualOverrideCells = manuals;
+  return out;
 }
 
 
