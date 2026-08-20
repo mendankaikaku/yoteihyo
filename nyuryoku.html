@@ -1234,6 +1234,31 @@ function getDates(){const base=new Date($('#weekStart').value+'T00:00:00');retur
 function daysBetween(a,b){const aa=new Date(a.getFullYear(),a.getMonth(),a.getDate());const bb=new Date(b.getFullYear(),b.getMonth(),b.getDate());return Math.round((bb-aa)/86400000)}
 function localDateOnlyValue(v){if(!v)return null;const s=String(v).trim();if(!s)return null;const m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);if(!m)return null;const d=new Date(Number(m[1]),Number(m[2])-1,Number(m[3]),0,0,0,0);return isNaN(d)?null:d}
 function currentWeekStartDateOnly(){return localDateOnlyValue($('#weekStart')?.value)||new Date(new Date().getFullYear(),new Date().getMonth(),new Date().getDate())}
+function safeInputWeekStartValueForSave(){
+  const raw=String($('#weekStart')?.value||'').trim();
+  const d=localDateOnlyValue(raw);
+  if(d) return ymd(d);
+  const today=new Date();
+  return ymd(new Date(today.getFullYear(), today.getMonth(), today.getDate()));
+}
+function inputCurrentScheduleDatesForSave(){
+  const base=localDateOnlyValue(safeInputWeekStartValueForSave());
+  return Array.from({length:7},(_,i)=>{const d=new Date(base); d.setDate(base.getDate()+i); return ymd(d);});
+}
+function scheduleByDateFromSchedule(schedule, dateList){
+  const out={};
+  if(!Array.isArray(schedule)) return out;
+  (dateList||[]).forEach((date,i)=>{out[date]=Array.from({length:6},(_,r)=>schedule?.[i]?.[r]||'');});
+  return out;
+}
+function scheduleHasAnyText(schedule){return inputScheduleRowsHaveAnyValue(schedule)}
+function savedAtCloseToCurrentWeek(savedAt){
+  const d=savedAt ? new Date(savedAt) : null;
+  const current=localDateOnlyValue($('#weekStart')?.value||'') || new Date();
+  if(!d || isNaN(d)) return false;
+  const dd=new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  return Math.abs(daysBetween(current, dd)) <= 10;
+}
 function isWeekStartInsideDisplayRange(item){const start=currentWeekStartDateOnly();const from=localDateOnlyValue(item&&item.displayStart);const to=localDateOnlyValue(item&&item.displayEnd);if(from && daysBetween(from,start)<0)return false;if(to && daysBetween(start,to)<0)return false;return true}
 function displayRangeHint(item){const from=(item&&item.displayStart)||'';const to=(item&&item.displayEnd)||'';if(from&&to)return `表示期間：${from}〜${to}`;if(from)return `表示開始：${from}〜`;if(to)return `表示終了：〜${to}`;return ''}
 
@@ -1697,18 +1722,55 @@ function inputScheduleRowsHaveAnyValue(schedule){
 }
 function remapRestoredScheduleToCurrentInputWeek(restored){
   const out=Array.from({length:7},()=>Array(6).fill(''));
-  const restoredBase=parseYmdLocal(restored?.weekStart || '');
   const currentBase=parseYmdLocal($('#weekStart')?.value || '');
   const schedule=restored?.schedule || [];
-  if(!restoredBase || !currentBase || !Array.isArray(schedule)) return out;
-  const oneDay=24*60*60*1000;
-  for(let oldIndex=0; oldIndex<7; oldIndex++){
-    const savedDate=new Date(restoredBase);
-    savedDate.setDate(restoredBase.getDate()+oldIndex);
-    const newIndex=Math.round((savedDate-currentBase)/oneDay);
-    if(newIndex>=0 && newIndex<7){
-      out[newIndex]=Array.from({length:6},(_,r)=>schedule?.[oldIndex]?.[r]||'');
+  if(!currentBase || !Array.isArray(schedule)) return out;
+
+  // 新形式：保存時の日付リスト/日付別予定があれば、それを最優先で使う。
+  // weekStart が誤っていても、日付キーが合えば正しく復元できる。
+  if(restored?.scheduleByDate && typeof restored.scheduleByDate === 'object'){
+    for(let newIndex=0; newIndex<7; newIndex++){
+      const d=new Date(currentBase); d.setDate(currentBase.getDate()+newIndex);
+      const key=ymd(d);
+      if(Array.isArray(restored.scheduleByDate[key])){
+        out[newIndex]=Array.from({length:6},(_,r)=>restored.scheduleByDate[key]?.[r]||'');
+      }
     }
+    if(inputScheduleRowsHaveAnyValue(out)) return out;
+  }
+  if(Array.isArray(restored?.scheduleDates)){
+    const oneDay=24*60*60*1000;
+    restored.scheduleDates.forEach((date, oldIndex)=>{
+      const savedDate=parseYmdLocal(date);
+      if(!savedDate) return;
+      const newIndex=Math.round((savedDate-currentBase)/oneDay);
+      if(newIndex>=0 && newIndex<7){
+        out[newIndex]=Array.from({length:6},(_,r)=>schedule?.[oldIndex]?.[r]||'');
+      }
+    });
+    if(inputScheduleRowsHaveAnyValue(out)) return out;
+  }
+
+  // 旧形式：weekStart を基準に日付をずらして復元する。
+  const restoredBase=parseYmdLocal(restored?.weekStart || '');
+  if(restoredBase){
+    const oneDay=24*60*60*1000;
+    for(let oldIndex=0; oldIndex<7; oldIndex++){
+      const savedDate=new Date(restoredBase);
+      savedDate.setDate(restoredBase.getDate()+oldIndex);
+      const newIndex=Math.round((savedDate-currentBase)/oneDay);
+      if(newIndex>=0 && newIndex<7){
+        out[newIndex]=Array.from({length:6},(_,r)=>schedule?.[oldIndex]?.[r]||'');
+      }
+    }
+    if(inputScheduleRowsHaveAnyValue(out)) return out;
+  }
+
+  // さらに保険：保存日が現在の開始日に近いのに weekStart がずれている旧JSONは、
+  // 予定が消える事故を避けるため、行位置そのままで復元する。
+  // 例：8/19に保存したJSONのweekStartだけ8/26になってしまった場合でも、8/20復元で表示する。
+  if(inputScheduleRowsHaveAnyValue(schedule) && savedAtCloseToCurrentWeek(restored?.savedAt)){
+    return Array.from({length:7},(_,i)=>Array.from({length:6},(_,r)=>schedule?.[i]?.[r]||''));
   }
   return out;
 }
@@ -3478,8 +3540,17 @@ function deleteSubjectTemplateFromEditor(){
 ========================================================= */
 function indivKey(name){return `yoteiStudentMemory:${name}`}
 function groupKey(){return `yoteiGroupMemory:${students.join('|')}`}
+function attachScheduleDateMetadata(data){
+  const d=Object.assign({}, data||{});
+  const weekStart=safeInputWeekStartValueForSave();
+  d.weekStart=weekStart;
+  d.scheduleDates=inputCurrentScheduleDatesForSave();
+  d.scheduleByDate=scheduleByDateFromSchedule(d.schedule||[], d.scheduleDates);
+  return d;
+}
 function buildIndividualMemory(name,savedAt=new Date().toISOString()){
-  return Object.assign({studentName:name,weekStart:$('#weekStart').value,savedAt},ensureStudent(name));
+  syncFromDom();
+  return Object.assign({studentName:name,weekStart:safeInputWeekStartValueForSave(),savedAt},attachScheduleDateMetadata(ensureStudent(name)));
 }
 function saveOneToBrowser(name,savedAt=new Date().toISOString()){
   if(!name)return false;
@@ -3498,8 +3569,9 @@ function buildGroupMemory(savedAt=new Date().toISOString()){
     type:'group',
     targetRestoreVersion:MASTER_TARGET_RESTORE_VERSION,
     names:students,
-    weekStart:$('#weekStart').value,
-    studentData:Object.fromEntries(students.map(n=>[n,ensureStudent(n)])),
+    weekStart:safeInputWeekStartValueForSave(),
+    scheduleDates:inputCurrentScheduleDatesForSave(),
+    studentData:Object.fromEntries(students.map(n=>[n,attachScheduleDateMetadata(ensureStudent(n))])),
     examMaster:getExamMaster(),eventMaster:getEventMaster(),examTargetHistory:getExamTargetHistory(),eventTargetHistory:getEventTargetHistory(),commentMaster:getCommentMaster(),commentTargetHistory:getCommentTargetHistory(),
     subjectTemplates:getSubjectTemplates(),
     savedAt
@@ -3977,7 +4049,7 @@ async function loadGroup(){
             version:1,
             type:'group-from-shared-individuals',
             names,
-            weekStart:$('#weekStart').value,
+            weekStart:safeInputWeekStartValueForSave(),
             studentData:collected,
             savedAt:new Date().toISOString()
           };
@@ -4012,7 +4084,7 @@ async function loadGroup(){
         version:1,
         type:'group-from-browser-individuals',
         names,
-        weekStart:$('#weekStart').value,
+        weekStart:safeInputWeekStartValueForSave(),
         studentData:collected,
         savedAt:new Date().toISOString()
       };
@@ -4031,7 +4103,7 @@ async function loadGroup(){
       version:2,
       type:'new-from-student-folders',
       names:[...names],
-      weekStart:$('#weekStart').value,
+      weekStart:safeInputWeekStartValueForSave(),
       studentData:{},
       savedAt:new Date().toISOString()
     };
@@ -4553,8 +4625,9 @@ function buildSharedGroupMemory(){
     type:'group',
     targetRestoreVersion:MASTER_TARGET_RESTORE_VERSION,
     names:students,
-    weekStart:$('#weekStart').value,
-        studentData:Object.fromEntries(students.map(n=>[n,ensureStudent(n)])),
+    weekStart:safeInputWeekStartValueForSave(),
+    scheduleDates:inputCurrentScheduleDatesForSave(),
+        studentData:Object.fromEntries(students.map(n=>[n,attachScheduleDateMetadata(ensureStudent(n))])),
     examMaster:getExamMaster(),eventMaster:getEventMaster(),examTargetHistory:getExamTargetHistory(),eventTargetHistory:getEventTargetHistory(),commentMaster:getCommentMaster(),commentTargetHistory:getCommentTargetHistory(),
     subjectTemplates:getSubjectTemplates(),
     savedAt:new Date().toISOString()
@@ -4566,7 +4639,7 @@ async function saveSharedFolder(){
     const groupMem = buildSharedGroupMemory();
     await writeJsonToShared(sharedGroupFileName(students), groupMem);
     for(const name of students){
-      const mem=Object.assign({studentName:name,savedAt:groupMem.savedAt},ensureStudent(name));
+      const mem=Object.assign({studentName:name,weekStart:safeInputWeekStartValueForSave(),savedAt:groupMem.savedAt},attachScheduleDateMetadata(ensureStudent(name)));
       await writeJsonToShared(sharedStudentFileName(name), mem);
     }
     await writeMasterSettingsFilesToShared(buildMasterSettingsPayload(groupMem.savedAt));
@@ -6727,7 +6800,7 @@ async function collectWeeklyAbsentRowsForPrint(){
   syncFromDom();
   const target=getMeetingPrepTargetDate();
   const map=new Map();
-  students.forEach(name=>{const one=Object.assign({studentName:name,weekStart:$('#weekStart')?.value||'',savedAt:'画面表示中'},ensureStudent(name)); addAbsentRowUnique(map,rowFromMemoryForAbsent(one,name,target));});
+  students.forEach(name=>{const one=Object.assign({studentName:name,weekStart:safeInputWeekStartValueForSave(),savedAt:'画面表示中'},ensureStudent(name)); addAbsentRowUnique(map,rowFromMemoryForAbsent(one,name,target));});
   collectWeeklyAbsentRowsFromBrowser(target).forEach(r=>addAbsentRowUnique(map,r));
   try{ if(sharedSupported()){ await ensureSharedFolder(); const sharedRows=await collectWeeklyAbsentRowsFromShared(target); sharedRows.forEach(r=>addAbsentRowUnique(map,r)); } }catch(e){ console.warn('保存用フォルダの週面欠席者集計に失敗', e); }
   return Array.from(map.values()).sort((a,b)=>String(a.grade||'').localeCompare(String(b.grade||''),'ja')||String(a.name||'').localeCompare(String(b.name||''),'ja'));
