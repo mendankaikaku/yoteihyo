@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>面談予定入力アプリ（2026-08-20 20:33 出力）</title>
+<title>面談予定入力アプリ（2026-08-20 20:41 出力）</title>
 <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
 <script src="./libs/xlsx.bundle.js"></script>
 <script></script>
@@ -1469,10 +1469,14 @@ function mergeRosterProfileIntoStudentData(name, data){
   const p=findRosterProfileForInputName(name, d);
   if(!p) return {data:d, changed:[], matched:false, ambiguous:false};
   const changed=[];
-  if(!String(d.studentNo||'').trim() && String(p.studentNo||'').trim()){ d.studentNo=String(p.studentNo).trim(); changed.push('生徒番号'); }
-  if(!String(d.grade||'').trim() && normalizeInputGradeValue(p.grade)){ d.grade=normalizeInputGradeValue(p.grade); changed.push('学年'); }
-  if(!String(d.school||'').trim() && String(p.school||'').trim()){ d.school=String(p.school).trim(); changed.push('高校'); }
-  if(!String(d.assistant||'').trim() && String(p.assistant||'').trim()){ d.assistant=String(p.assistant).trim(); changed.push('担任助手'); }
+  const pNo=cleanProfileValue('studentNo', p.studentNo);
+  const pGrade=cleanProfileValue('grade', p.grade);
+  const pSchool=cleanProfileValue('school', p.school);
+  const pAssistant=cleanProfileValue('assistant', p.assistant);
+  if(!String(d.studentNo||'').trim() && pNo){ d.studentNo=pNo; changed.push('生徒番号'); }
+  if(!String(d.grade||'').trim() && pGrade){ d.grade=pGrade; changed.push('学年'); }
+  if(!String(d.school||'').trim() && pSchool){ d.school=pSchool; changed.push('高校'); }
+  if(!String(d.assistant||'').trim() && pAssistant){ d.assistant=pAssistant; changed.push('担任助手'); }
   return {data:d, changed, matched:true, profile:p};
 }
 function applyRosterProfilesToStudents(names){
@@ -8553,16 +8557,31 @@ function personalExcelLooksLikeProfileHeader(row){
   const joined=(row||[]).map(v=>norm(v)).join('|');
   return /生徒番号|生徒No|氏名|生徒名|学年|高校|学校|担任助手|担当/.test(joined);
 }
+function isProfileHeaderLikeValue(v){
+  const t=norm(v);
+  return /^(生徒番号|生徒No|番号|ID|名前|生徒名|氏名|フルネーム|学年|高校|高校名|学校|学校名|在籍校|所属校|在学校|担任助手|担当|助手|担任|担当者)$/.test(t);
+}
+function cleanProfileValue(kind, v){
+  const t=norm(v);
+  if(!t || isProfileHeaderLikeValue(t)) return '';
+  if(kind==='grade') return normalizeInputGradeValue(t);
+  if(kind==='school' && /^(担任助手|担当|助手|担任|担当者)$/.test(t)) return '';
+  if(kind==='assistant' && /^(高校|高校名|学校|学校名|在籍校|所属校|在学校)$/.test(t)) return '';
+  return t;
+}
 function profileFromKeyValueRows(aoa){
   const p={studentNo:'',grade:'',school:'',assistant:''};
   (aoa||[]).forEach(row=>{
+    // 見出し行そのものを key-value と誤読しない。
+    // 例：「高校｜担任助手」の横並びを 高校=担任助手 と読んでしまう事故を防ぐ。
+    if(personalExcelLooksLikeProfileHeader(row)) return;
     for(let c=0;c<(row||[]).length-1;c++){
-      const k=norm(row[c]); const v=norm(row[c+1]);
-      if(!v) continue;
-      if(/生徒番号|生徒No|^番号$|^ID$/.test(k) && !p.studentNo) p.studentNo=v;
-      if(/学年/.test(k) && !p.grade) p.grade=normalizeInputGradeValue(v);
-      if(/高校|高校名|学校|学校名|在籍校|所属校|在学校/.test(k) && !p.school) p.school=v;
-      if(/担任助手|担当|助手|担任|担当者/.test(k) && !p.assistant) p.assistant=v;
+      const k=norm(row[c]); const raw=norm(row[c+1]);
+      if(!raw || isProfileHeaderLikeValue(raw)) continue;
+      if(/生徒番号|生徒No|^番号$|^ID$/.test(k) && !p.studentNo) p.studentNo=cleanProfileValue('studentNo', raw);
+      if(/学年/.test(k) && !p.grade) p.grade=cleanProfileValue('grade', raw);
+      if(/高校|高校名|学校|学校名|在籍校|所属校|在学校/.test(k) && !p.school) p.school=cleanProfileValue('school', raw);
+      if(/担任助手|担当|助手|担任|担当者/.test(k) && !p.assistant) p.assistant=cleanProfileValue('assistant', raw);
     }
   });
   return p;
@@ -8591,10 +8610,10 @@ function extractProfileFromWorkbookForInputStudent(wb, studentName){
         // 生徒名列が無いシートや本人Excelでは、先頭のデータ行を本人情報として読む。
         if(nameMatches){
           merge({
-            studentNo:idx.studentNo>=0?rowNo:'',
-            grade:idx.grade>=0?normalizeInputGradeValue(row[idx.grade]):'',
-            school:idx.school>=0?norm(row[idx.school]):'',
-            assistant:idx.assistant>=0?norm(row[idx.assistant]):''
+            studentNo:idx.studentNo>=0?cleanProfileValue('studentNo', rowNo):'',
+            grade:idx.grade>=0?cleanProfileValue('grade', row[idx.grade]):'',
+            school:idx.school>=0?cleanProfileValue('school', row[idx.school]):'',
+            assistant:idx.assistant>=0?cleanProfileValue('assistant', row[idx.assistant]):''
           });
           break;
         }
@@ -8648,10 +8667,14 @@ async function applyPersonalExcelProfilesToStudents(names){
     const p=res.profile;
     if(!p) continue;
     const changed=[];
-    if(!String(data.studentNo||'').trim() && String(p.studentNo||'').trim()){ data.studentNo=String(p.studentNo).trim(); changed.push('生徒番号'); }
-    if(!String(data.grade||'').trim() && normalizeInputGradeValue(p.grade)){ data.grade=normalizeInputGradeValue(p.grade); changed.push('学年'); }
-    if(!String(data.school||'').trim() && String(p.school||'').trim()){ data.school=String(p.school).trim(); changed.push('高校'); }
-    if(!String(data.assistant||'').trim() && String(p.assistant||'').trim()){ data.assistant=String(p.assistant).trim(); changed.push('担任助手'); }
+    const pNo=cleanProfileValue('studentNo', p.studentNo);
+    const pGrade=cleanProfileValue('grade', p.grade);
+    const pSchool=cleanProfileValue('school', p.school);
+    const pAssistant=cleanProfileValue('assistant', p.assistant);
+    if(!String(data.studentNo||'').trim() && pNo){ data.studentNo=pNo; changed.push('生徒番号'); }
+    if(!String(data.grade||'').trim() && pGrade){ data.grade=pGrade; changed.push('学年'); }
+    if(!String(data.school||'').trim() && pSchool){ data.school=pSchool; changed.push('高校'); }
+    if(!String(data.assistant||'').trim() && pAssistant){ data.assistant=pAssistant; changed.push('担任助手'); }
     if(changed.length) filled.push(`${name}: ${changed.join('・')}`);
   }
   return {filled, logs};
@@ -9590,6 +9613,48 @@ main.wrap{
 }
 </style></head><body><section class="page"><h1>週面欠席者 電話確認リスト</h1><div class="subline">対象日：${esc(todayLabel)} / 週開始：${esc(weekStart)} / 作成：${esc(now.toLocaleString('ja-JP'))}</div><div class="summary">週面欠席にチェックが入っている生徒：<b>${absentRows.length}名</b>　※電話後に「電話済み」欄へチェックしてください。</div><table><thead><tr><th>No.</th><th>学年</th><th>生徒番号</th><th>生徒名</th><th>未電話</th><th>電話済み</th><th>電話メモ</th></tr></thead><tbody>${rows}</tbody></table><div class="note">使い方：欠席確認前は「未電話」、電話完了後は「電話済み」にチェック。つながらなかった場合や保護者対応などは電話メモへ記入してください。</div><div class="footerLine"><div>担当者：</div><div>確認完了時刻：</div></div></section>
 
+
+
+<style>
+/* =========================================================
+   2026-08-20 20:41 緊急固定：画面スクロール復帰
+   合格設計図追加の影響で古い固定レイアウトが勝たないよう、最後に上書きする。
+========================================================= */
+html,body{height:auto!important;min-height:100%!important;overflow:auto!important;}
+main.wrap{height:auto!important;min-height:calc(100vh - 64px)!important;overflow:visible!important;display:block!important;}
+#studentGrid.studentGrid{overflow-x:auto!important;overflow-y:visible!important;}
+.studentCard{overflow:visible!important;}
+.goukakuPlanWrap{max-height:360px!important;overflow:auto!important;}
+@media print{html,body{overflow:visible!important;} main.wrap{display:block!important;height:auto!important;}}
+</style>
+<script>
+// 2026-08-20 20:41 緊急固定：高校欄に「担任助手」などの見出し語が入った場合は表示前に除去する。
+(function(){
+  function scrubBadProfileLabels(){
+    try{
+      Object.keys(studentData||{}).forEach(name=>{
+        const d=studentData[name]||{};
+        if(typeof cleanProfileValue==='function'){
+          d.studentNo=cleanProfileValue('studentNo', d.studentNo);
+          d.grade=cleanProfileValue('grade', d.grade);
+          d.school=cleanProfileValue('school', d.school);
+          d.assistant=cleanProfileValue('assistant', d.assistant);
+        }else{
+          if(/^(担任助手|担当|助手|担任|担当者)$/.test(String(d.school||'').trim())) d.school='';
+          if(/^(高校|高校名|学校|学校名)$/.test(String(d.assistant||'').trim())) d.assistant='';
+        }
+      });
+    }catch(e){}
+  }
+  const oldRender=window.renderStudents;
+  if(typeof oldRender==='function'){
+    window.renderStudents=function(options){
+      scrubBadProfileLabels();
+      return oldRender.call(this, options||{});
+    };
+  }
+})();
+</script>
 
 </body></html>`;
 }
