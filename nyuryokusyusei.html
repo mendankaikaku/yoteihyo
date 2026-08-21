@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>面談予定入力アプリ（2026-08-21 17:53 出力）</title>
+<title>面談予定入力アプリ（2026-08-21 17:57 出力）</title>
 <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
 <script src="./libs/xlsx.bundle.js"></script>
 <script></script>
@@ -7576,7 +7576,7 @@ function buildMeetingPrepPrintHtml(resultRecords, weeklyHtml){
         var scale=Math.max(0.02, Math.min(80, scaleX, scaleY));
         // 印刷エンジンの罫線・小数丸めで右端が数px切れるのを防ぐ。
         // 縦倍率は維持し、横方向だけ安全余白を確保する。
-        var horizontalSafety=fitMode==='rotated'?0.95:(fitMode==='half'?0.98:1);
+        var horizontalSafety=fitMode==='rotated'?0.95:(fitMode==='half'?0.95:1);
         var finalScaleX=scale*horizontalSafety;
         var finalScaleY=scale;
         inner.style.transform='scale(' + finalScaleX + ',' + finalScaleY + ')';
