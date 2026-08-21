@@ -8112,14 +8112,9 @@ function applyCompactPrintRows(ws, aoa, widths){
   function smallCellEstimatedLines(text){
     const lines = String(text || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
     if(!lines.length) return 1;
-    // 小規模欄は5pt台まで縮小するため、1文字あたりの必要幅をやや小さめに見積もる。
-    const charsPerLine = Math.max(16, smallW * 1.72);
-    let need = 0;
-    for(const line of lines){
-      const len = allListPrintVisualTextLength(line);
-      need += Math.max(1, Math.ceil(len / charsPerLine));
-    }
-    return Math.max(lines.length, need);
+    // 行高は小規模模試・イベントの件数（明示改行数）で決める。
+    // 長い1行は自動折り返しで高さを増やさず、縮小してセル幅内へ最大サイズで収める。
+    return lines.length;
   }
 
   ws['!rows'] = (aoa || []).map((row, r) => {
@@ -8365,16 +8360,25 @@ function allListBuildAutoPrintWidths(aoa, manualCount, planCount){
 function allListForcePrintTextFitAllCells(ws, range, aoa){
   if(!ws || !range) return;
   const header = aoa?._printSubHeader || aoa?.[1] || [];
+  const headerRows = Math.max(2, Number(aoa?._printHeaderRows || 2));
+  const bottomStart = Number.isFinite(Number(aoa?._printBottomHeaderStart)) ? Number(aoa._printBottomHeaderStart) : -1;
+  const bottomRows = Math.max(0, Number(aoa?._printBottomHeaderRows || 0));
+  const smallCol = Number.isFinite(Number(aoa?._printSmallColumnIndex)) ? Number(aoa._printSmallColumnIndex) : -1;
   for(let R=range.s.r; R<=range.e.r; R++){
     for(let C=range.s.c; C<=range.e.c; C++){
       const addr = XLSX.utils.encode_cell({r:R,c:C});
       if(!ws[addr]) continue;
       const oneLineIdentity = R > 0 && isAllListOneLineIdentityHeader(header[C], C);
+      const isTopHeader = R > 0 && R < headerRows;
+      const isBottomHeader = bottomStart >= 0 && R >= bottomStart && R < bottomStart + bottomRows;
+      const isSmallData = C === smallCol && R >= headerRows && !isBottomHeader;
       ws[addr].s = ws[addr].s || {};
       ws[addr].s.alignment = Object.assign({}, ws[addr].s.alignment || {}, {
         vertical: 'center',
         horizontal: 'center',
-        wrapText: !oneLineIdentity,
+        // 見出しの2段表示と、小規模欄のイベントごとの明示改行だけを残す。
+        // その他のセルは折り返さず、縮小してセル内へ最大サイズで収める。
+        wrapText: isTopHeader || isBottomHeader || isSmallData ? true : false,
         shrinkToFit: true
       });
     }
@@ -8512,6 +8516,7 @@ function styleAllStudentPrintSheet(ws, aoa){
   const eventFill = {fgColor:{rgb:'F5F3FF'}};
   const planFill = {fgColor:{rgb:'FFF7ED'}};
   const missingFill = {fgColor:{rgb:'FECACA'}};
+  const alternateRowGrayFill = {fgColor:{rgb:'F2F2F2'}};
   const printListFontName = allListDisplayFontName();
   const fontTitle = {name:printListFontName, sz:14, bold:true, color:{rgb:'000000'}};
   const fontHeader = {name:printListFontName, sz:6.2, bold:true, color:{rgb:'000000'}};
@@ -8548,7 +8553,10 @@ function styleAllStudentPrintSheet(ws, aoa){
     }else{
       const len = allListPrintVisualTextLength(text);
       if(isData && isSmallCol){
-        cellFont = len > 260 ? fontSmallTiny : (len > 150 ? fontSmallCompact : fontSmallReadable);
+        // 件数が多いときは行高を伸ばすため、総文字数では小さくしない。
+        // 1イベント中の最長行だけを見て、セル幅に収まる最大寄りの文字サイズを選ぶ。
+        const maxLineLen = Math.max(0, ...String(text || '').split(/\r?\n/).map(line => allListPrintVisualTextLength(line)));
+        cellFont = maxLineLen > 70 ? fontSmallTiny : (maxLineLen > 45 ? fontSmallCompact : fontSmallReadable);
       }else{
         cellFont = R===0 ? fontTitle : (isHeader ? fontHeader : (len > 120 ? fontBaseTiny : (len > 70 ? fontBaseMid : fontBase)));
       }
@@ -8567,6 +8575,11 @@ function styleAllStudentPrintSheet(ws, aoa){
     else if(isSmallCol) style.fill = hasSmallBlankWritingField ? missingFill : eventFill;
     else if(isLargeCol) style.fill = isDirectMissing ? missingFill : eventFill;
     else if(isPlanResultCol) style.fill = planFill;
+    // 生徒を横一行ずつ追いやすくして入力・確認ミスを防ぐため、1行おきに薄い灰色を敷く。
+    // 未入力・注意を示す赤背景だけは灰色で上書きしない。
+    if(isData && ((R - headerRows) % 2 === 1) && !isDirectMissing && !hasSmallBlankWritingField){
+      style.fill = alternateRowGrayFill;
+    }
     return style;
   });
 
