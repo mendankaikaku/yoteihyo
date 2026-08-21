@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>面談予定入力アプリ（2026-08-21 16:55 出力）</title>
+<title>面談予定入力アプリ（2026-08-21 17:01 出力）</title>
 <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
 <script src="./libs/xlsx.bundle.js"></script>
 <script></script>
@@ -7500,6 +7500,41 @@ function buildMeetingPrepPrintHtml(resultRecords, weeklyHtml){
         }
       }
     }
+    function applyRequestedGoukakuPrintSizing(){
+      document.querySelectorAll('.goukakuPrintExcelWrap[data-goukaku-fit-excel="1"]').forEach(function(wrap){
+        if(wrap.getAttribute('data-requested-sizing')==='1')return;
+        var mode=wrap.getAttribute('data-fit-mode')||'';
+        if(mode!=='half'&&mode!=='rotated')return;
+        var rowScale=2;
+        var fontScale=mode==='half'?1.5:2;
+        var colScale=mode==='rotated'?1.3:1;
+        var tables=Array.from(wrap.querySelectorAll('table.goukakuPlanTable'));
+        tables.forEach(function(table){
+          var rows=Array.from(table.querySelectorAll('tr'));
+          var rowHeights=rows.map(function(row){return row.getBoundingClientRect().height||row.offsetHeight||parseFloat(row.style.height)||20;});
+          var cells=Array.from(table.querySelectorAll('th,td'));
+          var fontSizes=cells.map(function(cell){return parseFloat(getComputedStyle(cell).fontSize)||10;});
+          var cols=Array.from(table.querySelectorAll('col'));
+          var colWidths=cols.map(function(col){
+            var inlineWidth=parseFloat(col.style.width);
+            return inlineWidth||col.getBoundingClientRect().width||parseFloat(getComputedStyle(col).width)||34;
+          });
+          rows.forEach(function(row,i){row.style.height=(rowHeights[i]*rowScale).toFixed(2)+'px';});
+          cells.forEach(function(cell,i){cell.style.fontSize=(fontSizes[i]*fontScale).toFixed(2)+'px';});
+          if(colScale!==1)cols.forEach(function(col,i){col.style.width=(colWidths[i]*colScale).toFixed(2)+'px';});
+        });
+        if(mode==='half'){
+          Array.from(wrap.querySelectorAll('.goukakuBookBlankRow')).forEach(function(row){
+            var h=row.getBoundingClientRect().height||row.offsetHeight||parseFloat(row.style.height)||20;
+            row.style.height=(h*rowScale).toFixed(2)+'px';
+          });
+        }
+        wrap.setAttribute('data-row-scale','2');
+        wrap.setAttribute('data-font-scale',String(fontScale));
+        wrap.setAttribute('data-col-scale',String(colScale));
+        wrap.setAttribute('data-requested-sizing','1');
+      });
+    }
     function fitGoukakuExcelPrintPages(){
       function mmToPx(mm){ return mm * 96 / 25.4; }
       document.querySelectorAll('.goukakuPrintExcelWrap[data-goukaku-fit-excel="1"]').forEach(function(wrap){
@@ -7598,6 +7633,7 @@ function buildMeetingPrepPrintHtml(resultRecords, weeklyHtml){
     }
     async function prepareMeetingPrepPrint(){
       await renderGoukakuPdfAllPages();
+      applyRequestedGoukakuPrintSizing();
       fitGoukakuExcelPrintPages();
       fitMeetingPrepFirstPages();
       fitMeetingFlowHalf();
