@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>面談予定入力アプリ（2026-08-20 23:59 出力）</title>
+<title>面談予定入力アプリ（2026-08-21 13:35 出力）</title>
 <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
 <script src="./libs/xlsx.bundle.js"></script>
 <script></script>
@@ -2765,6 +2765,52 @@ function downloadGoukakuExcelBlob(blob,fileName){
   a.remove();
   setTimeout(()=>URL.revokeObjectURL(url),30000);
 }
+function buildLightweightGoukakuWorkbook(sourceWorkbook){
+  if(!sourceWorkbook || !window.XLSX)throw new Error('軽量Excelを作成するための元ブックがありません。');
+  const outWorkbook=XLSX.utils.book_new();
+  let cellCount=0, formulaCount=0;
+  for(const sheetName of sourceWorkbook.SheetNames||[]){
+    const sourceSheet=sourceWorkbook.Sheets?.[sheetName]||{};
+    const outSheet={};
+    let minR=Infinity,minC=Infinity,maxR=-1,maxC=-1;
+    for(const addr of Object.keys(sourceSheet)){
+      if(addr.startsWith('!') || !/^[A-Z]+\d+$/i.test(addr))continue;
+      const cell=sourceSheet[addr];
+      if(!cell || typeof cell!=='object')continue;
+      const hasFormula=typeof cell.f==='string' && cell.f.length>0;
+      const hasValue=Object.prototype.hasOwnProperty.call(cell,'v') && cell.v!==undefined && cell.v!==null;
+      if(!hasFormula && !hasValue)continue;
+      const next={};
+      if(cell.t!==undefined)next.t=cell.t;
+      if(hasValue)next.v=cell.v;
+      if(hasFormula){next.f=cell.f;formulaCount++;}
+      // 配列数式・動的配列数式の範囲情報は数式の一部として保持する。
+      if(cell.F!==undefined)next.F=cell.F;
+      if(cell.D!==undefined)next.D=cell.D;
+      outSheet[addr]=next;
+      cellCount++;
+      const pos=XLSX.utils.decode_cell(addr);
+      minR=Math.min(minR,pos.r);minC=Math.min(minC,pos.c);maxR=Math.max(maxR,pos.r);maxC=Math.max(maxC,pos.c);
+    }
+    outSheet['!ref']=maxR>=0
+      ? XLSX.utils.encode_range({s:{r:minR,c:minC},e:{r:maxR,c:maxC}})
+      : 'A1:A1';
+    XLSX.utils.book_append_sheet(outWorkbook,outSheet,String(sheetName).slice(0,31));
+  }
+  // 名前定義と1904日付設定は、数式・日付の意味を壊さないための最小情報だけ保持する。
+  const names=(sourceWorkbook.Workbook?.Names||[]).map(n=>{
+    const x={};
+    ['Name','Ref','Sheet'].forEach(k=>{if(n?.[k]!==undefined)x[k]=n[k];});
+    return x;
+  }).filter(n=>n.Name&&n.Ref);
+  const date1904=sourceWorkbook.Workbook?.WBProps?.date1904;
+  if(names.length || date1904!==undefined){
+    outWorkbook.Workbook=outWorkbook.Workbook||{};
+    if(names.length)outWorkbook.Workbook.Names=names;
+    if(date1904!==undefined)outWorkbook.Workbook.WBProps={date1904};
+  }
+  return {workbook:outWorkbook,cellCount,formulaCount};
+}
 async function saveEditedGoukakuExcelForStudent(name){
   const item=goukakuDesignSheets[name];
   if(!item || item.kind!=='excel') return {ok:false,msg:`${name}: 合格設計図Excelが読み込まれていません。`};
@@ -2779,10 +2825,12 @@ async function saveEditedGoukakuExcelForStudent(name){
     Object.entries(item.editedCells || {}).forEach(([addr,value])=>applyGoukakuEditToWorkbook(item, addr, value, item.sheetName));
     stage='フォルダーの書込権限確認';
     if(!(await ensureGoukakuWritePermission(item.dirHandle)))throw new Error('生徒フォルダへの書込権限が許可されませんでした。');
-    // xlsxはZIPコンテナ。圧縮を明示しないと、同じ内容でも保存後の容量が大きくなりやすい。
+    // 元ブックの書式・画像・コメント・巨大な空セル範囲は持ち越さず、セル番地・値・数式だけで再構成する。
     stage='Excelデータの生成';
-    goukakuSaveLog(`${name}: ExcelデータをZIP圧縮で生成中`);
-    const out=XLSX.write(item.workbook,{bookType:'xlsx',type:'array',cellStyles:true,compression:true});
+    goukakuSaveLog(`${name}: セル番地・値・数式だけの軽量Excelを生成中`);
+    const lightweight=buildLightweightGoukakuWorkbook(item.workbook);
+    goukakuSaveLog(`${name}: 軽量化対象 ${lightweight.cellCount}セル（数式 ${lightweight.formulaCount}セル）`);
+    const out=XLSX.write(lightweight.workbook,{bookType:'xlsx',type:'array',cellStyles:false,bookSST:false,compression:true});
     const blob=new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     const fileName=editedGoukakuFileName(item);
     const wasEditedFile=isGoukakuEditedWorkbookFileName(item.fileName);
@@ -2827,7 +2875,7 @@ async function saveEditedGoukakuExcelForStudent(name){
 
     const action=(wasEditedFile&&savedName===fileName) ? '上書き保存しました' : '新規作成しました';
     const beforeSize=sourceFileSize ? `${(sourceFileSize/1024/1024).toFixed(2)} MB → ` : '';
-    const sizeNote=item.lastSavedFileSize ? `\nファイルサイズ：${beforeSize}${(item.lastSavedFileSize/1024/1024).toFixed(2)} MB（ZIP圧縮あり）` : '';
+    const sizeNote=item.lastSavedFileSize ? `\nファイルサイズ：${beforeSize}${(item.lastSavedFileSize/1024/1024).toFixed(2)} MB（セル番地・値・数式のみ）` : '';
     const msg=`${name}: 合格設計図の編集セル ${count}件を${action}。\n保存先：${item.path || ''} / ${savedName}${sizeNote}${rereadWarning}`;
     goukakuSaveLog(msg);
     return {ok:true,msg};
@@ -9342,21 +9390,73 @@ try{
 </script>
 <script>
 /* v20260820_1953 ④復元：フォルダー選択後すぐ生徒パネルへ表示 */
-async function loadGroup(){
+const RESTORE_LOADING_STATE={active:false,stage:'',dots:1,timer:null};
+function restoreLoadingElements(){
+  const button=document.getElementById('quietLogButton');
+  const panel=document.getElementById('quietLogPanel');
+  const brief=document.getElementById('quietLogBrief');
+  let row=document.getElementById('restoreLoadingLive');
+  if(panel && !row){
+    row=document.createElement('div');
+    row.id='restoreLoadingLive';
+    row.style.cssText='display:none;margin:8px 10px 0;padding:8px 10px;border:1px solid #93c5fd;border-radius:9px;background:#eff6ff;color:#1d4ed8;font-weight:900;white-space:pre-wrap;';
+    const head=panel.querySelector('.quietLogHead');
+    if(head) head.insertAdjacentElement('afterend',row); else panel.prepend(row);
+  }
+  return {button,panel,brief,row};
+}
+function renderRestoreLoading(){
+  if(!RESTORE_LOADING_STATE.active)return;
+  const parts=restoreLoadingElements();
+  const dots='.'.repeat(RESTORE_LOADING_STATE.dots);
+  const text=`④ 読み込み中${dots} ${RESTORE_LOADING_STATE.stage}`;
+  if(parts.button) parts.button.textContent=`読込中${dots}`;
+  if(parts.row){parts.row.style.display='block';parts.row.textContent=text;}
+  if(parts.brief){parts.brief.textContent=text;parts.brief.classList.add('show');}
+}
+function restoreLoadingStart(stage){
+  restoreLoadingStop();
+  RESTORE_LOADING_STATE.active=true;
+  RESTORE_LOADING_STATE.stage=String(stage||'復元準備中');
+  RESTORE_LOADING_STATE.dots=1;
+  renderRestoreLoading();
+  RESTORE_LOADING_STATE.timer=setInterval(()=>{
+    RESTORE_LOADING_STATE.dots=RESTORE_LOADING_STATE.dots%3+1;
+    renderRestoreLoading();
+  },420);
+}
+function restoreLoadingStage(stage){
+  if(!RESTORE_LOADING_STATE.active)return;
+  RESTORE_LOADING_STATE.stage=String(stage||'読み取り中');
+  RESTORE_LOADING_STATE.dots=1;
+  renderRestoreLoading();
+}
+function restoreLoadingStop(){
+  if(RESTORE_LOADING_STATE.timer){clearInterval(RESTORE_LOADING_STATE.timer);RESTORE_LOADING_STATE.timer=null;}
+  RESTORE_LOADING_STATE.active=false;
+  const parts=restoreLoadingElements();
+  if(parts.row){parts.row.style.display='none';parts.row.textContent='';}
+  if(parts.button) parts.button.textContent=`ログ ${(window.__QUIET_LOGS__||[]).length}`;
+}
+async function loadGroupCoreWithProgress(){
   const names=splitNames();
   if(!names.length) return alert('先に生徒名を入力してください。');
   let mem=null, place='未取得';
   const details=[];
   inputRestoreConflictLog=[];
   LAST_PROFILE_RESTORE_LOGS=[];
+  restoreLoadingStage('保存復元フォルダーの選択待ち');
   showSaveInfo('④復元：保存復元フォルダーを選択してください。');
   const dir=await pickSaveRootFolder(true);
   if(dir){
     try{
+      restoreLoadingStage('生徒フォルダーと対応表Excelを確認中');
       showSaveInfo('④復元：フォルダーを読み取り中です。JSON・個人Excel・対応表を確認しています。');
       await refreshDynamicStudentNameCandidatesFromFolder(dir);
       await refreshRosterProfilesFromShared(true);
+      restoreLoadingStage('マスタ設定を読み込み中');
       await applySharedSettingsIfAny();
+      restoreLoadingStage('グループJSONを確認中');
       const groupHit=await readGroupJsonFromSharedByNames(names);
       if(groupHit.mem){
         mem=groupHit.mem;
@@ -9368,6 +9468,7 @@ async function loadGroup(){
       if(!mem){
         const collected={}, missing=[];
         for(const name of names){
+          restoreLoadingStage(`${name}の個人JSONを確認中`);
           const oneHit=await readStudentJsonFromSharedByName(name);
           if(oneHit.mem){
             oneHit.mem._sourceUpdatedAtMillis=oneHit.sourceModified || inputTimeMillis(oneHit.mem.savedAt);
@@ -9385,6 +9486,7 @@ async function loadGroup(){
     }catch(e){ details.push(`保存復元フォルダー読込エラー: ${e?.message || e}`); }
   }
   if(!mem){
+    restoreLoadingStage('ブラウザ内の保存データを確認中');
     const s=localStorage.getItem(`yoteiGroupMemory:${names.join('|')}`);
     mem=s?JSON.parse(s):null;
     if(mem) place='ブラウザ内グループ保存';
@@ -9408,6 +9510,7 @@ async function loadGroup(){
   $('#studentNames').value=students.join(', ');
   Object.assign(studentData, applyRestoredStudentMapForInput(mem.studentData||{}));
   try{
+    restoreLoadingStage('個人Excel・対応表からプロフィールを補完中');
     if(typeof applyProfilePriorityAfterJsonRestore==='function') await applyProfilePriorityAfterJsonRestore(students);
     else{
       const rosterProfileResult=applyRosterProfilesToStudents(students);
@@ -9418,8 +9521,11 @@ async function loadGroup(){
   applyExamMasterFromRestoredMemory(mem, '復元JSON');
   renderExamMasterPanel(); renderEventMasterPanel(); renderCommentMasterPanel();
   if(dir){
+    restoreLoadingStage('全員分リストを反映中');
     try{ const allListResult=await applyAllStudentListOverridesToInput(students); if(allListResult?.msg) details.push(allListResult.msg); }catch(e){ details.push(`全員分リスト反映エラー: ${e?.message || e}`); }
+    restoreLoadingStage('科目リストを反映中');
     try{ const subjectListResult=await applySubjectListOverridesToInput(students); if(subjectListResult) details.push(`科目リスト反映: ${subjectListResult.count || 0}件`); }catch(e){ details.push(`科目リスト反映エラー: ${e?.message || e}`); }
+    restoreLoadingStage('復元結果を確認中');
     try{ const diagLines=await buildInputRestoreDiagnostics(dir, students); if(diagLines.length) details.push(diagLines.join('\n')); }catch(e){ details.push(`復元診断エラー: ${e?.message || e}`); }
     const conflictLines=inputRestoreConflictSummaryLines(); if(conflictLines?.length) details.push(conflictLines.join('\n'));
   }
@@ -9431,18 +9537,36 @@ async function loadGroup(){
   await new Promise(resolve=>setTimeout(resolve,0));
   if(dir){
     try{
+      restoreLoadingStage('担任助手・生徒フォルダーを確認中');
       const studentParent=await findStudentFolderParentFromSaveRoot(dir, students);
       if(studentParent?.label) details.push(`担任助手フォルダ: ${studentParent.label}`);
       details.push('週面シート: 読み取り廃止（3ページ目は常に面談フロー）');
+      restoreLoadingStage('合格設計図Excelを読み込み中');
       const goukakuResult=await loadGoukakuDesignsFromRoot(dir, students);
       const goukakuMsg=formatGoukakuLoadSummary(goukakuResult);
       if(goukakuMsg) details.push(goukakuMsg);
     }catch(e){ details.push(`合格設計図読込エラー: ${e?.message || e}`); }
+    restoreLoadingStage('結果履歴を確認中');
     try{ const hist=await readPrepResultHistoryFromShared(); if(hist.debug?.length) details.push(hist.debug.join(' / ')); }catch(e){ details.push(`結果履歴JSON確認エラー: ${e?.message || e}`); }
   }
   const finalDetails=[...details, ...LAST_PROFILE_RESTORE_LOGS].filter(Boolean);
   const detailText=finalDetails.length?'\n'+Array.from(new Set(finalDetails)).join('\n'):'';
+  restoreLoadingStage('読み込み完了');
   showSaveInfo(`内容を復元しました：${students.join('、')}（${savedAt} / ${place}）${detailText}`);
+}
+async function loadGroup(){
+  const names=splitNames();
+  if(!names.length)return alert('先に生徒名を入力してください。');
+  restoreLoadingStart('復元準備中');
+  try{
+    return await loadGroupCoreWithProgress();
+  }catch(e){
+    const msg=`④復元エラー：${e?.message || e}`;
+    if(typeof addQuietLog==='function')addQuietLog(msg);
+    else alert(msg);
+  }finally{
+    restoreLoadingStop();
+  }
 }
 try{
   const oldBindGlobalEventsForRestore1953=bindGlobalEvents;
