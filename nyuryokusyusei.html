@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>面談予定入力アプリ（2026-08-21 14:34 出力）</title>
+<title>面談予定入力アプリ（2026-08-21 14:54 出力）</title>
 <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
 <script src="./libs/xlsx.bundle.js"></script>
 <script></script>
@@ -2591,7 +2591,7 @@ function goukakuPanelHtml(name){
   if(item.kind==='pdf') return `<div class="goukakuPlanBox"><div class="goukakuPlanHead"><div><div class="goukakuPlanTitle">合格設計図PDF</div><div class="goukakuPlanMeta">${escapeHtml(item.fileName||'')}</div></div><div class="goukakuPlanActions"><button type="button" class="secondary small" data-open-goukaku="${escapeHtml(name)}">開く</button></div></div><div class="goukakuPlanEmpty">PDFは学習計画表の抽出対象外です。Excel形式の合格設計図を置くと4表を表示できます。</div></div>`;
   const cnt=goukakuEditedCount(item);
   const sourceMeta=`原本：${item.baseFileName||item.fileName||''}${item.valueSnapshotFileName?` / 入力値：${item.valueSnapshotFileName}`:''} / ${item.sheetName||''}`;
-  return `<div class="goukakuPlanBox"><div class="goukakuPlanHead"><div><div class="goukakuPlanTitle">合格設計図 学習計画${cnt?`<span class="goukakuDirtyBadge">編集 ${cnt}セル</span>`:''}</div><div class="goukakuPlanMeta">${escapeHtml(sourceMeta)}</div></div><div class="goukakuPlanActions"><button type="button" class="secondary small" data-open-goukaku="${escapeHtml(name)}">拡大</button><button type="button" class="secondary small" data-add-goukaku-course="${escapeHtml(name)}">講座行を追加</button><button type="button" class="secondary small" data-save-goukaku-excel="${escapeHtml(name)}">入力差分Excelを保存</button></div></div><div class="goukakuPlanNotice">原本Excelの数式・結合・配置を使い、最新の入力差分を同じセル番地へ重ねています。数式のないセルは直接編集でき、数式セルは原本基準で編集不可です。保存するのは実際に編集したセル番地と値だけで、未編集セルは更新された原本の値を使います。</div><div class="goukakuPlanWrap">${goukakuBookLayoutHtml(item,name,{editable:true})}</div></div>`;
+  return `<div class="goukakuPlanBox"><div class="goukakuPlanHead"><div><div class="goukakuPlanTitle">合格設計図 学習計画${cnt?`<span class="goukakuDirtyBadge">編集 ${cnt}セル</span>`:''}</div><div class="goukakuPlanMeta">${escapeHtml(sourceMeta)}</div></div><div class="goukakuPlanActions"><button type="button" class="secondary small" data-open-goukaku="${escapeHtml(name)}">拡大</button><button type="button" class="secondary small" data-add-goukaku-course="${escapeHtml(name)}">講座行を追加</button><button type="button" class="secondary small" data-save-goukaku-excel="${escapeHtml(name)}">入力差分Excelを保存</button></div></div><div class="goukakuPlanNotice">原本Excelの数式・結合・配置を使い、最新の入力差分を同じセル番地へ重ねています。数式のないセルは直接編集でき、数式セルは原本基準で編集不可です。差分Excelは「入力差分一覧」と「元のセル番地へ値を置いたシート」の2枚を保存し、未編集セルは更新された原本の値を使います。</div><div class="goukakuPlanWrap">${goukakuBookLayoutHtml(item,name,{editable:true})}</div></div>`;
 }
 function renderGoukakuPanel(name){
   const host=document.querySelector(`[data-goukaku-panel="${cssEscape(name)}"]`);
@@ -2647,7 +2647,7 @@ function openGoukakuModal(name){
   if(item.kind === 'pdf'){
     $('#goukakuModalBody').innerHTML=`<div class="hint" style="padding:8px 0">PDFは学習計画表の抽出対象外です。Excel形式の合格設計図を生徒フォルダに置いてください。</div><div class="goukakuPdfWrap"><iframe class="goukakuPdfFrame" src="${escapeHtml(item.pdfUrl||'')}"></iframe></div>`;
   }else{
-    $('#goukakuModalBody').innerHTML='<div class="goukakuPlanNotice">原本Excelの数式・結合・配置へ最新の入力差分を重ねて表示しています。数式セルは原本基準で編集不可です。新しい通期講座は「講座行を追加」で入力してください。保存するのは編集したセル番地と値だけです。</div><div class="goukakuPlanActions" style="padding:8px 0"><button type="button" class="secondary small" data-add-goukaku-course="'+escapeHtml(name)+'">講座行を追加</button><button type="button" class="secondary small" data-save-goukaku-excel="'+escapeHtml(name)+'">入力差分Excelを保存</button><button type="button" class="secondary small" data-clear-goukaku-edits="'+escapeHtml(name)+'">編集をクリア</button></div><div class="goukakuPlanWrap" style="max-height:none">'+goukakuBookLayoutHtml(item,name,{editable:true})+'</div>';
+    $('#goukakuModalBody').innerHTML='<div class="goukakuPlanNotice">原本Excelの数式・結合・配置へ最新の入力差分を重ねて表示しています。数式セルは原本基準で編集不可です。新しい通期講座は「講座行を追加」で入力してください。差分Excelには一覧表と、一覧化前の元セル番地シートの両方を保存します。</div><div class="goukakuPlanActions" style="padding:8px 0"><button type="button" class="secondary small" data-add-goukaku-course="'+escapeHtml(name)+'">講座行を追加</button><button type="button" class="secondary small" data-save-goukaku-excel="'+escapeHtml(name)+'">入力差分Excelを保存</button><button type="button" class="secondary small" data-clear-goukaku-edits="'+escapeHtml(name)+'">編集をクリア</button></div><div class="goukakuPlanWrap" style="max-height:none">'+goukakuBookLayoutHtml(item,name,{editable:true})+'</div>';
     setTimeout(bindGoukakuButtons,0);
   }
   $('#goukakuModal').classList.add('open');
@@ -2773,11 +2773,13 @@ function buildLightweightGoukakuWorkbook(sourceWorkbook, onlySheetName, valueCel
   let cellCount=0, formulaProtected=0;
   for(const sheetName of [selectedSheetName]){
     const sourceSheet=sourceWorkbook.Sheets?.[sheetName]||{};
-    const outSheet={
+    const listSheet={
       A1:{v:'合格設計図 入力差分（アプリ用）',t:'s'},
       A2:{v:'セル番地',t:'s'},B2:{v:'入力値',t:'s'},C2:{v:'値の型',t:'s'}
     };
+    const positionedSheet={};
     let outputRow=3;
+    let minR=Infinity,minC=Infinity,maxR=-1,maxC=-1;
     for(const [rawAddr,rawValue] of Object.entries(valueCells||{})){
       const addr=String(rawAddr||'').toUpperCase();
       if(!/^[A-Z]+\d+$/.test(addr))continue;
@@ -2788,15 +2790,24 @@ function buildLightweightGoukakuWorkbook(sourceWorkbook, onlySheetName, valueCel
       else if(typeof rawValue==='number')next={v:rawValue,t:'n'};
       else if(typeof rawValue==='boolean')next={v:rawValue,t:'b'};
       else next=normalizeGoukakuCellValueForWrite(rawValue);
-      outSheet[`A${outputRow}`]={v:addr,t:'s'};
-      outSheet[`B${outputRow}`]=next;
-      outSheet[`C${outputRow}`]={v:next.t||'s',t:'s'};
+      listSheet[`A${outputRow}`]={v:addr,t:'s'};
+      listSheet[`B${outputRow}`]=Object.assign({},next);
+      listSheet[`C${outputRow}`]={v:next.t||'s',t:'s'};
+      // 一覧表にする前の方式：元Excelと同じセル番地へ差分値だけを置く。
+      positionedSheet[addr]=Object.assign({},next);
+      const pos=XLSX.utils.decode_cell(addr);
+      minR=Math.min(minR,pos.r);minC=Math.min(minC,pos.c);maxR=Math.max(maxR,pos.r);maxC=Math.max(maxC,pos.c);
       outputRow++;
       cellCount++;
     }
-    outSheet['!ref']=`A1:C${Math.max(2,outputRow-1)}`;
-    outSheet['!cols']=[{wch:16},{wch:42},{wch:10}];
-    XLSX.utils.book_append_sheet(outWorkbook,outSheet,String(sheetName).slice(0,31));
+    listSheet['!ref']=`A1:C${Math.max(2,outputRow-1)}`;
+    listSheet['!cols']=[{wch:16},{wch:42},{wch:10}];
+    positionedSheet['!ref']=maxR>=0
+      ? XLSX.utils.encode_range({s:{r:minR,c:minC},e:{r:maxR,c:maxC}})
+      : 'A1:A1';
+    const listSheetName=sheetName==='入力差分一覧'?'入力差分一覧_確認':'入力差分一覧';
+    XLSX.utils.book_append_sheet(outWorkbook,listSheet,listSheetName);
+    XLSX.utils.book_append_sheet(outWorkbook,positionedSheet,String(sheetName).slice(0,31));
   }
   // 値だけのスナップショットなので名前定義は保存しない。日付基準だけは値の意味を守るため保持する。
   const date1904=sourceWorkbook.Workbook?.WBProps?.date1904;
@@ -2804,7 +2815,7 @@ function buildLightweightGoukakuWorkbook(sourceWorkbook, onlySheetName, valueCel
     outWorkbook.Workbook=outWorkbook.Workbook||{};
     outWorkbook.Workbook.WBProps={date1904};
   }
-  return {workbook:outWorkbook,cellCount,formulaProtected,sheetName:selectedSheetName};
+  return {workbook:outWorkbook,cellCount,formulaProtected,sheetName:selectedSheetName,sheetCount:2};
 }
 async function saveEditedGoukakuExcelForStudent(name){
   const item=goukakuDesignSheets[name];
@@ -2825,7 +2836,7 @@ async function saveEditedGoukakuExcelForStudent(name){
     stage='Excelデータの生成';
     goukakuSaveLog(`${name}: 合格設計図シート「${item.sheetName}」の入力差分だけを保存する軽量Excelを生成中`);
     const lightweight=buildLightweightGoukakuWorkbook(item.workbook,item.sheetName,mergedValues);
-    goukakuSaveLog(`${name}: 保存対象「${lightweight.sheetName}」1シート / 入力差分 ${lightweight.cellCount}セル（数式 ${lightweight.formulaProtected}セル保護）`);
+    goukakuSaveLog(`${name}: 差分Excel 2シート（入力差分一覧 / 元座標「${lightweight.sheetName}」） / 入力差分 ${lightweight.cellCount}セル（数式 ${lightweight.formulaProtected}セル保護）`);
     const out=XLSX.write(lightweight.workbook,{bookType:'xlsx',type:'array',cellStyles:false,bookSST:false,compression:true});
     const blob=new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     const fileName=editedGoukakuFileName(item);
@@ -2869,7 +2880,7 @@ async function saveEditedGoukakuExcelForStudent(name){
 
     const action=(wasEditedFile&&savedName===fileName) ? '上書き保存しました' : '新規作成しました';
     const beforeSize=sourceFileSize ? `${(sourceFileSize/1024/1024).toFixed(2)} MB → ` : '';
-    const sizeNote=item.lastSavedFileSize ? `\nファイルサイズ：${beforeSize}${(item.lastSavedFileSize/1024/1024).toFixed(2)} MB（合格設計図1シート・入力差分のみ）` : '';
+    const sizeNote=item.lastSavedFileSize ? `\nファイルサイズ：${beforeSize}${(item.lastSavedFileSize/1024/1024).toFixed(2)} MB（差分一覧＋元座標の2シート）` : '';
     const msg=`${name}: 合格設計図の編集セル ${count}件を入力差分へ${action}。\n原本：${item.baseFileName||item.fileName||''}\n保存先：${item.path || ''} / ${savedName}${sizeNote}${rereadWarning}`;
     goukakuSaveLog(msg);
     return {ok:true,msg};
