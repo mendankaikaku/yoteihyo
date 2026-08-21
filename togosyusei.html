@@ -6920,6 +6920,29 @@ function allListPatchWorksheetXmlWithPrintStudentRowHeight(xml, opt={}){
     return `<row${a} ht="${h}" customHeight="1">`;
   });
 }
+function allListPatchWorksheetXmlWithB4TwoPagePrint(xml){
+  // SheetJSの環境差で !pageSetup が落ちても、Excel内部XMLへ直接
+  // 「B4横・横1ページ・縦2ページ」を確実に書き込む。
+  let out = String(xml || '');
+  out = out.replace(/<pageSetUpPr\b[^>]*\/>/g, '');
+  if(/<sheetPr\b[^>]*\/>/.test(out)){
+    out = out.replace(/<sheetPr\b([^>]*)\/>/, '<sheetPr$1><pageSetUpPr fitToPage="1"/></sheetPr>');
+  }else if(/<\/sheetPr>/.test(out)){
+    out = out.replace(/<\/sheetPr>/, '<pageSetUpPr fitToPage="1"/></sheetPr>');
+  }else{
+    out = out.replace(/(<worksheet\b[^>]*>)/, '$1<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>');
+  }
+  out = out
+    .replace(/<printOptions\b[^>]*\/>/g, '')
+    .replace(/<pageMargins\b[^>]*\/>/g, '')
+    .replace(/<pageSetup\b[^>]*\/>/g, '');
+  const printXml = '<printOptions horizontalCentered="1" verticalCentered="0"/>' +
+    '<pageMargins left="0.03" right="0.03" top="0.05" bottom="0.05" header="0" footer="0"/>' +
+    '<pageSetup paperSize="12" orientation="landscape" fitToWidth="1" fitToHeight="2" horizontalDpi="300" verticalDpi="300" usePrinterDefaults="0"/>';
+  const insertBefore = out.search(/<headerFooter\b|<drawing\b|<legacyDrawing\b|<picture\b|<tableParts\b|<extLst\b|<\/worksheet>/);
+  if(insertBefore >= 0) return out.slice(0, insertBefore) + printXml + out.slice(insertBefore);
+  return out + printXml;
+}
 function allListCrc32Table(){
   if(window.__allListCrc32Table) return window.__allListCrc32Table;
   const table = new Uint32Array(256);
@@ -7017,7 +7040,8 @@ async function allListWriteFileWithDropdownXml(wb, filename){
       const specs = ws && ws['!allListDropdownSpecs'];
       const needRowHeightPatch = !!(ws && ws['!forceAllListInputRowHeight32']);
       const needPrintRowHeightPatch = !!(ws && ws['!forceAllListPrintStudentRowHeight']);
-      if((!specs || !specs.length) && !needRowHeightPatch && !needPrintRowHeightPatch) continue;
+      const needB4TwoPagePrintPatch = !!(ws && ws['!forceAllListB4TwoPagePrint']);
+      if((!specs || !specs.length) && !needRowHeightPatch && !needPrintRowHeightPatch && !needB4TwoPagePrintPatch) continue;
       const path = `xl/worksheets/sheet${i+1}.xml`;
       const entry = entries.find(e => e.name === path);
       if(!entry) continue;
@@ -7037,6 +7061,9 @@ async function allListWriteFileWithDropdownXml(wb, filename){
           bottomHeaderRows: ws['!allListPrintBottomHeaderRows'] || 0
         });
         rowHeightPatchedCount++;
+      }
+      if(needB4TwoPagePrintPatch){
+        patched = allListPatchWorksheetXmlWithB4TwoPagePrint(patched);
       }
       entry.data = enc.encode(patched);
       patchedCount++;
@@ -8284,6 +8311,8 @@ function allListApplyB4LandscapeOnePagePrintSettings(ws){
     header: 0,
     footer: 0
   };
+  // xlsx XML直書き段階でも同じ印刷設定を再適用する印。
+  ws['!forceAllListB4TwoPagePrint'] = true;
 }
 
 
@@ -8462,7 +8491,8 @@ function allListAdjustPrintWidthsToB4LandscapeAspect(ws, widths){
   // Excel列幅(wch)と行高(pt)は単位が違うため、一般的な表示換算で近似する。
   // 1pt ≒ 96/72px、1wch ≒ 7px として、表全体の見た目比をB4横に合わせる。
   const rowHeightPx = totalRowHpt * (96 / 72);
-  const targetTotalWch = (rowHeightPx * B4_LANDSCAPE_RATIO) / 7;
+  // Excel/プリンタごとの列幅換算差で右端だけ2枚目へ送られないよう、横幅に6%の安全余白を持たせる。
+  const targetTotalWch = ((rowHeightPx * B4_LANDSCAPE_RATIO) / 7) * 0.94;
   const currentTotalWch = widths.reduce((sum, w) => sum + Number(w || 0), 0);
   if(!currentTotalWch || !targetTotalWch) return widths;
 
