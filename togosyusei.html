@@ -7740,6 +7740,7 @@ function styleAllStudentGradeSheet(ws, aoa){
   const resultFill = {fgColor:{rgb:'ECFDF5'}};
   const missingFill = {fgColor:{rgb:'FECACA'}};
   const conflictFill = {fgColor:{rgb:'FDE68A'}};
+  const alternateRowGrayFill = {fgColor:{rgb:'F2F2F2'}};
   const inputListFontName = allListDisplayFontName();
   const fontTitle = {name:inputListFontName, sz:11, bold:true, color:{rgb:'000000'}};
   const fontHeader = {name:inputListFontName, sz:7.2, bold:true, color:{rgb:'000000'}};
@@ -7781,6 +7782,11 @@ function styleAllStudentGradeSheet(ws, aoa){
       else if(headerText.includes('\n結果')) style.fill = resultFill;
       else if(isExtra) style.fill = extraFill;
       else style.fill = baseFill;
+    }
+    // 入力用も生徒行を横に追いやすくするため、1行おきに薄い灰色を敷く。
+    // 未入力の赤色と衝突の黄色は、この後で優先して上書きする。
+    if(R>=inputDataStart && ((R - inputDataStart) % 2 === 1)){
+      style.fill = alternateRowGrayFill;
     }
     if(isMissing){
       style.fill = missingFill;
