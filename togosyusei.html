@@ -377,6 +377,62 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
 }
 
 </style>
+<style id="simpleIntegrationScreenStyle">
+/* 統合用の簡易画面：指定された操作ボタンとログ以外は表示しない。DOMは残して内部処理を維持する。 */
+header .headerInner > div:first-child,
+#download1mBtn,
+#downloadBtn,
+#cleanupOldFilesBtn,
+#dailyPosterTargetPreview,
+#clearBtn,
+#outputButtonReason{
+  display:none!important;
+}
+header .headerInner{
+  display:block!important;
+}
+header .headerActions{
+  display:grid!important;
+  grid-template-columns:repeat(4,minmax(170px,1fr))!important;
+  gap:10px!important;
+  width:100%!important;
+}
+.wrap{
+  display:block!important;
+  max-width:1500px!important;
+  margin:0 auto!important;
+  padding:14px!important;
+}
+.controlGrid{
+  display:block!important;
+  margin:0 0 12px!important;
+}
+.controlGrid > *{
+  display:none!important;
+}
+.controlGrid > .card:last-child{
+  display:block!important;
+}
+.controlGrid > .card:last-child .cardTitle{
+  margin-bottom:8px!important;
+}
+.previewCard .stats,
+.previewCard .tabs,
+#calendarPane,
+#listPane,
+#resultPane,
+#rosterPane{
+  display:none!important;
+}
+#logPane{
+  display:block!important;
+  max-height:none!important;
+  min-height:240px!important;
+}
+@media(max-width:900px){
+  header .headerActions{grid-template-columns:repeat(2,minmax(150px,1fr))!important;}
+}
+</style>
 <!-- 精査済み: 印刷用行高は34.8ptを基準に小規模模試イベント量で可変・中央揃え・模試イベント太罫線版 -->
 <!-- 精査済み: 志望校登録は大規模模試2段見出し内、または小規模模試イベント欄の文章内だけ許可。独立列は禁止。 -->
 </head>
