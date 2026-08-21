@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>面談予定入力アプリ（2026-08-21 16:11 出力）</title>
+<title>面談予定入力アプリ（2026-08-21 16:23 出力）</title>
 <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
 <script src="./libs/xlsx.bundle.js"></script>
 <script></script>
@@ -6726,6 +6726,7 @@ function prepHighSpeedRecordFromRow(row, idx, fileName, sheetName, sourceRow){
     result:summary,
     dateObj:dateOnly, dateKey:ymd(dateOnly), timeLabel:hm(dt),
     summary,
+    highSpeedPassCount:correct,
     sourceFile:fileName || '毎日更新.xlsx',
     sourceSheet:sheetName || '高速マスターデイリー',
     sourceRow,
@@ -7026,6 +7027,46 @@ function resultForStudentDate(resultRecords, name, dateKey){
   // 名前は空白・全角空白・苗字だけ/フルネームの差を吸収する。
   return resultRecords.filter(r=>String(r.dateKey||'')===String(dateKey||'') && prepResultMatchesStudent(r, name));
 }
+const MEETING_PREP_RESULT_LINE_LIMIT=4;
+function prepIsHighSpeedResultRecord(record){
+  return /高速|高マス|マスター|高速マスターデイリー/.test([
+    record?.type,record?.study,record?.result,record?.summary,record?.sourceSheet,record?.sourceFormat
+  ].map(norm).join(' '));
+}
+function prepHighSpeedPassCountFromRecord(record){
+  const direct=Number(record?.highSpeedPassCount);
+  if(Number.isFinite(direct)&&direct>=0)return direct;
+  const text=[record?.result,record?.summary].map(norm).join(' ')
+    .replace(/[０-９]/g,ch=>String.fromCharCode(ch.charCodeAt(0)-0xFEE0)).replace(/,/g,'');
+  const match=text.match(/(?:合格数(?:合計)?|正解数)\s*[:：]?\s*(\d+(?:\.\d+)?)/);
+  return match?Number(match[1]):0;
+}
+function meetingPrepLimitedResultsForDay(resultRecords,name,dateKey){
+  const raw=resultForStudentDate(resultRecords,name,dateKey);
+  // result_history.jsonと直接選択Excelの両方から同じ行を読んだ場合の二重表示・二重加算を防ぐ。
+  const unique=[];
+  const seen=new Set();
+  raw.forEach(record=>{
+    const key=[record?.dateKey,record?.studentNo||record?.student||record?.rawName,record?.timeLabel,record?.study,record?.result,record?.summary].map(norm).join('|');
+    if(seen.has(key))return;
+    seen.add(key);
+    unique.push(record);
+  });
+  const highSpeed=unique.filter(prepIsHighSpeedResultRecord);
+  const normal=unique.filter(record=>!prepIsHighSpeedResultRecord(record))
+    .sort((a,b)=>String(a?.timeLabel||'').localeCompare(String(b?.timeLabel||''),'ja'))
+    .map(record=>({timeLabel:record?.timeLabel||'',summary:record?.summary||''}));
+  const items=[];
+  if(highSpeed.length){
+    const total=highSpeed.reduce((sum,record)=>sum+prepHighSpeedPassCountFromRecord(record),0);
+    items.push({timeLabel:'',summary:`高マス：合格数合計 ${total}`});
+  }
+  items.push(...normal);
+  if(items.length<=MEETING_PREP_RESULT_LINE_LIMIT)return items;
+  const kept=items.slice(0,MEETING_PREP_RESULT_LINE_LIMIT-1);
+  kept.push({timeLabel:'',summary:`ほか${items.length-(MEETING_PREP_RESULT_LINE_LIMIT-1)}件`});
+  return kept;
+}
 function parseYmdLocal(s){
   if(!s) return null;
   const d=new Date(String(s)+'T00:00:00');
@@ -7170,7 +7211,7 @@ function meetingPrepScheduleTableHtml(name, resultRecords){
     const si=scheduleIndexForPrepDate(data,d,di);
     const daySchedule = si >= 0 ? (data.schedule?.[si] || []) : [];
     const plans=daySchedule.map((v,i)=>String(v||'').trim()?`<li>${esc(LIMITS[i])} ${esc(v).replace(/\n/g,'<br>')}</li>`:'').filter(Boolean).join('');
-    const results=resultForStudentDate(resultRecords,name,dateKey).map(r=>`<li>${esc(r.timeLabel? r.timeLabel+' ' : '')}${esc(r.summary)}</li>`).join('');
+    const results=meetingPrepLimitedResultsForDay(resultRecords,name,dateKey).map(r=>`<li>${esc(r.timeLabel? r.timeLabel+' ' : '')}${esc(r.summary)}</li>`).join('');
     html+=`<tr><th>${jpDate(d)}<br>${DOW[d.getDay()]}曜</th><td>${plans?'<ul>'+plans+'</ul>':'<span class="muted">予定なし</span>'}</td><td>${results?'<ul>'+results+'</ul>':'<span class="muted">結果なし</span>'}</td></tr>`;
   });
   html+='</tbody></table>';
