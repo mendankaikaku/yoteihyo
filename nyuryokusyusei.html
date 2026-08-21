@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>面談予定入力アプリ（2026-08-21 16:23 出力）｜2026-08-21 16:36 出力</title>
+<title>面談予定入力アプリ（2026-08-21 16:46 出力）</title>
 <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
 <script src="./libs/xlsx.bundle.js"></script>
 <script></script>
@@ -839,7 +839,7 @@ body .prepCompactCard .prepDetails summary{min-height:28px!important;font-size:1
         <li>面談準備印刷を押します。</li>
         <li>印刷設定は A4縦・両面・長辺とじ です。</li>
       </ol>
-      <div class="usageHelpSmall">各生徒4ページです。1ページ目は先週の予定と結果、2ページ目は今週の計画表、3ページ目は必ず面談フロー、4ページ目は合格設計図Excelの4表です。週面シートExcelは読み取りません。</div>
+      <div class="usageHelpSmall">各生徒4ページです。1ページ目は先週の予定と結果、2ページ目は今週の計画表、3ページ目は面談フロー＋高速マスター・学校科目・週間予定、4ページ目は通期講座受講計画をA4横いっぱいに印刷します。</div>
     </div>
 
     <div class="usageHelpBox">
@@ -933,8 +933,8 @@ body .prepCompactCard .prepDetails summary{min-height:28px!important;font-size:1
          └─ 生徒C</div>
       <ul>
         <li>生徒フォルダー名は、アプリに入力する生徒名と合わせます。</li>
-        <li>通期講座・高速マスター・学校科目/学習時期・週間予定の画面表示と4枚目印刷には、合格設計図Excelを使います。</li>
-        <li>週面シートExcelは不要です。面談準備印刷の3ページ目は常に面談フローを印刷します。</li>
+        <li>合格設計図Excelから、通期講座・高速マスター・学校科目/学習時期・週間予定を読み取ります。</li>
+        <li>3ページ目は上半分に面談フロー、下半分に高速マスター・学校科目/学習時期・週間予定を印刷します。4ページ目は通期講座受講計画だけをA4横で大きく印刷します。</li>
       </ul>
     </div>
 
@@ -987,12 +987,12 @@ body .prepCompactCard .prepDetails summary{min-height:28px!important;font-size:1
     <details id="meetingPrepDetails" class="prepDetails">
       <summary>印刷メニューを開く</summary>
       <div class="printActions prepInside" style="grid-template-columns:minmax(260px,1fr) 170px auto;">
-        <div class="compactHint" style="margin-top:0">復元ボタンで読み込んだ「まとめて復元」フォルダから、結果履歴JSON・毎日更新Excel・合格設計図を自動で使います。面談準備印刷の3ページ目は常に面談フローです。</div>
+        <div class="compactHint" style="margin-top:0">復元ボタンで読み込んだ「まとめて復元」フォルダから、結果履歴JSON・毎日更新Excel・合格設計図を自動で使います。3ページ目の下半分に補助3表、4ページ目に通期講座受講計画をA4横で大きく印刷します。</div>
         <div class="field"><label>面談準備の対象日</label><input id="meetingPrepTargetDate" type="date"></div>
         <button class="secondary primaryBig" id="printMeetingPrep" type="button">面談準備を印刷</button>
       </div>
-      <div class="printDialogNote"><b>印刷設定：</b>印刷時は「システムダイアログを使用して印刷」を利用して、<b>用紙サイズ：A4／向き：縦／両面印刷：オン／長辺とじ</b>に設定してください。各生徒は4ページ（1：前週確認、2：今週記入、3：面談フロー、4：合格設計図の4表）で印刷されます。</div>
-      <div id="meetingPrepFolderInfo" class="compactHint">復元した内容を先週分として使い、今週欄は印刷時だけ白紙にします。復元時に「まとめて復元」フォルダを選ぶと、json/result_history.json、毎日更新フォルダ内の毎日更新.xlsx（モチベーション支援／高速マスターデイリー）、担任助手フォルダ/生徒名フォルダ内の合格設計図PDFまたはExcelを自動で読みます。週面シートは読み取らず、3ページ目は常に面談フローです。</div>
+      <div class="printDialogNote"><b>印刷設定：</b>印刷時は「システムダイアログを使用して印刷」を利用して、<b>用紙サイズ：A4／向き：自動（CSSに従う）／両面印刷：オン</b>に設定してください。1〜3ページ目は縦、4ページ目の通期講座受講計画だけ横向きで印刷されます。</div>
+      <div id="meetingPrepFolderInfo" class="compactHint">復元した内容を先週分として使い、今週欄は印刷時だけ白紙にします。復元時に「まとめて復元」フォルダを選ぶと、json/result_history.json、毎日更新フォルダ内の毎日更新.xlsx、担任助手フォルダ/生徒名フォルダ内の合格設計図Excelを自動で読みます。3ページ目は面談フロー＋補助3表、4ページ目は通期講座受講計画です。</div>
     </details>
   </section>
 
@@ -3189,7 +3189,7 @@ async function loadWeeklySheetFromAssistantFolder(assistantDir){
   // 面談準備印刷の3ページ目は、週面シートの有無に関係なく常に面談フローを使う。
   meetingPrepWeeklyFileName='';
   meetingPrepWeeklyHtmlCache=meetingFlowFallbackHtml('');
-  return {loaded:false,msg:'週面シート: 読み取り廃止（3ページ目は常に面談フロー）'};
+  return {loaded:false,msg:'週面シート: 読み取り廃止（3ページ目は面談フロー＋合格設計図の補助3表）'};
 }
 
 function updateScheduleHeaders(){const dates=getDates();$$('[data-day-head]').forEach(th=>{const d=dates[Number(th.dataset.dayHead)];th.innerHTML=`<div>${jpDate(d)}</div><div style="font-size:12px;color:#667085">${DOW[d.getDay()]}曜日</div>`})}
@@ -4874,8 +4874,8 @@ async function loadGroup(){
       const studentParent=await findStudentFolderParentFromSaveRoot(dir, students);
       if(studentParent && studentParent.label) details.push(`担任助手フォルダ: ${studentParent.label}`);
 
-      // 週面シートの自動読込は廃止。面談準備印刷の3ページ目は常に面談フローを使う。
-      details.push('週面シート: 読み取り廃止（3ページ目は常に面談フロー）');
+      // 週面シートの自動読込は廃止。3ページ目は面談フローと合格設計図の補助3表を使う。
+      details.push('週面シート: 読み取り廃止（3ページ目は面談フロー＋合格設計図の補助3表）');
 
       // 合格設計図は保存復元フォルダ配下から生徒ごとに探す。
       // 「打ち込み結果 / 担任助手フォルダ / 各担任助手名 / 各生徒名」の階層にも対応し、
@@ -7275,20 +7275,47 @@ function goukakuPrintExcelHtml(item){
     goukakuExcelModelToHtml(model, rows, cols, false, {showHeaders:false, forceRowCount:true, forceColCount:true}) +
     '</div></div>';
 }
-function meetingPrepGoukakuDesignHtml(name){
+function meetingPrepGoukakuPrintItem(name){
   const item = goukakuDesignSheets && goukakuDesignSheets[name];
   if(!item){
-    return '<div class="box muted">合格設計図の学習計画はまだ読み込まれていません。④復元で保存復元フォルダーを選んでから印刷してください。</div>';
+    return {error:'合格設計図の学習計画はまだ読み込まれていません。④復元で保存復元フォルダーを選んでから印刷してください。'};
   }
   if(item.error){
-    return `<div class="box muted">合格設計図の学習計画の読み込みに失敗しました。<br>${esc(item.error)}</div>`;
+    return {error:`合格設計図の学習計画の読み込みに失敗しました。<br>${esc(item.error)}`};
   }
   if(item.kind!=='excel' || !item.model){
-    return '<div class="box muted">PDFは学習計画表の抽出対象外です。生徒フォルダ直下に合格設計図Excelを置いてください。</div>';
+    return {error:'PDFは学習計画表の抽出対象外です。生徒フォルダ直下に合格設計図Excelを置いてください。'};
   }
+  return {item};
+}
+function meetingPrepGoukakuCourseHtml(name){
+  const resolved=meetingPrepGoukakuPrintItem(name);
+  if(resolved.error)return `<div class="box muted">${resolved.error}</div>`;
+  const item=resolved.item;
   const meta=`${esc(item.fileName||'合格設計図.xlsx')}${item.sheetName?' / '+esc(item.sheetName):''}`;
-  const table=goukakuBookLayoutHtml(item,name,{editable:false,showSummary:false});
-  return `<div class="muted">${meta}</div><div class="goukakuPlanPrintNotice">通期講座は見出しと講座CDまたは講座名入りの行だけを表示し、講座行の縦幅を自動拡大しています。高速マスター・学校科目/学習時期・週間予定はBook1と同じ上下左右配置・B〜CA列座標で表示しています。</div><div class="goukakuPrintExcelWrap goukakuCoursePlanPrintWrap" data-goukaku-fit-excel="1"><div class="goukakuPrintExcelFitInner">${table}</div></div>`;
+  const table=goukakuCoursePlanHtml(item,name,{editable:false,showSummary:false});
+  return `<div class="goukakuPrintMeta">${meta}</div><div class="goukakuPrintExcelWrap goukakuCoursePlanPrintWrap goukakuMainCoursePrintWrap" data-goukaku-fit-excel="1" data-fit-mode="landscape"><div class="goukakuPrintExcelFitInner">${table}</div></div>`;
+}
+function meetingPrepGoukakuSupplementHtml(name){
+  const resolved=meetingPrepGoukakuPrintItem(name);
+  if(resolved.error)return `<div class="box muted">${resolved.error}</div>`;
+  const item=resolved.item;
+  const book=planBuildBookSections(item.model,item.extraCourseRows||[]);
+  if(!book)return '<div class="box muted">高速マスター・学校科目/学習時期・週間予定を見つけられませんでした。</div>';
+  let tables='<div class="goukakuSupplementLayout">';
+  if(book.highRange){
+    tables+='<div class="goukakuSupplementSection">'+goukakuRangeTableHtml(item,name,book.highRange,{editable:false})+'</div>';
+  }else{
+    tables+='<div class="goukakuBookMissing">高速マスター基礎力養成講座学習計画は見つかりませんでした。</div>';
+  }
+  if(book.bottomRange){
+    if(book.highRange)tables+=goukakuBookBlankRowsHtml(item.model,book.highRange.endRow+1,book.bottomRange.startRow-1);
+    tables+='<div class="goukakuSupplementSection">'+goukakuRangeTableHtml(item,name,book.bottomRange,{editable:false})+'</div>';
+  }else{
+    tables+='<div class="goukakuBookMissing">学校での科目選択・学習時期／週間予定は見つかりませんでした。</div>';
+  }
+  tables+='</div>';
+  return `<div class="goukakuPrintExcelWrap goukakuCoursePlanPrintWrap goukakuSupplementPrintWrap" data-goukaku-fit-excel="1" data-fit-mode="half"><div class="goukakuPrintExcelFitInner">${tables}</div></div>`;
 }
 
 function arrayBufferToBase64(buffer){
@@ -7315,7 +7342,7 @@ async function loadWeeklySheetHtmlFromFile(file){
   // 週面シート読み取りは廃止。
   meetingPrepWeeklyFileName = '';
   meetingPrepWeeklyHtmlCache = meetingFlowFallbackHtml('');
-  setMeetingPrepFolderInfo('週面シートは読み取らず、3ページ目は常に面談フローを印刷します。');
+  setMeetingPrepFolderInfo('週面シートは読み取らず、3ページ目は面談フロー＋合格設計図の補助3表を印刷します。');
   return meetingPrepWeeklyHtmlCache;
 }
 
@@ -7323,14 +7350,12 @@ async function handleMeetingPrepWeeklyFileChange(){
   // 週面シート選択・読取は廃止。
   meetingPrepWeeklyFileName = '';
   meetingPrepWeeklyHtmlCache = meetingFlowFallbackHtml('');
-  setMeetingPrepFolderInfo('週面シートは読み取らず、3ページ目は常に面談フローを印刷します。');
+  setMeetingPrepFolderInfo('週面シートは読み取らず、3ページ目は面談フロー＋合格設計図の補助3表を印刷します。');
 }
 
 function meetingFlowFallbackHtml(reason){
   return `
     <div class="meetingFlowFallback">
-      <div class="muted">週面シートは読み取らず、3ページ目は常に面談フローを印刷します。</div>
-      <h2>3. 面談フロー</h2>
       <table class="prepTable flowTable">
         <tr><th>順番</th><th>内容</th><th>目安</th><th>やること</th></tr>
         <tr><td>①</td><td>模試・イベント・方針告知</td><td>3分</td><td>Comiru回答をその場でさせる。助手は模試・イベントのチェックを埋める。</td></tr>
@@ -7373,14 +7398,17 @@ function buildMeetingPrepPrintHtml(resultRecords, weeklyHtml){
   names.forEach((name,idx)=>{
     const isLastStudent = idx === names.length - 1;
     // 印刷順は各生徒A4両面2枚に固定する。
-    // 1ページ目: 前週確認 / 2ページ目: 今週記入 / 3ページ目: 面談フロー / 4ページ目: 合格設計図の4表
+    // 1ページ目: 前週確認 / 2ページ目: 今週記入
+    // 3ページ目: 上半分に面談フロー、下半分に高速マスター・学校科目/学習時期・週間予定
+    // 4ページ目: 通期講座受講計画だけをA4横いっぱいに表示
     body+=`<section class="page prevResultPage sheetFront"><div class="sheetMark">1枚目 表</div><div class="fitPageShell"><div class="fitPageInner"><h1>面談準備資料：${esc(name)}</h1><div class="subline">対象日までの一週間：${esc(prevPeriod)} / 作成：${now.toLocaleString('ja-JP')}</div><h2>1. 予定・結果カレンダー</h2>${meetingPrepScheduleTableHtml(name,resultRecords)}</div></div></section>`;
     body+=`<section class="page sheetBack"><div class="sheetMark">1枚目 裏</div><h1>面談準備資料：${esc(name)}</h1><div class="subline">今週：${esc(currentPeriod)}</div><h2>2. 今週の記入用予定表・模試・イベント</h2>${meetingPrepCurrentPlanHtml(name)}</section>`;
-    body+=`<section class="page weeklyPage sheetFront"><div class="sheetMark">2枚目 表</div><h1>面談準備資料：${esc(name)}</h1><h2>3. 面談フロー</h2>${weeklyHtml}</section>`;
-    body+=`<section class="page goukakuPrintPage sheetBack${isLastStudent ? ' isLastPrintPage' : ''}"><div class="sheetMark">4枚目</div><h1>面談準備資料：${esc(name)}</h1><h2>4. 合格設計図 学習計画</h2>${meetingPrepGoukakuDesignHtml(name)}</section>`;
+    body+=`<section class="page weeklyPage sheetFront"><div class="sheetMark">3ページ目</div><h1>面談準備資料：${esc(name)}</h1><div class="thirdPageSplit"><section class="flowHalf"><h2>3. 面談フロー</h2><div class="flowFitShell"><div class="flowFitInner">${weeklyHtml}</div></div></section><section class="goukakuSupplementHalf"><h2>合格設計図：高速マスター・学校科目・週間予定</h2>${meetingPrepGoukakuSupplementHtml(name)}</section></div></section>`;
+    body+=`<section class="page goukakuPrintPage sheetBack${isLastStudent ? ' isLastPrintPage' : ''}"><div class="sheetMark">4ページ目（横）</div><h1>面談準備資料：${esc(name)}</h1><h2>4. 通期講座受講計画</h2>${meetingPrepGoukakuCourseHtml(name)}</section>`;
   });
   return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>面談準備資料</title><style>
     @page{size:A4 portrait;margin:6mm;}
+    @page goukakuLandscape{size:A4 landscape;margin:4mm;}
     html,body{margin:0!important;padding:0!important;background:#fff!important;}
     body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif;color:#111827;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
     .printGuide{position:fixed;left:8mm;right:8mm;bottom:5mm;z-index:9999;background:rgba(255,255,255,.94);border:1px solid #d1d5db;border-radius:6px;padding:2mm 3mm;font-size:9px;color:#475569;}
@@ -7392,10 +7420,10 @@ function buildMeetingPrepPrintHtml(resultRecords, weeklyHtml){
     .subline,.muted{color:#667085;font-size:10px}.box{border:1px solid #9ca3af;padding:6px;border-radius:6px;white-space:pre-wrap;}
     .prepTable{border-collapse:collapse;width:100%;font-size:10px;margin:4px 0 7px;}.prepTable th,.prepTable td{border:1px solid #9ca3af;padding:3px 4px;vertical-align:top;word-break:break-word;}.prepTable th{background:#f3f4f6;text-align:center;font-weight:800;}.prepTable ul{margin:0;padding-left:1.1em;}.prepTable li{margin:0 0 1px;}.listenTable th{background:#eef2ff}.listenTable td{font-size:11px;line-height:1.45}.twoCols{display:grid;grid-template-columns:1fr 1fr;gap:7px;align-items:start}.examConfirmBlock,.eventConfirmBlock{margin-top:4px;break-inside:avoid;page-break-inside:avoid}.examConfirmTable{table-layout:fixed;width:100%;font-size:9.2px;line-height:1.22}.examConfirmTable th:first-child,.examConfirmTable td:first-child{width:27mm}.examConfirmTable th,.examConfirmTable td{padding:2px 3px}.examPrintDetail{line-height:1.23}.examPrintLine{margin:0 0 1px}.subjectWrap{display:flex;flex-wrap:wrap;gap:1px 5px;align-items:flex-start}.printCheck{display:inline-block;white-space:nowrap;min-width:13mm}.smallChecks{font-size:9px}.eventConfirmTable{font-size:9.2px;line-height:1.25;table-layout:fixed;width:100%}.eventConfirmTable th:first-child,.eventConfirmTable td:first-child{width:34mm}.weekly{font-size:9px}.weekly th,.weekly td{padding:3px;}.blankTable td{height:12mm}.blankLines div{height:6mm;border-bottom:1px solid #d1d5db}.blankBox{height:24mm}
     .prevResultPage{padding:5mm;overflow:hidden}.fitPageShell{width:100%;height:270mm;overflow:hidden;position:relative}.fitPageInner{transform-origin:top left;width:100%;}.prevResultPage h1{font-size:17px}.prevResultPage h2{font-size:13px;margin:6px 0 4px}.prevResultPage h3{font-size:11.5px;margin:4px 0 3px}.prevResultPage .prepTable{font-size:9.8px;margin:3px 0 5px}.prevResultPage .prepTable th,.prevResultPage .prepTable td{padding:2.4px 3.4px}.prevResultPage .box{padding:4.5px}
-    .weeklyPage{padding:5mm;}
-    .goukakuPrintPage{padding:2mm;overflow:hidden;display:flex;flex-direction:column;height:282mm!important;max-height:282mm!important}.goukakuPrintPage h1{font-size:8px;margin:0;flex:0 0 auto}.goukakuPrintPage h2{font-size:7px;margin:0 0 .2mm;flex:0 0 auto;border-left:2px solid #2563eb;padding-left:2px}.goukakuPrintPage .muted{font-size:6px;margin:0;flex:0 0 auto}.goukakuPlanPrintNotice{font-size:6px;color:#475569;margin:0 0 .2mm;flex:0 0 auto}.goukakuPrintExcelWrap{flex:1 1 auto;min-height:0;overflow:hidden;border:0;background:#fff;position:relative;width:100%;height:auto}.goukakuPrintExcelFitInner{transform-origin:top left;width:max-content}.goukakuCoursePlanPrintWrap .goukakuBookLayout{display:flex;flex-direction:column;align-items:flex-start;width:max-content;gap:0}.goukakuCoursePlanPrintWrap .goukakuBookSection{width:max-content}.goukakuCoursePlanPrintWrap .goukakuBookBlankRows,.goukakuCoursePlanPrintWrap .goukakuBookBlankRow{width:100%;background:#fff;flex:none}.goukakuCoursePlanPrintWrap .goukakuPlanTable{border-collapse:collapse;width:max-content;min-width:0;font-size:10px;line-height:1.05;table-layout:fixed;background:#fff}.goukakuCoursePlanPrintWrap .goukakuPlanTable th,.goukakuCoursePlanPrintWrap .goukakuPlanTable td{border:1px solid #6b7280;padding:1px;min-width:0;white-space:pre-wrap;word-break:break-word;text-align:center;vertical-align:middle}.goukakuCoursePlanPrintWrap .planTitleCell{font-size:13px;font-weight:900;text-align:left;background:#dbeafe}.goukakuCoursePlanPrintWrap .planHeaderCell{font-weight:900;background:#eef2ff}.goukakuCoursePlanPrintWrap .planPeriodCell{font-weight:900;background:#ecfdf5}.goukakuCoursePlanPrintWrap .planCourseName,.goukakuCoursePlanPrintWrap .planLeftCell,.goukakuCoursePlanPrintWrap .planFormLabel{text-align:left;font-weight:800}.goukakuCoursePlanPrintWrap .planNumberCell{font-size:12px;font-weight:900}.goukakuPrintExcelWrap[data-fitted="1"]::after{content:"";display:none}
+    .weeklyPage{padding:4mm;display:flex;flex-direction:column}.weeklyPage>h1{font-size:13px;margin:0 0 1mm;flex:0 0 auto}.thirdPageSplit{height:270mm;min-height:0;display:grid;grid-template-rows:1fr 1fr;gap:2mm}.flowHalf,.goukakuSupplementHalf{min-height:0;overflow:hidden;display:flex;flex-direction:column;border:1px solid #cbd5e1;border-radius:5px;padding:2mm}.flowHalf h2,.goukakuSupplementHalf h2{font-size:11px;margin:0 0 1mm;flex:0 0 auto}.flowFitShell{min-height:0;flex:1 1 auto;overflow:hidden}.flowFitInner{transform-origin:top left;width:100%}.flowHalf .meetingFlowFallback{font-size:9.2px;line-height:1.25}.flowHalf .prepTable{font-size:8.6px;margin:2px 0 4px}.flowHalf .prepTable th,.flowHalf .prepTable td{padding:2px 3px}.flowHalf h3{font-size:9.5px;margin:3px 0 2px}.flowHalf .flowMemo{margin-top:3px;padding:4px;font-size:8.5px}.flowHalf .flowTimeTable{width:45%;margin-top:2px}.goukakuSupplementHalf{background:#fff}.goukakuSupplementHalf .goukakuPrintExcelWrap{flex:1 1 auto;min-height:0}
+    .goukakuPrintPage{page:goukakuLandscape;width:289mm!important;height:202mm!important;max-height:202mm!important;padding:2mm;overflow:hidden;display:flex;flex-direction:column}.goukakuPrintPage h1{font-size:10px;margin:0;flex:0 0 auto}.goukakuPrintPage h2{font-size:9px;margin:0 0 .5mm;flex:0 0 auto;border-left:2px solid #2563eb;padding-left:3px}.goukakuPrintPage .muted{font-size:6px;margin:0;flex:0 0 auto}.goukakuPrintMeta{font-size:6px;color:#667085;margin:0 0 .3mm;flex:0 0 auto}.goukakuPlanPrintNotice{font-size:6px;color:#475569;margin:0 0 .2mm;flex:0 0 auto}.goukakuPrintExcelWrap{flex:1 1 auto;min-height:0;overflow:hidden;border:0;background:#fff;position:relative;width:100%;height:auto}.goukakuPrintExcelFitInner{transform-origin:top left;width:max-content}.goukakuCoursePlanPrintWrap .goukakuBookLayout,.goukakuSupplementLayout{display:flex;flex-direction:column;align-items:flex-start;width:max-content;gap:0}.goukakuCoursePlanPrintWrap .goukakuBookSection,.goukakuSupplementSection{width:max-content}.goukakuCoursePlanPrintWrap .goukakuBookBlankRows,.goukakuCoursePlanPrintWrap .goukakuBookBlankRow{width:100%;background:#fff;flex:none}.goukakuCoursePlanPrintWrap .goukakuPlanTable{border-collapse:collapse;width:max-content;min-width:0;font-size:10px;line-height:1.05;table-layout:fixed;background:#fff}.goukakuCoursePlanPrintWrap .goukakuPlanTable th,.goukakuCoursePlanPrintWrap .goukakuPlanTable td{border:1px solid #6b7280;padding:1px;min-width:0;white-space:pre-wrap;word-break:break-word;text-align:center;vertical-align:middle}.goukakuCoursePlanPrintWrap .planTitleCell{font-size:13px;font-weight:900;text-align:left;background:#dbeafe}.goukakuCoursePlanPrintWrap .planHeaderCell{font-weight:900;background:#eef2ff}.goukakuCoursePlanPrintWrap .planPeriodCell{font-weight:900;background:#ecfdf5}.goukakuCoursePlanPrintWrap .planCourseName,.goukakuCoursePlanPrintWrap .planLeftCell,.goukakuCoursePlanPrintWrap .planFormLabel{text-align:left;font-weight:800}.goukakuCoursePlanPrintWrap .planNumberCell{font-size:12px;font-weight:900}.goukakuSupplementPrintWrap .goukakuPlanTable{font-size:8px}.goukakuSupplementPrintWrap .goukakuPlanTable th,.goukakuSupplementPrintWrap .goukakuPlanTable td{padding:.7px}.goukakuPrintExcelWrap[data-fitted="1"]::after{content:"";display:none}
     @media print{.printGuide{display:none!important}.page{break-after:auto!important;page-break-after:auto!important;}.page + .page{break-before:page!important;page-break-before:always!important;}}
-  </style><script src="./libs/pdf.min.js"><\/script></head><body><div class="printGuide">印刷設定：A4／縦／両面印刷オン／長辺とじ。各生徒は4ページ：前週確認、今週記入、面談フロー、合格設計図の4表。</div>${body}<script>
+  </style><script src="./libs/pdf.min.js"><\/script></head><body><div class="printGuide">印刷設定：A4／向きは自動（CSSに従う）／両面印刷オン。1〜3ページ目は縦、4ページ目の通期講座受講計画だけ横向きです。</div>${body}<script>
     function base64ToUint8Array(base64){
       var binary=atob(base64 || '');
       var len=binary.length;
@@ -7490,12 +7518,18 @@ function buildMeetingPrepPrintHtml(resultRecords, weeklyHtml){
 
         // 親画面では印刷用iframeを画面外に置くため、印刷前の測定値が1px近くになることがある。
         // その小さい値で倍率計算すると、印刷プレビューで左上に極小表示される。
-        // A4縦・余白4mmの合格設計図枠として実寸相当の値を補正してからフィットする。
-        if(cw < 200) cw = mmToPx(194);  // A4縦：@page左右6mm＋4枚目左右2mm
-        if(ch < 300) ch = mmToPx(276);  // A4縦：上下余白・最小見出しを除いた最大枠
+        // 画面外iframeで測定値が小さい場合は、配置先の実寸で補正する。
+        // landscape: 4ページ目A4横全面 / half: 3ページ目下半分。
+        var fitMode=wrap.getAttribute('data-fit-mode') || '';
+        if(cw < 200){
+          cw = mmToPx(fitMode==='landscape' ? 285 : 194);
+        }
+        if(ch < 300){
+          ch = mmToPx(fitMode==='landscape' ? 194 : (fitMode==='half' ? 122 : 276));
+        }
 
         if(sw<=1 || sh<=1 || cw<=1 || ch<=1) return;
-        // Book1の縦横比を崩さず、4表全体がA4の合格設計図枠内へ収まる倍率にする。
+        // Book1の縦横比を崩さず、割り当てた枠いっぱいに収まる倍率にする。
         // 横だけ・縦だけを別倍率にすると左右表の配置感が崩れるため、必ず等倍縮小する。
         var scaleX=cw/sw;
         var scaleY=ch/sh;
@@ -7545,12 +7579,32 @@ function buildMeetingPrepPrintHtml(resultRecords, weeklyHtml){
         shell.setAttribute('data-scale', scale.toFixed(2));
       });
     }
+    function fitMeetingFlowHalf(){
+      document.querySelectorAll('.flowFitShell').forEach(function(shell){
+        var inner=shell.querySelector('.flowFitInner');
+        if(!inner)return;
+        inner.style.transform='scale(1)';
+        inner.style.width='100%';
+        var sw=inner.scrollWidth||inner.offsetWidth||1;
+        var sh=inner.scrollHeight||inner.offsetHeight||1;
+        var cw=shell.clientWidth||shell.offsetWidth||1;
+        var ch=shell.clientHeight||shell.offsetHeight||1;
+        if(sw<=1||sh<=1||cw<=1||ch<=1)return;
+        var scale=Math.min(1,cw/sw,ch/sh);
+        if(!isFinite(scale)||scale<=0)scale=1;
+        inner.style.transform='scale('+scale+')';
+        inner.style.width=(100/scale)+'%';
+        shell.setAttribute('data-scale',scale.toFixed(3));
+      });
+    }
     async function prepareMeetingPrepPrint(){
       await renderGoukakuPdfAllPages();
       fitGoukakuExcelPrintPages();
       fitMeetingPrepFirstPages();
+      fitMeetingFlowHalf();
       await new Promise(function(resolve){ setTimeout(resolve, 80); });
       fitGoukakuExcelPrintPages();
+      fitMeetingFlowHalf();
     }
     window.addEventListener('load', function(){ setTimeout(function(){ prepareMeetingPrepPrint(); }, 60); });
   <\/script>
@@ -7628,7 +7682,7 @@ async function printMeetingPrep(){
   const empty=students.filter(n=>!studentHasMeaningfulInputData(n));
   if(empty.length && !confirm(`入力内容が空の生徒がいます：${empty.join('、')}\nこのまま印刷しますか？`)) return;
   const resultRecords=await readPrepResultRecords();
-  // 週面シートは読み取らない。3ページ目は常に面談フローを印刷する。
+  // 週面シートは読み取らない。3ページ目は面談フロー＋合格設計図の補助3表を印刷する。
   const weeklyHtml=loadWeeklySheetHtml();
   const html=buildMeetingPrepPrintHtml(resultRecords, weeklyHtml);
   printHtmlInHiddenIframe(html);
@@ -9351,7 +9405,7 @@ async function loadGroupCoreWithProgress(){
       restoreLoadingStage('担任助手・生徒フォルダーを確認中');
       const studentParent=await findStudentFolderParentFromSaveRoot(dir, students);
       if(studentParent?.label) details.push(`担任助手フォルダ: ${studentParent.label}`);
-      details.push('週面シート: 読み取り廃止（3ページ目は常に面談フロー）');
+      details.push('週面シート: 読み取り廃止（3ページ目は面談フロー＋合格設計図の補助3表）');
       restoreLoadingStage('合格設計図Excelを読み込み中');
       const goukakuResult=await loadGoukakuDesignsFromRoot(dir, students);
       const goukakuMsg=formatGoukakuLoadSummary(goukakuResult);
