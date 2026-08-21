@@ -377,7 +377,7 @@ button[data-pane].activePane{background:var(--accent);color:#fff;}
 }
 
 </style>
-<!-- 精査済み: 印刷用行高34.8pt・中央揃え・模試イベント太罫線版 -->
+<!-- 精査済み: 印刷用行高は34.8ptを基準に小規模模試イベント量で可変・中央揃え・模試イベント太罫線版 -->
 <!-- 精査済み: 志望校登録は大規模模試2段見出し内、または小規模模試イベント欄の文章内だけ許可。独立列は禁止。 -->
 </head>
 <body>
@@ -5476,10 +5476,14 @@ function buildMonthlyPosterResultAoa(records, rule, label){
   return posterMoveNoHitRowsToBottom(aoa);
 }
 function styleMonthlyPosterSheet(ws, aoa){
-  // 掲示用の横幅：Excel列幅はwch指定なので、286px相当を約41wchとして使う。
-  // 内容列はその約2.6倍で、40ptでも横に広く使えるようにする。
+  // 毎日掲示は40ptのまま一行表示できることを優先し、内容量に応じて横幅を広げる。
+  // 折り返しや縮小表示には頼らず、長い文章ほど内容列そのものを広くする。
   const posterTwoCharWch = 286 / 7;
-  const widths = [Math.round(posterTwoCharWch * 0.45), Math.round(posterTwoCharWch * 0.90), Math.round(posterTwoCharWch * 2.60), Math.round(posterTwoCharWch * 0.70)];
+  const contentMaxLen = Math.max(1, ...(aoa || []).slice(2).map(row => allListPrintVisualTextLength(String(row?.[2] || '').replace(/\r?\n/g, ' '))));
+  const nameMaxLen = Math.max(1, ...(aoa || []).slice(2).map(row => allListPrintVisualTextLength(String(row?.[1] || '').replace(/\r?\n/g, ' '))));
+  const contentWch = Math.max(Math.round(posterTwoCharWch * 2.60), Math.min(300, Math.ceil(contentMaxLen * 5.4)));
+  const nameWch = Math.max(Math.round(posterTwoCharWch * 0.90), Math.min(90, Math.ceil(nameMaxLen * 5.2)));
+  const widths = [Math.round(posterTwoCharWch * 0.45), nameWch, contentWch, Math.round(posterTwoCharWch * 0.70)];
   const range = applyNiceSheetSettings(ws, aoa, widths, {rows:{min:60,max:240,header:78,pxPerLine:52}});
   const colCount = Math.max(3, (aoa && aoa[1] ? aoa[1].length : 3));
   ws['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:colCount-1}}];
@@ -5496,9 +5500,9 @@ function styleMonthlyPosterSheet(ws, aoa){
   const fontHeader = {name:posterFontName, sz:40, bold:true, color:{rgb:'000000'}};
   const fontBase = {name:posterFontName, sz:40, bold:true, color:{rgb:'000000'}};
   setRangeStyle(ws, range, (R,C,cell)=>{
-    const style = {font:fontBase, alignment:{vertical:'center', horizontal:'center', wrapText:true}, border};
+    const style = {font:fontBase, alignment:{vertical:'center', horizontal:'center', wrapText:false, shrinkToFit:false}, border};
     if(R === 0){ style.font = fontTitle; style.fill = titleFill; style.alignment = {vertical:'center', horizontal:'center', wrapText:false, shrinkToFit:true}; }
-    else if(R === 1){ style.font = fontHeader; style.fill = headerFill; style.alignment = {vertical:'center', horizontal:'center', wrapText:true}; }
+    else if(R === 1){ style.font = fontHeader; style.fill = headerFill; style.alignment = {vertical:'center', horizontal:'center', wrapText:false, shrinkToFit:false}; }
     else if(C < 2){ style.fill = nameFill; }
     return style;
   });
@@ -8097,9 +8101,8 @@ function buildAllStudentPrintAoaFromFullAoa(grade, fullAoa){
 }
 
 function applyCompactPrintRows(ws, aoa, widths){
-  // 基本は20.6px相当で詰める。ただし小規模模試/イベント欄が多い生徒だけは、
-  // 読める文字サイズを保ったまま、無駄な余白が出ない範囲で行高を上げる。
-  const DATA_ROW_HPT = 15.45; // 20.6px ≒ 15.45pt
+  // 34.8ptを通常行の基準にし、小規模模試/イベント欄の文章量が多い生徒だけ行高を上げる。
+  const DATA_ROW_HPT = 34.8;
   const headerRows = Number(aoa?._printHeaderRows || 2);
   const bottomStart = Number.isFinite(Number(aoa?._printBottomHeaderStart)) ? Number(aoa._printBottomHeaderStart) : -1;
   const bottomRows = Number(aoa?._printBottomHeaderRows || 0);
@@ -8130,8 +8133,8 @@ function applyCompactPrintRows(ws, aoa, widths){
       const smallText = smallCol >= 0 ? String(row?.[smallCol] || '') : '';
       const estimated = smallCellEstimatedLines(smallText);
       if(estimated <= 2) return {hpt:DATA_ROW_HPT};
-      // 4行程度までは少しだけ伸ばし、以降は段階的に伸ばす。最大でもB4 2ページを壊しすぎない範囲で抑える。
-      const h = Math.min(76, DATA_ROW_HPT + (estimated - 2) * 4.2);
+      // 小規模欄の必要行数に応じて段階的に伸ばす。極端な高さにならないよう上限を設ける。
+      const h = Math.min(110, DATA_ROW_HPT + (estimated - 2) * 6.3);
       return {hpt:Math.round(h * 10) / 10};
     }
     return {hpt:DATA_ROW_HPT};
@@ -8490,7 +8493,6 @@ function styleAllStudentPrintSheet(ws, aoa){
   const widths = allListBuildAutoPrintWidths(aoa, manualCount, planCount);
   const range = applyNiceSheetSettings(ws, aoa, widths, {rows:{min:5.8,max:50,header:13,pxPerLine:4.2}});
   applyCompactPrintRows(ws, aoa, widths);
-  allListForcePrintStudentRowHeight(ws, aoa, 34.8);
   allListAdjustPrintWidthsToB4LandscapeAspect(ws, widths);
   setWorksheetFreezePane(ws, 3, headerRows, `D${headerRows+1}`, 'bottomRight');
   allListSetInitialOpenZoom(ws, aoa, {targetWch:112, minZoom:45, maxZoom:100});
