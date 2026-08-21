@@ -8107,39 +8107,94 @@ function buildAllStudentPrintAoaFromFullAoa(grade, fullAoa){
 }
 
 function applyCompactPrintRows(ws, aoa, widths){
-  // 34.8ptを通常行の基準にし、小規模模試/イベント欄の文章量が多い生徒だけ行高を上げる。
-  const DATA_ROW_HPT = 34.8;
+  // B4横2ページの印刷可能高さを先に予算化し、その中で生徒行の高さを比重配分する。
+  // 通常は34.8ptを目安にし、小規模模試・イベントが多い行へ多めに割り当てる。
+  const BASE_DATA_ROW_HPT = 34.8;
+  const MIN_DATA_ROW_HPT = 16.0;
+  const MAX_DATA_ROW_HPT = 110.0;
+  const B4_SHORT_SIDE_MM = 257; // JIS B4横置き時の縦寸法
+  const PT_PER_MM = 72 / 25.4;
+  const PAGE_MARGIN_PT = (0.05 + 0.05) * 72; // 上下余白（!marginsと一致）
+  const PAGE_SAFETY_RATIO = 0.975; // プリンター差・罫線分の安全余白
+  const PAGE_COUNT = 2;
   const headerRows = Number(aoa?._printHeaderRows || 2);
   const bottomStart = Number.isFinite(Number(aoa?._printBottomHeaderStart)) ? Number(aoa._printBottomHeaderStart) : -1;
   const bottomRows = Number(aoa?._printBottomHeaderRows || 0);
   const smallCol = Number.isFinite(Number(aoa?._printSmallColumnIndex)) ? Number(aoa._printSmallColumnIndex) : -1;
-  const smallW = smallCol >= 0 && widths ? Number(widths[smallCol] || 24) : 24;
 
-  function smallCellEstimatedLines(text){
+  function rowKindCounts(text){
     const lines = String(text || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-    if(!lines.length) return 1;
-    // 行高は小規模模試・イベントの件数（明示改行数）で決める。
-    // 長い1行は自動折り返しで高さを増やさず、縮小してセル幅内へ最大サイズで収める。
-    return lines.length;
+    let exams = 0, events = 0, others = 0;
+    for(const line of lines){
+      if(/【模試】/.test(line)) exams++;
+      else if(/【イベント】/.test(line)) events++;
+      else others++;
+    }
+    return {lines:lines.length, exams, events, others};
   }
 
-  ws['!rows'] = (aoa || []).map((row, r) => {
-    if(r === 0) return {hpt:17.5};
-    const isTopHeader = r > 0 && r < headerRows;
+  const rowHeights = Array((aoa || []).length).fill(12);
+  if(rowHeights.length) rowHeights[0] = 17.5;
+  for(let r=1; r<rowHeights.length; r++){
     const isBottomHeader = bottomStart >= 0 && r >= bottomStart && r < bottomStart + bottomRows;
-    // 2行目の見出し（大項目行）は高すぎないよう半分程度にする。下部見出しも同じ。
-    if(r === 1 || (bottomStart >= 0 && r === bottomStart)) return {hpt:8.0};
-    if(isTopHeader || isBottomHeader) return {hpt:12.0};
-    if(r >= headerRows){
-      const smallText = smallCol >= 0 ? String(row?.[smallCol] || '') : '';
-      const estimated = smallCellEstimatedLines(smallText);
-      if(estimated <= 2) return {hpt:DATA_ROW_HPT};
-      // 小規模欄の必要行数に応じて段階的に伸ばす。極端な高さにならないよう上限を設ける。
-      const h = Math.min(110, DATA_ROW_HPT + (estimated - 2) * 6.3);
-      return {hpt:Math.round(h * 10) / 10};
+    if(r === 1 || (bottomStart >= 0 && r === bottomStart)) rowHeights[r] = 8.0;
+    else if(r < headerRows || isBottomHeader) rowHeights[r] = 12.0;
+  }
+
+  const dataRows = [];
+  for(let r=headerRows; r<rowHeights.length; r++){
+    const isBottomHeader = bottomStart >= 0 && r >= bottomStart && r < bottomStart + bottomRows;
+    if(isBottomHeader) continue;
+    const smallText = smallCol >= 0 ? String(aoa?.[r]?.[smallCol] || '') : '';
+    const counts = rowKindCounts(smallText);
+    // 比重は維持：模試をイベントより少し重くし、分類できない明示行にも小さな比重を持たせる。
+    const weight = 1 + counts.exams * 0.9 + counts.events * 0.7 + counts.others * 0.35;
+    dataRows.push({r, weight, counts});
+  }
+
+  const printablePerPagePt = B4_SHORT_SIDE_MM * PT_PER_MM - PAGE_MARGIN_PT;
+  const repeatedHeaderPt = rowHeights.slice(0, headerRows).reduce((a,b)=>a+b,0); // 2ページ目で再印刷
+  const fixedWorkbookPt = rowHeights.reduce((sum,h,r)=> dataRows.some(x=>x.r===r) ? sum : sum+h, 0);
+  const totalTwoPagePt = printablePerPagePt * PAGE_COUNT * PAGE_SAFETY_RATIO;
+  const dataBudgetPt = Math.max(dataRows.length * MIN_DATA_ROW_HPT, totalTwoPagePt - repeatedHeaderPt - fixedWorkbookPt);
+  const evenShare = dataRows.length ? dataBudgetPt / dataRows.length : BASE_DATA_ROW_HPT;
+  const basePt = Math.max(MIN_DATA_ROW_HPT, Math.min(BASE_DATA_ROW_HPT, evenShare * 0.78));
+  let remaining = Math.max(0, dataBudgetPt - basePt * dataRows.length);
+  const extras = dataRows.map(x => Math.max(0.05, x.weight - 1));
+  let active = dataRows.map((_,i)=>i);
+  const allocated = dataRows.map(()=>basePt);
+  let guard = 0;
+  while(remaining > 0.05 && active.length && guard++ < 100){
+    const totalExtra = active.reduce((s,i)=>s+extras[i],0) || active.length;
+    let used = 0;
+    const next = [];
+    for(const i of active){
+      const share = remaining * ((extras[i] || 1) / totalExtra);
+      const room = MAX_DATA_ROW_HPT - allocated[i];
+      const add = Math.max(0, Math.min(room, share));
+      allocated[i] += add;
+      used += add;
+      if(allocated[i] < MAX_DATA_ROW_HPT - 0.05) next.push(i);
     }
-    return {hpt:DATA_ROW_HPT};
-  });
+    if(used <= 0.01) break;
+    remaining -= used;
+    active = next;
+  }
+  // 比重が全行ほぼ同じ、または上限到達後に余りがある場合は均等に再配分する。
+  if(remaining > 0.05 && dataRows.length){
+    const add = remaining / dataRows.length;
+    for(let i=0;i<allocated.length;i++) allocated[i] = Math.min(MAX_DATA_ROW_HPT, allocated[i] + add);
+  }
+  dataRows.forEach((x,i)=>{ rowHeights[x.r] = Math.round(allocated[i] * 10) / 10; });
+  ws['!rows'] = rowHeights.map(h=>({hpt:h}));
+  ws._allListTwoPageHeightBudget = {
+    paper:'B4横', pages:PAGE_COUNT, printablePerPagePt, totalTwoPagePt,
+    repeatedHeaderPt, fixedWorkbookPt, dataBudgetPt,
+    dataRowCount:dataRows.length,
+    minRowPt:dataRows.length ? Math.min(...allocated) : 0,
+    maxRowPt:dataRows.length ? Math.max(...allocated) : 0,
+    examWeight:0.9, eventWeight:0.7
+  };
 }
 
 function allListSheetQuotedName(name){
@@ -8398,7 +8453,8 @@ function allListApplyPrintColumns(ws, widths){
 }
 function allListAdjustPrintWidthsToB4LandscapeAspect(ws, widths){
   if(!ws || !Array.isArray(widths) || !widths.length) return widths;
-  const B4_LANDSCAPE_RATIO = 364 / 257; // B4横：横364mm / 縦257mm
+  // 表全体は縦2ページなので、横幅/総高さは B4横1枚ではなく「B4横を縦に2枚」の比率に合わせる。
+  const B4_LANDSCAPE_RATIO = 364 / (257 * 2);
   const rows = ws['!rows'] || [];
   const totalRowHpt = rows.reduce((sum, r) => sum + Number(r?.hpt || 12), 0);
   if(!totalRowHpt) return widths;
@@ -8571,6 +8627,13 @@ function styleAllStudentPrintSheet(ws, aoa){
     const oneLineIdentity = R > 0 && isAllListOneLineIdentityHeader(String((aoa._printSubHeader || aoa[1] || [])[C] || ''), C);
     if(oneLineIdentity && isData){
       cellFont = {name:printListFontName, sz:allListIdentityDisplayFontSize(text, C, true), bold:true, color:{rgb:'000000'}};
+    }
+    if(isData && cellFont){
+      // B4横2ページの高さ予算から配分された行高に連動して文字も大きくする。
+      // 面積感に近い平方根比例にして、行が高いほど読みやすくしつつ急激な拡大を防ぐ。
+      const rowHpt = Number(ws?.['!rows']?.[R]?.hpt || 34.8);
+      const rowFontScale = Math.max(0.82, Math.min(1.65, Math.sqrt(rowHpt / 34.8)));
+      cellFont = Object.assign({}, cellFont, {sz:Math.round(Number(cellFont.sz || 6.0) * rowFontScale * 10) / 10});
     }
     const style = {font:cellFont, alignment:{vertical:'center', horizontal:'center', wrapText:!oneLineIdentity, shrinkToFit:true}, border};
     const isGroupHeaderRow = R === 1 || (bottomHeaderStart >= 0 && R === bottomHeaderStart);
