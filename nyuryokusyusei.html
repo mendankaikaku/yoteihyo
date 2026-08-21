@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>面談予定入力アプリ（2026-08-21 17:41 出力）</title>
+<title>面談予定入力アプリ（2026-08-21 17:46 出力）</title>
 <!-- セキュリティ方針：CDN/外部通信なし。Excel読み書きライブラリは同じフォルダ配下の libs から読み込みます。 -->
 <script src="./libs/xlsx.bundle.js"></script>
 <script></script>
@@ -7507,7 +7507,7 @@ function buildMeetingPrepPrintHtml(resultRecords, weeklyHtml){
         if(mode!=='half'&&mode!=='rotated')return;
         var rowScale=2;
         var fontScale=mode==='half'?1.5:2;
-        var colScale=mode==='rotated'?1.3:1;
+        var colScale=mode==='rotated'?1.2:0.95;
         var tables=Array.from(wrap.querySelectorAll('table.goukakuPlanTable'));
         tables.forEach(function(table){
           var rows=Array.from(table.querySelectorAll('tr'));
